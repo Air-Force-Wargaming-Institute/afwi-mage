@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+langchain
+langchain-core
+langchain-community
+langchain-openai
+python-dotenv
+faiss-cpu
+langgraph
+pydantic
+pyyaml
+flask
+flask-cors

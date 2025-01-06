@@ -1,0 +1,49 @@
+# Web framework and related
+fastapi==0.104.1 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]==0.24.0 #consider using 0.32.0
+python-multipart==0.0.6 #consider using 0.0.12
+pydantic==1.10.13 #Langchain cannot use pydantic v1 anymore. We need to upgrade to v2. Pydantic 2.9.2 comes with 1.10.18, (from pydantic import v1 as pydantic_v1), so the code doesn't completely break 
+
+# PDF and document processing
+PyPDF4==1.27.0 #Seriously consider NOT using PyPDF4; it was last updated in 2018. Consider PyPDF 5.1.0
+python-docx==1.0.1 #Potentially consider 1.1.2, but difference seems minor
+pdfplumber==0.10.3 #Consider 0.11.3/4
+spacy==3.5.3 #Consider 3.8.2 it would allow for pydantic v2; 3.5.3 is from May 2023
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.5.0/en_core_web_sm-3.5.0-py3-none-any.whl
+
+# System and file operations
+psutil==5.9.6 #Seriously consider 6.0/1.0 for a critical Windows fix
+aiofiles==23.2.1
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Utilities
+tenacity==8.2.3 #Cosider 9.0.0? There is no changelog that I can find, but 8.2.3 is from August 2023 and is 6 versions behind
+pandas==2.1.3 #Consider 2.2.2 for a memory leak fix. Version depends on langchain/NLP stuff since we don't use pandas ourselves
+zipfile36==0.1.3 #Can we just use the built in zipfile module?
+python-dotenv==1.0.0
+requests==2.31.0
+typing-extensions==4.8.0 #Consider 4.12.2, but likely unnecessary
+
+# AI and OpenAI
+#openai==1.3.5 #I do not think we want to include openai since these come with langchain
+ollama==0.3.3 #Do we want to use ollama through langchain (langchain-ollama)?
+# LangChain and related
+langchain-openai==0.2.4
+langchain-community==0.3.3
+langchain-core==0.3.13
+langchain==0.3.4
+langgraph==0.2.39
+faiss-cpu==1.9.0 #https://github.com/kyamagu/faiss-wheels for GPU support
+
+# Path handling
+pathlib==1.0.1
+
+nltk==3.9.1
+
+# Development tools (consider moving these to a separate dev-requirements.txt)
+# pytest==7.4.3
+# black==23.11.0
+# flake8==6.1.0

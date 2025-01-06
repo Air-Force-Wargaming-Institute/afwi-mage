@@ -1,0 +1,16 @@
+# Web framework and related
+fastapi==0.111.1 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+pydantic==1.10.13
+
+# Database
+SQLAlchemy==2.0.27
+psycopg2-binary==2.9.9
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Environment variables
+python-dotenv==1.0.0

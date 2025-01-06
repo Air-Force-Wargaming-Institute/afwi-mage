@@ -1,0 +1,207 @@
+version: '3.8'
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  init-data:
+    image: busybox
+    volumes:
+      - ../data:/data
+    command: >
+      sh -c "mkdir -p /data/uploads && chmod -R 777 /data/uploads"
+
+  core:
+    build: ./core_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
+      - UPLOAD_SERVICE_URL=http://upload:8005
+      - EXTRACTION_SERVICE_URL=http://extraction:8002
+      - GENERATION_SERVICE_URL=http://generation:8003
+      - AGENT_SERVICE_URL=http://agent:8001
+      - REVIEW_SERVICE_URL=http://review:8004
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../data:/app/data:rw
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  chat:
+    build: ./chat_service
+    ports:
+      - "8009:8009"
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    volumes:
+      - ./chat_service:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  agent:
+    build: ./agent_service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./models:/app/models
+      - ./agent_service:/app
+      - ./agent_service/agents:/app/agents
+    environment:
+      - PYTHONPATH=/app
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  extraction:
+    build: ./extraction_service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../data:/app/data
+      - ./models:/app/models
+      - ./extraction_service:/app
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  generation:
+    build: ./generation_service
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../data:/app/data
+      - ./models:/app/models
+      - ./generation_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  review:
+    build: ./review_service
+    ports:
+      - "8004:8004"
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+      - ./review_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  upload:
+    build: ./upload_service
+    ports:
+      - "8005:8005"
+    volumes:
+      - ../data:/app/data
+      - ./models:/app/models
+      - ./upload_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  api_gateway:
+    image: traefik:v2.5
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_MULTIPLE_DATABASES: dbname,authdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+
+  embedding:
+    build: ./embedding_service
+    ports:
+      - "8006:8006"
+    volumes:
+      - ../data:/app/data
+      - ./models:/app/models
+      - ./embedding_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - API_KEY='None'
+      - BASE_URL='None'
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  auth:
+    build: ./auth_service
+    volumes:
+      - ./auth_service:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+      - SECRET_KEY=your-secret-key-here-change-in-production
+      - DISABLE_AUTH=false
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - PORT=8010
+      - HOST=0.0.0.0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8010:8010"
+    restart: always
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.so
+
+# React
+node_modules/
+/build
+npm-debug.log*
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+/data/uploads/*
+/data/datasets/*
+/data/outputs/*
+/data/logs/*
+/backend/models/fine_tuned_models/*
+/backend/models/base_models/*
+
+# Keep .gitkeep files
+!/**/.gitkeep
+
+# Include .gitkeep files
+!.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# But allow example environment files
+!.env.example
+
+# Ignore specific file types in all directories
+*.csv
+*.pdf
+*.docx
+*.txt
+*.gguf
+!requirements.txt
+!README.md
+
+# But don't ignore the directories themselves
+!data/
+!models/
+!data/**/
+!models/**/
+
+# Critical files that must be included
+!entrypoint.sh
+!init_db.py
+!init-multiple-databases.sh
+!setup_directories.sh
+!deploy_backend.sh
+!docker-compose.yml
+!Dockerfile
+!config.py
+!database.py
+!schemas.py
+!user.py
+!app.py
+!user_routes.py
+
+# Python module files
+!__init__.py
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore environment files
+venv/
+
+# Ignore logs
+*.log
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+
+# Ignore npm dependencies
+node_modules/
+
+# Ignore build outputs
+build/
+dist/
+
+# Ignore any local configuration files
+config.local.js
+
+__langchain+graph_documentation/
