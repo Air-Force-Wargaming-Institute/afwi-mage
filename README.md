@@ -1,4 +1,4 @@
-# AFWI MAGE FineTune
+# AFWI Multi-Agent Generative Engine
 
 ## Prerequisites
 
