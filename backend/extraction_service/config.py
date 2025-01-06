@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 
 # Base paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR.parent / "data"
+BASE_DIR = Path("/app")  # This is the mounted path in the Docker container
+DATA_DIR = Path("/app/data")  # Direct path to data directory
 MODELS_DIR = BASE_DIR / "models"
 
 # Specific paths
@@ -27,3 +27,7 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 # Service URLs
 CORE_SERVICE_URL = os.getenv("CORE_SERVICE_URL", "http://core:8000")
+
+# Add debug logging
+print(f"Upload directory path: {UPLOAD_DIR}")
+print(f"Files in upload directory: {list(UPLOAD_DIR.glob('*.pdf'))}")

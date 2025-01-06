@@ -8,9 +8,9 @@ import os
 from fastapi import APIRouter
 from config import API_KEY, BASE_URL, PERSIST_DIR, UPLOAD_DIR
 
-EMBEDDINGS = OpenAIEmbeddings(check_embedding_ctx_length=False, api_key=API_KEY, base_url=BASE_URL, model="nomic-ai/nomic-embed-text-v1.5-GGUF")
+EMBEDDINGS = OpenAIEmbeddings(check_embedding_ctx_length=False, api_key=API_KEY, base_url=BASE_URL, model="nomic-embed-text")
 FOLDER_PATH = "./pdfs"
-PERSIST_DIR = "./vectorstore"
+PERSIST_DIR = "../data/vectorstores"
 
 def load_documents(folder_path: str) -> List[Document]:
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100, add_start_index=True)

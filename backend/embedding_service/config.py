@@ -26,5 +26,5 @@ for dir_path in [DATASET_DIR, EXTRACTION_DIR, UPLOAD_DIR, OUTPUT_DIR, LOG_DIR, B
 # Other configuration settings
 CORE_SERVICE_URL = os.getenv("CORE_SERVICE_URL", "http://core:8000")
 API_KEY = os.getenv("API_KEY", "None")
-BASE_URL = os.getenv("BASE_URL", "http://localhost:1234/v1")
+BASE_URL = os.getenv("BASE_URL", "http://host.docker.internal:11434/v1")
 

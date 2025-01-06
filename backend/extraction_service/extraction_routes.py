@@ -17,6 +17,7 @@ from typing import List
 from pydantic import BaseModel
 from utils.file_utils import get_file_security_classification
 import itertools
+import json
 
 # Download necessary NLTK data
 nltk.download('punkt')
@@ -26,7 +27,123 @@ nltk.download('averaged_perceptron_tagger')
 logging.basicConfig(filename=LOG_DIR / 'extraction_service.log', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def extract_sentences(text):
+    """
+    Extract sentences using a simple but robust approach.
+    """
+    try:
+        # Clean the text first
+        text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        text = text.strip()
+        
+        # Try the NLTK sentence tokenizer first
+        try:
+            sentences = sent_tokenize(text)
+            if sentences:
+                return sentences
+        except Exception as e:
+            logger.warning(f"NLTK sent_tokenize failed: {str(e)}")
+        
+        # Fallback: Split on common sentence endings
+        potential_sentences = []
+        current = []
+        
+        # Split on common sentence endings while preserving abbreviations
+        words = text.split()
+        for i, word in enumerate(words):
+            current.append(word)
+            
+            # Check if this might be the end of a sentence
+            if (word.endswith('.') or word.endswith('!') or word.endswith('?')) and \
+               (i == len(words) - 1 or  # Last word
+                (i < len(words) - 1 and words[i + 1][0].isupper())):  # Next word starts with capital
+                
+                # Check for common abbreviations
+                if not any(word.lower().startswith(abbr) for abbr in ['mr.', 'mrs.', 'dr.', 'prof.', 'sr.', 'jr.', 'vs.', 'etc.', 'e.g.', 'i.e.']):
+                    potential_sentences.append(' '.join(current))
+                    current = []
+        
+        # Add any remaining text as a sentence
+        if current:
+            potential_sentences.append(' '.join(current))
+        
+        return potential_sentences if potential_sentences else [text]
+        
+    except Exception as e:
+        logger.error(f"Error in sentence extraction: {str(e)}")
+        # If all else fails, return the entire text as one sentence
+        return [text] if text.strip() else []
+
 router = APIRouter()
+
+@router.get("/files/")
+async def list_files(folder: str = ""):
+    try:
+        target_dir = UPLOAD_DIR / folder if folder else UPLOAD_DIR
+        logger.info(f"Checking directory: {target_dir}")
+        
+        if not target_dir.exists():
+            logger.error(f"Directory not found: {target_dir}")
+            raise HTTPException(status_code=404, detail=f"Directory not found: {target_dir}")
+            
+        files = []
+        logger.info(f"Scanning directory contents...")
+        
+        # First, build a map of metadata information
+        metadata_map = {}
+        for metadata_file in target_dir.glob('*.metadata'):
+            try:
+                with open(metadata_file, 'r') as f:
+                    metadata_json = json.loads(f.read().strip())
+                    base_filename = metadata_file.stem.replace('.metadata', '')
+                    # Extract just the security classification
+                    metadata_map[base_filename] = metadata_json.get('security_classification', 'UNCLASSIFIED')
+            except Exception as e:
+                logger.error(f"Error reading metadata file {metadata_file}: {str(e)}")
+                metadata_map[base_filename] = 'UNCLASSIFIED'
+        
+        for item in target_dir.iterdir():
+            # Skip hidden files and metadata files
+            if item.name.startswith('.') or item.name.endswith('.metadata'):
+                logger.info(f"Skipping file: {item.name}")
+                continue
+                
+            # Only include supported file types for extraction
+            if item.is_file() and item.suffix.lower() not in ['.pdf', '.docx', '.txt']:
+                logger.info(f"Skipping unsupported file: {item.name}")
+                continue
+                
+            logger.info(f"Adding file to list: {item.name}")
+            
+            # Get classification from metadata
+            base_filename = item.stem
+            classification = metadata_map.get(base_filename, "UNCLASSIFIED")
+            
+            file_info = {
+                "name": item.name,
+                "path": item.name,  # Just use filename since all files are in uploads directory
+                "type": "folder" if item.is_dir() else item.suffix[1:].lower(),
+                "size": item.stat().st_size if item.is_file() else None,
+                "classification": classification
+            }
+            
+            if item.is_file():
+                file_info["uploadDate"] = datetime.fromtimestamp(item.stat().st_mtime).isoformat()
+                
+            files.append(file_info)
+            
+        # Sort files by upload date (newest first)
+        files.sort(key=lambda x: x.get("uploadDate", ""), reverse=True)
+        
+        logger.info(f"Returning {len(files)} files")
+        logger.info(f"File list: {files}")
+        
+        return files
+        
+    except Exception as e:
+        logger.error(f"Error listing files: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
 
 class ExtractionRequest(BaseModel):
     filenames: List[str]
@@ -68,9 +185,6 @@ def extract_from_txt(file_path):
 def extract_paragraphs(text):
     return text.split('\n\n')
 
-def extract_sentences(text):
-    return sent_tokenize(text)
-
 def is_meaningful_text(text):
     words = word_tokenize(text)
     tagged = pos_tag(words)
@@ -89,24 +203,163 @@ def clean_text(text):
     cleaned_text = ' '.join(cleaned_text.split())
     return cleaned_text
 
+def create_csv_metadata(csv_filename: str, original_name: str, source_files: List[str], source_classifications: List[str]):
+    """Create metadata file for a CSV file."""
+    metadata = {
+        "filename": csv_filename,
+        "original_name": original_name,
+        "created_at": datetime.now().isoformat(),
+        "source_files": [
+            {
+                "filename": filename,
+                "security_classification": classification
+            }
+            for filename, classification in zip(source_files, source_classifications)
+        ]
+    }
+    
+    metadata_path = EXTRACTION_DIR / f"{csv_filename}.metadata"
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+def get_file_security_classification(filename):
+    """Get security classification from file's metadata."""
+    try:
+        # Handle potential folder paths in filename
+        filename = filename.replace('/', os.sep).replace('\\', os.sep)
+        
+        # Get the full path components
+        file_path = Path(filename)
+        file_stem = file_path.stem
+        folder_path = file_path.parent
+        
+        # Construct metadata path
+        if str(folder_path) != '.':
+            metadata_path = UPLOAD_DIR / folder_path / f"{file_stem}.metadata"
+        else:
+            metadata_path = UPLOAD_DIR / f"{file_stem}.metadata"
+            
+        logger.info(f"=== Security Classification Lookup ===")
+        logger.info(f"Input filename: {filename}")
+        logger.info(f"Upload directory: {UPLOAD_DIR}")
+        logger.info(f"File stem: {file_stem}")
+        logger.info(f"Folder path: {folder_path}")
+        logger.info(f"Looking for metadata at: {metadata_path}")
+        logger.info(f"Metadata exists: {metadata_path.exists()}")
+        
+        if metadata_path.exists():
+            logger.info(f"Found metadata file at: {metadata_path}")
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                try:
+                    metadata = json.load(f)
+                    logger.info(f"Metadata content: {json.dumps(metadata, indent=2)}")
+                    classification = metadata.get('security_classification')
+                    if classification:
+                        logger.info(f"Found classification: {classification}")
+                        return classification
+                    else:
+                        logger.warning("No security_classification field in metadata")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error decoding metadata JSON: {e}")
+                    logger.info(f"Raw metadata content: {f.read()}")
+                    raise
+        
+        # If we get here, either no metadata file or no classification found
+        logger.warning(f"No valid metadata found, using default classification")
+        logger.warning(f"Available metadata files: {list(UPLOAD_DIR.glob('**/*.metadata'))}")
+        return 'UNCLASSIFIED'
+    except Exception as e:
+        logger.error(f"Error reading metadata for {filename}: {str(e)}")
+        logger.exception("Full traceback:")
+        return 'UNCLASSIFIED'
+
+def extract_portion_marking(text):
+    """
+    Extract portion marking from the beginning of text if present.
+    Portion markings appear between parentheses at the start of paragraphs.
+    Normalizes and standardizes common classification markings.
+    """
+    try:
+        # Simple pattern to match any content within parentheses at the start of text
+        portion_marking_pattern = r'^\s*\(([^)]+)\)\s*'
+        
+        match = re.match(portion_marking_pattern, text)
+        if match:
+            # Extract the classification marking (everything inside the parentheses)
+            classification = match.group(1).strip()
+            
+            # First, convert everything to uppercase for consistent processing
+            classification = classification.upper()
+            
+            # 1. Basic classification level normalization with word boundaries
+            if re.match(r'^\s*U\s*$', classification):
+                classification = 'UNCLASSIFIED'
+            elif re.match(r'^\s*C\s*$', classification):
+                classification = 'CONFIDENTIAL'
+            elif re.match(r'^\s*S\s*$', classification):
+                classification = 'SECRET'
+            elif re.match(r'^\s*TS\s*$', classification):
+                classification = 'TOP SECRET'
+            
+            # 2. Standardize separators first (before other replacements)
+            classification = re.sub(r'\s*[/]+\s*', '//', classification)
+            
+            # 3. Replace full forms (with word boundaries)
+            classification = re.sub(r'\bFOR\s+OFFICIAL\s+USE\s+ONLY\b', 'FOUO', classification)
+            classification = re.sub(r'\bSENSITIVE\s+COMPARTMENTED\s+INFORMATION\b', 'SCI', classification)
+            
+            # 4. Normalize control markings (with word boundaries)
+            classification = re.sub(r'\bNF\b', 'NOFORN', classification)
+            classification = re.sub(r'\bREL\s+TO\b', 'REL TO', classification)
+            
+            # 5. Standardize special access program markings (with word boundaries)
+            classification = re.sub(r'\bSI(?:-[A-Z])?\b', 'SI', classification)
+            classification = re.sub(r'\bTK\b', 'TK', classification)
+            classification = re.sub(r'\bHCS(?:-[A-Z])?(?:-P)?\b', 'HCS', classification)
+            
+            # 6. Clean up any multiple separators that might have been created
+            classification = re.sub(r'[/]{2,}', '//', classification)
+            
+            # 7. Clean up whitespace
+            classification = re.sub(r'\s+', ' ', classification.strip())
+            
+            # Remove the portion marking from the text
+            clean_text = re.sub(portion_marking_pattern, '', text, 1).strip()
+            
+            logger.info(f"Extracted portion marking: {classification}")
+            return classification, clean_text
+            
+        return None, text
+    except Exception as e:
+        logger.error(f"Error extracting portion marking: {str(e)}")
+        return None, text
+
 @router.post("/extract/")
 async def extract_file_content(request_data: ExtractionRequest):
     results = []
     extracted_content = []
+    source_classifications = []  # Store classifications for metadata
 
     for filename in request_data.filenames:
         try:
-            file_path = UPLOAD_DIR / filename
+            # Handle potential folder paths in filename
+            file_path = UPLOAD_DIR / filename.replace('/', os.sep).replace('\\', os.sep)
+            logger.info(f"Processing file: {filename}")
+            logger.info(f"Full file path: {file_path}")
+            logger.info(f"File exists: {file_path.exists()}")
+            
             if not file_path.exists():
                 results.append({"filename": filename, "status": "File not found"})
                 continue
 
+            # Get the security classification for this file
+            file_security_classification = get_file_security_classification(filename)
+            source_classifications.append(file_security_classification)
+            logger.info(f"File security classification for {filename}: {file_security_classification}")
+
             # Extract content with layout information
             raw_content = extract_text_with_layout(str(file_path))
             logger.info(f"Raw content extracted from {filename}: {len(raw_content)} items")
-
-            # Get the security classification for this file
-            security_classification = get_file_security_classification(filename)
 
             # First pass: Extract paragraphs
             for content in raw_content:
@@ -114,10 +367,20 @@ async def extract_file_content(request_data: ExtractionRequest):
                 paragraphs = extract_paragraphs(cleaned_content)
                 for para in paragraphs:
                     if is_meaningful_text(para):
+                        # Extract portion marking if present
+                        content_classification, clean_para = extract_portion_marking(para)
+                        
+                        logger.info(f"Processing paragraph: {para[:100]}...")  # Log first 100 chars
+                        logger.info(f"File Classification: {file_security_classification}")
+                        
+                        # Use the portion marking if found, otherwise use file classification
+                        final_classification = content_classification if content_classification else file_security_classification
+                        
                         extracted_content.append({
-                            "answer": para,
+                            "answer": clean_para if content_classification else para,
                             "source": filename,
-                            "security_classification": security_classification,
+                            "file_security_classification": file_security_classification,
+                            "content_security_classification": final_classification,
                             "type": "paragraph"
                         })
 
@@ -127,35 +390,62 @@ async def extract_file_content(request_data: ExtractionRequest):
                 sentences = extract_sentences(cleaned_content)
                 for sentence in sentences:
                     if is_meaningful_text(sentence):
+                        # Extract portion marking if present
+                        content_classification, clean_sentence = extract_portion_marking(sentence)
+                        
+                        logger.info(f"Processing sentence: {sentence[:100]}...")  # Log first 100 chars
+                        logger.info(f"File Classification: {file_security_classification}")
+                        
+                        # Use the portion marking if found, otherwise use file classification
+                        final_classification = content_classification if content_classification else file_security_classification
+                        
                         extracted_content.append({
-                            "answer": sentence,
+                            "answer": clean_sentence if content_classification else sentence,
                             "source": filename,
-                            "security_classification": security_classification,
+                            "file_security_classification": file_security_classification,
+                            "content_security_classification": final_classification,
                             "type": "sentence"
                         })
 
             results.append({"filename": filename, "status": "Content extracted successfully"})
         except Exception as e:
             logger.error(f"Error extracting content from {filename}: {str(e)}")
+            logger.exception("Full traceback:")
             results.append({"filename": filename, "status": f"Error: {str(e)}"})
 
     logger.info(f"Total extracted items: {len(extracted_content)}")
+    logger.info(f"Sample of extracted content: {extracted_content[:2] if extracted_content else []}")
 
     # Create CSV file
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     csv_filename = f"{request_data.csv_filename}_{current_date}.csv"
     csv_path = EXTRACTION_DIR / csv_filename
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create metadata file
+    create_csv_metadata(
+        csv_filename=csv_filename,
+        original_name=csv_filename,  # Initially, original name is the same
+        source_files=request_data.filenames,
+        source_classifications=source_classifications
+    )
 
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(["question", "answer", "source", "security classification", "type"])
+        csv_writer.writerow([
+            "question", 
+            "answer", 
+            "source", 
+            "file security classification",
+            "content security classification",
+            "type"
+        ])
         for item in extracted_content:
             csv_writer.writerow([
                 "",  # question (empty for now)
                 item["answer"],
                 item["source"],
-                item["security_classification"],
+                item["file_security_classification"],
+                item["content_security_classification"],
                 item["type"]
             ])
 
@@ -175,12 +465,22 @@ async def get_csv_files():
         for f in os.listdir(EXTRACTION_DIR):
             if f.endswith('.csv'):
                 file_path = EXTRACTION_DIR / f
-                csv_files.append({
+                metadata_path = EXTRACTION_DIR / f"{f}.metadata"
+                
+                file_info = {
                     "name": f,
                     "created_at": datetime.fromtimestamp(file_path.stat().st_ctime).isoformat()
-                })
-        logger.info(f"CSV files found: {csv_files}")
-        logger.info(f"EXTRACTION_DIR: {EXTRACTION_DIR}")
+                }
+                
+                # Add metadata information if available
+                if metadata_path.exists():
+                    with open(metadata_path, 'r') as mf:
+                        metadata = json.load(mf)
+                        file_info["original_name"] = metadata.get("original_name")
+                        file_info["source_files"] = metadata.get("source_files")
+                
+                csv_files.append(file_info)
+                
         return JSONResponse(content=csv_files, status_code=200)
     except Exception as e:
         logger.error(f"Error fetching CSV files: {str(e)}")
@@ -220,8 +520,31 @@ async def rename_csv_file(request: dict = Body(...)):
         raise HTTPException(status_code=400, detail="New file name already exists")
     
     try:
+        # Rename CSV file
         old_path.rename(new_path)
-        return JSONResponse(content={"message": f"CSV file renamed from '{old_name}' to '{new_name}' successfully"}, status_code=200)
+        
+        # Update metadata file
+        old_metadata_path = EXTRACTION_DIR / f"{old_name}.metadata"
+        new_metadata_path = EXTRACTION_DIR / f"{new_name}.metadata"
+        
+        if old_metadata_path.exists():
+            with open(old_metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # Update filename in metadata
+            metadata["filename"] = new_name
+            
+            # Write updated metadata to new file
+            with open(new_metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            # Remove old metadata file
+            old_metadata_path.unlink()
+        
+        return JSONResponse(
+            content={"message": f"CSV file renamed from '{old_name}' to '{new_name}' successfully"},
+            status_code=200
+        )
     except Exception as e:
         logger.error(f"Error renaming CSV file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error renaming CSV file: {str(e)}")
@@ -229,13 +552,23 @@ async def rename_csv_file(request: dict = Body(...)):
 @router.delete("/delete-csv/{filename}")
 async def delete_csv_file(filename: str):
     file_path = EXTRACTION_DIR / filename
+    metadata_path = EXTRACTION_DIR / f"{filename}.metadata"
     
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="CSV file not found")
     
     try:
+        # Delete CSV file
         os.remove(file_path)
-        return JSONResponse(content={"message": f"CSV file '{filename}' deleted successfully"}, status_code=200)
+        
+        # Delete metadata file if it exists
+        if metadata_path.exists():
+            os.remove(metadata_path)
+            
+        return JSONResponse(
+            content={"message": f"CSV file '{filename}' and its metadata deleted successfully"},
+            status_code=200
+        )
     except Exception as e:
         logger.error(f"Error deleting CSV file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting CSV file: {str(e)}")
