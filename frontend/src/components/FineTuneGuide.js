@@ -8,9 +8,9 @@ import {
   Divider,
 } from '@material-ui/core';
 import { 
-  Description as FileIcon,
-  Code as GenerateIcon,
-  Settings as CogIcon,
+  CallSplit as ExtractIcon,
+  Settings as GenerateIcon,
+  Tune as TuneIcon,
   ChevronRight as ArrowIcon,
   PlayCircleFilled as TestIcon,
 } from '@material-ui/icons';
@@ -18,7 +18,7 @@ import {
 function FineTuneGuide() {
   const steps = [
     {
-      icon: <FileIcon fontSize="large" />,
+      icon: <span className="extract-icon"><ExtractIcon fontSize="large" /></span>,
       title: 'Extract',
       description: 'Automatically extract relevant content from your documents using AI.'
     },
@@ -28,7 +28,7 @@ function FineTuneGuide() {
       description: 'Use AI to generate a comprehensive training dataset based on extracted content.'
     },
     {
-      icon: <CogIcon fontSize="large" />,
+      icon: <TuneIcon fontSize="large" />,
       title: 'Fine-Tune',
       description: 'Prepare and initiate the fine-tuning process for your custom LLM.'
     },

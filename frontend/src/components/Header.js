@@ -9,10 +9,10 @@ import ExitToAppIcon from '@material-ui/icons/ExitToApp';
 import logo from '../assets/afwi_logo.png';
 import HomeIcon from '@material-ui/icons/Home';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
-import ExtractIcon from '@material-ui/icons/Description';
+import CallSplitIcon from '@material-ui/icons/CallSplit';
 import RateReviewIcon from '@material-ui/icons/RateReview';
 import TuneIcon from '@material-ui/icons/Tune';
-import AssessmentIcon from '@material-ui/icons/Assessment';
+import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import ArrowForwardIcon from '@material-ui/icons/ArrowForward';
 import { FaDatabase } from 'react-icons/fa';
 import GroupWorkIcon from '@material-ui/icons/GroupWork';
@@ -250,11 +250,15 @@ function Header() {
               </Link>
             </li>
             <li className="workflow-step">
-              <Link to="/fine-tuning/extract" className={isActive('/fine-tuning/extract')}><ExtractIcon /> Extract</Link>
+              <Link to="/fine-tuning/extract" className={isActive('/fine-tuning/extract')}>
+                <span className="extract-icon"><CallSplitIcon /></span> Extract
+              </Link>
               <ArrowForwardIcon className="arrow" />
             </li>
             <li className="workflow-step">
-              <Link to="/fine-tuning/generate" className={isActive('/fine-tuning/generate')}><FaDatabase style={{marginRight: '5px'}} /> Generate</Link>
+              <Link to="/fine-tuning/generate" className={isActive('/fine-tuning/generate')}>
+                <SettingsIcon /> Generate
+              </Link>
               <ArrowForwardIcon className="arrow" />
             </li>
             <li className="workflow-step">
@@ -262,7 +266,9 @@ function Header() {
               <ArrowForwardIcon className="arrow" />
             </li>
             <li className="workflow-step">
-              <Link to="/fine-tuning/test" className={isActive('/fine-tuning/test')}><AssessmentIcon /> Test</Link>
+              <Link to="/fine-tuning/test" className={isActive('/fine-tuning/test')}>
+                <PlayCircleFilledIcon /> Test
+              </Link>
             </li>
           </ul>
         </nav>
