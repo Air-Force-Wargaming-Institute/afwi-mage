@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Grid, Paper, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@material-ui/core';
+import { Container, Typography, Grid, Paper, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@material-ui/core';
 import axios from 'axios';
 import '../App.css';
-import CSVPreview from './CSVPreview'; // Import the CSVPreview component
+import CSVPreview from './CSVPreview';
 import { getApiUrl } from '../config';
 
 function GenerateDataset() {
@@ -74,117 +74,177 @@ function GenerateDataset() {
         datasetName: finalDatasetName
       });
       console.log(response.data);
-      // Refresh the list of training datasets
       fetchTrainingDatasets();
-      // You can add some user feedback here, like a success message
     } catch (error) {
       console.error('Error creating dataset:', error);
-      // You can add some error feedback for the user here
     }
   };
 
   return (
-    <div className="container">
-      <h2>Generate Dataset</h2>
-      <Grid container spacing={3} className="generate-dataset-grid">
-        <Grid item xs={12} md={4}>
-          <Paper className="generate-dataset-step">
-            <Typography variant="h6" component="h3">
-              Step 1: Select CSV File of Extracted Data
-            </Typography>
-            <Typography variant="body2" className="step-instruction">
-              Choose the CSV file containing the extracted data that you want the system to use for creating training data for an LLM.
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel id="csv-select-label">Select CSV File</InputLabel>
-              <Select
-                labelId="csv-select-label"
-                id="csv-select"
-                value={selectedCsv}
-                onChange={handleCsvSelect}
-              >
-                {csvFiles.map((file) => (
-                  <MenuItem key={file.name} value={file.name}>
-                    {file.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className="generate-dataset-step">
-            <Typography variant="h6" component="h3">
-              Step 2: Name Your Training Dataset
-            </Typography>
-            <Typography variant="body2" className="step-instruction">
-              Provide a name for your training dataset. This name will be used to identify your dataset in future steps.
-            </Typography>
-            <TextField
-              fullWidth
-              label="Dataset Name"
-              variant="outlined"
-              value={datasetName}
-              onChange={handleDatasetNameChange}
-            />
-            {finalDatasetName && (
-              <Typography variant="body2" className="dataset-name-preview">
-                File name preview: {finalDatasetName}
+    <Container 
+      maxWidth="xl" 
+      sx={{ 
+        height: 'calc(100vh - 200px)',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '16px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        '& .extract-section': {
+          padding: '16px',
+          height: '100%',
+          borderRadius: '8px',
+          backgroundColor: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          '& h3': {
+            margin: '0 0 16px 0',
+            color: '#1976d2',
+            fontSize: '1.2rem',
+            fontWeight: 500
+          }
+        }
+      }}
+    >
+      <h2 style={{ 
+        margin: '0 0 16px 0',
+        color: '#1976d2',
+        fontSize: '1.5rem',
+        fontWeight: 500,
+        flexShrink: 0
+      }}>Generate Training Dataset</h2>
+
+      <Grid container spacing={3} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <Grid item xs={12} md={4} sx={{ height: '100%', overflow: 'hidden' }}>
+          <Paper className="extract-section" elevation={3}>
+            <h3>Step 1: Select Source CSV File</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <Typography variant="body2" sx={{ color: '#666', marginBottom: '16px' }}>
+                Choose the CSV file containing extracted data to use for creating the training dataset.
               </Typography>
-            )}
+              <FormControl fullWidth variant="outlined" size="small">
+                <InputLabel>Select CSV File</InputLabel>
+                <Select
+                  value={selectedCsv}
+                  onChange={handleCsvSelect}
+                  label="Select CSV File"
+                >
+                  {csvFiles.map((file) => (
+                    <MenuItem key={file.name} value={file.name}>
+                      {file.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </div>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className="generate-dataset-step">
-            <Typography variant="h6" component="h3">
-              Step 3: Initiate Dataset Creation
-            </Typography>
-            <Typography variant="body2" className="step-instruction">
-              Once you've selected a CSV file and named your dataset, click the button below to create your training dataset. This process may take a while depending on the size of your data.
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={!selectedCsv || !datasetName}
-              onClick={handleCreateDataset}
-            >
-              Create Dataset
-            </Button>
+
+        <Grid item xs={12} md={4} sx={{ height: '100%' }}>
+          <Paper className="extract-section" elevation={3}>
+            <h3>Step 2: Name Your Dataset</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <Typography variant="body2" sx={{ color: '#666', marginBottom: '16px' }}>
+                Provide a name for your training dataset. The date will be automatically appended.
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                label="Dataset Name"
+                value={datasetName}
+                onChange={handleDatasetNameChange}
+              />
+              {finalDatasetName && (
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    marginTop: '8px',
+                    color: '#666',
+                    fontSize: '0.875rem',
+                    fontStyle: 'italic'
+                  }}
+                >
+                  Final name: {finalDatasetName}
+                </Typography>
+              )}
+            </div>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={4} sx={{ height: '100%' }}>
+          <Paper className="extract-section" elevation={3}>
+            <h3>Step 3: Create Dataset</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <Typography variant="body2" sx={{ color: '#666', marginBottom: '16px' }}>
+                Click the button below to create your training dataset from the selected CSV file.
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                disabled={!selectedCsv || !datasetName}
+                onClick={handleCreateDataset}
+                sx={{ marginTop: '16px' }}
+              >
+                Create Dataset
+              </Button>
+            </div>
           </Paper>
         </Grid>
       </Grid>
-      <Paper className="review-datasets-section">
-        <Typography variant="h6" component="h3">
-          Review Training Datasets
-        </Typography>
-        <Typography variant="body2" className="step-instruction">
-          Select a training dataset to review its contents.
-        </Typography>
-        <FormControl fullWidth>
-          <InputLabel id="training-dataset-select-label">Select Training Dataset</InputLabel>
-          <Select
-            labelId="training-dataset-select-label"
-            id="training-dataset-select"
-            value={selectedTrainingDataset}
-            onChange={handleTrainingDatasetSelect}
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {trainingDatasets.map((dataset) => (
-              <MenuItem key={dataset.name} value={dataset.name}>
-                {dataset.name}
+
+      <Paper 
+        elevation={3}
+        sx={{ 
+          marginTop: '24px',
+          padding: '20px',
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#ffffff',
+          '& h3': {
+            margin: '0 0 16px 0',
+            color: '#1976d2',
+            fontSize: '1.2rem',
+            fontWeight: 500
+          }
+        }}
+      >
+        <h3>Review Training Datasets</h3>
+        <div style={{ marginBottom: '20px' }}>
+          <Typography variant="body2" sx={{ color: '#666', marginBottom: '16px' }}>
+            Select a training dataset to review its contents.
+          </Typography>
+          <FormControl fullWidth variant="outlined" size="small">
+            <InputLabel>Select Training Dataset</InputLabel>
+            <Select
+              value={selectedTrainingDataset}
+              onChange={handleTrainingDatasetSelect}
+              label="Select Training Dataset"
+            >
+              <MenuItem value="">
+                <em>None</em>
               </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+              {trainingDatasets.map((dataset) => (
+                <MenuItem key={dataset.name} value={dataset.name}>
+                  {dataset.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
+
         {selectedFile && (
-          <div className="csv-preview-container">
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <CSVPreview filename={selectedFile} />
           </div>
         )}
       </Paper>
-    </div>
+    </Container>
   );
 }
 

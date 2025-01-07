@@ -18,61 +18,105 @@ from pydantic import BaseModel
 from utils.file_utils import get_file_security_classification
 import itertools
 import json
+from nltk.tokenize.punkt import PunktSentenceTokenizer
+from nltk.chunk import ne_chunk
+from nltk.corpus import names
 
 # Download necessary NLTK data
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
+nltk.download('maxent_ne_chunker')
+nltk.download('words')
 
 # Configure logging
 logging.basicConfig(filename=LOG_DIR / 'extraction_service.log', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def has_dependent_pronoun(sentence):
+    """Check if a sentence starts with a pronoun or contains dependent markers."""
+    words = word_tokenize(sentence.lower())
+    if not words:
+        return False
+        
+    # Common pronouns that might indicate dependency
+    pronouns = {'he', 'she', 'it', 'they', 'his', 'her', 'their', 'its', 'this', 'that', 'these', 'those'}
+    
+    # Words/phrases that might indicate a dependent clause
+    dependent_markers = {'however', 'therefore', 'thus', 'hence', 'consequently', 'as a result',
+                        'moreover', 'furthermore', 'in addition', 'additionally', 'also',
+                        'meanwhile', 'nevertheless', 'nonetheless', 'instead', 'conversely',
+                        'rather', 'although', 'though', 'otherwise', 'likewise', 'similarly',
+                        'accordingly', 'subsequently'}
+    
+    # Check first word for pronouns
+    if words[0] in pronouns:
+        return True
+        
+    # Check for dependent markers at start of sentence
+    first_phrase = ' '.join(words[:3]).lower()
+    if any(marker in first_phrase for marker in dependent_markers):
+        return True
+        
+    # Check for other indicators of dependency
+    tagged = pos_tag(words)
+    if tagged and tagged[0][1] in {'PRP', 'PRP$', 'DT'}:  # Personal pronouns, possessive pronouns, or determiners
+        return True
+        
+    return False
+
 def extract_sentences(text):
     """
-    Extract sentences using a simple but robust approach.
+    Extract sentences while preserving context for dependent clauses.
     """
     try:
         # Clean the text first
         text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
         text = text.strip()
         
-        # Try the NLTK sentence tokenizer first
-        try:
-            sentences = sent_tokenize(text)
-            if sentences:
-                return sentences
-        except Exception as e:
-            logger.warning(f"NLTK sent_tokenize failed: {str(e)}")
-        
-        # Fallback: Split on common sentence endings
-        potential_sentences = []
-        current = []
-        
-        # Split on common sentence endings while preserving abbreviations
-        words = text.split()
-        for i, word in enumerate(words):
-            current.append(word)
+        # Use NLTK's sentence tokenizer
+        sentences = sent_tokenize(text)
+        if not sentences:
+            return []
             
-            # Check if this might be the end of a sentence
-            if (word.endswith('.') or word.endswith('!') or word.endswith('?')) and \
-               (i == len(words) - 1 or  # Last word
-                (i < len(words) - 1 and words[i + 1][0].isupper())):  # Next word starts with capital
-                
-                # Check for common abbreviations
-                if not any(word.lower().startswith(abbr) for abbr in ['mr.', 'mrs.', 'dr.', 'prof.', 'sr.', 'jr.', 'vs.', 'etc.', 'e.g.', 'i.e.']):
-                    potential_sentences.append(' '.join(current))
-                    current = []
+        # Process sentences to combine dependent ones with their context
+        processed_sentences = []
+        i = 0
+        while i < len(sentences):
+            current_sentence = sentences[i].strip()
+            combined_sentence = current_sentence
+            
+            # Look ahead for dependent sentences
+            while i + 1 < len(sentences) and has_dependent_pronoun(sentences[i + 1]):
+                # Combine with next sentence
+                combined_sentence += " " + sentences[i + 1].strip()
+                i += 1
+            
+            if combined_sentence:
+                processed_sentences.append(combined_sentence)
+            i += 1
         
-        # Add any remaining text as a sentence
-        if current:
-            potential_sentences.append(' '.join(current))
-        
-        return potential_sentences if potential_sentences else [text]
+        return processed_sentences
         
     except Exception as e:
         logger.error(f"Error in sentence extraction: {str(e)}")
-        # If all else fails, return the entire text as one sentence
         return [text] if text.strip() else []
+
+def extract_sentences_with_context(paragraph):
+    """
+    Extract sentences from a paragraph while maintaining the portion marking context.
+    Returns a tuple of (portion_marking, list_of_sentences)
+    """
+    try:
+        # First, extract any portion marking from the paragraph
+        portion_marking, clean_paragraph = extract_portion_marking(paragraph)
+        
+        # Now extract sentences from the cleaned paragraph
+        sentences = extract_sentences(clean_paragraph)
+        
+        return portion_marking, sentences
+    except Exception as e:
+        logger.error(f"Error in sentence extraction with context: {str(e)}")
+        return None, [paragraph] if paragraph.strip() else []
 
 router = APIRouter()
 
@@ -186,15 +230,36 @@ def extract_paragraphs(text):
     return text.split('\n\n')
 
 def is_meaningful_text(text):
+    """
+    Enhanced check for meaningful text that considers context and completeness.
+    """
     words = word_tokenize(text)
     tagged = pos_tag(words)
+    
+    # Check for minimum requirements
     has_noun = any(tag.startswith('NN') for _, tag in tagged)
     has_verb = any(tag.startswith('VB') for _, tag in tagged)
     is_long_enough = len(words) > 5
+    
+    # Calculate text quality metrics
     text_chars = sum(1 for c in text if c.isalpha())
     total_chars = len(text)
     text_ratio = text_chars / total_chars if total_chars > 0 else 0
-    return has_noun and has_verb and is_long_enough and text_ratio > 0.7
+    
+    # Check sentence structure
+    has_subject_predicate = False
+    for i, (word, tag) in enumerate(tagged):
+        if tag.startswith('NN'):  # Found a noun
+            # Look for a verb after the noun
+            for _, vtag in tagged[i+1:]:
+                if vtag.startswith('VB'):
+                    has_subject_predicate = True
+                    break
+            if has_subject_predicate:
+                break
+    
+    return (has_noun and has_verb and is_long_enough and 
+            text_ratio > 0.7 and has_subject_predicate)
 
 def clean_text(text):
     # Remove headers, footers, and page numbers
@@ -384,28 +449,32 @@ async def extract_file_content(request_data: ExtractionRequest):
                             "type": "paragraph"
                         })
 
-            # Second pass: Extract sentences
+            # Second pass: Extract sentences while maintaining portion marking context
             for content in raw_content:
                 cleaned_content = clean_text(content)
-                sentences = extract_sentences(cleaned_content)
-                for sentence in sentences:
-                    if is_meaningful_text(sentence):
-                        # Extract portion marking if present
-                        content_classification, clean_sentence = extract_portion_marking(sentence)
+                paragraphs = extract_paragraphs(cleaned_content)
+                
+                for para in paragraphs:
+                    if is_meaningful_text(para):
+                        # Get the paragraph's portion marking and its sentences
+                        para_classification, sentences = extract_sentences_with_context(para)
                         
-                        logger.info(f"Processing sentence: {sentence[:100]}...")  # Log first 100 chars
-                        logger.info(f"File Classification: {file_security_classification}")
+                        # Use paragraph classification or fall back to file classification
+                        para_final_classification = para_classification if para_classification else file_security_classification
                         
-                        # Use the portion marking if found, otherwise use file classification
-                        final_classification = content_classification if content_classification else file_security_classification
-                        
-                        extracted_content.append({
-                            "answer": clean_sentence if content_classification else sentence,
-                            "source": filename,
-                            "file_security_classification": file_security_classification,
-                            "content_security_classification": final_classification,
-                            "type": "sentence"
-                        })
+                        # Process each sentence with the paragraph's classification context
+                        for sentence in sentences:
+                            if is_meaningful_text(sentence):
+                                logger.info(f"Processing sentence: {sentence[:100]}...")
+                                logger.info(f"Using paragraph classification: {para_final_classification}")
+                                
+                                extracted_content.append({
+                                    "answer": sentence,
+                                    "source": filename,
+                                    "file_security_classification": file_security_classification,
+                                    "content_security_classification": para_final_classification,
+                                    "type": "sentence"
+                                })
 
             results.append({"filename": filename, "status": "Content extracted successfully"})
         except Exception as e:
@@ -424,7 +493,7 @@ async def extract_file_content(request_data: ExtractionRequest):
     # Create metadata file
     create_csv_metadata(
         csv_filename=csv_filename,
-        original_name=csv_filename,  # Initially, original name is the same
+        original_name=csv_filename,
         source_files=request_data.filenames,
         source_classifications=source_classifications
     )
@@ -572,3 +641,49 @@ async def delete_csv_file(filename: str):
     except Exception as e:
         logger.error(f"Error deleting CSV file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting CSV file: {str(e)}")
+
+@router.post("/update-csv/{filename}")
+async def update_csv_file(filename: str, data: dict = Body(...)):
+    try:
+        csv_path = EXTRACTION_DIR / filename
+        if not csv_path.exists():
+            raise HTTPException(status_code=404, detail=f"CSV file '{filename}' not found")
+
+        logger.info(f"Updating CSV file: {filename}")
+        logger.info(f"Received data: {json.dumps(data, indent=2)}")
+
+        # First, verify we can read the existing file
+        with open(csv_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            original_fieldnames = reader.fieldnames
+            logger.info(f"Original CSV fieldnames: {original_fieldnames}")
+
+        # Now write the updated data
+        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=original_fieldnames)
+            writer.writeheader()
+            
+            if data.get('data'):
+                logger.info(f"Writing {len(data['data'])} rows to CSV")
+                for row in data['data']:
+                    # Map the row data to match the CSV field names exactly
+                    csv_row = {}
+                    for field in original_fieldnames:
+                        csv_row[field] = row.get(field, '')
+                    
+                    logger.info(f"Writing row: {csv_row}")
+                    writer.writerow(csv_row)
+
+        # Verify the file was written correctly
+        with open(csv_path, 'r', newline='', encoding='utf-8') as csvfile:
+            content = csvfile.read()
+            logger.info(f"CSV file content after write:\n{content}")
+
+        return JSONResponse(
+            content={"message": f"CSV file '{filename}' updated successfully"},
+            status_code=200
+        )
+    except Exception as e:
+        logger.error(f"Error updating CSV file {filename}: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=f"Error updating CSV file: {str(e)}")

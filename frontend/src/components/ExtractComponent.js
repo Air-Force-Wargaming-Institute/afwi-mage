@@ -10,6 +10,37 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import InfoIcon from '@mui/icons-material/Info';
 import { DataGrid } from '@mui/x-data-grid';
+import { keyframes } from '@emotion/react';
+import { styled } from '@mui/material/styles';
+
+// Add the pulsing animation keyframes
+const pulseAnimation = keyframes`
+  0% {
+    background-color: #1976d2;
+  }
+  50% {
+    background-color: #2196f3;
+  }
+  100% {
+    background-color: #1976d2;
+  }
+`;
+
+// Create a styled button component with the animation
+const PulsingButton = styled(Button)(({ theme, isextracting }) => ({
+  ...(isextracting === 'true' && {
+    animation: `${pulseAnimation} 2s infinite ease-in-out`,
+    color: '#ffffff !important',
+    '& .MuiCircularProgress-root': {
+      color: '#ffffff !important',
+    },
+    '&:hover': {
+      animation: 'none',
+      backgroundColor: theme.palette.primary.dark,
+      color: '#ffffff',
+    },
+  }),
+}));
 
 function ExtractComponent() {
   const [files, setFiles] = useState([]);
@@ -599,11 +630,12 @@ function ExtractComponent() {
                 margin="normal"
                 helperText="Enter a name for the output CSV file"
               />
-              <Button 
+              <PulsingButton 
                 onClick={handleExtract}
                 disabled={isExtracting || selectedFiles.length === 0 || !csvFilename.trim()}
                 variant="contained"
                 color="primary"
+                isextracting={isExtracting.toString()}
                 style={{ marginTop: '20px', marginBottom: '30px' }}
               >
                 {isExtracting ? 'Extracting...' : 'Start Extraction'}
@@ -613,7 +645,7 @@ function ExtractComponent() {
                     style={{ marginLeft: '10px', color: 'white' }} 
                   />
                 )}
-              </Button>
+              </PulsingButton>
             </div>
 
             {/* CSV Files section with flex: 1 and overflow */}
@@ -754,7 +786,15 @@ function ExtractComponent() {
           <Button onClick={() => setDeleteConfirmOpen(false)} color="primary">
             Cancel
           </Button>
-          <Button onClick={confirmDelete} color="secondary">
+          <Button 
+            onClick={confirmDelete} 
+            sx={{ 
+              color: '#d32f2f',
+              '&:hover': {
+                backgroundColor: 'rgba(211, 47, 47, 0.04)'
+              }
+            }}
+          >
             Delete
           </Button>
         </DialogActions>
@@ -799,6 +839,44 @@ function ExtractComponent() {
             >
               See Details
             </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={async () => {
+                try {
+                  console.log('Saving changes to CSV file:', selectedCsvFile);
+                  console.log('Preview data to save:', previewData);
+                  
+                  // Ensure all rows have the correct field names
+                  const formattedData = previewData.map(row => ({
+                    question: row.question || '',
+                    answer: row.answer || '',
+                    source: row.source || '',
+                    'file security classification': row['file security classification'] || '',
+                    'content security classification': row['content security classification'] || '',
+                    type: row.type || ''
+                  }));
+
+                  console.log('Formatted data:', formattedData);
+
+                  await axios.post(getApiUrl('EXTRACTION', `/api/extraction/update-csv/${selectedCsvFile}`), {
+                    data: formattedData
+                  });
+                  
+                  setMessage('CSV file updated successfully');
+                  
+                  // Refresh the preview data
+                  const response = await axios.get(getApiUrl('EXTRACTION', `/api/extraction/csv-preview/${selectedCsvFile}`));
+                  setPreviewData(response.data);
+                } catch (error) {
+                  console.error('Error saving changes:', error);
+                  setError(`Error updating CSV file: ${error.message}`);
+                }
+              }}
+            >
+              Save Changes
+            </Button>
           </div>
         </DialogTitle>
         <DialogContent dividers>
@@ -813,6 +891,7 @@ function ExtractComponent() {
                   field: 'question', 
                   headerName: 'Question', 
                   flex: 1,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
@@ -823,6 +902,7 @@ function ExtractComponent() {
                   field: 'answer', 
                   headerName: 'Answer', 
                   flex: 2,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
@@ -833,47 +913,79 @@ function ExtractComponent() {
                   field: 'source', 
                   headerName: 'Source', 
                   flex: 1,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
                     </div>
                   )
                 },
-                { 
-                  field: 'file security classification', 
-                  headerName: 'File Security Classification', 
+                {
+                  field: 'file security classification',
+                  headerName: 'File Security Classification',
                   flex: 1,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
                     </div>
                   )
                 },
-                { 
-                  field: 'content security classification', 
-                  headerName: 'Content Security Classification', 
+                {
+                  field: 'content security classification',
+                  headerName: 'Content Security Classification',
                   flex: 1,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
                     </div>
                   )
                 },
-                { 
-                  field: 'type', 
-                  headerName: 'Type', 
-                  flex: 1,
+                {
+                  field: 'type',
+                  headerName: 'Type',
+                  flex: 0.5,
+                  editable: true,
                   renderCell: (params) => (
                     <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', lineHeight: '1.5' }}>
                       {params.value}
                     </div>
+                  )
+                },
+                {
+                  field: 'actions',
+                  headerName: 'Actions',
+                  flex: 0.5,
+                  sortable: false,
+                  renderCell: (params) => (
+                    <IconButton
+                      onClick={() => {
+                        const newData = previewData.filter((_, index) => index !== params.row.id);
+                        setPreviewData(newData);
+                      }}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   )
                 }
               ]}
-              pageSize={10}
               rowsPerPageOptions={[10, 25, 50]}
               disableSelectionOnClick
               getRowHeight={() => 'auto'}
+              onCellEditCommit={(params) => {
+                const updatedData = previewData.map((row, index) => {
+                  if (index === params.id) {
+                    // Create a new object with the updated field
+                    const updatedRow = { ...row };
+                    updatedRow[params.field] = params.value;
+                    return updatedRow;
+                  }
+                  return row;
+                });
+                setPreviewData(updatedData);
+              }}
               sx={{
                 '& .MuiDataGrid-cell': {
                   padding: '12px 8px',
