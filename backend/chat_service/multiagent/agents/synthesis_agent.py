@@ -1,6 +1,9 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import json
+import os
+from datetime import datetime
 
 from utils.shared_state import shared_state
 from multiagent.graphState import GraphState
@@ -36,7 +39,29 @@ def synthesis_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
         "question": question,
         "analyses": analyses_text
     })
-
+    
     shared_state.CONVERSATION += f"\t---Synthesized Analysis {shared_state.ITERATION}: {synthesized_report},\n\n"
+    
+    # Create a conversation log directory if it doesn't exist
+    log_dir = "conversation_logs"
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Create a timestamp for the filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = os.path.join(log_dir, f"conversation_{timestamp}.json")
+    
+    # Create the conversation data structure
+    conversation_data = {
+        "timestamp": timestamp,
+        "iteration": shared_state.ITERATION,
+        "question": question,
+        "analyses": analyses_text,
+        "synthesized_report": synthesized_report,
+        "full_conversation": shared_state.CONVERSATION
+    }
+    
+    # Write to JSON file
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(conversation_data, f, indent=4, ensure_ascii=False)
     
     return {"keys": {**state_dict, "synthesized_report": synthesized_report, "last_actor": whoami}}
