@@ -34,7 +34,8 @@ def regional_dynamics_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
         if collaborator:
             collab_report_list = []
             for c in config["EXPERT_AGENTS"]:
-                collab_report_list.append(state_dict.get(c+"_collab_report", ""))
+                crs = state_dict.get('collab_reports')
+                collab_report_list.append(crs.get(c+"_collab_report", ""))
             collab_report = "\n\t".join(f"- {expert}: {report}" for expert, report in zip(config["EXPERT_AGENTS"], collab_report_list))
 
             prompt = PromptTemplate(
@@ -79,7 +80,13 @@ def regional_dynamics_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
 
         shared_state.CONVERSATION += f"\t---{whoami} Analysis {shared_state.ITERATION}: {analysis},\n\n"
 
-        return {"keys": {**state_dict, whoami+"_analysis": analysis, "last_actor": whoami, "selected_experts": selected_experts, "collaborator": None, "domestic_stability_collab_report": "", "global_influence_collab_report": "", "prc_economic_collab_report": "", "prc_government_collab_report": "", "prc_military_collab_report": "", "regional_dynamics_collab_report": "", "technology_innovation_collab_report": ""}}
+        # Clear out the collab reports for subsequent agents in the question chain
+        expert_collab_reports = {}
+        for expert in config["EXPERT_AGENTS"]:
+            ecr = expert+"_collab_report"
+            expert_collab_reports[ecr] = ""
+
+        return {"keys": {**state_dict, whoami+"_analysis": analysis, "last_actor": whoami, "selected_experts": selected_experts, "collaborator": None, "collab_reports": expert_collab_reports}}
     
     else:
         print("\n\n\t---------------------------\n\n\t---REGIONAL DYNAMICS EXPERT---\n\n\t---------------------------\n\n\t")
