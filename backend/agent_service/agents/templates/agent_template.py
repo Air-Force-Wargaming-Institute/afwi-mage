@@ -20,7 +20,7 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
     moderator_guidance = state_dict["moderator_guidance"]
 
     if reflected:
-        print("\\n\n\t---------------------------\n\n\t---{{AGENT_NAME}} AFTER REFLECTION---\n\n\t---------------------------\n\n\t")
+        print("\\n\n\t---------------------------\n\n\t---{{AGENT_NAME}} AFTER REFLECTION & COLLABORATION---\n\n\t---------------------------\n\n\t")
 
         old_analysis = state_dict[whoami+"_analysis"]
         critique = state_dict[whoami+"_reflection"]
@@ -35,7 +35,7 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
 
             prompt = PromptTemplate(
                 input_variables=["old_analysis", "critique", "question", "document_summary", "relevant_docs", "collab_report"],
-                template="You are the {{AGENT_NAME}} in a multi-agent system. You just wrote the following report:\n{old_analysis}\n\nHere is the feedback to your report:\n{critique}\n\nYou also collaborated with others, and they provided this augmentation to your report:\n{collab_report}\n\nPlease consider the expert feedback and collaboration and revise your report to answer this question:\n{question}\n\nDo not simply rewrite your previous report. Instead, incorporate the feedback and revise your report to answer the question. {{AGENT_INSTRUCTIONS}}\n\nDocument Summary: {document_summary}\n\nRelevant Documents: {relevant_docs}\n\nAnalysis:"
+                template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_DESCRIPTION}}. You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n You also collaborated with other subject matter experts, and they provided the following feedback and suggestions to improve your report from their expert perspective: \n{collab_report}\n\n It is time to write your final report. While your focus is to speak to your own expertise, please remember to consider and incorporate the feedback and collaborative inputs of the perspectives from the other experts. Be sure not to simply rewrite your previous report. As appropriate, briefly site where you incorporated the inputs from the other experts. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{{AGENT_NAME}} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report."
             )
 
             chain = prompt | llm | StrOutputParser()
@@ -50,7 +50,7 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
         else:
             prompt = PromptTemplate(
                 input_variables=["old_analysis", "critique", "question", "document_summary", "relevant_docs"],
-                template="You are the {{AGENT_NAME}} in a multi-agent system. You just wrote the following report:\n{old_analysis}\n\nHere is the feedback to your report:\n{critique}\n\nPlease consider the expert feedback and revise your report to answer this question:\n{question}\n\nDo not simply rewrite your previous report. Instead, incorporate the feedback and revise your report to answer the question. {{AGENT_INSTRUCTIONS}}\n\nDocument Summary: {document_summary}\n\nRelevant Documents: {relevant_docs}\n\nAnalysis:"
+                template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_DESCRIPTION}}. You have been working to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n It is time to write your final report. Your focus should be to speak from your own expertise. Be sure not to simply rewrite your previous report. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{{AGENT_NAME}} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report."
             )   
         
             chain = prompt | llm | StrOutputParser()
@@ -88,7 +88,7 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
     
         prompt = PromptTemplate(
             input_variables=["question", "document_summary", "relevant_docs", "moderator_guidance"],
-            template="{{AGENT_DESCRIPTION}}Provide specific examples from the documents of domestic factors and their effects.\n\nModerator Guidance: {moderator_guidance}\n\nQuestion: {question}\n\nDocument Summary: {document_summary}\n\nRelevant Documents: {relevant_docs}\n\nAnalysis:"
+            template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_DESCRIPTION}}. The panel has been asked this question/query: {question}\n\n A moderator for your panel has provided the following guidance to panel members:{moderator_guidance}\n\n To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n From your perspective, provide specific examples from the documents that help to address the question/query."
         )
     
         chain = prompt | llm | StrOutputParser()
@@ -102,12 +102,13 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
 
         print("\n\t------\n\t---INITIAL REFLECTION---\n\t------\n")
         reflection_prompt = PromptTemplate(
-            input_variables=["analysis", "documents_text"],
-            template="You are a professional analyst who specializes in reviewing and critiquing reports on PRC domestic stability, specifically the PRC's internal social, demographic, and political factors. You are tasked to provide a critical analysis on a report about the PRC's domestic stability and provide feedback and identify potential mischaracterizations in the analysis along with calling out information that is not true or that you suspect may be innaccurate. After explaining your findings of the initial report, create a succinct list of instructions for the expert to incorporate as corrections or clarifications in the expert's new draft of their report. The report is as follows: {analysis}.\n\nSupport your points with relevant facts and examples found in the this document summary: {documents_text}.\n\nCritique:"
+            input_variables=["question", "analysis", "documents_text"],
+            template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_DESCRIPTION}}. You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had written the following report: \n{analysis}.\n\n It is time to write a critique of your first draft report. Write your critique, focusing on three main areas for improvement. 1.) CLARIFICATION: Potential clarification of mischaracterizations in the first draft. 2.) INNACCURACIES: Information that is not true or that you suspect may be innaccurate. 3.) FINAL REPORT CONSIDERATIONS: Create a succinct list of specific instructions for corrections or clarifications to incorporate in subsequent drafts of the report. Where appropriate, support your critique with relevant facts and examples found from these relevant documents: \n{documents_text}.\n\n At the start of your critique, please provide a short title that includes '{{AGENT_NAME}} INITIAL SELF-CRITIQUE on:' and then restate the question/query but paraphrased from your perspective."
         )
 
         chain = reflection_prompt | llm | StrOutputParser()
         reflection = chain.invoke({
+            "question": question,
             "analysis": analysis,
             "documents_text": documents_text,
         })
@@ -126,8 +127,8 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
             shared_state.MORE_COLLAB = True
 
             prompt = PromptTemplate(
-                input_variables=["analysis", "reflection", "collab_experts"],
-                template="You are the {{AGENT_NAME}} in a multi agent system. You just wrote this report:\n{analysis}\n\nYou also identified ways to improve the report here:\n{reflection}\n\nThe following experts have been selected to collaborate with you to improve the report by adding to, or rewriting parts of the report using their expert domain knowledge: {collab_experts}. For each expert, using your original analysis and guidance on how to improve it, please identify a few specific areas that expert should focus on while collaborating with you.\n\nCollaboration areas:"
+                input_variables=["question", "analysis", "reflection", "collab_experts"],
+                template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_DESCRIPTION}}. Your panel has been asked this question/query: \n{question}\n\n You just wrote this report as a first draft attempt to address the question/query: \n{analysis}\n\n You also provided reflected on your report and provided this self-critique on how to improve it:\n{reflection}\n\n The following experts have been selected to collaborate with you to improve the report by adding to, or rewriting parts of the report using their expert domain knowledge: {collab_experts}. For each expert, using your original analysis and guidance on how to improve it, please identify a few specific areas that expert should focus on while collaborating with you.\n\nCollaboration areas:"
             )
             #template="You are the Domestic Stability Expert in a multi agent system. You just wrote this report:\n{analysis}\n\nYou also identified ways to improve the report here:\n{reflection}\n\nThe {collaborator} expert has been selected to collaborate with you to improve the report by adding to, or rewriting parts of the report using their expert domain knowledge. Using your original analysis and guidance on how to improve it, please identify a few specific areas the expert should focus on in their collaboration with you.\n\nCollaboration areas:"
 
@@ -136,6 +137,7 @@ def {{AGENT_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
 
             chain = prompt | llm | StrOutputParser()
             collab_areas = chain.invoke({
+                "question": question,
                 "analysis": analysis,
                 "reflection": reflection,
                 "collab_experts": collab_experts_str

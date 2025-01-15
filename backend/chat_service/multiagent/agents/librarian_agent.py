@@ -28,8 +28,8 @@ def librarian_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
     # Do we actually want the librarian to summerize the documents? Would it be better to have the experts get unedited information?
     # This increases token usage, so trade off consideration
     prompt = PromptTemplate(
-        input_variables=["relevant_docs", "agent_request"],
-        template="You are the Librarian in a multi-agent system analyzing PRC behavior. Your role is to: 1. Search the vector store for the most relevant documents related to each request. 2. Summarize the key points from these documents clearly and concisely. 3. Provide factual, unembellished information without personal interpretation. 4. If information is not available or is unclear, state this explicitly. When available, always include sources or references but do not make up sources or references if none are clear and available.\n\nAgent Request: {agent_request}\n\nRelevant Documents: {relevant_docs}\n\nSearch Query:"
+        input_variables=["relevant_docs", "agent_request", "requester"],
+        template="You are the Librarian that retrieves information from documents to support the analysis and report writing of a panel of experts. Your role is to:\n1. Search for the most relevant documents related to each request you receive.\n2. Summarize the key points from these documents clearly and concisely.\n3. Provide factual information without embellishment or personal interpretation.\n4. If information is not available or is unclear, state this explicitly.\n5. When available, always include sources or references. Do not make up sources or references if none are clear and available.\n\n Here is the request you received from the {requester} expert: {agent_request}\n\nRelevant Documents: {relevant_docs}\n\nSearch Query:"
     )
     
     chain = prompt | llm | StrOutputParser()
@@ -39,6 +39,7 @@ def librarian_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
     summary = chain.invoke({
         "relevant_docs": documents_text,
         "agent_request": agent_request,
+        "requester": requester
     })
 
     print("\n\n\t---------------------------\n\n\t\n\n\t---------------------------\n\n\tLibrarian Summary\n\n\t---------------------------\n\n\t")
