@@ -207,7 +207,7 @@ def {{AGENT_FILE_NAME}}_requester(state: GraphState) -> GraphState:
 
             return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request, whoami+"_reflected": True}}
     else:
-        request = f"I need documents with information on the internal social and political factors in the PRC that are related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
+        request = f"I am the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {{AGENT_INSTRUCTIONS}}. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
     
         return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request}}
 
