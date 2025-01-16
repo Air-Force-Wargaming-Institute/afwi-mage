@@ -214,6 +214,49 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString(undefined, options);
 };
 
+const sanitizeInput = (input) => {
+  // Remove any HTML tags and limit special characters
+  return input.replace(/<[^>]*>/gm, '')
+              .replace(/'/gm, "\\'")     // Escape single quotes
+              .replace(/"/gm, '\\"')     // Escape double quotes
+              .replace(/[^\w\s.,!?()\-'"\\]/gm, ''); // Remove special chars except quotes and backslashes
+};
+
+const validateInput = (input, field) => {
+  const sanitized = sanitizeInput(input);
+  
+  switch (field) {
+    case 'name':
+      // Name should be 3-50 characters, alphanumeric with spaces
+      if (sanitized.length < 3 || sanitized.length > 50) {
+        return { isValid: false, message: 'Name must be between 3 and 50 characters' };
+      }
+      break;
+    case 'description':
+      // Description should be 10-140 characters
+      if (sanitized.length < 10 || sanitized.length > 140) {
+        return { isValid: false, message: 'Description must be between 10 and 140 characters' };
+      }
+      break;
+    case 'instructions':
+      // Instructions should be at least 10 characters
+      if (sanitized.length < 10) {
+        return { isValid: false, message: 'Instructions must be at least 10 characters' };
+      }
+      break;
+  }
+  return { isValid: true, sanitized };
+};
+
+const unescapeString = (str) => {
+  if (!str) return '';
+  return str
+    .replace(/\\n/g, '\n')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, '\\');
+};
+
 function AgentPortfolio() {
   const classes = useStyles();
   const [open, setOpen] = useState(false);
@@ -241,6 +284,8 @@ function AgentPortfolio() {
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [infoDialogContent, setInfoDialogContent] = useState({ title: '', content: '' });
   const [descriptionError, setDescriptionError] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
 
   useEffect(() => {
     fetchAgents();
@@ -265,20 +310,61 @@ function AgentPortfolio() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    if (name === 'description' && value.length > 140) {
-      setDescriptionError(true);
-    } else {
-      setDescriptionError(false);
-    }
     setNewAgent(prevState => ({
       ...prevState,
       [name]: value
     }));
   };
 
+  const validateForm = (data) => {
+    const errors = {};
+    
+    // Validate name
+    if (!data.name || data.name.length < 3 || data.name.length > 50) {
+      errors.name = 'Name must be between 3 and 50 characters';
+    }
+    
+    // Validate description
+    if (!data.description || data.description.length < 10 || data.description.length > 140) {
+      errors.description = 'Description must be between 10 and 140 characters';
+    }
+    
+    // Validate instructions
+    if (!data.agent_instructions || data.agent_instructions.length < 10) {
+      errors.agent_instructions = 'Instructions must be at least 10 characters';
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = async () => {
+    // Clear previous errors
+    setFormErrors({});
+    
+    // Validate form
+    const errors = validateForm(newAgent);
+    
+    // If there are errors, show them and stop submission
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setSnackbar({
+        open: true,
+        message: 'Please fix the errors before submitting',
+        severity: 'error'
+      });
+      return;
+    }
+
+    // Proceed with submission if no errors
     try {
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), newAgent);
+      const sanitizedAgent = {
+        ...newAgent,
+        name: sanitizeInput(newAgent.name),
+        description: sanitizeInput(newAgent.description),
+        agent_instructions: sanitizeInput(newAgent.agent_instructions)
+      };
+
+      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), sanitizedAgent);
       setAgents([...agents, response.data]);
       setOpen(false);
       setSnackbar({
@@ -305,7 +391,11 @@ function AgentPortfolio() {
   };
 
   const handleViewDetails = (agent) => {
-    setSelectedAgent({...agent});
+    setSelectedAgent({
+      ...agent,
+      description: unescapeString(agent.description),
+      agent_instructions: unescapeString(agent.agent_instructions)
+    });
     setDetailsOpen(true);
     setIsEditing(false);
   };
@@ -322,11 +412,6 @@ function AgentPortfolio() {
 
   const handleAgentChange = (event) => {
     const { name, value } = event.target;
-    if (name === 'description' && value.length > 140) {
-      setDescriptionError(true);
-    } else {
-      setDescriptionError(false);
-    }
     setSelectedAgent(prevState => ({
       ...prevState,
       [name]: value
@@ -341,14 +426,39 @@ function AgentPortfolio() {
   };
 
   const handleSaveChanges = async () => {
+    // Clear previous errors
+    setEditFormErrors({});
+    
+    // Validate form
+    const errors = validateForm(selectedAgent);
+    
+    // If there are errors, show them and stop submission
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      setSnackbar({
+        open: true,
+        message: 'Please fix the errors before saving',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.file_name}`), selectedAgent);
+      const sanitizedAgent = {
+        ...selectedAgent,
+        name: sanitizeInput(selectedAgent.name),
+        description: sanitizeInput(selectedAgent.description),
+        agent_instructions: sanitizeInput(selectedAgent.agent_instructions)
+      };
+
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.file_name}`), sanitizedAgent);
       setSnackbar({
         open: true,
         message: 'Agent updated successfully!',
         severity: 'success'
       });
-      fetchAgents(); // Refresh the list of agents
+      fetchAgents();
+      handleCloseDetails();
     } catch (error) {
       console.error('Error updating agent:', error);
       setSnackbar({
@@ -389,7 +499,9 @@ function AgentPortfolio() {
     const duplicatedAgent = {
       ...agent,
       name: `Copy of ${agent.name}`,
-      color: agent.color // Preserve the original color
+      description: unescapeString(agent.description),
+      agent_instructions: unescapeString(agent.agent_instructions),
+      color: agent.color
     };
     setDuplicatedAgent(duplicatedAgent);
     setDuplicateDialogOpen(true);
@@ -595,6 +707,9 @@ function AgentPortfolio() {
               fullWidth
               value={newAgent.name}
               onChange={handleChange}
+              required
+              error={!!formErrors.name}
+              helperText={formErrors.name}
             />
             {renderTooltip(
               "Agent Name",
@@ -612,8 +727,9 @@ function AgentPortfolio() {
               rows={3}
               value={newAgent.description}
               onChange={handleChange}
-              error={descriptionError}
-              helperText={descriptionError ? "Description must be 140 characters or less" : ""}
+              required
+              error={!!formErrors.description}
+              helperText={formErrors.description}
             />
             <Typography className={classes.characterCount}>
               {newAgent.description.length}/140 characters
@@ -630,7 +746,10 @@ function AgentPortfolio() {
               rows={8}
               value={newAgent.agent_instructions}
               onChange={handleChange}
+              required
               className={classes.largeTextField}
+              error={!!formErrors.agent_instructions}
+              helperText={formErrors.agent_instructions}
             />
             {renderTooltip(
               "Agent Instructions",
@@ -645,6 +764,7 @@ function AgentPortfolio() {
                 name="llm_model"
                 value={newAgent.llm_model}
                 onChange={handleChange}
+                required
               >
                 <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
                 <MenuItem value="gpt-4">GPT-4</MenuItem>

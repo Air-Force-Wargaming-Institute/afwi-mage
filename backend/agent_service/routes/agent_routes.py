@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 import os
 import json
 from datetime import datetime
@@ -19,6 +19,36 @@ class AgentCreate(BaseModel):
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
     color: str = "#4fc3f7"
 
+    @validator('name')
+    def validate_name(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError('Name must be between 3 and 50 characters')
+        return v
+
+    @validator('description')
+    def validate_description(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 10 or len(v) > 140:
+            raise ValueError('Description must be between 10 and 140 characters')
+        return v
+
+    @validator('agent_instructions')
+    def validate_instructions(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 10:
+            raise ValueError('Instructions must be at least 10 characters')
+        return v
+
 class TeamCreate(BaseModel):
     name: str
     description: str
@@ -27,6 +57,36 @@ class TeamCreate(BaseModel):
     team_instructions: str = ""
     memory_type: str = "ConversationBufferMemory"
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
+
+    @validator('name')
+    def validate_name(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError('Name must be between 3 and 50 characters')
+        return v
+
+    @validator('description')
+    def validate_description(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 10 or len(v) > 140:
+            raise ValueError('Description must be between 10 and 140 characters')
+        return v
+
+    @validator('team_instructions')
+    def validate_instructions(cls, v):
+        # Remove HTML tags and special characters
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        
+        if len(v) < 10:
+            raise ValueError('Instructions must be at least 10 characters')
+        return v
 
 def format_agent_name(name):
     return re.sub(r'\s+', '_', name)
@@ -56,8 +116,8 @@ async def create_agent(agent_data: AgentCreate):
         # Replace placeholders in the template
         agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
         agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", formatted_name)
-        agent_code = agent_code.replace("{{AGENT_DESCRIPTION}}", description)
-        agent_code = agent_code.replace("{{AGENT_INSTRUCTIONS}}", instructions)
+        agent_code = agent_code.replace("""{{AGENT_DESCRIPTION}}""", description)
+        agent_code = agent_code.replace("""{{AGENT_INSTRUCTIONS}}""", instructions)
         agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
         agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
         agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
@@ -126,9 +186,9 @@ async def list_agents():
                     content = f.read()
                     try:
                         # Use regex patterns that handle multi-line strings and escaped characters
-                        name_pattern = r'AGENT_NAME\s*=\s*"([^"]*)"'
-                        desc_pattern = r'AGENT_DESCRIPTION\s*=\s*"""([^"]*)"""'
-                        instr_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""([^"]*)"""'
+                        name_pattern = r'AGENT_NAME\s*=\s*"((?:[^"\\]|\\.)*)"'
+                        desc_pattern = r'AGENT_DESCRIPTION\s*=\s*"""((?:[^\\]|\\.)*?)"""'
+                        instr_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
                         model_pattern = r'LLM_MODEL\s*=\s*"([^"]*)"'
                         memory_pattern = r'MEMORY_TYPE\s*=\s*"([^"]*)"'
                         memory_kwargs_pattern = r'MEMORY_KWARGS\s*=\s*(\{[^}]*\})'
@@ -200,10 +260,19 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}.py"
         new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}.py"
 
+        # Open the old agent file and grab the created date
+        with open(old_agent_path, 'r') as f:
+            content = f.read()
+            created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
+            created_date = re.search(created_pattern, content, re.DOTALL).group(1)
+    
         if not os.path.exists(old_agent_path):
             raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
 
         # Load the agent template
+        # TODO: Issue is likely that we don't want the agent template to "re-run"
+        # If we do use that approach though, we need to save the instructions and description differently
+        # We also need to grab the created date before use the template again
         with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
             template = f.read()
         
@@ -223,6 +292,9 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
         agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
         
+        # Set the created date
+        agent_code = agent_code.replace("{{CREATED_AT}}", created_date)
+
         # Update modification date
         current_time = datetime.now().isoformat()
         agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
