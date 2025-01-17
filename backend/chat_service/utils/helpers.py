@@ -127,7 +127,7 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
     collab_template = PromptTemplate(
             input_variables=["reflection", "analysis", "expert_agents"],
-            template="Given a report and a reflection on that report, please identify a single expert or multiple experts from the following list that could best help improve the report: {expert_agents}. Return the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\nExpert:"
+            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}. Return the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\nExpert:"
     )
 
     prompt = collab_template.format(

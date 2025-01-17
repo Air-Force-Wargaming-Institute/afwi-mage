@@ -83,7 +83,7 @@ def {{AGENT_FILE_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
         return {"keys": {**state_dict, whoami+"_analysis": analysis, "last_actor": whoami, "selected_experts": selected_experts, "collaborator": None, "collab_reports": expert_collab_reports}}
         
     
-    else:
+    else: #Initial report
         banner = "\n\n\t---------------------------\n\n\t---{{AGENT_NAME}}---\n\n\t---------------------------\n\n\t"
         print(banner.upper())
     
@@ -118,6 +118,8 @@ def {{AGENT_FILE_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
         expert_agents = config["EXPERT_AGENTS"]
         expert_agents.remove(whoami)
         expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
+        print("\tINFO: {{AGENT_NAME}} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
+        #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
         collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
         print("\n\n\n")
         print(collaborators)
@@ -201,13 +203,19 @@ def {{AGENT_FILE_NAME}}_requester(state: GraphState) -> GraphState:
 
             request = f"Here is a report from {last_actor}:\n{last_actor_analysis}\n\nPlease consider the following areas that need work when retrieving documents:\n{collab_areas}\n\nProvide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
 
+            print(request)
+
             return {"keys": {**state_dict, last_actor+"_request": request, last_actor+"_reflected": True}}
         else:
             request = f"Here is the feedback from the {{AGENT_NAME}} expert in regards to the analysis generated from the document summery: {agent_reflection}.\n\nPlease consider the expert feedback and retrieve documents that are most related to the question: {question}.\nProvide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
 
+            print(request)
+
             return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request, whoami+"_reflected": True}}
     else:
         request = f"I am the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {{AGENT_INSTRUCTIONS}}. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
+
+        print(request)
     
         return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request}}
 

@@ -19,7 +19,7 @@ def librarian_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
     state_dict = state["keys"]
     requester = state_dict["last_actor"]
     agent_request = state_dict[requester+"_request"]
-    print(agent_request.strip())
+    #print(agent_request.strip())
     retriever = shared_state.RETRIEVER
     
     # Begin by retrieving documents relevant to the agent request
@@ -35,6 +35,7 @@ def librarian_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
     chain = prompt | llm | StrOutputParser()
     
     documents_text = "\n\n".join([doc.page_content for doc in relevant_docs[:TOP_N_DOCUMENTS]])
+    print("\tINFO: Relevant documents:\n\n"+documents_text)
 
     summary = chain.invoke({
         "relevant_docs": documents_text,
