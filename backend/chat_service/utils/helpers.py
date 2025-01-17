@@ -151,5 +151,5 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     collaborators = response.content
     collaborators = collaborators.strip("[\"\']")
     collaborators_list = collaborators.split(", ")
-    print("\t\t*/*/*/*/*/*/*/*/*/"+response.content+"\*\*\*\*\*\*\*\*\*\*\*")
+    collaborators_list = [item.strip("[\"\']") for item in collaborators_list]
     return collaborators_list
