@@ -1,12 +1,20 @@
 #!/bin/bash
 
-# Wait for database to be ready
-echo "Waiting for database..."
-while ! python -c "import psycopg2; psycopg2.connect(host='db', database='authdb', user='postgres', password='password')" 2>/dev/null; do
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL..."
+while ! pg_isready -h db -p 5432 -U postgres; do
     sleep 1
 done
 
-echo "Database is ready!"
+echo "PostgreSQL is ready!"
+
+# Create database if it doesn't exist
+echo "Creating database if it doesn't exist..."
+PGPASSWORD=password psql -h db -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'authdb'" | grep -q 1 || \
+    PGPASSWORD=password psql -h db -U postgres -c "CREATE DATABASE authdb"
+
+# Wait a moment for the database to be ready
+sleep 2
 
 # Create database tables
 echo "Creating database tables..."
