@@ -8,10 +8,10 @@ from config import load_config
 from utils.shared_state import shared_state
 from utils.helpers import determine_collaboration
 
-def {{AGENT_FILE_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
+def {{AGENT_FILE_NAME}}_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
     state_dict = state["keys"]
     question = state_dict["question"]
-    whoami = "{{AGENT_NAME}}"
+    whoami = "{{AGENT_FILE_NAME}}"
     config = load_config()
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
@@ -152,7 +152,7 @@ def {{AGENT_FILE_NAME}}(state: GraphState, llm: ChatOpenAI) -> GraphState:
 def {{AGENT_FILE_NAME}}_collaborator(state: GraphState, llm: ChatOpenAI) -> GraphState:
     banner = "\n\n\t---------------------------\n\n\t---{{AGENT_NAME}} COLLABORATOR---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
-    whoami = "{{AGENT_NAME}}"
+    whoami = "{{AGENT_FILE_NAME}}"
     state_dict = state["keys"]
     question = state_dict["question"]
     last_actor = state_dict["last_actor"]
@@ -190,7 +190,7 @@ def {{AGENT_FILE_NAME}}_collaborator(state: GraphState, llm: ChatOpenAI) -> Grap
 def {{AGENT_FILE_NAME}}_requester(state: GraphState) -> GraphState:
     banner = "\n\n\t---------------------------\n\n\t---{{AGENT_NAME}} REQUESTER---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
-    whoami = "{{AGENT_NAME}}"
+    whoami = "{{AGENT_FILE_NAME}}"
     state_dict = state["keys"]
     question = state_dict["question"]
     last_actor = state_dict["last_actor"]

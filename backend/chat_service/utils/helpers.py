@@ -33,8 +33,9 @@ def identify_experts(state: GraphState) -> GraphState:
                         "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
                         "Expert on the PRC's relationships with neighboring countries and regional powers.",
                         "Expert on the PRC's efforts to expand its global influence.",
-                        "Expert on the PRC's recent advancements in key technologies.",
-                        "Expert on internal social, demographic, and political factors in the PRC."
+                        "Expert on internal social, demographic, and political factors in the PRC.",
+                        "Expert on the PRC's recent advancements in key technologies."
+                        
     ]
 
     llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
@@ -56,10 +57,13 @@ def identify_experts(state: GraphState) -> GraphState:
         """
     )
 
+    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_nodes, expert_descriptions))
+    print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
+
     # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
     prompt = prompt_template.format(
         question=user_question,
-        experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_nodes, expert_descriptions))
+        experts_with_descriptions = experts_with_descriptions
     )
 
     response = llm.invoke([HumanMessage(content=prompt)])

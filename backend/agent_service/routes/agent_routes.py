@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import os
 import json
 from datetime import datetime
@@ -19,32 +19,29 @@ class AgentCreate(BaseModel):
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
     color: str = "#4fc3f7"
 
-    @validator('name')
-    def validate_name(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 3 or len(v) > 50:
             raise ValueError('Name must be between 3 and 50 characters')
         return v
 
-    @validator('description')
-    def validate_description(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 10 or len(v) > 140:
             raise ValueError('Description must be between 10 and 140 characters')
         return v
 
-    @validator('agent_instructions')
-    def validate_instructions(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('agent_instructions')
+    @classmethod
+    def validate_instructions(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 10:
             raise ValueError('Instructions must be at least 10 characters')
         return v
@@ -58,32 +55,29 @@ class TeamCreate(BaseModel):
     memory_type: str = "ConversationBufferMemory"
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
 
-    @validator('name')
-    def validate_name(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 3 or len(v) > 50:
             raise ValueError('Name must be between 3 and 50 characters')
         return v
 
-    @validator('description')
-    def validate_description(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 10 or len(v) > 140:
             raise ValueError('Description must be between 10 and 140 characters')
         return v
 
-    @validator('team_instructions')
-    def validate_instructions(cls, v):
-        # Remove HTML tags and special characters
+    @field_validator('team_instructions')
+    @classmethod
+    def validate_instructions(cls, v: str) -> str:
         v = re.sub(r'<[^>]*>', '', v)
         v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        
         if len(v) < 10:
             raise ValueError('Instructions must be at least 10 characters')
         return v
@@ -129,7 +123,7 @@ async def create_agent(agent_data: AgentCreate):
         agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
         
         # Save the new agent file using the formatted name
-        with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}.py", "w") as f:
+        with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}_expert.py", "w") as f:
             f.write(agent_code)
         
         return {"message": f"Agent {agent_data.name} created successfully", "file_name": formatted_name}
@@ -257,8 +251,17 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         new_formatted_name = format_agent_name(agent_data.name)
         old_formatted_name = format_agent_name(agent_name)
         
-        old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}.py"
-        new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}.py"
+        # Remove _expert suffix if it exists in the old name before adding it again
+        old_formatted_name = old_formatted_name.replace('_expert', '')
+        new_formatted_name = new_formatted_name.replace('_expert', '')
+        
+        old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}_expert.py"
+        print("OLD AGENT PATH: ", old_agent_path)
+        new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}_expert.py"
+        print("NEW AGENT PATH: ", new_agent_path)
+
+        if not os.path.exists(old_agent_path):
+            raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
 
         # Open the old agent file and grab the created date
         with open(old_agent_path, 'r') as f:
@@ -266,13 +269,7 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
             created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
             created_date = re.search(created_pattern, content, re.DOTALL).group(1)
     
-        if not os.path.exists(old_agent_path):
-            raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
-
         # Load the agent template
-        # TODO: Issue is likely that we don't want the agent template to "re-run"
-        # If we do use that approach though, we need to save the instructions and description differently
-        # We also need to grab the created date before use the template again
         with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
             template = f.read()
         
