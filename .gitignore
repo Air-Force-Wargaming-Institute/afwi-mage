@@ -33,6 +33,7 @@ Thumbs.db
 /data/logs/*
 /backend/models/fine_tuned_models/*
 /backend/models/base_models/*
+/backend/extraction_service/nltk_data/*
 
 # Keep .gitkeep files
 !/**/.gitkeep
