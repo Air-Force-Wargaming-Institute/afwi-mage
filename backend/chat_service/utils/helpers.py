@@ -33,8 +33,9 @@ def identify_experts(state: GraphState) -> GraphState:
                         "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
                         "Expert on the PRC's relationships with neighboring countries and regional powers.",
                         "Expert on the PRC's efforts to expand its global influence.",
-                        "Expert on the PRC's recent advancements in key technologies.",
-                        "Expert on internal social, demographic, and political factors in the PRC."
+                        "Expert on internal social, demographic, and political factors in the PRC.",
+                        "Expert on the PRC's recent advancements in key technologies."
+                        
     ]
 
     llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
@@ -56,10 +57,13 @@ def identify_experts(state: GraphState) -> GraphState:
         """
     )
 
+    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_nodes, expert_descriptions))
+    print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
+
     # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
     prompt = prompt_template.format(
         question=user_question,
-        experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_nodes, expert_descriptions))
+        experts_with_descriptions = experts_with_descriptions
     )
 
     response = llm.invoke([HumanMessage(content=prompt)])
@@ -127,7 +131,7 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
     collab_template = PromptTemplate(
             input_variables=["reflection", "analysis", "expert_agents"],
-            template="Given a report and a reflection on that report, please identify a single expert or multiple experts from the following list that could best help improve the report: {expert_agents}. Return the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\nExpert:"
+            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}. Return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n Again, return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic])"
     )
 
     prompt = collab_template.format(
@@ -140,12 +144,9 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
 
     print("\t\t*/*/*/*/*/*/*/*/*/"+response.content+"\*\*\*\*\*\*\*\*\*\*\*")
 
-    # if response.content not in EXPERT_LIST:
-    #     collaborator = "None"
-    # else:
-    #     collaborator = response.content
     collaborators = response.content
     collaborators = collaborators.strip("[\"\']")
     collaborators_list = collaborators.split(", ")
-    print("\t\t*/*/*/*/*/*/*/*/*/"+response.content+"\*\*\*\*\*\*\*\*\*\*\*")
+    collaborators_list = [item.strip("[\"\']") for item in collaborators_list]
+    collaborators_list = [x for x in collaborators_list if x in EXPERT_LIST]
     return collaborators_list

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import os
 import json
 from datetime import datetime
@@ -19,6 +19,33 @@ class AgentCreate(BaseModel):
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
     color: str = "#4fc3f7"
 
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError('Name must be between 3 and 50 characters')
+        return v
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 10 or len(v) > 140:
+            raise ValueError('Description must be between 10 and 140 characters')
+        return v
+
+    @field_validator('agent_instructions')
+    @classmethod
+    def validate_instructions(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 10:
+            raise ValueError('Instructions must be at least 10 characters')
+        return v
+
 class TeamCreate(BaseModel):
     name: str
     description: str
@@ -27,6 +54,33 @@ class TeamCreate(BaseModel):
     team_instructions: str = ""
     memory_type: str = "ConversationBufferMemory"
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError('Name must be between 3 and 50 characters')
+        return v
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 10 or len(v) > 140:
+            raise ValueError('Description must be between 10 and 140 characters')
+        return v
+
+    @field_validator('team_instructions')
+    @classmethod
+    def validate_instructions(cls, v: str) -> str:
+        v = re.sub(r'<[^>]*>', '', v)
+        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+        if len(v) < 10:
+            raise ValueError('Instructions must be at least 10 characters')
+        return v
 
 def format_agent_name(name):
     return re.sub(r'\s+', '_', name)
@@ -47,12 +101,18 @@ async def create_agent(agent_data: AgentCreate):
         with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
             template = f.read()
         
+        description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
+        instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
+         # Create the escaped strings
+        description = description.replace('\n', '\\n')
+        instructions = instructions.replace('\n', '\\n')
+
         # Replace placeholders in the template
         agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
         agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", formatted_name)
-        agent_code = agent_code.replace("{{AGENT_DESCRIPTION}}", agent_data.description)
+        agent_code = agent_code.replace("""{{AGENT_DESCRIPTION}}""", description)
+        agent_code = agent_code.replace("""{{AGENT_INSTRUCTIONS}}""", instructions)
         agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
-        agent_code = agent_code.replace("{{AGENT_INSTRUCTIONS}}", agent_data.agent_instructions)
         agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
         agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
         agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
@@ -63,7 +123,7 @@ async def create_agent(agent_data: AgentCreate):
         agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
         
         # Save the new agent file using the formatted name
-        with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}.py", "w") as f:
+        with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}_expert.py", "w") as f:
             f.write(agent_code)
         
         return {"message": f"Agent {agent_data.name} created successfully", "file_name": formatted_name}
@@ -119,17 +179,28 @@ async def list_agents():
                 with open(agent_path, 'r') as f:
                     content = f.read()
                     try:
+                        # Use regex patterns that handle multi-line strings and escaped characters
+                        name_pattern = r'AGENT_NAME\s*=\s*"((?:[^"\\]|\\.)*)"'
+                        desc_pattern = r'AGENT_DESCRIPTION\s*=\s*"""((?:[^\\]|\\.)*?)"""'
+                        instr_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
+                        model_pattern = r'LLM_MODEL\s*=\s*"([^"]*)"'
+                        memory_pattern = r'MEMORY_TYPE\s*=\s*"([^"]*)"'
+                        memory_kwargs_pattern = r'MEMORY_KWARGS\s*=\s*(\{[^}]*\})'
+                        color_pattern = r'COLOR\s*=\s*"([^"]*)"'
+                        created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
+                        modified_pattern = r'MODIFIED_AT\s*=\s*"([^"]*)"'
+
                         agent_details = {
-                            "name": content.split('AGENT_NAME = "')[1].split('"')[0],
+                            "name": re.search(name_pattern, content, re.DOTALL).group(1),
                             "file_name": agent_file_name,
-                            "description": content.split('AGENT_DESCRIPTION = """')[1].split('"""')[0],
-                            "llm_model": content.split('LLM_MODEL = "')[1].split('"')[0],
-                            "agent_instructions": content.split('AGENT_INSTRUCTIONS = """')[1].split('"""')[0],
-                            "memory_type": content.split('MEMORY_TYPE = "')[1].split('"')[0],
-                            "memory_kwargs": json.loads(content.split('MEMORY_KWARGS = ')[1].split('\n')[0]),
-                            "color": content.split('COLOR = "')[1].split('"')[0],
-                            "createdAt": content.split('CREATED_AT = "')[1].split('"')[0],
-                            "modifiedAt": content.split('MODIFIED_AT = "')[1].split('"')[0]
+                            "description": re.search(desc_pattern, content, re.DOTALL).group(1),
+                            "llm_model": re.search(model_pattern, content, re.DOTALL).group(1),
+                            "agent_instructions": re.search(instr_pattern, content, re.DOTALL).group(1),
+                            "memory_type": re.search(memory_pattern, content, re.DOTALL).group(1),
+                            "memory_kwargs": json.loads(re.search(memory_kwargs_pattern, content, re.DOTALL).group(1)),
+                            "color": re.search(color_pattern, content, re.DOTALL).group(1),
+                            "createdAt": re.search(created_pattern, content, re.DOTALL).group(1),
+                            "modifiedAt": re.search(modified_pattern, content, re.DOTALL).group(1)
                         }
                         agents.append(agent_details)
                         logger.info(f"Successfully processed agent: {agent_details['name']}")
@@ -180,26 +251,47 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         new_formatted_name = format_agent_name(agent_data.name)
         old_formatted_name = format_agent_name(agent_name)
         
-        old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}.py"
-        new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}.py"
+        # Remove _expert suffix if it exists in the old name before adding it again
+        old_formatted_name = old_formatted_name.replace('_expert', '')
+        new_formatted_name = new_formatted_name.replace('_expert', '')
+        
+        old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}_expert.py"
+        print("OLD AGENT PATH: ", old_agent_path)
+        new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}_expert.py"
+        print("NEW AGENT PATH: ", new_agent_path)
 
         if not os.path.exists(old_agent_path):
             raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
 
+        # Open the old agent file and grab the created date
+        with open(old_agent_path, 'r') as f:
+            content = f.read()
+            created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
+            created_date = re.search(created_pattern, content, re.DOTALL).group(1)
+    
         # Load the agent template
         with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
             template = f.read()
         
+        description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
+        instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
+         # Create the escaped strings
+        description = description.replace('\n', '\\n')
+        instructions = instructions.replace('\n', '\\n')
+
         # Replace placeholders in the template
         agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
         agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", new_formatted_name)
-        agent_code = agent_code.replace("{{AGENT_DESCRIPTION}}", agent_data.description)
+        agent_code = agent_code.replace("{{AGENT_DESCRIPTION}}", description)
+        agent_code = agent_code.replace("{{AGENT_INSTRUCTIONS}}", instructions)
         agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
-        agent_code = agent_code.replace("{{AGENT_INSTRUCTIONS}}", agent_data.agent_instructions)
         agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
         agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
         agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
         
+        # Set the created date
+        agent_code = agent_code.replace("{{CREATED_AT}}", created_date)
+
         # Update modification date
         current_time = datetime.now().isoformat()
         agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
