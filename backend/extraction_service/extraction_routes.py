@@ -22,11 +22,8 @@ from nltk.tokenize.punkt import PunktSentenceTokenizer
 from nltk.chunk import ne_chunk
 from nltk.corpus import names
 
-# Download necessary NLTK data
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('maxent_ne_chunker')
-nltk.download('words')
+#added the path the data was moved to because we couldn't get the docker image to move the data.
+nltk.data.path.append('/app/nltk_data')
 
 # Configure logging
 logging.basicConfig(filename=LOG_DIR / 'extraction_service.log', level=logging.INFO)
