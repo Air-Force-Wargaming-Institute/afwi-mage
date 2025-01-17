@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field, validator
 import os
 import zipfile
 from io import BytesIO
+import subprocess
+import uuid
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -20,13 +22,15 @@ router = APIRouter()
 
 # Constants - Use absolute path for container
 UPLOAD_DIR = Path("/app/data/uploads")
+TEMP_DIR = Path("/app/data/temp_conversions")
 ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.txt', '.md', '.json'}
 
 logger.info(f"Upload directory set to: {UPLOAD_DIR}")
 logger.info(f"Current working directory: {os.getcwd()}")
 
-# Ensure upload directory exists
+# Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # Log directory permissions
 try:
@@ -192,6 +196,58 @@ async def create_zip_with_progress(operation_id: str, document_ids: List[str], i
         progress.completed = True
         progress.status = "Completed" if not progress.errors else "Completed with errors"
 
+async def convert_docx_to_pdf(docx_path: Path) -> Optional[Path]:
+    """
+    Convert a DOCX file to PDF using LibreOffice.
+    Returns the path to the converted PDF file, or None if conversion fails.
+    """
+    try:
+        logger.info(f"Starting conversion of {docx_path}")
+        
+        # LibreOffice will create the PDF with the same name as the input file
+        expected_pdf_name = docx_path.stem + '.pdf'
+        temp_pdf_path = TEMP_DIR / expected_pdf_name
+        final_pdf_path = docx_path.with_suffix('.pdf')
+        
+        # Construct the conversion command
+        cmd = [
+            "soffice",
+            "--headless",
+            "--convert-to", "pdf",
+            "--outdir", str(TEMP_DIR),
+            str(docx_path)
+        ]
+        
+        logger.info(f"Running command: {' '.join(cmd)}")
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        stdout, stderr = process.communicate()
+        
+        if process.returncode != 0:
+            logger.error(f"Conversion failed with return code {process.returncode}")
+            logger.error(f"stderr: {stderr.decode()}")
+            logger.error(f"stdout: {stdout.decode()}")
+            return None
+            
+        # Check if the converted file exists
+        if temp_pdf_path.exists():
+            # Move the converted file to its final location
+            shutil.move(str(temp_pdf_path), str(final_pdf_path))
+            logger.info(f"Successfully converted {docx_path} to {final_pdf_path}")
+            return final_pdf_path
+        else:
+            logger.error(f"Conversion completed but output file not found at {temp_pdf_path}")
+            # List files in temp directory for debugging
+            logger.error(f"Files in temp directory: {list(TEMP_DIR.glob('*'))}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error during conversion: {str(e)}")
+        return None
+
 @router.get("/documents")
 async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
     """List all documents and folders in the specified path"""
@@ -203,8 +259,34 @@ async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
             raise HTTPException(status_code=404, detail="Path not found")
         
         items = []
+        # Keep track of files to exclude (original DOCX files that have been converted)
+        files_to_exclude = set()
+        
+        # First pass: identify files to exclude by checking metadata
+        for item_path in current_path.iterdir():
+            if item_path.is_file() and item_path.suffix.lower() == '.metadata':
+                try:
+                    with open(item_path, 'r') as f:
+                        metadata = json.load(f)
+                        if metadata.get("converted_pdf"):
+                            # If this is a converted file, exclude the original DOCX
+                            original_file = metadata.get("original_file")
+                            if original_file:
+                                files_to_exclude.add(current_path / original_file)
+                except Exception as e:
+                    logger.error(f"Error reading metadata file {item_path}: {str(e)}")
+        
+        # Second pass: list files and folders
         for item_path in current_path.iterdir():
             try:
+                # Skip if this file should be excluded
+                if item_path in files_to_exclude:
+                    continue
+                    
+                # Skip metadata files
+                if item_path.suffix.lower() == '.metadata':
+                    continue
+                
                 stats = item_path.stat()
                 relative_path = str(item_path.relative_to(UPLOAD_DIR))
                 parent_path = str(item_path.parent.relative_to(UPLOAD_DIR)) if item_path.parent != UPLOAD_DIR else ""
@@ -214,6 +296,8 @@ async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
                         # Read metadata file if it exists
                         metadata_path = item_path.with_suffix('.metadata')
                         security_classification = "Unclassified"
+                        upload_date = None
+                        
                         if metadata_path.exists():
                             try:
                                 with open(metadata_path, 'r') as f:
@@ -222,7 +306,7 @@ async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
                                     upload_date = metadata.get("upload_date")
                             except Exception as e:
                                 logger.error(f"Error reading metadata file {metadata_path}: {str(e)}")
-
+                        
                         items.append(DocumentResponse(
                             id=relative_path,
                             name=item_path.name,
@@ -339,61 +423,80 @@ async def move_items(
 
 @router.post("/documents/upload")
 async def upload_documents(files: List[UploadFile] = File(...), folder_path: str = Form("")):
+    """Upload one or more documents"""
     try:
-        target_dir = UPLOAD_DIR
-        if folder_path:
-            target_dir = target_dir / folder_path
-            if not target_dir.exists():
-                target_dir.mkdir(parents=True, exist_ok=True)
+        upload_path = UPLOAD_DIR / folder_path
+        upload_path.mkdir(parents=True, exist_ok=True)
         
-        uploaded_files = []
+        responses = []
         for file in files:
             if not any(file.filename.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
+                responses.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "message": f"File type not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+                })
                 continue
             
-            safe_filename = os.path.basename(file.filename)
-            file_path = target_dir / safe_filename
+            file_path = upload_path / file.filename
             
-            # Ensure unique filename
-            counter = 1
-            while file_path.exists():
-                name = f"{file_path.stem}_{counter}{file_path.suffix}"
-                file_path = file_path.with_name(name)
-                counter += 1
+            # Save the uploaded file
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
             
-            # Write the file
-            content = await file.read()
-            with open(file_path, "wb") as f:
-                f.write(content)
-            
-            # Create metadata file with enhanced information
-            metadata_path = file_path.with_suffix('.metadata')
+            # Create metadata
             metadata = {
-                "security_classification": "SELECT A CLASSIFICATION",
+                "security_classification": "Unclassified",
                 "upload_date": datetime.now().isoformat(),
-                "original_filename": file.filename,
-                "file_size": len(content),
-                "mime_type": file.content_type,
-                "last_modified": datetime.now().isoformat(),
-                "version": "1.0"
+                "original_file": file.filename,
+                "converted_pdf": None
             }
             
-            # Write metadata file
+            response_file = file_path  # Default to original file
+            
+            # If file is DOCX, convert to PDF
+            if file_path.suffix.lower() == '.docx':
+                pdf_path = await convert_docx_to_pdf(file_path)
+                if pdf_path:
+                    metadata["converted_pdf"] = pdf_path.name
+                    logger.info(f"Successfully converted {file.filename} to PDF")
+                    # Use the PDF file for the response
+                    response_file = pdf_path
+                else:
+                    logger.error(f"Failed to convert {file.filename} to PDF")
+            
+            # Save metadata
+            metadata_path = file_path.with_suffix('.metadata')
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=2)
             
-            logger.info(f"Created metadata file at {metadata_path}")
-            uploaded_files.append(str(file_path.relative_to(UPLOAD_DIR)))
-
-        return JSONResponse(
-            content={
-                "message": "Files uploaded successfully",
-                "files": uploaded_files
-            },
-            status_code=200
-        )
+            # Get file stats for the response
+            stats = response_file.stat()
+            relative_path = str(response_file.relative_to(UPLOAD_DIR))
+            
+            responses.append({
+                "filename": response_file.name,
+                "original_filename": file.filename,
+                "status": "success",
+                "message": "File uploaded successfully",
+                "converted_pdf": metadata["converted_pdf"],
+                "file_info": {
+                    "id": relative_path,
+                    "name": response_file.name,
+                    "type": response_file.suffix[1:].upper(),
+                    "size": stats.st_size,
+                    "uploadDate": metadata["upload_date"],
+                    "path": relative_path,
+                    "isFolder": False,
+                    "parentPath": folder_path,
+                    "securityClassification": metadata["security_classification"]
+                }
+            })
+        
+        return responses
+        
     except Exception as e:
-        logger.error(f"Error uploading files: {str(e)}")
+        logger.error(f"Error during file upload: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/documents/{document_id}/download")

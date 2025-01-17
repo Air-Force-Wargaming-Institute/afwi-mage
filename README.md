@@ -33,8 +33,11 @@ cd backend
 # Copy environment file
 cp auth_service/.env.example auth_service/.env
 
+# If it's the first time running the app, you need to install the backend dependencies
+docker compose build
+
 # Start all services
-docker compose up -d
+docker compose up # Add the -d flag at the end to run in detached mode and hide the logs
 ```
 
 ### 4. Start the Frontend

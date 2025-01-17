@@ -191,11 +191,57 @@ function DocumentLibrary() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const result = await response.json();
-      if (result.files) {
-        console.log('Successfully uploaded files:', result.files);
-        fetchDocuments();
+      const results = await response.json();
+      console.log('Upload response:', results); // Debug log
+      
+      // Update documents list with new files
+      const newFiles = results
+        .filter(result => result.status === 'success' && result.file_info)
+        .map(result => {
+          // If this is a converted PDF, use its info
+          if (result.converted_pdf) {
+            return {
+              ...result.file_info,
+              isFolder: false,
+              type: 'PDF',
+              securityClassification: result.file_info.securityClassification || 'SELECT A CLASSIFICATION'
+            };
+          }
+          // For non-converted files, use the original info
+          return {
+            ...result.file_info,
+            isFolder: false,
+            type: result.file_info.type || 'FILE',
+            securityClassification: result.file_info.securityClassification || 'SELECT A CLASSIFICATION'
+          };
+        });
+      
+      if (newFiles.length > 0) {
+        setDocuments(prevDocs => {
+          // Create a new array with existing documents and new files
+          const updatedDocs = [...prevDocs];
+          
+          // Add or update each new file
+          newFiles.forEach(newFile => {
+            const existingIndex = updatedDocs.findIndex(doc => doc.id === newFile.id);
+            if (existingIndex >= 0) {
+              updatedDocs[existingIndex] = newFile;
+            } else {
+              updatedDocs.push(newFile);
+            }
+          });
+          
+          return updatedDocs;
+        });
       }
+      
+      // Log any errors
+      const errors = results.filter(result => result.status === 'error');
+      if (errors.length > 0) {
+        console.error('Some files failed to upload:', errors);
+        setError('Some files failed to upload: ' + errors.map(e => e.message).join(', '));
+      }
+      
     } catch (error) {
       console.error('Error uploading files:', error);
       setError('Failed to upload files: ' + error.message);
@@ -828,19 +874,19 @@ function DocumentLibrary() {
   return (
     <main style={{ 
       padding: '20px', 
-      height: 'calc(100vh)', 
+      height: 'calc(100vh + 1000px)',  // Adjust for padding
       overflow: 'hidden' 
     }}>
       <Container maxWidth={false} style={{ 
         height: '100%',
-        maxHeight: 'calc(100vh)' 
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         <Grid 
           container 
           spacing={3} 
           style={{ 
             height: '100%',
-            maxHeight: '100%', 
             flexWrap: 'nowrap'
           }}
         >
@@ -853,7 +899,9 @@ function DocumentLibrary() {
               flexShrink: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px'
+              gap: '16px',
+              maxHeight: '100%',
+              overflow: 'auto'
             }}
           >
             {/* Upload Section */}
@@ -974,14 +1022,14 @@ function DocumentLibrary() {
               display: 'flex',
               flexDirection: 'column',
               height: '100%',
-              overflow: 'auto'
+              overflow: 'hidden'
             }}
           >
             <Paper className="paper" style={{ 
-              flex: 4,
+              flex: '2 1 35%',
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'auto',
+              overflow: 'hidden',
               marginBottom: '16px'
             }}>
               <div className="section" style={{ marginBottom: '12px' }}>
@@ -1316,10 +1364,11 @@ function DocumentLibrary() {
 
             {/* File Preview Section */}
             <Paper className="paper" style={{ 
-              flex: 1,
+              flex: '1 1 65%',
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'auto'
+              overflow: 'hidden',
+              minHeight: '300px'  // Add minimum height
             }}>
               {previewFile ? (
                 <FilePreview file={previewFile} onFileUpdate={handleFileUpdate} />

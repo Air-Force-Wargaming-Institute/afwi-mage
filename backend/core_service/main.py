@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core_service.routes import document_library
+from routes import document_library
 
 app = FastAPI()
 
