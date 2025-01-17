@@ -13,14 +13,16 @@ import logging
 import shutil
 from datetime import datetime
 import json
-from PyPDF4 import PdfFileReader, PdfFileWriter
 import io
 from docx import Document
+from PyPDF2 import PdfReader, PdfWriter
+from docx_converter import DocxConverter
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+docx_converter = DocxConverter()
 
 class FolderCreate(BaseModel):
     name: str
@@ -181,7 +183,7 @@ def get_file_type(file_name: str) -> str:
 @router.post("/upload/")
 async def upload_files(file: UploadFile = File(...), folder: Optional[str] = ""):
     try:
-        folder_path = UPLOAD_DIR / folder
+        folder_path = Path(UPLOAD_DIR) / folder
         folder_path.mkdir(parents=True, exist_ok=True)
         
         file_path = folder_path / file.filename
@@ -191,14 +193,31 @@ async def upload_files(file: UploadFile = File(...), folder: Optional[str] = "")
         with file_path.open("wb") as buffer:
             buffer.write(content)
 
-        # Create metadata file with default classification
-        metadata_path = file_path.with_suffix('.metadata')
         metadata = {
             "security_classification": "SELECT A CLASSIFICATION",
-            "upload_date": datetime.now().isoformat()
+            "upload_date": datetime.now().isoformat(),
+            "original_file": file.filename,
+            "converted_pdf": None
         }
+
+        # If file is DOCX, convert to PDF
+        if file_path.suffix.lower() == '.docx':
+            try:
+                pdf_path, error = docx_converter.convert_to_pdf(str(file_path))
+                if pdf_path:
+                    # Move the converted PDF to the same folder as the DOCX
+                    final_pdf_path = folder_path / f"{file_path.stem}.pdf"
+                    shutil.move(pdf_path, final_pdf_path)
+                    metadata["converted_pdf"] = final_pdf_path.name
+                    logger.info(f"Successfully converted {file.filename} to PDF: {final_pdf_path}")
+                else:
+                    logger.error(f"Failed to convert {file.filename} to PDF: {error}")
+            except Exception as e:
+                logger.error(f"Error during PDF conversion: {str(e)}")
+                # Continue with upload even if conversion fails
         
-        # Write metadata file
+        # Create metadata file
+        metadata_path = file_path.with_suffix('.metadata')
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
             
@@ -208,7 +227,8 @@ async def upload_files(file: UploadFile = File(...), folder: Optional[str] = "")
             content={
                 "filename": file.filename, 
                 "status": "File uploaded successfully",
-                "security_classification": "SELECT A CLASSIFICATION"
+                "security_classification": "SELECT A CLASSIFICATION",
+                "converted_pdf": metadata["converted_pdf"]
             }, 
             status_code=200
         )
@@ -226,15 +246,35 @@ async def delete_file(filename: str):
         metadata_path = file_path.with_suffix('.metadata')
         
         logger.debug(f"Attempting to delete file: {file_path}")
+        
+        # Read metadata to check for converted PDF
+        converted_pdf = None
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                    converted_pdf = metadata.get("converted_pdf")
+            except Exception as e:
+                logger.error(f"Error reading metadata file: {str(e)}")
+
+        # Delete the original file
         if file_path.exists():
             os.remove(file_path)
             logger.info(f"File {filename} deleted successfully")
             
+            # Delete the converted PDF if it exists
+            if converted_pdf:
+                pdf_path = file_path.parent / converted_pdf
+                if pdf_path.exists():
+                    os.remove(pdf_path)
+                    logger.info(f"Converted PDF {converted_pdf} deleted successfully")
+            
+            # Delete metadata file
             if metadata_path.exists():
                 os.remove(metadata_path)
                 logger.info(f"Metadata file for {filename} deleted successfully")
             
-            return JSONResponse(content={"status": f"File {filename} and its metadata deleted successfully"}, status_code=200)
+            return JSONResponse(content={"status": f"File {filename} and associated files deleted successfully"}, status_code=200)
         else:
             logger.warning(f"File {filename} not found")
             raise HTTPException(status_code=404, detail=f"File {filename} not found")
@@ -418,37 +458,78 @@ async def delete_pdf_page(request: dict):
         raise HTTPException(status_code=404, detail="File not found")
     
     try:
+        # Create a temporary file for the output
+        temp_path = full_path.with_suffix('.tmp.pdf')
+        
+        # Open and process the PDF
         with open(full_path, 'rb') as file:
-            pdf = PdfFileReader(file)
-            writer = PdfFileWriter()
+            reader = PdfReader(file)
+            writer = PdfWriter()
             
-            for i in range(pdf.getNumPages()):
+            # Add all pages except the one to delete
+            for i in range(len(reader.pages)):
                 if i != page_number - 1:  # Page numbers start from 1, but index starts from 0
-                    writer.addPage(pdf.getPage(i))
+                    writer.add_page(reader.pages[i])
             
-            with open(full_path, 'wb') as output_file:
+            # Write to temporary file first
+            with open(temp_path, 'wb') as output_file:
                 writer.write(output_file)
+        
+        # Replace original with new file
+        temp_path.replace(full_path)
         
         return {"success": True, "message": f"Page {page_number} deleted successfully"}
     except Exception as e:
-        logger.error(f"Error deleting PDF page: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting PDF page: {str(e)}")
+        # Clean up temp file if it exists
+        if temp_path.exists():
+            temp_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Failed to delete page: {str(e)}")
 
 @router.get("/preview-docx/{file_path:path}")
 async def preview_docx(file_path: str):
-    full_path = Path(UPLOAD_DIR) / file_path
-    if not full_path.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
-    
     try:
-        doc = Document(full_path)
-        html_content = "<html><body>"
-        for para in doc.paragraphs:
-            html_content += f"<p>{para.text}</p>"
-        html_content += "</body></html>"
-        return HTMLResponse(content=html_content)
+        full_path = Path(UPLOAD_DIR) / file_path
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Check metadata for converted PDF
+        metadata_path = full_path.with_suffix('.metadata')
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                    converted_pdf = metadata.get("converted_pdf")
+                    if converted_pdf:
+                        pdf_path = full_path.parent / converted_pdf
+                        if pdf_path.exists():
+                            return FileResponse(pdf_path, media_type="application/pdf")
+            except Exception as e:
+                logger.error(f"Error reading metadata file: {str(e)}")
+
+        # If no converted PDF exists or can't be found, convert on the fly
+        pdf_path, error = docx_converter.convert_to_pdf(str(full_path))
+        if pdf_path:
+            try:
+                # Update metadata with new conversion
+                metadata = {
+                    "security_classification": "SELECT A CLASSIFICATION",
+                    "upload_date": datetime.now().isoformat(),
+                    "original_file": full_path.name,
+                    "converted_pdf": Path(pdf_path).name
+                }
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+
+                return FileResponse(pdf_path, media_type="application/pdf")
+            finally:
+                # Clean up temporary file after sending
+                docx_converter.cleanup_temp_file(pdf_path)
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to convert DOCX to PDF: {error}")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error previewing DOCX: {str(e)}")
+        logger.error(f"Error previewing DOCX file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/preview-txt/{file_path:path}")
 async def preview_txt(file_path: str):
@@ -463,3 +544,18 @@ async def preview_txt(file_path: str):
         return HTMLResponse(content=html_content)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error previewing TXT: {str(e)}")
+
+@router.get("/pdf-info/{file_path:path}")
+async def get_pdf_info(file_path: str):
+    full_path = Path(UPLOAD_DIR) / file_path
+    if not full_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        with open(full_path, 'rb') as file:
+            pdf = PdfReader(file)
+            num_pages = len(pdf.pages)
+            return {"num_pages": num_pages}
+    except Exception as e:
+        logger.error(f"Error getting PDF info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting PDF info: {str(e)}")
