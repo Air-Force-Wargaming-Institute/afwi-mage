@@ -31,8 +31,6 @@ services:
     depends_on:
       init-data:
         condition: service_completed_successfully
-      db:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - app-network
@@ -138,25 +136,25 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  db:
-    image: postgres:13
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_MULTIPLE_DATABASES: dbname,authdb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    ports:
-      - "5432:5432"
+#  db:
+#    image: postgres:13
+#    environment:
+#      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+#      POSTGRES_MULTIPLE_DATABASES: dbname,authdb
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+#    networks:
+#      - app-network
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U postgres"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#      start_period: 10s
+#    ports:
+#      - "5432:5432"
 
   embedding:
     build: ./embedding_service
@@ -175,33 +173,33 @@ services:
     networks:
       - app-network
 
-  auth:
-    build: ./auth_service
-    volumes:
-      - ./auth_service:/app
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
-      - SECRET_KEY=your-secret-key-here-change-in-production
-      - DISABLE_AUTH=false
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-      - ACCESS_TOKEN_EXPIRE_MINUTES=60
-      - PORT=8010
-      - HOST=0.0.0.0
-      - PYTHONUNBUFFERED=1
-    ports:
-      - "8010:8010"
-    restart: always
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+#  auth:
+#    build: ./auth_service
+#    volumes:
+#      - ./auth_service:/app
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    environment:
+#      - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+#      - SECRET_KEY=your-secret-key-here-change-in-production
+#      - DISABLE_AUTH=false
+#      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+#      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+#      - PORT=8010
+#      - HOST=0.0.0.0
+#      - PYTHONUNBUFFERED=1
+#    ports:
+#      - "8010:8010"
+#    restart: always
+#    networks:
+#      - app-network
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#      start_period: 10s
 
 volumes:
   postgres_data:
