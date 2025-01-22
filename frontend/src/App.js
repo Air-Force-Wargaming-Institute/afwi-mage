@@ -22,18 +22,18 @@ import './App.css';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
-  const { isAuthenticated } = useContext(AuthContext);
+  //const { isAuthenticated } = useContext(AuthContext);
   const location = useLocation();
 
   // If not authenticated and not on login page, redirect to login
-  if (!isAuthenticated && location.pathname !== '/login') {
-    return <Redirect to="/login" />;
-  }
+  // if (!isAuthenticated && location.pathname !== '/login') {
+  //   return <Redirect to="/login" />;
+  // }
 
   // If authenticated and on login page, redirect to home
-  if (isAuthenticated && location.pathname === '/login') {
-    return <Redirect to="/home" />;
-  }
+  // if (isAuthenticated && location.pathname === '/login') {
+  //   return <Redirect to="/home" />;
+  // }
 
   const isLoginPage = location.pathname === '/login';
 
@@ -42,7 +42,7 @@ const AuthenticatedRoutes = () => {
       {!isLoginPage && <Header />}
       <main>
         <Switch>
-          <Route exact path="/login" component={Login} />
+          {/* <Route exact path="/login" component={Login} />
           <PrivateRoute exact path="/home" component={Home} />
           <PrivateRoute path="/admin" component={AdminDashboard} adminOnly={true} />
           <PrivateRoute path="/document-library" component={DocumentLibrary} />
@@ -57,11 +57,31 @@ const AuthenticatedRoutes = () => {
           <PrivateRoute path="/fine-tuning/test" component={Test} />
           <PrivateRoute exact path="/retrieval" component={RetrievalGuide} />
           <PrivateRoute path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
-          <PrivateRoute path="/retrieval/librarian-agents" component={LibrarianAgents} />
-          <Route exact path="/">
-            <Redirect to={isAuthenticated ? "/home" : "/login"} />
+          <PrivateRoute path="/retrieval/librarian-agents" component={LibrarianAgents} /> */}
+          <Route exact path="/login">
+            <Redirect to="/home" />
           </Route>
-          <Redirect to={isAuthenticated ? "/home" : "/login"} />
+          <Route exact path="/home" component={Home} />
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/document-library" component={DocumentLibrary} />
+          <Route exact path="/multi-agent" component={UserGuide} />
+          <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
+          <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
+          <Route path="/multi-agent/chat" component={MultiAgentChat} />
+          <Route exact path="/fine-tuning" component={FineTuneGuide} />
+          <Route path="/fine-tuning/extract" component={ExtractComponent} />
+          <Route path="/fine-tuning/generate" component={GenerateDataset} />
+          <Route path="/fine-tuning/fine-tune" component={FineTune} />
+          <Route path="/fine-tuning/test" component={Test} />
+          <Route exact path="/retrieval" component={RetrievalGuide} />
+          <Route path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
+          <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
+          <Route exact path="/">
+            <Redirect to="/home" />
+            {/*<Redirect to={isAuthenticated ? "/home" : "/login"} />*/}
+          </Route>
+          {/*<Redirect to={isAuthenticated ? "/home" : "/login"} />*/}
+          <Redirect to="/home" />
         </Switch>
       </main>
       {!isLoginPage && (
