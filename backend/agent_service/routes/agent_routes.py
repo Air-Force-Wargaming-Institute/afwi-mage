@@ -140,14 +140,28 @@ async def create_team(team_data: TeamCreate):
         # Load the team template
         with open(TEMPLATES_PATH / "team_template.py", "r") as f:
             template = f.read()
+
+        # Create a list of 8 agents, filling empty slots with "null_X"
+        agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Take the first 8 agents and remove _expert suffix
+        while len(agents) < 8:
+            agents.append(f"null_{len(agents)}")
         
         # Replace placeholders in the template
         team_code = template.replace("{{TEAM_NAME}}", team_data.name)
+        team_code = team_code.replace("{{TEAM_FILE_NAME}}", formatted_name)
         team_code = team_code.replace("{{TEAM_DESCRIPTION}}", team_data.description)
         team_code = team_code.replace("{{TEAM_COLOR}}", team_data.color)
         team_code = team_code.replace("{{TEAM_INSTRUCTIONS}}", team_data.team_instructions)
         team_code = team_code.replace("{{MEMORY_TYPE}}", team_data.memory_type)
         team_code = team_code.replace("{{MEMORY_KWARGS}}", json.dumps(team_data.memory_kwargs))
+        team_code = team_code.replace("{{AGENT_ZERO}}", agents[0])
+        team_code = team_code.replace("{{AGENT_ONE}}", agents[1])
+        team_code = team_code.replace("{{AGENT_TWO}}", agents[2])
+        team_code = team_code.replace("{{AGENT_THREE}}", agents[3])
+        team_code = team_code.replace("{{AGENT_FOUR}}", agents[4])
+        team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
+        team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
+        team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent)}'" for agent in team_data.agents]))
         
         # Add creation and modification dates
@@ -334,9 +348,20 @@ async def update_team(team_name: str, team_data: TeamCreate):
         if not os.path.exists(old_team_path):
             raise HTTPException(status_code=404, detail=f"Team {team_name} not found")
 
+        # Get the original created date
+        with open(old_team_path, 'r') as f:
+            content = f.read()
+            created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
+            created_date = re.search(created_pattern, content, re.DOTALL).group(1)
+
         # Load the team template
         with open(TEMPLATES_PATH / "team_template.py", "r") as f:
             template = f.read()
+        
+        # Create a list of 8 agents, filling empty slots with "null_X"
+        agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Remove _expert suffix
+        while len(agents) < 8:
+            agents.append(f"null_{len(agents)}")
         
         # Replace placeholders in the template
         team_code = template.replace("{{TEAM_NAME}}", team_data.name)
@@ -345,9 +370,18 @@ async def update_team(team_name: str, team_data: TeamCreate):
         team_code = team_code.replace("{{TEAM_INSTRUCTIONS}}", team_data.team_instructions)
         team_code = team_code.replace("{{MEMORY_TYPE}}", team_data.memory_type)
         team_code = team_code.replace("{{MEMORY_KWARGS}}", json.dumps(team_data.memory_kwargs))
+        team_code = team_code.replace("{{AGENT_ZERO}}", agents[0])
+        team_code = team_code.replace("{{AGENT_ONE}}", agents[1])
+        team_code = team_code.replace("{{AGENT_TWO}}", agents[2])
+        team_code = team_code.replace("{{AGENT_THREE}}", agents[3])
+        team_code = team_code.replace("{{AGENT_FOUR}}", agents[4])
+        team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
+        team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
+        team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent)}'" for agent in team_data.agents]))
         
-        # Update modification date
+        # Set the created date and update modification date
+        team_code = team_code.replace("{{CREATED_AT}}", created_date)
         current_time = datetime.now().isoformat()
         team_code = team_code.replace("{{MODIFIED_AT}}", current_time)
         
