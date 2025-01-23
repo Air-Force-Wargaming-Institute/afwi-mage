@@ -309,7 +309,14 @@ function AgentTeams() {
 
   const handleSubmit = async () => {
     try {
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), newTeam);
+      // Filter out empty agent slots and create a compact list
+      const compactAgents = newTeam.agents.filter(agent => agent !== '');
+      const submissionData = {
+        ...newTeam,
+        agents: compactAgents
+      };
+
+      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), submissionData);
       setTeams([...teams, response.data]);
       setOpen(false);
       setSnackbar({
@@ -330,7 +337,14 @@ function AgentTeams() {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.file_name}`), editingTeam);
+      // Filter out empty agent slots and create a compact list
+      const compactAgents = editingTeam.agents.filter(agent => agent !== '');
+      const submissionData = {
+        ...editingTeam,
+        agents: compactAgents
+      };
+
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.file_name}`), submissionData);
       setEditOpen(false);
       setSnackbar({
         open: true,
@@ -358,7 +372,7 @@ function AgentTeams() {
   // Modify this function to work for both new and editing teams
   const getAvailableAgentsForDropdown = (index, team) => {
     const selectedAgents = team.agents.filter((agent, i) => i !== index && agent !== '');
-    return allAgents.filter(agent => !selectedAgents.includes(agent.file_name));
+    return allAgents.filter(agent => !selectedAgents.includes(agent.file_name.replace('_expert', '')));
   };
 
   const handleDeleteClick = (team) => {
