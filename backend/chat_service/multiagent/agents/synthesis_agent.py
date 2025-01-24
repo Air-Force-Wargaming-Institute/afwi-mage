@@ -7,12 +7,15 @@ from datetime import datetime
 
 from utils.shared_state import shared_state
 from multiagent.graphState import GraphState
+from multiagent.llm_manager import LLMManager
 
-def synthesis_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
+def synthesis_agent(state: GraphState) -> GraphState:
     """
     The Synthesis Agent
     Consolidates insights from all other agents into a comprehensive report.
     """
+    llm = LLMManager().llm 
+
     print("\n\n\t---------------------------\n\n\t---SYNTHESIS AGENT---\n\n\t---------------------------\n\n\t")
     state_dict = state["keys"]
     question = state_dict["question"]
