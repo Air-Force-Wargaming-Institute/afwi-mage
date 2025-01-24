@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from multiagent.llm_manager import LLMManager
 
 from multiagent.graphState import GraphState
 from utils.helpers import update_expert_input
@@ -8,11 +9,12 @@ from config import load_config
 from utils.shared_state import shared_state
 from utils.helpers import determine_collaboration
 
-def domestic_stability_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
+def domestic_stability_expert(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     question = state_dict["question"]
     whoami = "domestic_stability"
     config = load_config()
+    llm = LLMManager().llm
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -149,7 +151,7 @@ def domestic_stability_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
 
         return {"keys": {**state_dict, whoami+"_analysis": analysis, "last_actor": whoami, whoami+"_reflection": reflection}}
 
-def domestic_stability_collaborator(state: GraphState, llm: ChatOpenAI) -> GraphState:
+def domestic_stability_collaborator(state: GraphState) -> GraphState:
     banner = "\n\n\t---------------------------\n\n\t---domestic stability COLLABORATOR---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
     whoami = "domestic_stability"
@@ -161,6 +163,7 @@ def domestic_stability_collaborator(state: GraphState, llm: ChatOpenAI) -> Graph
     collaborator = state_dict["collaborator"]
     #last_actor_collab_request = state_dict[collaborator+"_collab_areas"]
     collab_areas = state_dict["collab_areas"]
+    llm = LLMManager().llm
 
     prompt = PromptTemplate(
         input_variables=["last_actor_analysis", "collab_areas"],

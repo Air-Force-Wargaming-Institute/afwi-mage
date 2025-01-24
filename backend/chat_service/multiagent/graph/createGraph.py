@@ -3,50 +3,45 @@ import functools
 from multiagent.agents import *
 from config import load_config
 from multiagent.graphState import GraphState
-from multiagent.graph.routers import router_expert_input_still_needed, router_check_requester, router_dynamic_librarian, router_check_collaborator, router_expert_reflected, router_dynamic_expert, router_dynamic_collab
-
+from multiagent.graph.routers import (
+    router_dynamic_librarian, 
+    router_expert_reflected, 
+    router_dynamic_expert, 
+    router_dynamic_collab
+)
 from langgraph.graph import StateGraph, END
-from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain_core.callbacks.manager import CallbackManager
-from langchain_openai import ChatOpenAI
 
 def create_graph() -> StateGraph:
     """
     Creates the agent graph for the multi-agent system.
     Defines the process for streaming agent output instead of waiting for the entire output to be generated.
     """
-
-    config = load_config()
-    TEMPERATURE = config['TEMPERATURE']
-    BASE_URL = config['BASE_URL']
-    API_KEY = config['API_KEY']
-    MAX_TOKENS = config['MAX_TOKENS']
-    LOCAL_LLM = config['LOCAL_LLM']
-
     workflow = StateGraph(GraphState)
 
-    callbacks = CallbackManager([StreamingStdOutCallbackHandler()])
-
-    experts = ["prc_government", "prc_military", "prc_economic", "regional_dynamics", "global_influence", "domestic_stability", "technology_innovation"]
-
-    streaming_llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, streaming=True, callbacks=callbacks, model=LOCAL_LLM)
-
-    non_streaming_llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
+    experts = [
+        "prc_government", 
+        "prc_military", 
+        "prc_economic", 
+        "regional_dynamics", 
+        "global_influence", 
+        "technology_innovation", 
+        "domestic_stability"
+    ]
 
     # Nodes are the logical steps in the program. Each node represents an agent that performs a small step in answering the user's question.
     # The use of functools.partial allows us to pass the LLM to the agent so that the agent can stream its output.
     # We don't stream the librarian because half of what it does (retrieving documents) cannot be streamed.
-    workflow.add_node("conversation_history_manager", functools.partial(conversation_history_manager, llm=non_streaming_llm))
-    workflow.add_node("user_proxy_moderator", functools.partial(user_proxy_moderator, llm=streaming_llm))
-    workflow.add_node("librarian", functools.partial(librarian_agent, llm=non_streaming_llm))
-    workflow.add_node("prc_government", functools.partial(prc_government_expert, llm=streaming_llm))
-    workflow.add_node("prc_military", functools.partial(prc_military_expert, llm=streaming_llm))
-    workflow.add_node("prc_economic", functools.partial(prc_economic_expert, llm=streaming_llm))
-    workflow.add_node("regional_dynamics", functools.partial(regional_dynamics_expert, llm=streaming_llm))
-    workflow.add_node("global_influence", functools.partial(global_influence_expert, llm=streaming_llm))
-    workflow.add_node("technology_innovation", functools.partial(technology_innovation_expert, llm=streaming_llm))
-    workflow.add_node("domestic_stability", functools.partial(domestic_stability_expert, llm=streaming_llm))
-    workflow.add_node("synthesis", functools.partial(synthesis_agent, llm=streaming_llm))
+    workflow.add_node("conversation_history_manager", conversation_history_manager)
+    workflow.add_node("user_proxy_moderator", user_proxy_moderator)
+    workflow.add_node("librarian", librarian_agent)
+    workflow.add_node("prc_government", prc_government_expert)
+    workflow.add_node("prc_military", prc_military_expert)
+    workflow.add_node("prc_economic", prc_economic_expert)
+    workflow.add_node("regional_dynamics", regional_dynamics_expert)
+    workflow.add_node("global_influence", global_influence_expert)
+    workflow.add_node("technology_innovation", technology_innovation_expert)
+    workflow.add_node("domestic_stability", domestic_stability_expert)
+    workflow.add_node("synthesis", synthesis_agent)
 
     workflow.add_node("prc_government_requester", prc_government_requester)
     workflow.add_node("prc_military_requester", prc_military_requester)
@@ -56,13 +51,13 @@ def create_graph() -> StateGraph:
     workflow.add_node("technology_innovation_requester", technology_innovation_requester)
     workflow.add_node("domestic_stability_requester", domestic_stability_requester)
 
-    workflow.add_node("prc_government_collaborator", functools.partial(prc_government_collaborator, llm=streaming_llm))
-    workflow.add_node("prc_military_collaborator", functools.partial(prc_military_collaborator, llm=streaming_llm))
-    workflow.add_node("prc_economic_collaborator", functools.partial(prc_economic_collaborator, llm=streaming_llm))
-    workflow.add_node("regional_dynamics_collaborator", functools.partial(regional_dynamics_collaborator, llm=streaming_llm))
-    workflow.add_node("global_influence_collaborator", functools.partial(global_influence_collaborator, llm=streaming_llm))
-    workflow.add_node("technology_innovation_collaborator", functools.partial(technology_innovation_collaborator, llm=streaming_llm))
-    workflow.add_node("domestic_stability_collaborator", functools.partial(domestic_stability_collaborator, llm=streaming_llm))
+    workflow.add_node("prc_government_collaborator", prc_government_collaborator)
+    workflow.add_node("prc_military_collaborator", prc_military_collaborator)
+    workflow.add_node("prc_economic_collaborator", prc_economic_collaborator)
+    workflow.add_node("regional_dynamics_collaborator",regional_dynamics_collaborator)
+    workflow.add_node("global_influence_collaborator", global_influence_collaborator)
+    workflow.add_node("technology_innovation_collaborator", technology_innovation_collaborator)
+    workflow.add_node("domestic_stability_collaborator", domestic_stability_collaborator)
 
     # Start at user proxy
     workflow.set_entry_point("conversation_history_manager")
