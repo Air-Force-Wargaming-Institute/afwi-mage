@@ -310,6 +310,22 @@ function AgentPortfolio() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+    
+    // Add name validation
+    if (name === 'name') {
+      if (!value.match(/^[a-zA-Z0-9\s_-]*$/)) {
+        setFormErrors({
+          ...formErrors,
+          name: 'Agent name can only contain letters, numbers, spaces, underscores, and hyphens'
+        });
+      } else {
+        setFormErrors({
+          ...formErrors,
+          name: ''
+        });
+      }
+    }
+    
     setNewAgent(prevState => ({
       ...prevState,
       [name]: value
@@ -345,7 +361,7 @@ function AgentPortfolio() {
     const errors = validateForm(newAgent);
     
     // If there are errors, show them and stop submission
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length > 0 || formErrors.name) {  // Add check for name validation error
       setFormErrors(errors);
       setSnackbar({
         open: true,
@@ -412,6 +428,22 @@ function AgentPortfolio() {
 
   const handleAgentChange = (event) => {
     const { name, value } = event.target;
+    
+    // Add name validation for editing
+    if (name === 'name') {
+      if (!value.match(/^[a-zA-Z0-9\s_-]*$/)) {
+        setEditFormErrors({
+          ...editFormErrors,
+          name: 'Agent name can only contain letters, numbers, spaces, underscores, and hyphens'
+        });
+      } else {
+        setEditFormErrors({
+          ...editFormErrors,
+          name: ''
+        });
+      }
+    }
+
     setSelectedAgent(prevState => ({
       ...prevState,
       [name]: value
@@ -433,7 +465,7 @@ function AgentPortfolio() {
     const errors = validateForm(selectedAgent);
     
     // If there are errors, show them and stop submission
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length > 0 || editFormErrors.name) {  // Add check for name validation error
       setEditFormErrors(errors);
       setSnackbar({
         open: true,
@@ -825,6 +857,8 @@ function AgentPortfolio() {
                   value={selectedAgent.name}
                   onChange={handleAgentChange}
                   disabled={!isEditing}
+                  error={!!editFormErrors.name}
+                  helperText={editFormErrors.name}
                 />
                 {renderTooltip(
                   "Agent Name",

@@ -47,7 +47,7 @@ def {{TEAM_FILE_NAME}}_graph() -> StateGraph:
 
     callbacks = CallbackManager([StreamingStdOutCallbackHandler()])
 
-    experts = config['EXPERT_AGENTS']
+    experts = AGENT_FILE_NAMES
 
     streaming_llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, streaming=True, callbacks=callbacks, model=LOCAL_LLM)
 
@@ -64,130 +64,58 @@ def {{TEAM_FILE_NAME}}_graph() -> StateGraph:
     workflow.add_node("synthesis", functools.partial(synthesis_agent, llm=streaming_llm))
 
     #--------------------Expert Agents--------------------
-    try:
-        if AGENT_ZERO != "null_0":
-            workflow.add_node("{{AGENT_ZERO}}", functools.partial({{AGENT_ZERO}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_ONE != "null_1":
-            workflow.add_node("{{AGENT_ONE}}", functools.partial({{AGENT_ONE}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_TWO != "null_2":
-            workflow.add_node("{{AGENT_TWO}}", functools.partial({{AGENT_TWO}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_THREE != "null_3":
-            workflow.add_node("{{AGENT_THREE}}", functools.partial({{AGENT_THREE}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:    
-        if AGENT_FOUR != "null_4":
-            workflow.add_node("{{AGENT_FOUR}}", functools.partial({{AGENT_FOUR}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_FIVE != "null_5":
-            workflow.add_node("{{AGENT_FIVE}}", functools.partial({{AGENT_FIVE}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_SIX != "null_6":  
-            workflow.add_node("{{AGENT_SIX}}", functools.partial({{AGENT_SIX}}_expert, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_SEVEN != "null_7":
-            workflow.add_node("{{AGENT_SEVEN}}", functools.partial({{AGENT_SEVEN}}_expert, llm=streaming_llm))
-    except:
-        pass
+    if AGENT_ZERO != "null_0":
+        workflow.add_node("{{AGENT_ZERO}}", functools.partial({{AGENT_ZERO}}_expert, llm=streaming_llm))
+    if AGENT_ONE != "null_1":
+        workflow.add_node("{{AGENT_ONE}}", functools.partial({{AGENT_ONE}}_expert, llm=streaming_llm))
+    if AGENT_TWO != "null_2":
+        workflow.add_node("{{AGENT_TWO}}", functools.partial({{AGENT_TWO}}_expert, llm=streaming_llm))
+    if AGENT_THREE != "null_3":
+        workflow.add_node("{{AGENT_THREE}}", functools.partial({{AGENT_THREE}}_expert, llm=streaming_llm))
+    if AGENT_FOUR != "null_4":
+        workflow.add_node("{{AGENT_FOUR}}", functools.partial({{AGENT_FOUR}}_expert, llm=streaming_llm))
+    if AGENT_FIVE != "null_5":
+        workflow.add_node("{{AGENT_FIVE}}", functools.partial({{AGENT_FIVE}}_expert, llm=streaming_llm))
+    if AGENT_SIX != "null_6":
+        workflow.add_node("{{AGENT_SIX}}", functools.partial({{AGENT_SIX}}_expert, llm=streaming_llm))
+    if AGENT_SEVEN != "null_7":
+        workflow.add_node("{{AGENT_SEVEN}}", functools.partial({{AGENT_SEVEN}}_expert, llm=streaming_llm))
 
     #--------------------Requesters--------------------
-    try:
-        if AGENT_ZERO != "null_0":
-            workflow.add_node("{{AGENT_ZERO}}", functools.partial({{AGENT_ZERO}}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_ONE != "null_1":
-            workflow.add_node("{{AGENT_ONE}}", functools.partial({{AGENT_ONE}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_TWO != "null_2":
-            workflow.add_node("{{AGENT_TWO}}", functools.partial({{AGENT_TWO}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_THREE != "null_3":
-            workflow.add_node("{{AGENT_THREE}}", functools.partial({{AGENT_THREE}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:    
-        if AGENT_FOUR != "null_4":
-            workflow.add_node("{{AGENT_FOUR}}", functools.partial({{AGENT_FOUR}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_FIVE != "null_5"   :
-            workflow.add_node("{{AGENT_FIVE}}", functools.partial({{AGENT_FIVE}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_SIX != "null_6":  
-            workflow.add_node("{{AGENT_SIX}}", functools.partial({{AGENT_SIX}}_requester, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_SEVEN != "null_7":
-            workflow.add_node("{{AGENT_SEVEN}}", functools.partial({{AGENT_SEVEN}}_requester, llm=streaming_llm))
-    except:
-        pass
+    if AGENT_ZERO != "null_0":
+        workflow.add_node("{{AGENT_ZERO}}_requester", {{AGENT_ZERO}}_requester)
+    if AGENT_ONE != "null_1":
+        workflow.add_node("{{AGENT_ONE}}_requester", {{AGENT_ONE}}_requester)
+    if AGENT_TWO != "null_2":
+        workflow.add_node("{{AGENT_TWO}}_requester", {{AGENT_TWO}}_requester)
+    if AGENT_THREE != "null_3":
+        workflow.add_node("{{AGENT_THREE}}_requester", {{AGENT_THREE}}_requester)
+    if AGENT_FOUR != "null_4":
+        workflow.add_node("{{AGENT_FOUR}}_requester", {{AGENT_FOUR}}_requester)
+    if AGENT_FIVE != "null_5":
+        workflow.add_node("{{AGENT_FIVE}}_requester", {{AGENT_FIVE}}_requester)
+    if AGENT_SIX != "null_6":
+        workflow.add_node("{{AGENT_SIX}}_requester", {{AGENT_SIX}}_requester)
+    if AGENT_SEVEN != "null_7":
+        workflow.add_node("{{AGENT_SEVEN}}_requester", {{AGENT_SEVEN}}_requester)
 
     #--------------------Collaborators--------------------
-    try:
-        if AGENT_ZERO != "null_0":
-            workflow.add_node("{{AGENT_ZERO}}", functools.partial({{AGENT_ZERO}}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_ONE != "null_1":
-            workflow.add_node("{{AGENT_ONE}}", functools.partial({{AGENT_ONE}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_TWO != "null_2":
-            workflow.add_node("{{AGENT_TWO}}", functools.partial({{AGENT_TWO}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_THREE != "null_3":
-            workflow.add_node("{{AGENT_THREE}}", functools.partial({{AGENT_THREE}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:    
-        if AGENT_FOUR != "null_4":
-            workflow.add_node("{{AGENT_FOUR}}", functools.partial({{AGENT_FOUR}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if AGENT_FIVE != "null_5":
-            workflow.add_node("{{AGENT_FIVE}}", functools.partial({{AGENT_FIVE}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if experts[6] != "null_6":  
-            workflow.add_node("{{AGENT_SIX}}", functools.partial({{AGENT_SIX}}_collaborator, llm=streaming_llm))
-    except:
-        pass
-    try:
-        if experts[7] != "null_7":
-            workflow.add_node("{{AGENT_SEVEN}}", functools.partial({{AGENT_SEVEN}}_collaborator, llm=streaming_llm))
-    except:
-        pass
+    if AGENT_ZERO != "null_0":
+        workflow.add_node("{{AGENT_ZERO}}_collaborator", functools.partial({{AGENT_ZERO}}_collaborator, llm=streaming_llm))
+    if AGENT_ONE != "null_1":
+        workflow.add_node("{{AGENT_ONE}}_collaborator", functools.partial({{AGENT_ONE}}_collaborator, llm=streaming_llm))
+    if AGENT_TWO != "null_2":
+        workflow.add_node("{{AGENT_TWO}}_collaborator", functools.partial({{AGENT_TWO}}_collaborator, llm=streaming_llm))
+    if AGENT_THREE != "null_3":
+        workflow.add_node("{{AGENT_THREE}}_collaborator", functools.partial({{AGENT_THREE}}_collaborator, llm=streaming_llm))
+    if AGENT_FOUR != "null_4":
+        workflow.add_node("{{AGENT_FOUR}}_collaborator", functools.partial({{AGENT_FOUR}}_collaborator, llm=streaming_llm))
+    if AGENT_FIVE != "null_5":
+        workflow.add_node("{{AGENT_FIVE}}_collaborator", functools.partial({{AGENT_FIVE}}_collaborator, llm=streaming_llm))
+    if AGENT_SIX != "null_6":
+        workflow.add_node("{{AGENT_SIX}}_collaborator", functools.partial({{AGENT_SIX}}_collaborator, llm=streaming_llm))
+    if AGENT_SEVEN != "null_7":
+        workflow.add_node("{{AGENT_SEVEN}}_collaborator", functools.partial({{AGENT_SEVEN}}_collaborator, llm=streaming_llm))
 
     # Start at user proxy
     workflow.set_entry_point("conversation_history_manager")
@@ -200,75 +128,40 @@ def {{TEAM_FILE_NAME}}_graph() -> StateGraph:
     # used to determine the next step during runtime.
     # Routing functions return some value that is definded mapping dictionary.
     # The key is the value that the routing function returns, and the value is the node that the program should flow to.
-    workflow.add_conditional_edges("user_proxy_moderator", router_dynamic_collab, 
-                                   {"{{AGENT_ZERO}}": "{{AGENT_ZERO}}_requester",
-                                    "{{AGENT_ONE}}": "{{AGENT_ONE}}_requester",
-                                    "{{AGENT_TWO}}": "{{AGENT_TWO}}_requester",
-                                    "{{AGENT_THREE}}": "{{AGENT_THREE}}_requester",
-                                    "{{AGENT_FOUR}}": "{{AGENT_FOUR}}_requester",
-                                    "{{AGENT_FIVE}}": "{{AGENT_FIVE}}_requester",
-                                    "{{AGENT_SIX}}": "{{AGENT_SIX}}_requester",
-                                    "{{AGENT_SEVEN}}": "{{AGENT_SEVEN}}_requester",
-                                    "synthesis": "synthesis"
-                                    })
+    dynamic_collab_edge_dict = {}
+    for e in experts:
+        dynamic_collab_edge_dict[e] = e+"_requester"
+    dynamic_collab_edge_dict["synthesis"] = "synthesis"
+    workflow.add_conditional_edges("user_proxy_moderator", router_dynamic_collab, dynamic_collab_edge_dict)
 
     # Regular edges are paths the program will ALWAYS take. You should not have multiple regular edges coming out of a node,
     # nor should you have a regular edge and a conditional edge coming out of a node.
+
+    dynamic_expert_edge_dict = {}
+    dynamic_expert_reflected_edge_dict = {}
+    for e in experts:
+        dynamic_expert_edge_dict[e+"_requester"] = e+"_requester"
+        dynamic_expert_reflected_edge_dict[e+"_requester"] = e+"_requester"
+        dynamic_expert_edge_dict[e+"_collaborator"] = e+"_collaborator"
+    dynamic_expert_edge_dict["user_proxy_moderator"] = "user_proxy_moderator"
+    dynamic_expert_reflected_edge_dict["user_proxy_moderator"] = "user_proxy_moderator"
+
     for e in experts:
         workflow.add_edge(e+"_requester", "librarian")
         #workflow.add_edge(e, "user_proxy_moderator")
-        workflow.add_conditional_edges(e, router_dynamic_expert,
-                                       {"{{AGENT_ZERO}}_requester": "{{AGENT_ZERO}}_requester",
-                                        "{{AGENT_ONE}}_requester": "{{AGENT_ONE}}_requester",
-                                        "{{AGENT_TWO}}_requester": "{{AGENT_TWO}}_requester",
-                                        "{{AGENT_THREE}}_requester": "{{AGENT_THREE}}_requester",
-                                        "{{AGENT_FOUR}}_requester": "{{AGENT_FOUR}}_requester",
-                                        "{{AGENT_FIVE}}_requester": "{{AGENT_FIVE}}_requester",
-                                        "{{AGENT_SIX}}_requester": "{{AGENT_SIX}}_requester",
-                                        "{{AGENT_SEVEN}}_requester": "{{AGENT_SEVEN}}_requester",
-                                        "{{AGENT_ZERO}}_collaborator": "{{AGENT_ZERO}}_collaborator",
-                                        "{{AGENT_ONE}}_collaborator": "{{AGENT_ONE}}_collaborator",
-                                        "{{AGENT_TWO}}_collaborator": "{{AGENT_TWO}}_collaborator",
-                                        "{{AGENT_THREE}}_collaborator": "{{AGENT_THREE}}_collaborator",
-                                        "{{AGENT_FOUR}}_collaborator": "{{AGENT_FOUR}}_collaborator",
-                                        "{{AGENT_FIVE}}_collaborator": "{{AGENT_FIVE}}_collaborator",
-                                        "{{AGENT_SIX}}_collaborator": "{{AGENT_SIX}}_collaborator",
-                                        "{{AGENT_SEVEN}}_collaborator": "{{AGENT_SEVEN}}_collaborator",
-                                        "user_proxy_moderator": "user_proxy_moderator"
-                                        })
-        workflow.add_conditional_edges(e+"_collaborator", router_expert_reflected,
-                                       {"{{AGENT_ZERO}}_requester": "{{AGENT_ZERO}}_requester",
-                                        "{{AGENT_ONE}}_requester": "{{AGENT_ONE}}_requester",
-                                        "{{AGENT_TWO}}_requester": "{{AGENT_TWO}}_requester",
-                                        "{{AGENT_THREE}}_requester": "{{AGENT_THREE}}_requester",
-                                        "{{AGENT_FOUR}}_requester": "{{AGENT_FOUR}}_requester",
-                                        "{{AGENT_FIVE}}_requester": "{{AGENT_FIVE}}_requester",
-                                        "{{AGENT_SIX}}_requester": "{{AGENT_SIX}}_requester",
-                                        "{{AGENT_SEVEN}}_requester": "{{AGENT_SEVEN}}_requester",
-                                        "user_proxy_moderator": "user_proxy_moderator",
-                                        })
+        workflow.add_conditional_edges(e, router_dynamic_expert, dynamic_expert_edge_dict)
+        workflow.add_conditional_edges(e+"_collaborator", router_expert_reflected, dynamic_expert_reflected_edge_dict)
 
     # Edges out of the librarian change based on the value of shared_state.COLLAB_LOOP using router_dynamic_routing
     # If COLLAB_LOOP is True, the edges point to the collaborator nodes.
     # If COLLAB_LOOP is False, the edges point to the original expert nodes.
-    workflow.add_conditional_edges("librarian", router_dynamic_librarian,
-                                   {"{{AGENT_ZERO}}": "{{AGENT_ZERO}}",
-                                    "{{AGENT_ONE}}": "{{AGENT_ONE}}",
-                                    "{{AGENT_TWO}}": "{{AGENT_TWO}}",
-                                    "{{AGENT_THREE}}": "{{AGENT_THREE}}",
-                                    "{{AGENT_FOUR}}": "{{AGENT_FOUR}}",
-                                    "{{AGENT_FIVE}}": "{{AGENT_FIVE}}",
-                                    "{{AGENT_SIX}}": "{{AGENT_SIX}}",
-                                    "{{AGENT_SEVEN}}": "{{AGENT_SEVEN}}",
-                                    "{{AGENT_ZERO}}_collaborator": "{{AGENT_ZERO}}_collaborator",
-                                    "{{AGENT_ONE}}_collaborator": "{{AGENT_ONE}}_collaborator",
-                                    "{{AGENT_TWO}}_collaborator": "{{AGENT_TWO}}_collaborator",
-                                    "{{AGENT_THREE}}_collaborator": "{{AGENT_THREE}}_collaborator",
-                                    "{{AGENT_FOUR}}_collaborator": "{{AGENT_FOUR}}_collaborator",
-                                    "{{AGENT_FIVE}}_collaborator": "{{AGENT_FIVE}}_collaborator",
-                                    "{{AGENT_SIX}}_collaborator": "{{AGENT_SIX}}_collaborator",
-                                    "{{AGENT_SEVEN}}_collaborator": "{{AGENT_SEVEN}}_collaborator",
-                                   })
+
+    dynamic_librarian_edge_dict = {}
+    for e in experts:
+        dynamic_librarian_edge_dict[e] = e
+        dynamic_librarian_edge_dict[e+"_collaborator"] = e+"_collaborator"
+
+    workflow.add_conditional_edges("librarian", router_dynamic_librarian, dynamic_librarian_edge_dict)
 
     # Once the program reaches the "synthesis" agent, always flow to the end of the program
     workflow.add_edge("synthesis", END)
