@@ -383,8 +383,11 @@ function AgentTeams() {
     }
 
     try {
-      // Filter out empty agent slots and create a compact list
-      const compactAgents = editingTeam.agents.filter(agent => agent !== '');
+      // Filter out empty agent slots and remove _expert suffix
+      const compactAgents = editingTeam.agents
+        .filter(agent => agent !== '')
+        .map(agent => agent.replace('_expert', ''));
+        
       const submissionData = {
         ...editingTeam,
         agents: compactAgents
@@ -447,10 +450,16 @@ function AgentTeams() {
   };
 
   const handleEditClick = (team) => {
-    setEditingTeam({
+    // Create a copy of the team with all 8 agent slots
+    const fullTeam = {
       ...team,
-      agents: [...team.agents, ...Array(8 - team.agents.length).fill('')]
-    });
+      // Map each agent filename to the full agent filename with _expert suffix
+      agents: [
+        ...team.agents.map(agentName => `${agentName}_expert`),
+        ...Array(8 - team.agents.length).fill('')
+      ]
+    };
+    setEditingTeam(fullTeam);
     setEditOpen(true);
   };
 
