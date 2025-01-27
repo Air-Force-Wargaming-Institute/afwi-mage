@@ -17,12 +17,7 @@ import {
   IconButton,
   Divider,
   Tooltip,
-  Typography,
-  Snackbar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
+  Typography
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -30,8 +25,6 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import GetAppIcon from '@material-ui/icons/GetApp';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
-import FileCopyIcon from '@material-ui/icons/FileCopy';
-import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 
@@ -42,15 +35,13 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     height: 'calc(80vh - 64px)',
     marginTop: '10px',
-    backgroundColor: theme.palette.background.default,
   },
   chatContainer: {
     display: 'flex',
     flexGrow: 1,
     overflow: 'hidden',
-    borderRadius: '12px',
+    borderRadius: '10px',
     height: '100%',
-    gap: theme.spacing(2),
   },
   chatLog: {
     width: '30%',
@@ -58,9 +49,7 @@ const useStyles = makeStyles((theme) => ({
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: theme.palette.background.paper,
-    borderRadius: '12px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    marginRight: theme.spacing(2),
   },
   chatArea: {
     flexGrow: 1,
@@ -68,92 +57,62 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     height: '100%',
     position: 'relative',
-    backgroundColor: theme.palette.background.paper,
-    borderRadius: '12px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
   },
   messageArea: {
     flexGrow: 1,
     overflowY: 'auto',
-    padding: theme.spacing(3),
+    padding: theme.spacing(2),
     marginBottom: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(2),
+    gap: theme.spacing(1),
     textAlign: 'left',
-    fontSize: '0.9rem',
-    backgroundColor: theme.palette.background.default,
+    fontSize: '0.7rem',
   },
   inputArea: {
     display: 'flex',
     alignItems: 'center',
-    padding: theme.spacing(2, 3),
+    padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
-    borderBottomLeftRadius: '12px',
-    borderBottomRightRadius: '12px',
   },
   input: {
     flexGrow: 1,
     marginRight: theme.spacing(2),
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '24px',
-      backgroundColor: theme.palette.background.default,
-      transition: 'all 0.2s ease',
-      '&:hover': {
-        backgroundColor: theme.palette.action.hover,
-      },
-      '&.Mui-focused': {
-        backgroundColor: theme.palette.background.paper,
-        boxShadow: '0 0 0 2px ${theme.palette.primary.main}',
-      },
-    },
   },
   newChatButton: {
     marginTop: theme.spacing(3),
     marginBottom: theme.spacing(2),
-    width: '80%',
+    width: '60%',
     alignSelf: 'center',
-    borderRadius: '24px',
-    padding: theme.spacing(1.5),
-    textTransform: 'none',
-    fontWeight: 500,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   },
   message: {
     marginBottom: theme.spacing(1),
-    padding: theme.spacing(2, 2.5),
-    borderRadius: '16px',
-    maxWidth: '85%',
+    padding: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius,
+    maxWidth: '80%',
     wordBreak: 'break-word',
-    position: 'relative',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
-    },
+    display: 'inline-block',
+    whiteSpace: 'pre-wrap',
+    fontSize: '0.9rem',
     '& p': {
-      margin: '0.5em 0',
-      lineHeight: 1.6,
+      margin: 0,
     },
     '& pre': {
-      margin: theme.spacing(1.5, 0),
-      padding: theme.spacing(2),
-      borderRadius: '8px',
-      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-      overflow: 'auto',
+      margin: theme.spacing(1, 0),
+      padding: 0,
+      backgroundColor: 'transparent',
     },
     '& .syntax-highlighter': {
       margin: 0,
-      borderRadius: '6px',
-      fontSize: '0.85rem !important',
+      borderRadius: theme.shape.borderRadius,
+      fontSize: '0.8rem !important',
     },
     '& code': {
-      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-      padding: '0.2em 0.4em',
-      borderRadius: '4px',
-      fontSize: '0.85rem',
-      fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+      backgroundColor: theme.palette.grey[100],
+      padding: theme.spacing(0.5),
+      borderRadius: '3px',
+      fontSize: '0.8rem',
     },
     '& ul, & ol': {
       marginTop: theme.spacing(1),
@@ -163,173 +122,57 @@ const useStyles = makeStyles((theme) => ({
     '& table': {
       borderCollapse: 'collapse',
       width: '100%',
-      marginTop: theme.spacing(1.5),
-      marginBottom: theme.spacing(1.5),
-      borderRadius: '6px',
-      overflow: 'hidden',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      marginTop: theme.spacing(1),
+      marginBottom: theme.spacing(1),
     },
     '& th, & td': {
       border: `1px solid ${theme.palette.divider}`,
-      padding: theme.spacing(1),
-      backgroundColor: theme.palette.background.paper,
-    },
-    '& th': {
-      backgroundColor: theme.palette.action.hover,
-      fontWeight: 600,
+      padding: theme.spacing(0.5),
     },
     '& blockquote': {
-      borderLeft: `4px solid ${theme.palette.primary.light}`,
-      margin: theme.spacing(1.5, 0),
-      padding: theme.spacing(0.5, 2),
+      borderLeft: `4px solid ${theme.palette.grey[300]}`,
+      margin: theme.spacing(1, 0),
+      padding: theme.spacing(0, 1),
       color: theme.palette.text.secondary,
-      backgroundColor: 'rgba(0, 0, 0, 0.02)',
-      borderRadius: '4px',
     },
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: theme.palette.primary.main,
-    color: '#fff !important',
-    '& *': {
-      color: '#fff !important',
-    },
+    backgroundColor: theme.palette.primary.light,
+    color: theme.palette.primary.contrastText,
     '& code, & pre': {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    '&::after': {
-      content: '""',
-      position: 'absolute',
-      bottom: '8px',
-      right: '-6px',
-      width: '12px',
-      height: '12px',
-      backgroundColor: theme.palette.primary.main,
-      transform: 'rotate(45deg)',
-      borderRadius: '2px',
-    },
-    '& .MuiTypography-caption': {
-      color: 'rgba(255, 255, 255, 0.7) !important',
-    },
-    '& .copyButton': {
-      color: '#fff',
     },
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.grey[100],
     '& pre, & code': {
-      backgroundColor: theme.palette.action.hover,
-    },
-    '&::after': {
-      content: '""',
-      position: 'absolute',
-      bottom: '8px',
-      left: '-6px',
-      width: '12px',
-      height: '12px',
-      backgroundColor: theme.palette.background.paper,
-      transform: 'rotate(45deg)',
-      borderRadius: '2px',
-    },
-    '& .copyButton': {
-      color: theme.palette.text.primary,
+      backgroundColor: theme.palette.grey[200],
     },
   },
   agentHeader: {
     fontSize: '0.8rem',
     color: theme.palette.text.secondary,
     marginBottom: theme.spacing(1),
-    fontWeight: 600,
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-    '&::before': {
-      content: '""',
-      width: '8px',
-      height: '8px',
-      backgroundColor: theme.palette.info.main,
-      borderRadius: '50%',
-      display: 'inline-block',
-    },
+    fontWeight: 'bold',
   },
   synthesisHeader: {
     fontSize: '0.8rem',
     color: theme.palette.secondary.main,
     marginBottom: theme.spacing(1),
-    fontWeight: 600,
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-    '&::before': {
-      content: '""',
-      width: '8px',
-      height: '8px',
-      backgroundColor: theme.palette.secondary.main,
-      borderRadius: '50%',
-      display: 'inline-block',
-    },
+    fontWeight: 'bold',
   },
   chatSessionItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing(1.5, 2),
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      backgroundColor: theme.palette.action.hover,
-    },
-    '&.Mui-selected': {
-      backgroundColor: theme.palette.action.selected,
-      '&:hover': {
-        backgroundColor: theme.palette.action.selected,
-      },
-    },
+    padding: theme.spacing(1, 2),
   },
   sessionActions: {
     display: 'flex',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: theme.spacing(0.5),
-    opacity: 0.7,
-    transition: 'opacity 0.2s ease',
-    '&:hover': {
-      opacity: 1,
-    },
-  },
-  buttonBar: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: theme.spacing(0.75, 2),
-    minHeight: '40px',
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
-    borderTopLeftRadius: '12px',
-    borderTopRightRadius: '12px',
-  },
-  messageTimestamp: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing(0.5),
-    fontSize: '0.7rem',
-    opacity: 0.8,
-  },
-  userMessageTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  aiMessageTimestamp: {
-    color: theme.palette.text.secondary,
-  },
-  fullscreen: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1300,
-    margin: 0,
-    borderRadius: 0,
   },
   fullscreenButton: {
     position: 'absolute',
@@ -337,58 +180,21 @@ const useStyles = makeStyles((theme) => ({
     right: theme.spacing(1),
     zIndex: 1000,
   },
-  buttonBarButton: {
-    position: 'relative',
-    marginLeft: 'auto',
+  fullscreen: {
+    position: 'fixed',
+    top: '0px',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1300,
+    maxHeight: 'calc(100vh)',
   },
-  copyButton: {
-    padding: theme.spacing(0.5),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    },
-  },
-  agentTeamInfo: {
+  buttonBar: {
     display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-    flexGrow: 1,
-    flexWrap: 'wrap',
-  },
-  agentTeamLabel: {
-    display: 'inline',
-    color: theme.palette.text.primary,
-    fontWeight: 500,
-  },
-  agentList: {
-    display: 'inline',
-    paddingLeft: '4px',
-  },
-  agentName: {
-    display: 'inline',
-    color: '#1a237e',
-    fontWeight: 500,
-    fontSize: '0.9rem',
-  },
-  helpDialog: {
-    '& .MuiDialog-paper': {
-      maxWidth: '600px',
-      padding: theme.spacing(2),
-    },
-  },
-  dialogSection: {
-    marginBottom: theme.spacing(3),
-  },
-  dialogSubtitle: {
-    color: theme.palette.primary.main,
-    fontWeight: 600,
-    marginBottom: theme.spacing(1),
-  },
-  systemAgentItem: {
-    marginBottom: theme.spacing(1),
-    '& span': {
-      fontWeight: 500,
-    },
+    justifyContent: 'flex-end',
+    padding: theme.spacing(1),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
   },
 }));
 
@@ -402,8 +208,6 @@ function MultiAgentChat() {
   const [isConnected, setIsConnected] = useState(false);
   const messageEndRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -610,20 +414,6 @@ function MultiAgentChat() {
     setIsFullscreen(!isFullscreen);
   };
 
-  const handleCopyMessage = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setSnackbarOpen(true);
-    });
-  };
-
-  const handleHelpOpen = () => {
-    setHelpDialogOpen(true);
-  };
-
-  const handleHelpClose = () => {
-    setHelpDialogOpen(false);
-  };
-
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -695,25 +485,6 @@ function MultiAgentChat() {
         )}
         <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           <div className={classes.buttonBar}>
-            <div className={classes.agentTeamInfo}>
-              <Tooltip title="Help">
-                <IconButton
-                  onClick={handleHelpOpen}
-                  color="primary"
-                  size="small"
-                >
-                  <HelpOutlineIcon />
-                </IconButton>
-              </Tooltip>
-              <Typography component="span" className={classes.agentTeamLabel}>
-                Agents on this Team:
-              </Typography>
-              {['PRC Domestic Stability Expert', 'PRC Economics Expert', 'PRC Global Influence Expert', 'PRC Government Expert', 'PRC Military Expert', 'PRC Regional Dynamics', 'PRC Technology and Innovation Expert'].map((agent, index) => (
-                <Typography key={index} component="span" className={classes.agentName}>
-                  {index === 0 ? ' ' : ''}{agent}{index < 6 ? ', ' : ''}
-                </Typography>
-              ))}
-            </div>
             <Tooltip title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
               <IconButton
                 className={classes.buttonBarButton}
@@ -741,7 +512,7 @@ function MultiAgentChat() {
                   </Typography>
                 )}
                 {message.sender === 'user' ? (
-                  <Typography style={{ color: '#fff' }}>{message.text}</Typography>
+                  <Typography>{message.text}</Typography>
                 ) : (
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
@@ -772,22 +543,8 @@ function MultiAgentChat() {
                     {message.text}
                   </ReactMarkdown>
                 )}
-                <Typography 
-                  variant="caption" 
-                  className={`${classes.messageTimestamp} ${
-                    message.sender === 'user' ? classes.userMessageTimestamp : classes.aiMessageTimestamp
-                  }`}
-                >
-                  <span>{new Date(message.timestamp).toLocaleString()}</span>
-                  <Tooltip title="Copy message">
-                    <IconButton
-                      className={`${classes.copyButton} copyButton`}
-                      size="small"
-                      onClick={() => handleCopyMessage(message.text)}
-                    >
-                      <FileCopyIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginTop: '4px' }}>
+                  {new Date(message.timestamp).toLocaleString()}
                 </Typography>
               </Box>
             ))}
@@ -814,66 +571,6 @@ function MultiAgentChat() {
           </form>
         </Paper>
       </div>
-
-      <Dialog
-        open={helpDialogOpen}
-        onClose={handleHelpClose}
-        className={classes.helpDialog}
-        aria-labelledby="help-dialog-title"
-      >
-        <DialogTitle id="help-dialog-title">
-          How to Interact with Multi-Agent Teams
-        </DialogTitle>
-        <DialogContent>
-          <div className={classes.dialogSection}>
-            <Typography variant="h6" className={classes.dialogSubtitle}>
-              System Agents
-            </Typography>
-            <Typography paragraph className={classes.systemAgentItem}>
-              <span>Agent Moderator:</span> Coordinates the conversation flow and ensures all relevant agents contribute their expertise at the appropriate time.
-            </Typography>
-            <Typography paragraph className={classes.systemAgentItem}>
-              <span>Librarian:</span> Manages information retrieval and helps maintain context throughout the conversation.
-            </Typography>
-            <Typography paragraph className={classes.systemAgentItem}>
-              <span>Synthesis Agent:</span> Combines insights from all agents to provide comprehensive, unified responses.
-            </Typography>
-          </div>
-          
-          <div className={classes.dialogSection}>
-            <Typography variant="h6" className={classes.dialogSubtitle}>
-              How It Works
-            </Typography>
-            <Typography paragraph>
-              When you send a message, the Agent Moderator analyzes your query and coordinates with the appropriate domain expert agents. The Librarian assists by providing relevant context and information, while the Synthesis Agent combines all insights into a coherent response.
-            </Typography>
-          </div>
-
-          <div className={classes.dialogSection}>
-            <Typography variant="h6" className={classes.dialogSubtitle}>
-              Tips for Effective Interaction
-            </Typography>
-            <Typography paragraph>
-              • Be specific in your questions to help the Agent Moderator direct them to the most relevant experts<br/>
-              • Feel free to ask follow-up questions - the Librarian maintains context throughout the conversation<br/>
-              • Complex questions are welcome - the system is designed to coordinate multiple experts for comprehensive answers
-            </Typography>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleHelpClose} color="primary">
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={2000}
-        onClose={() => setSnackbarOpen(false)}
-        message="Message copied to clipboard"
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      />
     </Container>
   );
 }
