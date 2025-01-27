@@ -162,7 +162,7 @@ async def create_team(team_data: TeamCreate):
         team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
         team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
         team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent)}'" for agent in team_data.agents]))
+        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
         
         # Add creation and modification dates
         current_time = datetime.now().isoformat()
@@ -365,6 +365,7 @@ async def update_team(team_name: str, team_data: TeamCreate):
         
         # Replace placeholders in the template
         team_code = template.replace("{{TEAM_NAME}}", team_data.name)
+        team_code = team_code.replace("{{TEAM_FILE_NAME}}", new_formatted_name)
         team_code = team_code.replace("{{TEAM_DESCRIPTION}}", team_data.description)
         team_code = team_code.replace("{{TEAM_COLOR}}", team_data.color)
         team_code = team_code.replace("{{TEAM_INSTRUCTIONS}}", team_data.team_instructions)
@@ -378,7 +379,7 @@ async def update_team(team_name: str, team_data: TeamCreate):
         team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
         team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
         team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent)}'" for agent in team_data.agents]))
+        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
         
         # Set the created date and update modification date
         team_code = team_code.replace("{{CREATED_AT}}", created_date)

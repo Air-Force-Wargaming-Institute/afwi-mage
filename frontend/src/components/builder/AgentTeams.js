@@ -205,6 +205,8 @@ function AgentTeams() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState(null);
   const [agentDescriptions, setAgentDescriptions] = useState({});
+  const [nameError, setNameError] = useState(false);
+  const [nameErrorMessage, setNameErrorMessage] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -259,6 +261,32 @@ function AgentTeams() {
 
   const handleChange = (event, isEditing = false) => {
     const { name, value } = event.target;
+    
+    // Validate team name
+    if (name === 'name') {
+      if (!value.match(/^[a-zA-Z0-9\s_-]*$/)) {
+        setNameError(true);
+        setNameErrorMessage('Team name can only contain letters, numbers, spaces, underscores, and hyphens');
+        // Still update the form state so user sees what they typed
+        if (isEditing) {
+          setEditingTeam(prevState => ({
+            ...prevState,
+            [name]: value
+          }));
+        } else {
+          setNewTeam(prevState => ({
+            ...prevState,
+            [name]: value
+          }));
+        }
+        return;
+      } else {
+        setNameError(false);
+        setNameErrorMessage('');
+      }
+    }
+
+    // Validate description length
     if (name === 'description' && value.length > 140) {
       setDescriptionError(true);
     } else {
@@ -308,6 +336,15 @@ function AgentTeams() {
   };
 
   const handleSubmit = async () => {
+    if (nameError || descriptionError) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix all errors before submitting',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       // Filter out empty agent slots and create a compact list
       const compactAgents = newTeam.agents.filter(agent => agent !== '');
@@ -329,13 +366,22 @@ function AgentTeams() {
       console.error('Error creating team:', error);
       setSnackbar({
         open: true,
-        message: 'Error creating team. Please try again.',
+        message: error.response?.data?.detail || 'Error creating team. Please try again.',
         severity: 'error'
       });
     }
   };
 
   const handleEditSubmit = async () => {
+    if (nameError || descriptionError) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix all errors before submitting',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       // Filter out empty agent slots and create a compact list
       const compactAgents = editingTeam.agents.filter(agent => agent !== '');
@@ -356,7 +402,7 @@ function AgentTeams() {
       console.error('Error updating team:', error);
       setSnackbar({
         open: true,
-        message: 'Error updating team. Please try again.',
+        message: error.response?.data?.detail || 'Error updating team. Please try again.',
         severity: 'error'
       });
     }
@@ -552,6 +598,8 @@ function AgentTeams() {
             value={newTeam.name}
             onChange={handleChange}
             className={classes.formControl}
+            error={nameError}
+            helperText={nameErrorMessage}
           />
           <Box display="flex" flexDirection="column">
             <TextField
@@ -665,6 +713,8 @@ function AgentTeams() {
             value={editingTeam ? editingTeam.name : ''}
             onChange={(e) => handleChange(e, true)}
             className={classes.formControl}
+            error={nameError}
+            helperText={nameErrorMessage}
           />
           <Box display="flex" flexDirection="column">
             <TextField
