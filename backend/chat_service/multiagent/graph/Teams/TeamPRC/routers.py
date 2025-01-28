@@ -7,8 +7,7 @@ def router_expert_input_still_needed(state: GraphState):
     If there are, it returns the next expert that needs to provide input.
     If there are no experts that need to provide input, we are ready for "synthesis".
     """
-    state_dict = state["keys"]
-    selected_experts = state_dict["selected_experts"]
+    selected_experts = state["selected_experts"]
     if len(selected_experts) > 0:
         return selected_experts[0]
     else:
@@ -18,8 +17,7 @@ def router_check_requester(state: GraphState):
     """
     This function is used by the librarian to determine which expert needs the documents that were retrieved.
     """
-    state_dict = state["keys"]
-    last_actor = state_dict["last_actor"]
+    last_actor = state['keys']['last_actor']
     return last_actor
     match last_actor:
         case "prc_government":
@@ -45,8 +43,7 @@ def router_check_collaborator(state: GraphState):
     If they have, we go into the last expert node so they can rewrite their report with the 
     reflection and collaboration input.
     """
-    state_dict = state["keys"]
-    collaborator = state_dict["collaborator"]
+    collaborator = state["collaborator"]
     return collaborator+"_collaborator"
 
 
@@ -56,9 +53,8 @@ def router_expert_reflected(state: GraphState):
     If they have, we go back to the moderator, who decides where to route next.
     If they have not, we go back into the expert node to get them to reflect.
     """
-    state_dict = state["keys"]
-    last_actor = state_dict["last_actor"]
-    reflected = state_dict.get(last_actor+"_reflected", False)
+    last_actor = state['keys']['last_actor']
+    reflected = state.get(last_actor+"_reflected", False)
 
     if reflected:
         return "user_proxy_moderator"
@@ -71,8 +67,7 @@ def router_collaboration_requested(state: GraphState):
     If they have, we go into the last expert node so they can rewrite their report with the 
     reflection and collaboration input.
     """
-    state_dict = state["keys"]
-    collaborator = state_dict["collaborator"]
+    collaborator = state['keys']['collaborator']
     return collaborator+"_requester"
 
 def router_collaboration_continue(state: GraphState):
@@ -81,8 +76,7 @@ def router_collaboration_continue(state: GraphState):
     If they have, we go into the last expert node so they can rewrite their report with the 
     reflection and collaboration input.
     """
-    state_dict = state["keys"]
-    collaborator = state_dict["collaborator"]
+    collaborator = state['keys']['collaborator']
     return collaborator
 
 def router_dynamic_librarian(state: GraphState):

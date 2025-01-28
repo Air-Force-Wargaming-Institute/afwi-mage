@@ -1,24 +1,14 @@
 from typing import Dict
 from multiagent.agents import *
 from config import load_config
-from multiagent.graphState import GraphState
 from multiagent.graph.routers import (
-    router_dynamic_librarian, 
-    router_expert_reflected, 
-    router_dynamic_expert, 
-    router_dynamic_collab,
     router_expert_subgraphs,
     router_get_Moderator_Guidance,
     router_collaboration_requested,
     router_expert_report
 )
 from langgraph.graph import StateGraph, END
-from typing import Dict, TypedDict
-
-class GraphState(TypedDict):
-    keys: Dict[str, any]
-class ExpertState(TypedDict):
-    keys: Dict[str, any]
+from multiagent.graphState import GraphState
 
 def create_graph() -> StateGraph:
     """
@@ -27,19 +17,9 @@ def create_graph() -> StateGraph:
     """
     workflow = StateGraph(GraphState)
 
-    # Define list of experts
-    experts = [
-        "prc_government", 
-        "prc_military", 
-        "prc_economic", 
-        "regional_dynamics", 
-        "global_influence", 
-        "technology_innovation", 
-        "domestic_stability"
-    ]
-
     # Add base nodes
     workflow.add_node("conversation_history_manager", conversation_history_manager)
+    workflow.set_entry_point("conversation_history_manager")
     workflow.add_node("identify_experts", identify_experts)
     workflow.add_edge("conversation_history_manager", "identify_experts")
     workflow.add_node("get_Moderator_Guidance", get_Moderator_Guidance)

@@ -19,8 +19,7 @@ def identify_experts(state: GraphState) -> GraphState:
     MAX_TOKENS = config['MAX_TOKENS']
     LOCAL_LLM = config['LOCAL_LLM']
 
-    state_dict = state["keys"]
-    user_question = state_dict["question"]
+    user_question = state['keys']['question']
     expert_nodes = ["prc_government", "prc_military", "prc_economic", "regional_dynamics", "global_influence", "domestic_stability", "technology_innovation"]
     expert_descriptions = ["Expert on the structure, decision-making processes, and key figures within the PRC government.",
                         "Expert on the capabilities, doctrine, and strategic objectives of the People's Liberation Army (PLA).",
@@ -81,17 +80,16 @@ def identify_experts(state: GraphState) -> GraphState:
     
     shared_state.EXPERT_LIST_GENERATED = True
 
-    return {"keys": {**state_dict, "selected_experts": validated_experts}}
+    return { 'keys': {**state['keys'], "selected_experts": validated_experts}}
 
 def update_expert_input(state: GraphState, expert_node= str):
     """
     This function is used by experts to update the graph state to reflect that they have provided input.
     """
-    state_dict = state["keys"]
-    experts_with_input = set(state_dict.get("experts_with_input", set()))
+    experts_with_input = set(state.get("experts_with_input", set()))
     experts_with_input.add(expert_node)
 
-    return {"keys": {**state_dict, "experts_with_input": experts_with_input}}
+    return {'keys': {**state['keys'], "experts_with_input": experts_with_input}}
 
 
 # def write_to_docx(whoami: str, analysis: str):
@@ -108,6 +106,7 @@ def update_expert_input(state: GraphState, expert_node= str):
 #     doc.save(OUTPUT_DIR+"/"+str(ITERATION)+"_"+whoami+"_analysis.docx")
 
 def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
+    print("determine_collaboration")
     '''
     This function is used to determine if collaboration is needed and which expert to collaborate with. Arguments are:
     reflection: The reflection on the report as a string

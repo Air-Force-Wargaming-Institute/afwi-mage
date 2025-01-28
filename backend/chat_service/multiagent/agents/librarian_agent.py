@@ -6,6 +6,7 @@ from config import load_config
 from multiagent.retriever_manager import RetrieverManager
 
 def librarian(requester:str, agent_request:str):
+    print("\n\n\t---------------------------\n\n\t---LIBRARIAN AGENT---\n\n\t---------------------------\n\n\t")
     """
     The Librarian Agent
     Retrieves the most relevant documents from the vector store based on the agent's request and user's question.
@@ -14,7 +15,7 @@ def librarian(requester:str, agent_request:str):
     config = load_config()
     TOP_N_DOCUMENTS = config['TOP_N_DOCUMENTS']
 
-    print("\n\n\t---------------------------\n\n\t---LIBRARIAN AGENT---\n\n\t---------------------------\n\n\t")
+    
     retriever = RetrieverManager().retriever
     
     llm = LLMManager().non_streaming
