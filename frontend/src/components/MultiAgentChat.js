@@ -11,7 +11,12 @@ import {
   ListItemText,
   IconButton,
   Divider,
-  Tooltip
+  Tooltip,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -20,11 +25,18 @@ import GetAppIcon from '@material-ui/icons/GetApp';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import SchoolIcon from '@mui/icons-material/School';
+import TuneIcon from '@mui/icons-material/Tune';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import robotIcon from '../assets/robot-icon.png';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -166,10 +178,16 @@ const useStyles = makeStyles((theme) => ({
   },
   buttonBar: {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
+  },
+  agentsText: {
+    color: theme.palette.text.secondary,
+    fontWeight: 600,
+    fontSize: '1.1rem',
   },
   markdown: {
     '& h1, & h2, & h3, & h4, & h5, & h6': {
@@ -292,6 +310,135 @@ const useStyles = makeStyles((theme) => ({
       margin: 'auto',
     },
   },
+  agentsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  helpIcon: {
+    color: theme.palette.text.secondary,
+    fontSize: '1.1rem',
+    cursor: 'pointer',
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
+  },
+  tooltip: {
+    maxWidth: 450,
+    fontSize: '0.9rem',
+    padding: theme.spacing(2),
+    '& h6': {
+      marginBottom: theme.spacing(1),
+      fontWeight: 600,
+    },
+    '& ul': {
+      margin: theme.spacing(1, 0),
+      paddingLeft: theme.spacing(2),
+    },
+    '& li': {
+      marginBottom: theme.spacing(1),
+    },
+  },
+  helpDialog: {
+    '& .MuiDialog-paper': {
+      maxWidth: 600,
+      padding: theme.spacing(2),
+      backgroundColor: '#ffffff',
+      borderRadius: '10px',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    },
+  },
+  dialogTitle: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing(2),
+    color: theme.palette.primary.main,
+    '& h6': {
+      fontWeight: 600,
+      fontSize: '1.2rem',
+    },
+  },
+  dialogContent: {
+    padding: theme.spacing(2),
+    '& ul': {
+      paddingLeft: theme.spacing(2),
+      marginTop: theme.spacing(1),
+    },
+    '& li': {
+      marginBottom: theme.spacing(2),
+    },
+    '& .MuiTypography-root': {
+      color: theme.palette.text.primary,
+      lineHeight: 1.6,
+    },
+  },
+  closeButton: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    top: theme.spacing(1),
+    color: theme.palette.grey[500],
+    '&:hover': {
+      color: theme.palette.primary.main,
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    },
+  },
+  agentListItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    padding: theme.spacing(1),
+    borderRadius: '8px',
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    },
+  },
+  robotIcon: {
+    width: '24px',
+    height: '30px',
+    marginTop: '3px',
+    filter: 'invert(1)',
+  },
+  agentDescription: {
+    flex: 1,
+    '& strong': {
+      color: theme.palette.primary.main,
+      fontWeight: 600,
+    },
+  },
+  inputHelpIcon: {
+    color: theme.palette.text.secondary,
+    marginRight: theme.spacing(1),
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
+  },
+  promptHelpDialog: {
+    '& .MuiDialog-paper': {
+      maxWidth: 700,  // Slightly wider for prompt guidance
+      padding: theme.spacing(2),
+      backgroundColor: '#ffffff',
+      borderRadius: '10px',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    },
+  },
+  promptTip: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(2),
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(2),
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: '8px',
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    },
+  },
+  tipIcon: {
+    color: theme.palette.primary.main,
+    marginTop: '2px',
+  },
 }));
 
 const MessageContent = ({ content, isUser }) => {
@@ -319,74 +466,62 @@ const MessageContent = ({ content, isUser }) => {
 
   const handleCopy = async () => {
     try {
-      let textToCopy;
       if (contentRef.current) {
-        // Get the rendered text content, preserving basic formatting
-        const processNode = (node) => {
-          // Handle text nodes
-          if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent;
-          }
-          
-          // Handle element nodes
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // Get tag name
-            const tag = node.tagName.toLowerCase();
-            
-            // Process children first
-            const childText = Array.from(node.childNodes)
-              .map(child => processNode(child))
-              .join('');
-            
-            // Add formatting based on tag
-            switch (tag) {
-              case 'h1':
-              case 'h2':
-              case 'h3':
-              case 'h4':
-              case 'h5':
-              case 'h6':
-                return `${childText}\n`;
-              case 'p':
-                return `${childText}\n\n`;
-              case 'ul':
-              case 'ol':
-                return childText;
-              case 'li':
-                return `• ${childText}\n`;
-              case 'br':
-                return '\n';
-              case 'strong':
-              case 'b':
-                return childText;
-              case 'em':
-              case 'i':
-                return childText;
-              case 'code':
-                return childText;
-              default:
-                return childText;
+        const tempDiv = document.createElement('div');
+        const clonedContent = contentRef.current.cloneNode(true);
+        
+        // Modified applyComputedStyles to exclude color properties
+        const applyComputedStyles = (original, clone) => {
+          const style = window.getComputedStyle(original);
+          const cssText = Array.from(style).reduce((css, property) => {
+            // Skip color-related properties
+            if (property === 'color' || 
+                property === 'background-color' || 
+                property === 'background' || 
+                property.includes('text-')) {
+              return css;
             }
-          }
-          return '';
+            return `${css}${property}:${style.getPropertyValue(property)};`;
+          }, '');
+          clone.style.cssText = cssText;
+          
+          // Recursively apply styles to children
+          Array.from(original.children).forEach((child, i) => {
+            if (clone.children[i]) {
+              applyComputedStyles(child, clone.children[i]);
+            }
+          });
         };
         
-        textToCopy = processNode(contentRef.current);
-        // Clean up extra whitespace and newlines
-        textToCopy = textToCopy
-          .replace(/\n\s*\n\s*\n/g, '\n\n')  // Replace triple newlines with double
-          .replace(/\s+$/gm, '')  // Remove trailing whitespace from lines
-          .trim();  // Remove leading/trailing whitespace from whole text
+        applyComputedStyles(contentRef.current, clonedContent);
+        tempDiv.appendChild(clonedContent);
+
+        // Create a Blob with HTML content
+        const blob = new Blob([tempDiv.innerHTML], { type: 'text/html' });
+        const plainText = contentRef.current.textContent;
+        
+        // Create ClipboardItem with both HTML and plain text
+        const clipboardItem = new ClipboardItem({
+          'text/html': blob,
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        });
+        
+        await navigator.clipboard.write([clipboardItem]);
       } else {
-        // Fallback to rendered version of markdown
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = textContent;
-        textToCopy = tempDiv.textContent;
+        await navigator.clipboard.writeText(content);
       }
-      
-      await navigator.clipboard.writeText(textToCopy);
     } catch (err) {
       console.error('Failed to copy text:', err);
+      try {
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = contentRef.current.textContent;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempTextArea);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+      }
     }
   };
 
@@ -445,6 +580,8 @@ function MultiAgentChat() {
   const [chatSessions, setChatSessions] = useState([{ id: 1, name: 'New Chat' }]);
   const messageEndRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [promptHelpOpen, setPromptHelpOpen] = useState(false);
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
@@ -506,6 +643,22 @@ function MultiAgentChat() {
     setIsFullscreen(!isFullscreen);
   };
 
+  const handleHelpOpen = () => {
+    setHelpDialogOpen(true);
+  };
+
+  const handleHelpClose = () => {
+    setHelpDialogOpen(false);
+  };
+
+  const handlePromptHelpOpen = () => {
+    setPromptHelpOpen(true);
+  };
+
+  const handlePromptHelpClose = () => {
+    setPromptHelpOpen(false);
+  };
+
   useEffect(() => {
     messageEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -554,16 +707,21 @@ function MultiAgentChat() {
         )}
         <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           <div className={classes.buttonBar}>
-            <Tooltip title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
-              <IconButton
-                className={classes.buttonBarButton}
-                onClick={toggleFullscreen}
-                color="primary"
-                size="small"
-              >
-                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            <div className={classes.agentsHeader}>
+              <IconButton onClick={handleHelpOpen} size="small">
+                <HelpOutlineIcon className={classes.helpIcon} />
               </IconButton>
-            </Tooltip>
+              <Typography className={classes.agentsText}>
+                Agents in this Chat:
+              </Typography>
+            </div>
+            <IconButton
+              className={classes.fullscreenButton}
+              onClick={toggleFullscreen}
+              size="small"
+            >
+              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </IconButton>
           </div>
           <Box className={classes.messageArea}>
             {messages.map((message, index) => (
@@ -585,6 +743,14 @@ function MultiAgentChat() {
             <div ref={messageEndRef} />
           </Box>
           <form onSubmit={handleSubmit} className={classes.inputArea}>
+            <IconButton 
+              onClick={handlePromptHelpOpen}
+              size="small"
+              className={classes.inputHelpIcon}
+              title="Prompt Engineering Tips"
+            >
+              <HelpOutlineIcon />
+            </IconButton>
             <TextField
               className={classes.input}
               variant="outlined"
@@ -608,6 +774,129 @@ function MultiAgentChat() {
           </form>
         </Paper>
       </div>
+      <Dialog
+        open={helpDialogOpen}
+        onClose={handleHelpClose}
+        className={classes.helpDialog}
+        aria-labelledby="help-dialog-title"
+      >
+        <DialogTitle id="help-dialog-title" className={classes.dialogTitle}>
+          <Typography variant="h6">Multi-Agent Team System</Typography>
+          <IconButton
+            aria-label="close"
+            className={classes.closeButton}
+            onClick={handleHelpClose}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className={classes.dialogContent}>
+          <Typography>
+            In addition to the team's expert agents, all multi-agent teams come with the following system agents:
+          </Typography>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            <li className={classes.agentListItem}>
+              <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+              <div className={classes.agentDescription}>
+                <Typography>
+                  <strong>Agent Moderator</strong> - Identifies which agents are needed and creates tailored guidance to help agents think more deeply to address the user's query
+                </Typography>
+              </div>
+            </li>
+            <li className={classes.agentListItem}>
+              <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+              <div className={classes.agentDescription}>
+                <Typography>
+                  <strong>The Librarian</strong> - Runs advanced database information retrieval at the request of agents to help find the most relevant information to address the user's query
+                </Typography>
+              </div>
+            </li>
+            <li className={classes.agentListItem}>
+              <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+              <div className={classes.agentDescription}>
+                <Typography>
+                  <strong>Synthesis Agent</strong> - Consolidates agent collaborations, reports, and research results for final output to the user
+                </Typography>
+              </div>
+            </li>
+          </ul>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleHelpClose} 
+            color="primary"
+            variant="contained"
+            style={{ borderRadius: '20px', textTransform: 'none' }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={promptHelpOpen}
+        onClose={handlePromptHelpClose}
+        className={classes.promptHelpDialog}
+        aria-labelledby="prompt-help-dialog-title"
+      >
+        <DialogTitle id="prompt-help-dialog-title" className={classes.dialogTitle}>
+          <Typography variant="h6">Effective Prompt Engineering Tips</Typography>
+          <IconButton
+            aria-label="close"
+            className={classes.closeButton}
+            onClick={handlePromptHelpClose}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className={classes.dialogContent}>
+          <div className={classes.promptTip}>
+            <LightbulbIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Be Specific and Clear</strong></Typography>
+              <Typography>
+                Instead of "How to make a website?", try "What are the key steps to create a responsive website using React and Material-UI for a small business?"
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <FormatListBulletedIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Break Down Complex Questions</strong></Typography>
+              <Typography>
+                For complex topics, break your query into smaller, focused questions. This helps get more detailed and accurate responses.
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <SchoolIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Provide Context</strong></Typography>
+              <Typography>
+                Include relevant background information and your level of expertise in the topic for more tailored responses.
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <TuneIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Iterate and Refine</strong></Typography>
+              <Typography>
+                If the response isn't quite what you need, refine your question or ask for clarification on specific points.
+              </Typography>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handlePromptHelpClose} 
+            color="primary"
+            variant="contained"
+            style={{ borderRadius: '20px', textTransform: 'none' }}
+          >
+            Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
