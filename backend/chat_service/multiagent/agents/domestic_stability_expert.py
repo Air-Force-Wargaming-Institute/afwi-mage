@@ -4,10 +4,10 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.llm_manager import LLMManager
 
 from multiagent.graphState import GraphState
-from utils.helpers import update_expert_input
+from backend.chat_service.multiagent.agents.helpers import update_expert_input
 from config import load_config
 from utils.shared_state import shared_state
-from utils.helpers import determine_collaboration
+from backend.chat_service.multiagent.agents.helpers import determine_collaboration
 
 def domestic_stability_expert(state: GraphState) -> GraphState:
     state_dict = state["keys"]
@@ -213,7 +213,7 @@ def domestic_stability_requester(state: GraphState) -> GraphState:
             request = f"Here is the feedback from the domestic stability expert in regards to the analysis generated from the document summery: {agent_reflection}.\n\nPlease consider the expert feedback and retrieve documents that are most related to the question: {question}.\nProvide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
 
             print(request)
-
+            
             return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request, whoami+"_reflected": True}}
     else:
         request = f"I am the domestic stability expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: You are the Domestic Stability expert in a multi-agent system.\n\nEvaluate internal social, demographic, and political factors in the PRC. \n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Explain how domestic issues influence PRC\'s approach to the query topic. \n2. Discuss relevant public opinion trends, ethnic tensions, or domestic challenges.\n3. Analyze how internal stability concerns affect PRC\'s decision-making. \n4. Identify any recent domestic developments that impact the issue. Provide specific examples from the documents of domestic factors and their effects.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."

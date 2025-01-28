@@ -2,12 +2,15 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-from multiagent.graphState import GraphState
+from multiagent.graphState import GraphState, ExpertState
 from backend.chat_service.multiagent.agents.helpers import update_expert_input
 from config import load_config
 from utils.shared_state import shared_state
 from backend.chat_service.multiagent.agents.helpers import determine_collaboration
 from multiagent.llm_manager import LLMManager
+from agents import librarian
+
+PRC_GOVERNMENT_AGENT_INSTRUCTIONS = """You are the PRC Government Expert in a multi-agent system. Focus on the structure, decision-making processes, and key figures within the PRC government.\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents."""
 
 def prc_government_expert(state: GraphState) -> GraphState:
     state_dict = state["keys"]
@@ -222,14 +225,101 @@ def prc_government_requester(state: GraphState) -> GraphState:
     
         return {"keys": {**state_dict, "last_actor": whoami, whoami+"_request": request}}
 
+def prc_government_subgraph_entry(state: ExpertState):
+    #This was the requester-->expert logic
+    agent_instructions = state['expert']+"_AGENT_INSTRUCTIONS"
+    banner = f"\n\n\t---------------------------\n\n\t---{state['expert']} SUBGRAPH ENTRY---\n\n\t---------------------------\n\n\t"
+    print(banner.upper())
+    whoami = state['expert']
+    question = state["question"]
+    request = f"I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
+    print(request)
+    document_summary, relevant_documents = librarian(whoami, request)
+    '''============================================================================='''
+    config = load_config()
+    llm = LLMManager().llm
+    documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
+    moderator_guidance = state[whoami+"_moderator_guidance"]
+
+    banner = f"\n\n\t---------------------------\n\n\t---{whoami}---\n\n\t---------------------------\n\n\t"
+    print(banner.upper())
+    
+    prompt = PromptTemplate(
+            input_variables=["question", "document_summary", "relevant_docs", "moderator_guidance","whoami","PRC_GOVERNMENT_AGENT_INSTRUCTIONS"],
+            template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n The panel has been asked this question/query: \n{question}\n\n A moderator for your panel has provided the following guidance to panel members: \n{moderator_guidance}\n\n It is time to write your first draft report. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your initial report, please provide a short title that includes '{whoami} INITIAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your initial report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your initial report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query."
+    )
+
+    chain = prompt | llm | StrOutputParser()
+
+    analysis = chain.invoke({
+        "question": question,
+        "document_summary": document_summary,
+        "relevant_docs": documents_text,
+        "moderator_guidance": moderator_guidance,
+        "whoami": whoami,
+        "agent_instructions": agent_instructions
+    })
+
+    print("\n\t------\n\t---INITIAL REFLECTION---\n\t------\n")
+    reflection_prompt = PromptTemplate(
+        input_variables=["question", "analysis", "documents_text","whoami","agent_instructions"],
+        template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had written the following report: \n{analysis}.\n\n It is time to write a critique of your first draft report. Write your critique, focusing on three main areas for improvement. 1.) CLARIFICATION: Potential clarification of mischaracterizations in the first draft. 2.) INNACCURACIES: Information that is not true or that you suspect may be innaccurate. 3.) FINAL REPORT CONSIDERATIONS: Create a succinct list of specific instructions for corrections or clarifications to incorporate in subsequent drafts of the report. Where appropriate, support your critique with relevant facts and examples found from these relevant documents: \n{documents_text}.\n\n At the start of your critique, please provide a short title that includes 'prc government INITIAL SELF-CRITIQUE on:' and then restate the question/query but paraphrased from your perspective. Your critique should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your critique to better support subsequent drafts of the report."
+    )
+
+    chain = reflection_prompt | llm | StrOutputParser()
+    reflection = chain.invoke({
+        "question": question,
+        "analysis": analysis,
+        "documents_text": documents_text,
+        "whoami": whoami,
+        "agent_instructions": agent_instructions
+    })
+
+    print("\n\t------\n\t---REQUEST COLLABORATION---\n\t------\n")
+    expert_agents = config["EXPERT_AGENTS"]
+    expert_agents.remove(whoami)
+    expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
+    print("\tINFO: {whoami} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
+    #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
+    collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
+    print("\n\n\n")
+    print(collaborators)
+    print("\n\n\n")
+
+    if collaborators:
+        shared_state.COLLAB_LOOP = True
+        shared_state.MORE_COLLAB = True
+
+        prompt = PromptTemplate(
+            input_variables=["question", "analysis", "reflection", "collab_experts","whoami","agent_instructions"],
+            template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n Your panel has been asked this question/query: \n{question}\n\n You just wrote this report as a first draft attempt to address the question/query: \n{analysis}\n\n You also reviewed your first draft report and provided this self-critique on how to improve it:\n{reflection}\n\n These experts have been selected to collaborate with you to help improve your report with contributions from their expert perspectives: \n{collab_experts}\n\n To direct each expert in how they can best help you improve your report but from the perspective of their expert domain knowledge, create concise instructions for each individual expert on what they should focus on when they draft their collaborative inputs."
+        )
+
+        collab_experts_str = ", ".join(f"{expert}" for expert in collaborators)
+        collaborator = str(collaborators[0])
+
+        chain = prompt | llm | StrOutputParser()
+        collab_areas = chain.invoke({
+            "question": question,
+            "analysis": analysis,
+            "reflection": reflection,
+            "collab_experts": collab_experts_str,
+            "whoami": whoami,
+            "agent_instructions": agent_instructions
+        })
+
+        return { whoami+"_analysis": analysis, whoami+"_reflection": reflection, whoami+"_collab_areas": collab_areas, whoami+"_collaborators_list": collaborators}
+    return {whoami+"_analysis": analysis, whoami+"_reflection": reflection}
+
+
+
 # The following will be filled in programmatically when creating a new agent
 AGENT_NAME = "prc government"                               #PRC_Domestic_Stability
 AGENT_FILE_NAME = "prc_government"                     #PRC_Domestic_Stability.py
 #AGENT_ATTRIBUTES = "{{AGENT_ATTRIBUTES}}"                   #domestic stability, social, demographic, and political factors,
 MEMORY_TYPE = "ConversationBufferMemory"                             #ConversationBufferMemory
 MEMORY_KWARGS = {"max_token_limit": 2000}                          #...
-AGENT_DESCRIPTION = """PRC Government Expert"""                 #...
-AGENT_INSTRUCTIONS = """You are the PRC Government Expert in a multi-agent system. Focus on the structure, decision-making processes, and key figures within the PRC government.\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents."""               #...
+AGENT_DESCRIPTION = """PRC Government Expert"""                 #...           #...
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#FFA500"                                         #FF0000
 CREATED_AT = "2025-01-17T17:14:42.183240"                               #2024-12-15

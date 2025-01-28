@@ -1,5 +1,6 @@
 import functools
 
+
 from multiagent.agents import *
 from config import load_config
 from multiagent.graphState import GraphState

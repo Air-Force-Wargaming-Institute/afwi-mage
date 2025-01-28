@@ -4,9 +4,7 @@ from pydantic import BaseModel
 
 from utils.shared_state import shared_state
 from config import load_config
-from utils.vector_store.vectorstore import check_for_vectorstore, load_local_vectorstore, create_retriever
 from multiagent.processQuestion import process_question
-
 
 class ChatMessage(BaseModel):
     message: str
@@ -14,9 +12,6 @@ class ChatMessage(BaseModel):
 app = FastAPI()
 
 config = load_config()
-VS_PERSIST_DIR = config['VS_PERSIST_DIR']
-SEARCH_TYPE = config['SEARCH_TYPE']
-K = config['K']
 
 # Configure CORS
 app.add_middleware(
@@ -26,18 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Check if a vector store exists at the VS_PERSIST_DIR location
-if check_for_vectorstore(VS_PERSIST_DIR):
-    shared_state.VECTOR_STORE = load_local_vectorstore(VS_PERSIST_DIR)
-else:
-    shared_state.VECTOR_STORE = None
-
-# If a vector store exists, create a retriever
-if shared_state.VECTOR_STORE:
-    shared_state.RETRIEVER = create_retriever(type=SEARCH_TYPE, vector_store=shared_state.VECTOR_STORE, k=K)
-else:
-    shared_state.RETRIEVER = None
 
 @app.post("/chat")
 async def chat(message: ChatMessage):
