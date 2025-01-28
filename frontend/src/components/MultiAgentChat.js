@@ -451,6 +451,115 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.primary.main,
     marginTop: '2px',
   },
+  typingIndicator: {
+    alignSelf: 'flex-start',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(1),
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.grey[100],
+    borderRadius: '30px',
+    margin: theme.spacing(1, 0),
+    maxWidth: '410px',
+    position: 'relative',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: '30px',
+      background: `linear-gradient(90deg, 
+        transparent 0%,
+        ${theme.palette.primary.main} 50%,
+        transparent 100%)`,
+      backgroundSize: '200% 100%',
+      backgroundRepeat: 'no-repeat',
+      animation: '$borderZip 3s linear infinite',
+      opacity: 0.1,
+      clipPath: `
+        polygon(
+          30px 0,
+          calc(100% - 30px) 0,
+          100% 0,
+          100% 30px,
+          100% calc(100% - 30px),
+          100% 100%,
+          calc(100% - 30px) 100%,
+          30px 100%,
+          0 100%,
+          0 calc(100% - 30px),
+          0 30px,
+          0 0
+        )
+      `,
+      border: '2px solid',
+    },
+    '& .loading-text': {
+      color: theme.palette.text.secondary,
+      fontSize: '1rem',
+      lineHeight: 1.4,
+      textAlign: 'center',
+      fontWeight: 500,
+      marginBottom: theme.spacing(1),
+    },
+    '& .loading-header': {
+      color: theme.palette.text.primary,
+      fontSize: '1.2rem',
+      fontWeight: 600,
+      textAlign: 'center',
+      marginBottom: theme.spacing(1),
+    },
+    '& .dots': {
+      display: 'flex',
+      gap: '4px',
+      justifyContent: 'center',
+    },
+    '& .dot': {
+      width: '8px',
+      height: '8px',
+      backgroundColor: theme.palette.grey[400],
+      borderRadius: '50%',
+      animation: '$bounce 3s infinite ease-in-out both',
+      '&:nth-child(1)': {
+        animationDelay: '-0.32s',
+      },
+      '&:nth-child(2)': {
+        animationDelay: '-0.16s',
+      },
+    },
+  },
+  '@keyframes bounce': {
+    '0%, 80%, 100%': {
+      transform: 'scale(0)',
+    },
+    '40%': {
+      transform: 'scale(1)',
+    },
+  },
+  '@keyframes pulseBorder': {
+    '0%': {
+      borderColor: 'rgba(0, 0, 0, 0.05)',
+      boxShadow: '0 0 0 0 rgba(0, 0, 0, 0.05)',
+    },
+    '50%': {
+      borderColor: 'rgba(0, 0, 0, 0.15)',
+      boxShadow: '0 0 0 4px rgba(0, 0, 0, 0.05)',
+    },
+    '100%': {
+      borderColor: 'rgba(0, 0, 0, 0.05)',
+      boxShadow: '0 0 0 0 rgba(0, 0, 0, 0.05)',
+    },
+  },
+  '@keyframes borderZip': {
+    '0%': {
+      backgroundPosition: '200% 0',
+    },
+    '100%': {
+      backgroundPosition: '-200% 0',
+    },
+  },
 }));
 
 const MessageContent = ({ content, isUser }) => {
@@ -594,6 +703,7 @@ function MultiAgentChat() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [promptHelpOpen, setPromptHelpOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
@@ -612,11 +722,11 @@ function MultiAgentChat() {
     const newMessages = [...messages, { text: input.trim(), sender: 'user' }];
     setMessages(newMessages);
     setInput('');
+    setIsLoading(true);
 
     try {
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
-      
-      // Handle array responses
+
       const aiResponse = Array.isArray(response.data.response) 
         ? response.data.response[0] 
         : (typeof response.data.response === 'string' 
@@ -627,6 +737,8 @@ function MultiAgentChat() {
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages([...newMessages, { text: 'Error: Failed to get response from AI', sender: 'system' }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -727,13 +839,13 @@ function MultiAgentChat() {
                 Agents in this Chat:
               </Typography>
             </div>
-            <IconButton
+              <IconButton
               className={classes.fullscreenButton}
-              onClick={toggleFullscreen}
-              size="small"
-            >
-              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-            </IconButton>
+                onClick={toggleFullscreen}
+                size="small"
+              >
+                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
           </div>
           <Box className={classes.messageArea}>
             {messages.map((message, index) => (
@@ -752,6 +864,21 @@ function MultiAgentChat() {
                 </div>
               </Box>
             ))}
+            {isLoading && (
+              <div className={classes.typingIndicator}>
+                <Typography className="loading-header">
+                  One moment...
+                </Typography>
+                <Typography className="loading-text">
+                  The team is gathering data, processing, reflecting, and collaborating to address your query. Depending on the complexity of the problem, this may take a few moments...
+                </Typography>
+                <div className="dots">
+                  <div className="dot" />
+                  <div className="dot" />
+                  <div className="dot" />
+                </div>
+              </div>
+            )}
             <div ref={messageEndRef} />
           </Box>
           <form onSubmit={handleSubmit} className={classes.inputArea}>
