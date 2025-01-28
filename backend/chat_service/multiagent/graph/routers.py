@@ -147,7 +147,13 @@ def router_dynamic_collab(state: GraphState):
         return router_expert_input_still_needed(state)
 
 def router_expert_subgraphs(state: GraphState):
-    return [Send("prc_government_subgraph_entry", {"expert": s, "question": state["Question"], s+"_moderator_guidance" : state[s+"_moderator_guidance"]}) for s in state["selected_experts"]]
+    return [Send("expert_subgraph_entry", {"expert": s, "question": state["Question"], s+"_moderator_guidance" : state[s+"_moderator_guidance"]}) for s in state["selected_experts"]]
 
 def router_get_Moderator_Guidance(state: GraphState):
     return [Send("get_Moderator_Guidance", {"expert": s, "question": state["Question"]}) for s in state["selected_experts"]]
+
+def router_collaboration_requested(state: GraphState):
+    return [Send("collab_subgraph_entry", {"expert": s, "collaborator": c, "question": state["Question"], s+"_reflection" : state[s+"_reflection"], s+"_analysis" : state[s+"_analysis"], s+"_collab_areas" : state[s+"_collab_areas"]}) for s in state["selected_experts"] for c in state[s+"_collaborators_list"]]
+
+def router_expert_report(state: GraphState):
+    pass
