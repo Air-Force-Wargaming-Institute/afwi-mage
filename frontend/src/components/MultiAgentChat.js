@@ -20,6 +20,7 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import GetAppIcon from '@material-ui/icons/GetApp';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 import ReactMarkdown from 'react-markdown';
@@ -87,17 +88,33 @@ const useStyles = makeStyles((theme) => ({
   message: {
     marginBottom: theme.spacing(1),
     padding: theme.spacing(2),
+    paddingBottom: theme.spacing(2),
     borderRadius: theme.shape.borderRadius,
     maxWidth: '80%',
     wordBreak: 'break-word',
     display: 'inline-block',
     whiteSpace: 'pre-wrap',
     fontSize: '0.7rem',
+    position: 'relative',
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: theme.palette.primary.light,
-    color: theme.palette.primary.contrastText,
+    backgroundColor: theme.palette.primary.main,
+    color: '#ffffff',
+    '& .copyButton': {
+      color: '#ffffff',
+      '&:hover': {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      },
+    },
+    '& .messageContent': {
+      color: '#ffffff',
+    },
+    '& .markdown': {
+      '& p, & h1, & h2, & h3, & h4, & h5, & h6, & ul, & ol, & li': {
+        color: '#ffffff',
+      },
+    },
   },
   aiMessage: {
     alignSelf: 'flex-start',
@@ -221,6 +238,37 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '0.9rem',
     lineHeight: 1.5,
     color: theme.palette.text.primary,
+    marginBottom: theme.spacing(2),
+  },
+  messageWrapper: {
+    position: 'relative',
+    width: '100%',
+  },
+  copyButton: {
+    position: 'absolute',
+    right: theme.spacing(0.5),
+    bottom: theme.spacing(-1),
+    padding: 0,
+    minWidth: '32px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 1)',
+    },
+    zIndex: 1,
+    '& .MuiSvgIcon-root': {
+      fontSize: '18px',
+      margin: 'auto',
+    },
+  },
+  messageContainer: {
+    position: 'relative',
+    width: '100%',
+    padding: theme.spacing(1),
   },
 }));
 
@@ -246,11 +294,18 @@ const MessageContent = ({ content, isUser }) => {
     // Clean up extra spaces
     .trim();
 
-  if (isUser) {
-    return <div className={classes.messageContent}>{textContent}</div>;
-  }
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      // Optionally add a toast/snackbar notification here
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
 
-  return (
+  const renderedContent = isUser ? (
+    <div className={classes.messageContent}>{textContent}</div>
+  ) : (
     <ReactMarkdown
       className={`${classes.markdown} ${classes.messageContent}`}
       components={{
@@ -276,6 +331,21 @@ const MessageContent = ({ content, isUser }) => {
     >
       {textContent}
     </ReactMarkdown>
+  );
+
+  return (
+    <div className={classes.messageContainer}>
+      {renderedContent}
+      <IconButton 
+        className={`${classes.copyButton} copyButton`}
+        size="small"
+        onClick={handleCopy}
+        title="Copy message"
+        centerRipple
+      >
+        <ContentCopyIcon />
+      </IconButton>
+    </div>
   );
 };
 
@@ -409,10 +479,12 @@ function MultiAgentChat() {
                 }`}
                 style={{ maxWidth: message.sender === 'user' ? '70%' : '85%' }}
               >
-                <MessageContent 
-                  content={message.text} 
-                  isUser={message.sender === 'user'} 
-                />
+                <div className={classes.messageWrapper}>
+                  <MessageContent 
+                    content={message.text} 
+                    isUser={message.sender === 'user'} 
+                  />
+                </div>
               </Box>
             ))}
             <div ref={messageEndRef} />
