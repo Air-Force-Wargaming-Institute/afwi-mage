@@ -7,10 +7,8 @@ def process_question():
     shared_state.CONVERSATION += f"User Question {shared_state.ITERATION}: {shared_state.QUESTION},\n\n"
 
     inputs = {
-        "keys": {
-            "question": shared_state.QUESTION,
-            "conversation_history": shared_state.CONVERSATION,
-        }
+        "question": shared_state.QUESTION,
+        "conversation_history": shared_state.CONVERSATION,
     }
 
     final_output = None

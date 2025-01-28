@@ -10,24 +10,24 @@ from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
 
 def synthesis_agent(state: GraphState) -> GraphState:
+    print("\n\n\t---------------------------\n\n\t---SYNTHESIS AGENT---\n\n\t---------------------------\n\n\t")
     """
     The Synthesis Agent
     Consolidates insights from all other agents into a comprehensive report.
     """
-    state_dict = state["keys"]
     llm = LLMManager().llm 
 
-    print("\n\n\t---------------------------\n\n\t---SYNTHESIS AGENT---\n\n\t---------------------------\n\n\t")
-    question = state["question"]
+    
+    question = state['keys']['question']
     whoami = "synthesis"
     analyses = {
-        "Government": state.get("prc_government_analysis", ""),
-        "Military": state.get("prc_military_analysis", ""),
-        "Economic": state.get("prc_economic_analysis", ""),
-        "Regional Dynamics": state.get("regional_dynamics_analysis", ""),
-        "Global Influence": state.get("global_influence_analysis", ""),
-        "Technology": state.get("technology_innovation_analysis", ""),
-        "Domestic Stability": state.get("domestic_stability_analysis", "")
+        "Government": state.get("keys", {}).get("prc_government_analysis", ""),
+        "Military": state.get("keys", {}).get("prc_military_analysis", ""),
+        "Economic": state.get("keys", {}).get("prc_economic_analysis", ""),
+        "Regional Dynamics": state.get("keys", {}).get("regional_dynamics_analysis", ""),
+        "Global Influence": state.get("keys", {}).get("global_influence_analysis", ""),
+        "Technology": state.get("keys", {}).get("technology_innovation_analysis", ""),
+        "Domestic Stability": state.get("keys", {}).get("domestic_stability_analysis", "")
     }
     
     prompt = PromptTemplate(
@@ -67,4 +67,4 @@ def synthesis_agent(state: GraphState) -> GraphState:
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(conversation_data, f, indent=4, ensure_ascii=False)
     
-    return {"keys": {**state_dict, "synthesized_report": synthesized_report, "last_actor": whoami}}
+    return {'keys': {**state['keys'], 'synthesized_report': synthesized_report, 'last_actor': whoami}}
