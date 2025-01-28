@@ -14,20 +14,20 @@ def synthesis_agent(state: GraphState) -> GraphState:
     The Synthesis Agent
     Consolidates insights from all other agents into a comprehensive report.
     """
+    state_dict = state["keys"]
     llm = LLMManager().llm 
 
     print("\n\n\t---------------------------\n\n\t---SYNTHESIS AGENT---\n\n\t---------------------------\n\n\t")
-    state_dict = state["keys"]
-    question = state_dict["question"]
+    question = state["question"]
     whoami = "synthesis"
     analyses = {
-        "Government": state_dict.get("prc_government_analysis", ""),
-        "Military": state_dict.get("prc_military_analysis", ""),
-        "Economic": state_dict.get("prc_economic_analysis", ""),
-        "Regional Dynamics": state_dict.get("regional_dynamics_analysis", ""),
-        "Global Influence": state_dict.get("global_influence_analysis", ""),
-        "Technology": state_dict.get("technology_innovation_analysis", ""),
-        "Domestic Stability": state_dict.get("domestic_stability_analysis", "")
+        "Government": state.get("prc_government_analysis", ""),
+        "Military": state.get("prc_military_analysis", ""),
+        "Economic": state.get("prc_economic_analysis", ""),
+        "Regional Dynamics": state.get("regional_dynamics_analysis", ""),
+        "Global Influence": state.get("global_influence_analysis", ""),
+        "Technology": state.get("technology_innovation_analysis", ""),
+        "Domestic Stability": state.get("domestic_stability_analysis", "")
     }
     
     prompt = PromptTemplate(
