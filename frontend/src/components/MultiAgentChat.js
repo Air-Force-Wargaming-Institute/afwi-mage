@@ -31,6 +31,9 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import Fade from '@material-ui/core/Fade';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 import ReactMarkdown from 'react-markdown';
@@ -78,6 +81,20 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(1),
     textAlign: 'left',
     fontSize: '0.7rem',
+    scrollBehavior: 'smooth',
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[300],
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.grey[400],
+      },
+    },
   },
   inputArea: {
     display: 'flex',
@@ -573,6 +590,52 @@ const useStyles = makeStyles((theme) => ({
       backgroundPosition: '-200% 0',
     },
   },
+  scrollTopButton: {
+    position: 'absolute',
+    right: theme.spacing(2),
+    bottom: theme.spacing(16),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[2],
+    width: '40px',
+    height: '40px',
+    padding: 0,
+    border: '1px solid rgba(0, 0, 0, 0.12)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '&:hover': {
+      backgroundColor: theme.palette.grey[100],
+    },
+    zIndex: 1000,
+    '& .MuiSvgIcon-root': {
+      fontSize: '24px',
+      margin: 0,
+      padding: 0,
+    },
+  },
+  scrollBottomButton: {
+    position: 'absolute',
+    right: theme.spacing(2),
+    bottom: theme.spacing(10),
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[2],
+    width: '40px',
+    height: '40px',
+    padding: 0,
+    border: '1px solid rgba(0, 0, 0, 0.12)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '&:hover': {
+      backgroundColor: theme.palette.grey[100],
+    },
+    zIndex: 1000,
+    '& .MuiSvgIcon-root': {
+      fontSize: '24px',
+      margin: 0,
+      padding: 0,
+    },
+  },
 }));
 
 const MessageContent = ({ content, isUser, timestamp }) => {
@@ -729,6 +792,9 @@ function MultiAgentChat() {
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [promptHelpOpen, setPromptHelpOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const messageAreaRef = useRef(null);
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
@@ -820,6 +886,28 @@ function MultiAgentChat() {
     setPromptHelpOpen(false);
   };
 
+  const handleScroll = (event) => {
+    const element = event.target;
+    const scrollTop = element.scrollTop;
+    const scrollHeight = element.scrollHeight;
+    const clientHeight = element.clientHeight;
+    
+    setShowScrollTop(scrollTop > 500);
+    // Show scroll bottom when not at bottom and has scrollable content
+    setShowScrollBottom(scrollTop < scrollHeight - clientHeight - 100);
+  };
+
+  const scrollToTop = () => {
+    messageAreaRef.current?.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
+
+  const scrollToBottom = () => {
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   useEffect(() => {
     messageEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -884,7 +972,11 @@ function MultiAgentChat() {
                 {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
               </IconButton>
           </div>
-          <Box className={classes.messageArea}>
+          <Box 
+            ref={messageAreaRef}
+            className={classes.messageArea}
+            onScroll={handleScroll}
+          >
             {messages.map((message, index) => (
               <Box 
                 key={index} 
@@ -908,7 +1000,7 @@ function MultiAgentChat() {
                   One moment...
                 </Typography>
                 <Typography className="loading-text">
-                  The team is gathering data, processing, reflecting, and collaborating to address your query. Depending on the complexity of the problem, this may take a few moments...
+                  The team is gathering data, processing, reflecting, and collaborating to address your query. Depending on the complexity of your query, this may take a few moments...
                 </Typography>
                 <div className="dots">
                   <div className="dot" />
@@ -918,6 +1010,26 @@ function MultiAgentChat() {
               </div>
             )}
             <div ref={messageEndRef} />
+            <Fade in={showScrollTop}>
+              <IconButton
+                className={classes.scrollTopButton}
+                onClick={scrollToTop}
+                size="medium"
+                title="Scroll to top"
+              >
+                <KeyboardArrowUpIcon />
+              </IconButton>
+            </Fade>
+            <Fade in={showScrollBottom}>
+              <IconButton
+                className={classes.scrollBottomButton}
+                onClick={scrollToBottom}
+                size="medium"
+                title="Scroll to bottom"
+              >
+                <KeyboardArrowDownIcon />
+              </IconButton>
+            </Fade>
           </Box>
           <form onSubmit={handleSubmit} className={classes.inputArea}>
             <IconButton 
