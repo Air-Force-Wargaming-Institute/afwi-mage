@@ -297,10 +297,24 @@ const useStyles = makeStyles((theme) => ({
       transform: 'translateY(0)',
     },
   },
+  messageFooter: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: theme.spacing(1),
+    paddingTop: theme.spacing(0.5),
+  },
+  timestamp: {
+    fontSize: '0.75rem',
+    color: theme.palette.text.secondary,
+    opacity: 0.8,
+    marginLeft: theme.spacing(1),
+  },
+  userMessageTimestamp: {
+    color: '#ffffff !important',
+    opacity: 0.7,
+  },
   copyButton: {
-    position: 'absolute',
-    right: theme.spacing(0.5),
-    bottom: theme.spacing(-1),
     padding: 0,
     minWidth: '32px',
     width: '32px',
@@ -310,7 +324,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     justifyContent: 'center',
     opacity: 0.7,
-    transform: 'translateY(2px)',
     transition: 'all 0.2s ease',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
@@ -562,7 +575,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const MessageContent = ({ content, isUser }) => {
+const MessageContent = ({ content, isUser, timestamp }) => {
   const classes = useStyles();
   const contentRef = useRef(null);
   
@@ -681,15 +694,27 @@ const MessageContent = ({ content, isUser }) => {
   return (
     <div className={classes.messageContainer}>
       {renderedContent}
-      <IconButton 
-        className={`${classes.copyButton} copyButton`}
-        size="small"
-        onClick={handleCopy}
-        title="Copy message"
-        centerRipple
-      >
-        <ContentCopyIcon />
-      </IconButton>
+      <div className={classes.messageFooter}>
+        <Typography 
+          variant="caption" 
+          className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}
+        >
+          {new Date(timestamp).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+          })}
+        </Typography>
+        <IconButton 
+          className={`${classes.copyButton} copyButton`}
+          size="small"
+          onClick={handleCopy}
+          title="Copy message"
+          centerRipple
+        >
+          <ContentCopyIcon />
+        </IconButton>
+      </div>
     </div>
   );
 };
@@ -719,7 +744,11 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
-    const newMessages = [...messages, { text: input.trim(), sender: 'user' }];
+    const newMessages = [...messages, { 
+      text: input.trim(), 
+      sender: 'user',
+      timestamp: new Date()  // Add timestamp
+    }];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
@@ -733,10 +762,18 @@ function MultiAgentChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      setMessages([...newMessages, { text: aiResponse, sender: 'ai' }]);
+      setMessages([...newMessages, { 
+        text: aiResponse, 
+        sender: 'ai',
+        timestamp: new Date()  // Add timestamp
+      }]);
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages([...newMessages, { text: 'Error: Failed to get response from AI', sender: 'system' }]);
+      setMessages([...newMessages, { 
+        text: 'Error: Failed to get response from AI', 
+        sender: 'system',
+        timestamp: new Date()  // Add timestamp
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -860,6 +897,7 @@ function MultiAgentChat() {
                   <MessageContent 
                     content={message.text} 
                     isUser={message.sender === 'user'} 
+                    timestamp={message.timestamp}
                   />
                 </div>
               </Box>
