@@ -238,10 +238,12 @@ def prc_government_subgraph_entry(state: ExpertState):
     print(banner.upper())
     whoami = state['expert']
     question = state["question"]
+    #Librarian request
     request = f"I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
     print(request)
     document_summary, relevant_documents = librarian(whoami, request)
     '''============================================================================='''
+    #Expert analysis -- Initial report
     config = load_config()
     llm = LLMManager().llm
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -291,7 +293,7 @@ def prc_government_subgraph_entry(state: ExpertState):
     print("\n\n\n")
     print(collaborators)
     print("\n\n\n")
-
+    #Request collaboration instructions for the individuals
     if collaborators:
         prompt = PromptTemplate(
             input_variables=["question", "analysis", "reflection", "collab_experts","whoami","agent_instructions"],
