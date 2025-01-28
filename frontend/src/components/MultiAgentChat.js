@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -9,7 +9,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Divider,
   Tooltip
@@ -78,6 +77,10 @@ const useStyles = makeStyles((theme) => ({
   input: {
     flexGrow: 1,
     marginRight: theme.spacing(2),
+    '& .MuiInputBase-root': {
+      maxHeight: '150px',
+      overflowY: 'auto',
+    },
   },
   newChatButton: {
     marginTop: theme.spacing(3),
@@ -89,18 +92,25 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: theme.spacing(1),
     padding: theme.spacing(2),
     paddingBottom: theme.spacing(2),
-    borderRadius: theme.shape.borderRadius,
+    borderRadius: '30px',
+    border: '1px solid #e0e0e0',
     maxWidth: '80%',
     wordBreak: 'break-word',
     display: 'inline-block',
     whiteSpace: 'pre-wrap',
-    fontSize: '0.7rem',
     position: 'relative',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+      transform: 'translateY(-1px)',
+    },
   },
   userMessage: {
     alignSelf: 'flex-end',
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
+    borderBottomRightRadius: '4px',
     '& .copyButton': {
       color: '#ffffff',
       '&:hover': {
@@ -108,18 +118,17 @@ const useStyles = makeStyles((theme) => ({
       },
     },
     '& .messageContent': {
-      color: '#ffffff',
+      color: '#ffffff !important',
     },
-    '& .markdown': {
-      '& p, & h1, & h2, & h3, & h4, & h5, & h6, & ul, & ol, & li': {
-        color: '#ffffff',
-      },
+    '& div': {
+      color: '#ffffff !important',
     },
   },
   aiMessage: {
     alignSelf: 'flex-start',
     backgroundColor: theme.palette.grey[100],
     color: theme.palette.text.primary,
+    borderBottomLeftRadius: '4px',
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
@@ -167,11 +176,13 @@ const useStyles = makeStyles((theme) => ({
       margin: '0.5em 0 0.3em',
       lineHeight: 1,
       color: theme.palette.text.primary,
+      fontSize: '1.1rem',
     },
     '& p': {
       margin: '0.3em 0',
       color: theme.palette.text.primary,
       lineHeight: 1.3,
+      fontSize: '1rem',
     },
     '& ul, & ol': {
       margin: '0.3em 0',
@@ -235,14 +246,26 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   messageContent: {
-    fontSize: '0.9rem',
+    fontSize: '1rem',
     lineHeight: 1.5,
     color: theme.palette.text.primary,
     marginBottom: theme.spacing(2),
+    '.userMessage & ': {
+      color: '#ffffff !important',
+    },
   },
   messageWrapper: {
     position: 'relative',
     width: '100%',
+  },
+  messageContainer: {
+    position: 'relative',
+    width: '100%',
+    padding: theme.spacing(1),
+    '&:hover .copyButton': {
+      opacity: 1,
+      transform: 'translateY(0)',
+    },
   },
   copyButton: {
     position: 'absolute',
@@ -256,8 +279,12 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    opacity: 0.7,
+    transform: 'translateY(2px)',
+    transition: 'all 0.2s ease',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
+      opacity: 1,
     },
     zIndex: 1,
     '& .MuiSvgIcon-root': {
@@ -265,15 +292,11 @@ const useStyles = makeStyles((theme) => ({
       margin: 'auto',
     },
   },
-  messageContainer: {
-    position: 'relative',
-    width: '100%',
-    padding: theme.spacing(1),
-  },
 }));
 
 const MessageContent = ({ content, isUser }) => {
   const classes = useStyles();
+  const contentRef = useRef(null);
   
   // Handle array responses and ensure content is a string
   let textContent = Array.isArray(content) 
@@ -296,41 +319,107 @@ const MessageContent = ({ content, isUser }) => {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(content);
-      // Optionally add a toast/snackbar notification here
+      let textToCopy;
+      if (contentRef.current) {
+        // Get the rendered text content, preserving basic formatting
+        const processNode = (node) => {
+          // Handle text nodes
+          if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent;
+          }
+          
+          // Handle element nodes
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Get tag name
+            const tag = node.tagName.toLowerCase();
+            
+            // Process children first
+            const childText = Array.from(node.childNodes)
+              .map(child => processNode(child))
+              .join('');
+            
+            // Add formatting based on tag
+            switch (tag) {
+              case 'h1':
+              case 'h2':
+              case 'h3':
+              case 'h4':
+              case 'h5':
+              case 'h6':
+                return `${childText}\n`;
+              case 'p':
+                return `${childText}\n\n`;
+              case 'ul':
+              case 'ol':
+                return childText;
+              case 'li':
+                return `• ${childText}\n`;
+              case 'br':
+                return '\n';
+              case 'strong':
+              case 'b':
+                return childText;
+              case 'em':
+              case 'i':
+                return childText;
+              case 'code':
+                return childText;
+              default:
+                return childText;
+            }
+          }
+          return '';
+        };
+        
+        textToCopy = processNode(contentRef.current);
+        // Clean up extra whitespace and newlines
+        textToCopy = textToCopy
+          .replace(/\n\s*\n\s*\n/g, '\n\n')  // Replace triple newlines with double
+          .replace(/\s+$/gm, '')  // Remove trailing whitespace from lines
+          .trim();  // Remove leading/trailing whitespace from whole text
+      } else {
+        // Fallback to rendered version of markdown
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = textContent;
+        textToCopy = tempDiv.textContent;
+      }
+      
+      await navigator.clipboard.writeText(textToCopy);
     } catch (err) {
       console.error('Failed to copy text:', err);
     }
   };
 
   const renderedContent = isUser ? (
-    <div className={classes.messageContent}>{textContent}</div>
+    <div ref={contentRef} className={classes.messageContent}>{textContent}</div>
   ) : (
-    <ReactMarkdown
-      className={`${classes.markdown} ${classes.messageContent}`}
-      components={{
-        code({ node, inline, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '');
-          const language = match ? match[1] : '';
-          
-          if (!inline && language) {
-            return (
-              <SyntaxHighlighter
-                style={materialDark}
-                language={language}
-                PreTag="div"
-                {...props}
-              >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            );
+    <div ref={contentRef}>
+      <ReactMarkdown
+        className={`${classes.markdown} ${classes.messageContent}`}
+        components={{
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const language = match ? match[1] : '';
+            
+            if (!inline && language) {
+              return (
+                <SyntaxHighlighter
+                  style={materialDark}
+                  language={language}
+                  PreTag="div"
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              );
+            }
+            return <code className={className} {...props}>{children}</code>;
           }
-          return <code className={className} {...props}>{children}</code>;
-        }
-      }}
-    >
-      {textContent}
-    </ReactMarkdown>
+        }}
+      >
+        {textContent}
+      </ReactMarkdown>
+    </div>
   );
 
   return (
@@ -359,6 +448,12 @@ function MultiAgentChat() {
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
+  };
+
+  const handleKeyPress = (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      handleSubmit(event);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -493,9 +588,13 @@ function MultiAgentChat() {
             <TextField
               className={classes.input}
               variant="outlined"
-              placeholder="Type your message here..."
+              placeholder="Type your message here... (Ctrl+Enter to send)"
               value={input}
               onChange={handleInputChange}
+              onKeyDown={handleKeyPress}
+              multiline
+              minRows={1}
+              maxRows={5}
               fullWidth
             />
             <Button 
