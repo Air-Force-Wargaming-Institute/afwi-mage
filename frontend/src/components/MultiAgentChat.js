@@ -22,6 +22,9 @@ import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
 import axios from 'axios';
 import { getApiUrl } from '../config';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -98,7 +101,16 @@ const useStyles = makeStyles((theme) => ({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor: theme.palette.grey[100],
+    color: theme.palette.text.primary,
+    '& pre': {
+      margin: '8px 0',
+      borderRadius: '4px',
+      overflow: 'auto',
+    },
+    '& code': {
+      fontFamily: 'monospace',
+    },
   },
   chatSessionItem: {
     display: 'flex',
@@ -133,7 +145,139 @@ const useStyles = makeStyles((theme) => ({
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
   },
+  markdown: {
+    '& h1, & h2, & h3, & h4, & h5, & h6': {
+      margin: '0.5em 0 0.3em',
+      lineHeight: 1,
+      color: theme.palette.text.primary,
+    },
+    '& p': {
+      margin: '0.3em 0',
+      color: theme.palette.text.primary,
+      lineHeight: 1.3,
+    },
+    '& ul, & ol': {
+      margin: '0.3em 0',
+      paddingLeft: theme.spacing(3),
+      color: theme.palette.text.primary,
+      '& li': {
+        marginTop: '0em',
+        marginBottom: '0.1em',
+        lineHeight: 1.3,
+      },
+      '& li:last-child': {
+        marginBottom: 0,
+      },
+    },
+    '& blockquote': {
+      margin: '0.8em 0',
+      padding: '0.4em 1em',
+      borderLeft: `4px solid ${theme.palette.grey[300]}`,
+      backgroundColor: theme.palette.grey[50],
+      color: theme.palette.text.secondary,
+    },
+    '& hr': {
+      margin: '.5em 0',
+    },
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    '& code': {
+      backgroundColor: 'rgba(0, 0, 0, 0.06)',
+      padding: '0.2em 0.4em',
+      borderRadius: 3,
+      fontSize: '85%',
+      color: theme.palette.text.primary,
+    },
+    '& pre': {
+      margin: '0.5em 0',
+      padding: theme.spacing(1),
+      backgroundColor: '#f5f5f5',
+      borderRadius: '4px',
+      overflow: 'auto',
+    },
+    '& table': {
+      borderCollapse: 'collapse',
+      width: '100%',
+      margin: '0.5em 0',
+      color: theme.palette.text.primary,
+    },
+    '& th, & td': {
+      border: `1px solid ${theme.palette.grey[300]}`,
+      padding: '0.4em',
+    },
+    '& a': {
+      color: theme.palette.primary.main,
+      textDecoration: 'none',
+      '&:hover': {
+        textDecoration: 'underline',
+      },
+    },
+  },
+  messageContent: {
+    fontSize: '0.9rem',
+    lineHeight: 1.5,
+    color: theme.palette.text.primary,
+  },
 }));
+
+const MessageContent = ({ content, isUser }) => {
+  const classes = useStyles();
+  
+  // Handle array responses and ensure content is a string
+  let textContent = Array.isArray(content) 
+    ? content[0] 
+    : (typeof content === 'string' ? content : JSON.stringify(content));
+
+  // Clean up the text formatting
+  textContent = textContent
+    // Replace multiple newlines with single newlines
+    .replace(/\n{3,}/g, '\n')
+    // Ensure proper spacing around headers (reduced spacing)
+    .replace(/\n(#{1,6}\s.*)\n/g, '\n$1\n')
+    // Remove newlines between headers and lists
+    .replace(/(\*\*.*?\*\*)\n+([*-]\s)/g, '$1\n$2')  // For bold headers
+    .replace(/(#{1,6}\s.*)\n+([*-]\s)/g, '$1\n$2')   // For markdown headers
+    // Ensure proper spacing around lists
+    .replace(/\n([*-]\s.*)\n/g, '\n$1\n')
+    // Clean up extra spaces
+    .trim();
+
+  if (isUser) {
+    return <div className={classes.messageContent}>{textContent}</div>;
+  }
+
+  return (
+    <ReactMarkdown
+      className={`${classes.markdown} ${classes.messageContent}`}
+      components={{
+        code({ node, inline, className, children, ...props }) {
+          const match = /language-(\w+)/.exec(className || '');
+          const language = match ? match[1] : '';
+          
+          if (!inline && language) {
+            return (
+              <SyntaxHighlighter
+                style={materialDark}
+                language={language}
+                PreTag="div"
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            );
+          }
+          return <code className={className} {...props}>{children}</code>;
+        }
+      }}
+    >
+      {textContent}
+    </ReactMarkdown>
+  );
+};
 
 function MultiAgentChat() {
   const classes = useStyles();
@@ -156,12 +300,16 @@ function MultiAgentChat() {
     setInput('');
 
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: input.trim(), 
-        team_name: 'team_one_two_three'
-      });
+      const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
+      
+      // Handle array responses
+      const aiResponse = Array.isArray(response.data.response) 
+        ? response.data.response[0] 
+        : (typeof response.data.response === 'string' 
+            ? response.data.response 
+            : JSON.stringify(response.data.response));
 
-      setMessages([...newMessages, { text: response.data.response, sender: 'ai' }]);
+      setMessages([...newMessages, { text: aiResponse, sender: 'ai' }]);
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages([...newMessages, { text: 'Error: Failed to get response from AI', sender: 'system' }]);
@@ -259,8 +407,12 @@ function MultiAgentChat() {
                 className={`${classes.message} ${
                   message.sender === 'user' ? classes.userMessage : classes.aiMessage
                 }`}
+                style={{ maxWidth: message.sender === 'user' ? '70%' : '85%' }}
               >
-                {message.text}
+                <MessageContent 
+                  content={message.text} 
+                  isUser={message.sender === 'user'} 
+                />
               </Box>
             ))}
             <div ref={messageEndRef} />
