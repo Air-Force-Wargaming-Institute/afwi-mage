@@ -10,15 +10,6 @@ def process_question():
         "keys": {
             "question": shared_state.QUESTION,
             "conversation_history": shared_state.CONVERSATION,
-            "agent_requests": {
-                "prc_government": "Information on PRC government structure and recent policy decisions",
-                "prc_military": "Details on PRC military capabilities and recent strategic moves",
-                "prc_economic": "Data on PRC economic policies and trade relationships",
-                "regional_dynamics": "Information on PRC's relationships with neighboring countries",
-                "global_influence": "Details on PRC's global diplomatic and economic initiatives",
-                "technology_innovation": "Information on PRC's advancements in key technologies",
-                "domestic_stability": "Data on internal social and political factors in PRC"
-            }
         }
     }
 

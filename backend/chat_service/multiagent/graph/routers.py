@@ -1,5 +1,6 @@
 from multiagent.graphState import GraphState
 from utils.shared_state import shared_state
+from langgraph.types import Send
 
 def router_expert_input_still_needed(state: GraphState):
     """
@@ -21,7 +22,7 @@ def router_check_requester(state: GraphState):
     state_dict = state["keys"]
     last_actor = state_dict["last_actor"]
     return last_actor
-    match last_actor:
+"""     match last_actor:
         case "prc_government":
             return "prc_government"
         case "prc_military":
@@ -37,7 +38,7 @@ def router_check_requester(state: GraphState):
         case "technology_innovation":
             return "technology_innovation"
         case _:
-            print("\t***This case should never be reached!***\n")
+            print("\t***This case should never be reached!***\n") """
 
 def router_check_collaborator(state: GraphState):
     """
@@ -144,3 +145,12 @@ def router_dynamic_collab(state: GraphState):
         return router_collaboration_continue(state)
     else:
         return router_expert_input_still_needed(state)
+
+def router_expert_subgraphs(state: GraphState):
+    requester_list = []
+    for expert in state["selected_experts"]:
+        requester_list.append(f"{expert}_requester")
+    return requester_list
+
+def router_get_Moderator_Guidance(state: GraphState):
+    return [Send("get_Moderator_Guidance", {"expert": s, "question": state["Question"]}) for s in state["selected_experts"]]

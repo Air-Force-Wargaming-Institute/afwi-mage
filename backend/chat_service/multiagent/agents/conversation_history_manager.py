@@ -5,7 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
 #from webProject.utils.setup_logging import setup_logging
-from utils.helpers import identify_experts
+from backend.chat_service.multiagent.agents.helpers import identify_experts
 from config import load_config
 from utils.shared_state import shared_state
 

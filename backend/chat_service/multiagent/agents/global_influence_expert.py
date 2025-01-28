@@ -4,10 +4,10 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.llm_manager import LLMManager
 
 from multiagent.graphState import GraphState
-from utils.helpers import update_expert_input
+from backend.chat_service.multiagent.agents.helpers import update_expert_input
 from config import load_config
 from utils.shared_state import shared_state
-from utils.helpers import determine_collaboration
+from backend.chat_service.multiagent.agents.helpers import determine_collaboration
 
 def global_influence_expert(state: GraphState) -> GraphState:
     state_dict = state["keys"]

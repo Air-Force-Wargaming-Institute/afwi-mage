@@ -1,13 +1,11 @@
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
 from config import load_config
-from utils.shared_state import shared_state
+from multiagent.retriever_manager import RetrieverManager
 
-def librarian_agent(state: GraphState) -> GraphState:
+def librarian(requester:str, agent_request:str):
     """
     The Librarian Agent
     Retrieves the most relevant documents from the vector store based on the agent's request and user's question.
@@ -17,11 +15,7 @@ def librarian_agent(state: GraphState) -> GraphState:
     TOP_N_DOCUMENTS = config['TOP_N_DOCUMENTS']
 
     print("\n\n\t---------------------------\n\n\t---LIBRARIAN AGENT---\n\n\t---------------------------\n\n\t")
-    state_dict = state["keys"]
-    requester = state_dict["last_actor"]
-    agent_request = state_dict[requester+"_request"]
-    #print(agent_request.strip())
-    retriever = shared_state.RETRIEVER
+    retriever = RetrieverManager().retriever
     
     llm = LLMManager().non_streaming
 
@@ -49,4 +43,4 @@ def librarian_agent(state: GraphState) -> GraphState:
     print("\n\n\t---------------------------\n\n\t\n\n\t---------------------------\n\n\tLibrarian Summary\n\n\t---------------------------\n\n\t")
     print(summary)
     
-    return {"keys": {**state_dict, requester+"_document_summary": summary, "relevant_documents": relevant_docs}}
+    return summary, relevant_docs
