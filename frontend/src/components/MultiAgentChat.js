@@ -92,6 +92,18 @@ const useStyles = makeStyles((theme) => ({
     '& .MuiInputBase-root': {
       maxHeight: '150px',
       overflowY: 'auto',
+      padding: theme.spacing(1.5, 2),
+    },
+    '& .MuiOutlinedInput-input': {
+      lineHeight: '1.5',
+      padding: theme.spacing(0.5, 1),
+      marginLeft: theme.spacing(0.5),
+    },
+    '& .MuiOutlinedInput-multiline': {
+      padding: theme.spacing(0.5),
+    },
+    '& textarea': {
+      overflow: 'hidden !important',
     },
   },
   newChatButton: {
