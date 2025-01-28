@@ -8,7 +8,9 @@ from multiagent.graph.routers import (
     router_dynamic_expert, 
     router_dynamic_collab,
     router_expert_subgraphs,
-    router_get_Moderator_Guidance
+    router_get_Moderator_Guidance,
+    router_collaboration_requested,
+    router_expert_report
 )
 from langgraph.graph import StateGraph, END
 from typing import Dict, TypedDict
@@ -47,11 +49,12 @@ def create_graph() -> StateGraph:
         workflow.add_node(expert, globals()[f"{expert}_expert"])
         workflow.add_node(f"{expert}_requester", globals()[f"{expert}_requester"])
         workflow.add_node(f"{expert}_collaborator", globals()[f"{expert}_collaborator"])
-    
-    
-    requester_routes = {expert: f"{expert}_requester" for expert in experts}
-    workflow.add_conditional_edges("get_Moderator_Guidance", router_expert_subgraphs, requester_routes)
-    
+    workflow.add_node("expert_subgraph_entry", expert_subgraph_entry)
+    workflow.add_conditional_edges("get_Moderator_Guidance", router_expert_subgraphs, ["expert_subgraph_entry"])
+    workflow.add_node("collab_subgraph_entry", collab_subgraph_entry)
+    workflow.add_conditional_edges("expert_subgraph_entry", router_collaboration_requested, ["collab_subgraph_entry"])
+    workflow.add_node("expert_subgraph_report", expert_subgraph_report)
+    workflow.add_conditional_edges("expert_subgraph_report", router_expert_report, ["expert_subgraph_report"])
     workflow.add_node("synthesis", synthesis_agent)
 
     # Add expert nodes

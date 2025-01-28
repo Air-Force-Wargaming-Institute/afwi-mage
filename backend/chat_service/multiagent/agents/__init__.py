@@ -2,7 +2,7 @@ from .domestic_stability_expert import domestic_stability_expert, domestic_stabi
 from .global_influence_expert import global_influence_expert, global_influence_requester, global_influence_collaborator
 from .librarian_agent import librarian_agent, librarian
 from .prc_economic_expert import prc_economic_expert, prc_economic_requester, prc_economic_collaborator
-from .prc_government_expert import prc_government_expert, prc_government_requester, prc_government_collaborator
+from .prc_government_expert import prc_government_expert, prc_government_requester, prc_government_collaborator, expert_subgraph_entry, expert_subgraph_report, collab_subgraph_entry
 from .prc_military_expert import prc_military_expert, prc_military_requester, prc_military_collaborator
 from .regional_dynamics_expert import regional_dynamics_expert, regional_dynamics_requester, regional_dynamics_collaborator
 from .synthesis_agent import synthesis_agent
@@ -39,5 +39,8 @@ __all__ = [
     "user_proxy_moderator",
     "conversation_history_manager",
     "get_Moderator_Guidance",
-    "identify_experts"
+    "identify_experts",
+    "expert_subgraph_entry",
+    "expert_subgraph_report",
+    "collab_subgraph_entry"
 ]
