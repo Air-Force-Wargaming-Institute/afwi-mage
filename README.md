@@ -12,16 +12,12 @@
    - Download and install from [Node.js website](https://nodejs.org/)
    - Recommended version: 18.x LTS
 
-3. **Git Bash** (Windows Users)
-   - Windows users should use Git Bash or WSL terminal
-   - Download from [Git for Windows](https://gitforwindows.org/)
-
 ## Quick Start Guide
 
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd afwi-multi-agent-generative-engine
+cd AFWI-MAGE-FineTune
 ```
 
 ### 2. Start Docker Desktop
@@ -29,24 +25,20 @@ cd afwi-multi-agent-generative-engine
 - Look for the whale icon in your system tray
 - Wait until it stops animating
 
-### 3. Setup and Start the Backend
+### 3. Start the Backend
 ```bash
-# Navigate to backend directory
+# Windows users: Use Git Bash or WSL terminal
 cd backend
 
-# Run the setup script (this only needs to be done once)
-./setup_dev_environment.sh
+# Copy environment file
+cp auth_service/.env.example auth_service/.env
+
+# If it's the first time running the app, you need to install the backend dependencies
+docker compose build
 
 # Start all services
-docker compose up # Add -d flag to run in detached mode
+docker compose up # Add the -d flag at the end to run in detached mode and hide the logs
 ```
-
-The setup script will automatically:
-- Create necessary directories
-- Fix line endings for shell scripts
-- Set correct file permissions
-- Copy environment files
-- Build all services
 
 ### 4. Start the Frontend
 ```bash
@@ -60,7 +52,7 @@ npm start
 - The application will automatically open in your default browser
 - If it doesn't, visit: http://localhost:3000
 
-### 6. Default Admin Login
+### 6. Default AdminLog In
 - Username: `admin`
 - Password: `12345`
 
@@ -121,23 +113,11 @@ npm start
 ## Development Notes
 
 ### Environment Setup
-The `setup_dev_environment.sh` script handles all initial setup:
-- Creates required data and model directories
-- Sets up environment files
-- Fixes line endings and permissions
-- Builds all services
-
-You only need to run this script once after cloning, or when:
-- Switching between different development machines
-- Experiencing permission or line ending issues
-- Needing to reset the development environment
-
-### Dependencies
-- All Python dependencies are managed through each service's `requirements.txt`
-- The auth service requires specific versions of security packages:
-  - passlib[bcrypt]==1.7.4
-  - bcrypt==4.0.1
-- Do not update these versions without testing as they may cause authentication issues
+- Each service has its own `.env.example` file
+- Copy these to `.env` before starting:
+  ```bash
+  cp auth_service/.env.example auth_service/.env
+  ```
 
 ### Default Credentials
 - Admin username: `admin`
