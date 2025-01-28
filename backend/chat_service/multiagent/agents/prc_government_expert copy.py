@@ -11,6 +11,12 @@ from multiagent.llm_manager import LLMManager
 from agents import librarian
 
 PRC_GOVERNMENT_AGENT_INSTRUCTIONS = """You are the PRC Government Expert in a multi-agent system. Focus on the structure, decision-making processes, and key figures within the PRC government.\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents."""
+DOMESTIC_STABILITY_AGENT_INSTRUCTIONS = """You are the Domestic Stability expert in a multi-agent system.\n\nEvaluate internal social, demographic, and political factors in the PRC. \n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Explain how domestic issues influence PRC\'s approach to the query topic. \n2. Discuss relevant public opinion trends, ethnic tensions, or domestic challenges.\n3. Analyze how internal stability concerns affect PRC\'s decision-making. \n4. Identify any recent domestic developments that impact the issue. Provide specific examples from the documents of domestic factors and their effects."""
+GLOBAL_INFLUENCE_AGENT_INSTRUCTIONS = """You are the Global Influence Expert in a multi-agent system. Track the PRC\'s efforts to expand its global influence. Your task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Assess the impact of PRC\'s global initiatives on the issue in the query. \n2. Discuss relevant diplomatic efforts, investments, or soft power initiatives. \n3. Analyze how PRC\'s actions affect international institutions and norms. \n4. Identify any global trends or reactions that influence PRC\'s approach. Use concrete examples from the documents of PRC\'s global activities and their outcomes."""
+PRC_ECONOMIC_EXPERT_INSTRUCTIONS = """You are the PRC Economic Expert in a multi-agent system. Focus on the PRC\'s economic policies, trade relationships, and industrial strategies. \n\nYour analysis should \n1. Predict economic actions and their geopolitical implications relevant to the query. \n2. Explain how economic factors influence PRC\'s approach to the issue at hand.\n3. Provide data on relevant economic indicators, trade patterns, or industrial policies.\n4. Discuss any recent economic initiatives or shifts that relate to the user\'s question. Use specific economic data and examples from the documents to support your points. Your task is to use the moderator guidance and provided documents to answer the question."""
+PRC_MILITARY_EXPERT_INSTRUCTIONS = """You are the PRC Military Expert in a multi-agent system. Concentrate on the capabilities, doctrine, and strategic objectives of the People\'s Liberation Army (PLA).\n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Assess potential military actions or responses related to the query. \n2. Provide details on relevant military capabilities, technologies, or strategies. \n3. Explain how military considerations influence PRC\'s approach to the issue at hand. \n4. Discuss any recent military developments or exercises relevant to the query. Provide concrete examples and data from the documents to support your analysis."""
+REGIONAL_DYNAMICS_EXPERT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent system. Examine the PRC\'s relationships with neighboring countries and regional powers.\n\nYour task is to use the moderator guidance and provided documents to answer the question.\n\nYour analysis should\n1. Explain how regional dynamics affect PRC\'s approach to the issue in the query.\n2. Discuss relevant historical context, territorial disputes, or shifting alliances. \n3. Analyze the positions and potential reactions of key regional players. \n4. Identify any recent regional developments or agreements that impact the issue. Provide specific examples of regional interactions from the documents and their implications."""
+TECHNOLOGY_INNOVATION_EXPERT_INSTRUCTIONS = """You are the Technology and Innovation Expert in a multi-agent system. Monitor the PRC\'s advancements in key technologies.\n\nYour task is to use the moderator guidance and provided documents to answer the question.\n\nYour analysis should\n1. Explain how technological factors relate to the issue in the query.\n2. Provide details on relevant advancements in AI, quantum computing, biotechnology, etc.\n3. Assess potential military and economic applications of these technologies.\n4. Discuss any recent technological developments or initiatives that relate to the user\'s question. Provide specific examples and data from the documents to support your analysis."""
 
 def prc_government_expert(state: GraphState) -> GraphState:
     state_dict = state["keys"]
@@ -287,16 +293,12 @@ def prc_government_subgraph_entry(state: ExpertState):
     print("\n\n\n")
 
     if collaborators:
-        shared_state.COLLAB_LOOP = True
-        shared_state.MORE_COLLAB = True
-
         prompt = PromptTemplate(
             input_variables=["question", "analysis", "reflection", "collab_experts","whoami","agent_instructions"],
             template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n Your panel has been asked this question/query: \n{question}\n\n You just wrote this report as a first draft attempt to address the question/query: \n{analysis}\n\n You also reviewed your first draft report and provided this self-critique on how to improve it:\n{reflection}\n\n These experts have been selected to collaborate with you to help improve your report with contributions from their expert perspectives: \n{collab_experts}\n\n To direct each expert in how they can best help you improve your report but from the perspective of their expert domain knowledge, create concise instructions for each individual expert on what they should focus on when they draft their collaborative inputs."
         )
 
         collab_experts_str = ", ".join(f"{expert}" for expert in collaborators)
-        collaborator = str(collaborators[0])
 
         chain = prompt | llm | StrOutputParser()
         collab_areas = chain.invoke({
@@ -310,42 +312,3 @@ def prc_government_subgraph_entry(state: ExpertState):
 
         return { whoami+"_analysis": analysis, whoami+"_reflection": reflection, whoami+"_collab_areas": collab_areas, whoami+"_collaborators_list": collaborators}
     return {whoami+"_analysis": analysis, whoami+"_reflection": reflection}
-
-
-
-# The following will be filled in programmatically when creating a new agent
-AGENT_NAME = "prc government"                               #PRC_Domestic_Stability
-AGENT_FILE_NAME = "prc_government"                     #PRC_Domestic_Stability.py
-#AGENT_ATTRIBUTES = "{{AGENT_ATTRIBUTES}}"                   #domestic stability, social, demographic, and political factors,
-MEMORY_TYPE = "ConversationBufferMemory"                             #ConversationBufferMemory
-MEMORY_KWARGS = {"max_token_limit": 2000}                          #...
-AGENT_DESCRIPTION = """PRC Government Expert"""                 #...           #...
-LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
-COLOR = "#FFA500"                                         #FF0000
-CREATED_AT = "2025-01-17T17:14:42.183240"                               #2024-12-15
-MODIFIED_AT = "2025-01-17T17:14:42.183240"                             #2025-01-23
-
-
-
-# class Agent:
-#     def __init__(self, name, description, llm, agent_instructions, memory_type="ConversationBufferMemory", memory_kwargs=None):
-#         self.name = name
-#         self.description = description
-#         self.llm = llm
-#         self.agent_instructions = agent_instructions
-        
-#         # Set up memory
-#         if memory_type == "ConversationBufferMemory":
-#             self.memory = ConversationBufferMemory(**(memory_kwargs or {}))
-#         else:
-#             raise ValueError(f"Unsupported memory type: {memory_type}")
-        
-#         # Set up prompt template
-#         template = f"{agent_instructions}\n\nHuman: {{human_input}}\nAI: "
-#         self.prompt = PromptTemplate(template=template, input_variables=["human_input"])
-        
-#         # Set up LLM chain
-#         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
-    
-#     async def run(self, human_input):
-#         return await self.chain.arun(human_input=human_input)
