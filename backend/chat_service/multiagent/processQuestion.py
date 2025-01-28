@@ -16,7 +16,8 @@ def process_question():
     final_output = None
     for output in graph.stream(inputs, {"recursion_limit": 200}):
         final_output = output
-
+    print("final_output!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(final_output)
     # Reset for the next question from this user
     shared_state.EXPERT_LIST_GENERATED = False
 
