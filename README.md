@@ -33,7 +33,7 @@ cd backend
 # Copy environment file
 cp auth_service/.env.example auth_service/.env
 
-# If it's the first time running the app, you need to install the backend dependencies
+# If it's the first time running the app, you need to install the backend dependencies with:
 docker compose build
 
 # Start all services
