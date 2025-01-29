@@ -40,6 +40,7 @@ const ACTIONS = {
   RESET_STATE: 'RESET_STATE',
   TOGGLE_BOOKMARK: 'TOGGLE_BOOKMARK',
   UPDATE_BOOKMARK_POSITIONS: 'UPDATE_BOOKMARK_POSITIONS',
+  REMOVE_ERROR_MESSAGES: 'REMOVE_ERROR_MESSAGES',
 };
 
 function chatReducer(state, action) {
@@ -120,6 +121,14 @@ function chatReducer(state, action) {
           ...msg,
           position: action.payload[msg.messageId] || msg.position
         }))
+      };
+      break;
+    case ACTIONS.REMOVE_ERROR_MESSAGES:
+      newState = {
+        ...state,
+        messages: state.messages.filter(msg => 
+          !(msg.sender === 'system' && msg.text.includes('Error:'))
+        )
       };
       break;
     default:

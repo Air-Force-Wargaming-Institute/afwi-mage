@@ -882,6 +882,7 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
+    // Add user message
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
@@ -904,13 +905,10 @@ function MultiAgentChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      dispatch({ 
-        type: ACTIONS.SET_MESSAGES, 
-        payload: messages.filter(msg => 
-          !(msg.sender === 'system' && msg.text.includes('Error:'))
-        ) 
-      });
+      // Remove any error messages before adding new AI response
+      dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
 
+      // Add AI response
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
