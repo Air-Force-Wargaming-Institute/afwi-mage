@@ -21,6 +21,8 @@ import { ExtractionProvider } from './contexts/ExtractionContext';
 import { GenerationProvider } from './contexts/GenerationContext';
 import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
+import DirectChat from './components/DirectChat';
+import { DirectChatProvider } from './contexts/DirectChatContext';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -45,6 +47,7 @@ const AuthenticatedRoutes = () => {
           <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
           <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
           <Route path="/multi-agent/chat" component={MultiAgentChat} />
+          <Route path="/multi-agent/direct-chat" component={DirectChat} />
           <Route exact path="/fine-tuning" component={FineTuneGuide} />
           <Route path="/fine-tuning/extract" component={ExtractComponent} />
           <Route path="/fine-tuning/generate" component={GenerateDataset} />
@@ -73,13 +76,15 @@ function App() {
     <ExtractionProvider>
       <GenerationProvider>
         <DocumentLibraryProvider>
-          <ChatProvider>
-            <AuthProvider>
-              <Router>
-                <AuthenticatedRoutes />
-              </Router>
-            </AuthProvider>
-          </ChatProvider>
+          <DirectChatProvider>
+            <ChatProvider>
+              <AuthProvider>
+                <Router>
+                  <AuthenticatedRoutes />
+                </Router>
+              </AuthProvider>
+            </ChatProvider>
+          </DirectChatProvider>
         </DocumentLibraryProvider>
       </GenerationProvider>
     </ExtractionProvider>
