@@ -995,7 +995,10 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
+      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
+        message: input.trim(), 
+        team_name: 'PRC_Team'
+      });
 
       const aiResponse = Array.isArray(response.data.response) 
         ? response.data.response[0] 

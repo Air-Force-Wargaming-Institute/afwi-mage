@@ -420,7 +420,14 @@ function AgentTeams() {
 
   // Modify this function to work for both new and editing teams
   const getAvailableAgentsForDropdown = (index, team) => {
-    const selectedAgents = team.agents.filter((agent, i) => i !== index && agent !== '');
+    // Ensure team.agents is an array
+    const agentsList = Array.isArray(team.agents) 
+      ? team.agents 
+      : typeof team.agents === 'string' 
+        ? [team.agents]
+        : [];
+        
+    const selectedAgents = agentsList.filter((agent, i) => i !== index && agent !== '');
     return allAgents.filter(agent => !selectedAgents.includes(agent.file_name.replace('_expert', '')));
   };
 
@@ -450,13 +457,20 @@ function AgentTeams() {
   };
 
   const handleEditClick = (team) => {
+    // Ensure team.agents is an array
+    const agentsList = Array.isArray(team.agents) 
+      ? team.agents 
+      : typeof team.agents === 'string' 
+        ? [team.agents]
+        : [];
+
     // Create a copy of the team with all 8 agent slots
     const fullTeam = {
       ...team,
       // Map each agent filename to the full agent filename with _expert suffix
       agents: [
-        ...team.agents.map(agentName => `${agentName}_expert`),
-        ...Array(8 - team.agents.length).fill('')
+        ...agentsList.map(agentName => `${agentName}_expert`),
+        ...Array(8 - agentsList.length).fill('')
       ]
     };
     setEditingTeam(fullTeam);
@@ -518,58 +532,67 @@ function AgentTeams() {
       </Box>
 
       <Grid container spacing={3}>
-        {teams.map((team, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <Card 
-              className={classes.card} 
-              style={{ borderColor: team.color }}
-              onClick={(event) => handleCardClick(event, team)}
-            >
-              <CardHeader
-                className={classes.cardHeader}
-                avatar={
-                  <Box display="flex" alignItems="center">
-                    <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
-                      <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
-                    </div>
-                  </Box>
-                }
-                title={team.name}
-              />
-              <CardContent className={classes.cardContent}>
-                <Typography variant="body2" color="textSecondary" component="p">
-                  {team.description}
-                </Typography>
-              </CardContent>
-              <CardActions className={classes.cardActions}>
-                <Tooltip title="Duplicate Team">
-                  <IconButton 
-                    aria-label="duplicate" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDuplicateClick(team);
-                    }}
-                    className={`${classes.duplicateIcon} action-button`}
-                  >
-                    <FileCopyIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete Team">
-                  <IconButton 
-                    aria-label="delete" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(team);
-                    }}
-                    className={`${classes.deleteIcon} action-button`}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
+        {teams.map((team, index) => {
+          // Ensure team.agents is an array at the start of the mapping
+          team.agents = Array.isArray(team.agents) 
+            ? team.agents 
+            : typeof team.agents === 'string' 
+              ? [team.agents]
+              : [];
+              
+          return (
+            <Grid item xs={12} sm={6} md={4} key={index}>
+              <Card 
+                className={classes.card} 
+                style={{ borderColor: team.color }}
+                onClick={(event) => handleCardClick(event, team)}
+              >
+                <CardHeader
+                  className={classes.cardHeader}
+                  avatar={
+                    <Box display="flex" alignItems="center">
+                      <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
+                        <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
+                      </div>
+                    </Box>
+                  }
+                  title={team.name}
+                />
+                <CardContent className={classes.cardContent}>
+                  <Typography variant="body2" color="textSecondary" component="p">
+                    {team.description}
+                  </Typography>
+                </CardContent>
+                <CardActions className={classes.cardActions}>
+                  <Tooltip title="Duplicate Team">
+                    <IconButton 
+                      aria-label="duplicate" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateClick(team);
+                      }}
+                      className={`${classes.duplicateIcon} action-button`}
+                    >
+                      <FileCopyIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete Team">
+                    <IconButton 
+                      aria-label="delete" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(team);
+                      }}
+                      className={`${classes.deleteIcon} action-button`}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
 
       <Dialog 
