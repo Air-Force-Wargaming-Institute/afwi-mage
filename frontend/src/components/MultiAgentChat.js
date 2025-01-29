@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -41,6 +41,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
 import { useChat, ACTIONS } from '../contexts/ChatContext';
+import ReplayIcon from '@mui/icons-material/Replay';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -637,91 +638,29 @@ const useStyles = makeStyles((theme) => ({
       padding: 0,
     },
   },
+  retryButton: {
+    marginRight: theme.spacing(1),
+    '&:hover': {
+      backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    },
+  },
 }));
 
-const MessageContent = ({ content, isUser, timestamp }) => {
+const MessageContent = ({ content, isUser, timestamp, sender, onRetry }) => {
   const classes = useStyles();
   const contentRef = useRef(null);
+  const [copied, setCopied] = useState(false);
   
-  // Handle array responses and ensure content is a string
-  let textContent = Array.isArray(content) 
-    ? content[0] 
-    : (typeof content === 'string' ? content : JSON.stringify(content));
-
-  // Clean up the text formatting
-  textContent = textContent
-    // Replace multiple newlines with single newlines
-    .replace(/\n{3,}/g, '\n')
-    // Ensure proper spacing around headers (reduced spacing)
-    .replace(/\n(#{1,6}\s.*)\n/g, '\n$1\n')
-    // Remove newlines between headers and lists
-    .replace(/(\*\*.*?\*\*)\n+([*-]\s)/g, '$1\n$2')  // For bold headers
-    .replace(/(#{1,6}\s.*)\n+([*-]\s)/g, '$1\n$2')   // For markdown headers
-    // Ensure proper spacing around lists
-    .replace(/\n([*-]\s.*)\n/g, '\n$1\n')
-    // Clean up extra spaces
-    .trim();
-
-  const handleCopy = async () => {
-    try {
-      if (contentRef.current) {
-        const tempDiv = document.createElement('div');
-        const clonedContent = contentRef.current.cloneNode(true);
-        
-        // Modified applyComputedStyles to exclude color properties
-        const applyComputedStyles = (original, clone) => {
-          const style = window.getComputedStyle(original);
-          const cssText = Array.from(style).reduce((css, property) => {
-            // Skip color-related properties
-            if (property === 'color' || 
-                property === 'background-color' || 
-                property === 'background' || 
-                property.includes('text-')) {
-              return css;
-            }
-            return `${css}${property}:${style.getPropertyValue(property)};`;
-          }, '');
-          clone.style.cssText = cssText;
-          
-          // Recursively apply styles to children
-          Array.from(original.children).forEach((child, i) => {
-            if (clone.children[i]) {
-              applyComputedStyles(child, clone.children[i]);
-            }
-          });
-        };
-        
-        applyComputedStyles(contentRef.current, clonedContent);
-        tempDiv.appendChild(clonedContent);
-
-        // Create a Blob with HTML content
-        const blob = new Blob([tempDiv.innerHTML], { type: 'text/html' });
-        const plainText = contentRef.current.textContent;
-        
-        // Create ClipboardItem with both HTML and plain text
-        const clipboardItem = new ClipboardItem({
-          'text/html': blob,
-          'text/plain': new Blob([plainText], { type: 'text/plain' }),
-        });
-        
-        await navigator.clipboard.write([clipboardItem]);
-      } else {
-        await navigator.clipboard.writeText(content);
-      }
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-      try {
-        const tempTextArea = document.createElement('textarea');
-        tempTextArea.value = contentRef.current.textContent;
-        document.body.appendChild(tempTextArea);
-        tempTextArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempTextArea);
-      } catch (fallbackErr) {
-        console.error('Fallback copy failed:', fallbackErr);
-      }
+  const handleCopy = () => {
+    if (contentRef.current) {
+      navigator.clipboard.writeText(contentRef.current.textContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  const isError = sender === 'system' && textContent.includes('Error:');
 
   const renderedContent = isUser ? (
     <div ref={contentRef} className={classes.messageContent}>{textContent}</div>
@@ -769,6 +708,18 @@ const MessageContent = ({ content, isUser, timestamp }) => {
             hour12: true 
           })}
         </Typography>
+        {isError && onRetry && (
+          <Tooltip title="Retry query">
+            <IconButton
+              className={classes.retryButton}
+              size="small"
+              onClick={onRetry}
+              color="secondary"
+            >
+              <ReplayIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <IconButton 
           className={`${classes.copyButton} copyButton`}
           size="small"
@@ -914,6 +865,40 @@ function MultiAgentChat() {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleRetry = async (failedMessage) => {
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+    try {
+      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
+        message: failedMessage 
+      });
+
+      const aiResponse = Array.isArray(response.data.response) 
+        ? response.data.response[0] 
+        : (typeof response.data.response === 'string' 
+            ? response.data.response 
+            : JSON.stringify(response.data.response));
+
+      // Remove the error message
+      dispatch({ 
+        type: ACTIONS.SET_MESSAGES, 
+        payload: messages.filter(msg => 
+          !(msg.sender === 'system' && msg.text.includes('Error:'))
+        ) 
+      });
+
+      // Add the new AI response
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { text: aiResponse, sender: 'ai', timestamp: new Date() }
+      });
+    } catch (error) {
+      console.error('Error retrying message:', error);
+    } finally {
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+    }
+  };
+
   useEffect(() => {
     messageEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -996,6 +981,12 @@ function MultiAgentChat() {
                     content={message.text} 
                     isUser={message.sender === 'user'} 
                     timestamp={message.timestamp}
+                    sender={message.sender}
+                    onRetry={
+                      message.sender === 'system' && message.text.includes('Error:') 
+                        ? () => handleRetry(messages[messages.length - 2]?.text) 
+                        : undefined
+                    }
                   />
                 </div>
               </Box>
