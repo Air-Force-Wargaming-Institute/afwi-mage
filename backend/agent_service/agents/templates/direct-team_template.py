@@ -138,8 +138,8 @@ def {{TEAM_FILE_NAME}}_graph() -> StateGraph:
     #     workflow.add_node("{{AGENT_SEVEN}}_collaborator", functools.partial({{AGENT_SEVEN}}_collaborator, llm=streaming_llm))
 
     # Start at user proxy
-    workflow.set_entry_point("{{AGENT_ZERO}}_expert")
-    workflow.set_finish_point("{{AGENT_ZERO}}_expert")
+    workflow.set_entry_point("{{AGENT_ZERO}}")
+    workflow.set_finish_point("{{AGENT_ZERO}}")
 
     #workflow.add_edge("conversation_history_manager", "user_proxy_moderator")
 
