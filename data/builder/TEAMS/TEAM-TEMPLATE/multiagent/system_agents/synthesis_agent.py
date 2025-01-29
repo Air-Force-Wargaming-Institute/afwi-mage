@@ -50,11 +50,14 @@ def synthesis_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
         "timestamp": timestamp,
         "iteration": shared_state.ITERATION,
         "question": question,
-        "analyses": analyses_text,
+        #"analyses": analyses_text,
         "synthesized_report": synthesized_report,
         "full_conversation": shared_state.CONVERSATION
     }
     
+    for key, value in analyses.items():
+        conversation_data[key] = value
+
     # Write to JSON file
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(conversation_data, f, indent=4, ensure_ascii=False)
