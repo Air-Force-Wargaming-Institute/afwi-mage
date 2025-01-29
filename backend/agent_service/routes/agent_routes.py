@@ -613,3 +613,35 @@ async def duplicate_team(team_name: str):
     except Exception as e:
         logger.error(f"Error duplicating team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error duplicating team: {str(e)}")
+
+@router.get("/available_teams/")
+async def get_available_teams():
+    teams = []
+    logger = logging.getLogger(__name__)
+    # Fix the path to point directly to the teams directory
+    teams_dir = Path(__file__).parent.parent / "agents" / "teams"
+    logger.info(f"Listing teams from directory: {teams_dir}")
+    
+    try:
+        if not os.path.exists(teams_dir):
+            logger.error(f"Teams directory not found: {teams_dir}")
+            return {"teams": []}
+            
+        for filename in os.listdir(teams_dir):
+            if filename.endswith('.py'):
+                team_name = filename[:-3]  # Remove .py extension
+                # Skip if it starts with _ or .
+                if team_name.startswith('_') or team_name.startswith('.'):
+                    continue
+                    
+                teams.append({
+                    "id": team_name,
+                    "name": team_name.replace('_', ' '),
+                    "file_name": team_name
+                })
+                
+        logger.info(f"Total teams found: {len(teams)}")
+        return {"teams": teams}
+    except Exception as e:
+        logger.error(f"Error listing teams: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error listing teams: {str(e)}")

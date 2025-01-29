@@ -1,0 +1,59 @@
+# Configuration for streaming_main.py
+
+# Name of the local LLM to use 
+#LOCAL_LLM: 'NousResearch/Hermes-3-Llama-3.1-8B-GGUF/Hermes-3-Llama-3.1-8B.Q8_0.gguf'
+#LOCAL_LLM: 'hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:Q8_0'
+LOCAL_LLM: "AFWI-Hermes3"
+
+# API key for the LLM
+API_KEY: 'None'
+
+# Base URL for where the LLM is hosted
+#BASE_URL: 'http://localhost:1234/v1'
+#BASE_URL: 'http://127.0.0.1:11434/v1'
+BASE_URL: 'http://host.docker.internal:11434/v1'
+
+# Run the LLM locally, "Yes" or "No"
+RUN_LOCAL: 'Yes'
+
+# Path to the folder containing the PDFs
+FOLDER_PATH: './pdfs'
+
+# Path to the folder where the Word documents will be saved
+WORD_PATH: './word_docs'
+
+# Path to log folder
+LOG_PATH: './logs'
+
+# Location to persist the vector store 
+VS_PERSIST_DIR: './vectorstore2'
+
+# Size of the chunks to split the documents into  
+CHUNK_SIZE: 1000
+
+# Overlap of the chunks to split the documents into
+CHUNK_OVERLAP: 100
+
+#Type of retrieval search to use, 'similarity', 'mmr', or 'similarity_score_threshold'
+SEARCH_TYPE: 'mmr'
+
+# Number of documents to retrieve 
+K: 5
+
+# Number of retrieved documents to use in the librarian's summary
+TOP_N_DOCUMENTS: 20
+
+# Maximum number of tokens for the LLM model to use in a reply
+MAX_TOKENS: 8000
+
+# Temperature for the LLM
+TEMPERATURE: 0.2
+
+# Team to chat with
+TEAM_NAME: team select test 3 # {{TEAM_FILE_NAME}}
+
+# Expert agents to use in the multi agent system
+EXPERT_AGENTS: ['Agent_Test']
+
+# Expert agent instructions
+EXPERT_INSTRUCTIONS: ["Do what the user wants"]

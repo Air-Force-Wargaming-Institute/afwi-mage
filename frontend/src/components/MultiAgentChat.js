@@ -16,7 +16,12 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -417,28 +422,15 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   dialogContent: {
-    padding: theme.spacing(2),
-    '& ul': {
-      paddingLeft: theme.spacing(2),
-      marginTop: theme.spacing(1),
-    },
-    '& li': {
-      marginBottom: theme.spacing(2),
-    },
-    '& .MuiTypography-root': {
-      color: theme.palette.text.primary,
-      lineHeight: 1.6,
-    },
+    paddingTop: theme.spacing(2),
   },
-  closeButton: {
-    position: 'absolute',
-    right: theme.spacing(1),
-    top: theme.spacing(1),
-    color: theme.palette.grey[500],
-    '&:hover': {
-      color: theme.palette.primary.main,
-      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-    },
+  formControl: {
+    marginTop: theme.spacing(2),
+    minWidth: 200,
+  },
+  errorText: {
+    color: theme.palette.error.main,
+    marginTop: theme.spacing(1),
   },
   agentListItem: {
     display: 'flex',
@@ -946,7 +938,14 @@ const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
 function MultiAgentChat() {
   const classes = useStyles();
   const { state, dispatch } = useChat();
-  console.log('MultiAgentChat - Current State:', state);
+  
+  // Add new state variables for the dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [newSessionName, setNewSessionName] = useState('');
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
+  const [teamError, setTeamError] = useState('');
 
   const {
     input,
@@ -980,7 +979,6 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
-    // Add user message
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
@@ -995,9 +993,12 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
+      const currentSession = chatSessions.find(session => session.id === state.currentSessionId);
+      const teamName = currentSession?.team || 'PRC_Team'; // Fallback to PRC_Team if no team selected
+
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
-        team_name: 'PRC_Team'
+        team_name: teamName
       });
 
       const aiResponse = Array.isArray(response.data.response) 
@@ -1006,10 +1007,8 @@ function MultiAgentChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      // Remove any error messages before adding new AI response
       dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
 
-      // Add AI response
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
@@ -1035,10 +1034,40 @@ function MultiAgentChat() {
     }
   };
 
-  const handleNewChat = () => {
-    const newSession = { id: chatSessions.length + 1, name: `New Chat ${chatSessions.length + 1}` };
+  const handleNewChat = async () => {
+    setIsLoadingTeams(true);
+    setTeamError('');
+    try {
+      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));  // Update path to include /agents
+      setAvailableTeams(response.data.teams);
+      setDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      setTeamError('Failed to load available teams. Please try again.');
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  };
+
+  const handleCreateNewChat = () => {
+    if (!selectedTeam || !newSessionName.trim()) {
+      setTeamError('Please select a team and enter a session name');
+      return;
+    }
+    
+    const newSession = { 
+      id: chatSessions.length + 1, 
+      name: newSessionName.trim(),
+      team: selectedTeam 
+    };
+    
     dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
     dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+    
+    setDialogOpen(false);
+    setNewSessionName('');
+    setSelectedTeam('');
+    setTeamError('');
   };
 
   const handleEditSession = (sessionId) => {
@@ -1223,6 +1252,76 @@ function MultiAgentChat() {
 
   return (
     <Container className={classes.root} maxWidth="xl">
+      <Dialog 
+        open={dialogOpen} 
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create New Chat Session</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Session Name"
+              fullWidth
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              error={teamError && !newSessionName.trim()}
+              helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Select Team</InputLabel>
+              <Select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                error={teamError && !selectedTeam}
+              >
+                {isLoadingTeams ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> Loading teams...
+                  </MenuItem>
+                ) : (
+                  availableTeams.map(team => (
+                    <MenuItem key={team.id} value={team.file_name}>
+                      {team.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {teamError && !selectedTeam && (
+                <Typography color="error" variant="caption">
+                  Please select a team
+                </Typography>
+              )}
+            </FormControl>
+            {teamError && (
+              <Typography color="error" variant="body2">
+                {teamError}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDialogOpen(false);
+            setTeamError('');
+            setNewSessionName('');
+            setSelectedTeam('');
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateNewChat}
+            color="primary"
+            variant="contained"
+            disabled={isLoadingTeams}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
       <div className={classes.chatContainer}>
         {!isFullscreen && (
           <Paper className={classes.chatLog} elevation={3}>
