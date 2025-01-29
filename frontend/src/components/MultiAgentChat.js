@@ -45,6 +45,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { debounce } from 'lodash';
+import CheckIcon from '@mui/icons-material/Check';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -321,6 +322,7 @@ const useStyles = makeStyles((theme) => ({
       opacity: 1,
       transform: 'translateY(0)',
     },
+    overflow: 'visible',
   },
   messageFooter: {
     display: 'flex',
@@ -351,6 +353,7 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: 'center',
     opacity: 0.7,
     transition: 'all 0.2s ease',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
       opacity: 1,
@@ -702,19 +705,89 @@ const useStyles = makeStyles((theme) => ({
     maxWidth: 300,
     fontSize: '0.875rem',
   },
+  messageActions: {
+    display: 'flex',
+    gap: theme.spacing(0.5),
+    opacity: 0,
+    transition: 'opacity 0.2s ease',
+    '$messageContainer:hover &': {
+      opacity: 1,
+    },
+  },
+  topActions: {
+    position: 'absolute',
+    top: theme.spacing(1),
+    right: theme.spacing(1),
+    zIndex: 1,
+  },
+  bookmarkRibbon: {
+    position: 'absolute',
+    width: 12,
+    height: 20,
+    backgroundColor: theme.palette.primary.main,
+    borderRadius: '0 0 4px 4px',
+    animation: '$dropRibbon 0.3s ease-out',
+    zIndex: 2,
+  },
+  topRibbon: {
+    top: -17,
+    right: 18,
+    transformOrigin: 'top center',
+    animation: '$dropRibbonDown 0.3s ease-out',
+  },
+  bottomRibbon: {
+    bottom: 4,
+    right: 18,
+    transform: 'rotate(180deg)',
+    transformOrigin: 'bottom center',
+    animation: '$dropRibbonUp 0.3s ease-out',
+  },
+  '@keyframes dropRibbonDown': {
+    from: {
+      transform: 'scaleY(0)',
+    },
+    to: {
+      transform: 'scaleY(1)',
+    },
+  },
+  '@keyframes dropRibbonUp': {
+    from: {
+      transform: 'rotate(180deg) scaleY(0)',
+    },
+    to: {
+      transform: 'rotate(180deg) scaleY(1)',
+    },
+  },
 }));
+
+const CodeBlock = ({ inline, className, children }) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+  
+  if (!inline && language) {
+    return (
+      <SyntaxHighlighter
+        style={materialDark}
+        language={language}
+        PreTag="div"
+      >
+        {String(children).replace(/\n$/, '')}
+      </SyntaxHighlighter>
+    );
+  }
+  return <code className={className}>{children}</code>;
+};
 
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
-  const contentRef = useRef(null);
   const [copied, setCopied] = useState(false);
-  
-  const handleCopy = async () => {
-    if (contentRef.current) {
+
+  const handleCopy = async (content) => {
+    if (content) {
       try {
         // Create a temporary div to handle HTML content
         const tempDiv = document.createElement('div');
-        const clonedContent = contentRef.current.cloneNode(true);
+        const clonedContent = content.cloneNode(true);
         
         // Function to recursively apply computed styles
         const applyComputedStyles = (original, clone) => {
@@ -731,13 +804,13 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
           });
         };
         
-        applyComputedStyles(contentRef.current, clonedContent);
+        applyComputedStyles(content, clonedContent);
         tempDiv.appendChild(clonedContent);
 
         // Create ClipboardItem with both HTML and plain text
         const clipboardItem = new ClipboardItem({
           'text/html': new Blob([tempDiv.innerHTML], { type: 'text/html' }),
-          'text/plain': new Blob([contentRef.current.textContent], { type: 'text/plain' })
+          'text/plain': new Blob([content.textContent], { type: 'text/plain' })
         });
         
         await navigator.clipboard.write([clipboardItem]);
@@ -747,7 +820,7 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         console.error('Failed to copy formatted text:', err);
         // Fallback to plain text copy if rich copy fails
         try {
-          await navigator.clipboard.writeText(contentRef.current.textContent);
+          await navigator.clipboard.writeText(content.textContent);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch (fallbackErr) {
@@ -758,92 +831,93 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
   };
 
   const textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-  const isError = sender === 'system' && textContent.includes('Error:');
-
-  const renderedContent = isUser ? (
-    <div ref={contentRef} className={classes.messageContent}>{textContent}</div>
-  ) : (
-    <div ref={contentRef}>
-      <ReactMarkdown
-        className={`${classes.markdown} ${classes.messageContent}`}
-        components={{
-          code({ node, inline, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '');
-            const language = match ? match[1] : '';
-            
-            if (!inline && language) {
-              return (
-                <SyntaxHighlighter
-                  style={materialDark}
-                  language={language}
-                  PreTag="div"
-                  {...props}
-                >
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-              );
-            }
-            return <code className={className} {...props}>{children}</code>;
-          }
-        }}
-      >
-        {textContent}
-      </ReactMarkdown>
-    </div>
-  );
 
   return (
     <div className={classes.messageContainer}>
-      {renderedContent}
+      {isBookmarked && !isUser && (
+        <div className={`${classes.bookmarkRibbon} ${classes.topRibbon}`} />
+      )}
+
+      {!isUser && (
+        <div className={`${classes.messageActions} ${classes.topActions}`}>
+          <IconButton
+            className={classes.copyButton}
+            onClick={() => handleCopy(content)}
+            size="small"
+            title="Copy message"
+          >
+            {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+          </IconButton>
+          <IconButton
+            className={classes.copyButton}
+            onClick={onBookmark}
+            size="small"
+            title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+          >
+            {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+          </IconButton>
+        </div>
+      )}
+
+      <div className={classes.messageContent}>
+        {isUser ? (
+          <div>{textContent}</div>
+        ) : (
+          <ReactMarkdown
+            children={content}
+            className={classes.markdown}
+            components={{
+              code: CodeBlock
+            }}
+          />
+        )}
+      </div>
+
       <div className={classes.messageFooter}>
-        <Typography 
-          variant="caption" 
-          className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}
-        >
+        <Typography className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}>
           {new Date(timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit',
             hour12: true 
           })}
         </Typography>
-        {isError && onRetry && (
-          <Tooltip title="Retry query">
+        
+        {!isUser && (
+          <div className={classes.messageActions}>
             <IconButton
-              className={classes.retryButton}
+              className={classes.copyButton}
+              onClick={() => handleCopy(content)}
               size="small"
-              onClick={onRetry}
-              color="secondary"
+              title="Copy message"
             >
-              <ReplayIcon />
+              {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>
-          </Tooltip>
+            <IconButton
+              className={classes.copyButton}
+              onClick={onBookmark}
+              size="small"
+              title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+            >
+              {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+            </IconButton>
+          </div>
         )}
-        {!isError && (
-          <>
-            <Tooltip title={copied ? "Copied!" : "Copy message"}>
-              <IconButton 
-                className={`${classes.copyButton} copyButton`}
-                size="small"
-                onClick={handleCopy}
-                centerRipple
-              >
-                <ContentCopyIcon />
-              </IconButton>
-            </Tooltip>
-            {!isUser && (
-              <Tooltip title={isBookmarked ? "Remove bookmark" : "Add bookmark"}>
-                <IconButton
-                  className={classes.bookmarkButton}
-                  size="small"
-                  onClick={() => onBookmark(messageId)}
-                >
-                  {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            )}
-          </>
+        
+        {onRetry && (
+          <IconButton
+            className={classes.copyButton}
+            onClick={onRetry}
+            size="small"
+            title="Retry last message"
+          >
+            <ReplayIcon fontSize="small" />
+          </IconButton>
         )}
       </div>
+
+      {isBookmarked && !isUser && (
+        <div className={`${classes.bookmarkRibbon} ${classes.bottomRibbon}`} />
+      )}
     </div>
   );
 };
@@ -975,15 +1049,19 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
   };
 
-  const handleScroll = (event) => {
-    const element = event.target;
-    const scrollTop = element.scrollTop;
-    const scrollHeight = element.scrollHeight;
-    const clientHeight = element.clientHeight;
+  const handleScroll = useCallback(({ target }) => {
+    const { scrollTop, scrollHeight, clientHeight } = target;
     
-    dispatch({ type: ACTIONS.SET_SCROLL_TOP, payload: scrollTop > 500 });
-    dispatch({ type: ACTIONS.SET_SCROLL_BOTTOM, payload: scrollTop < scrollHeight - clientHeight - 100 });
-  };
+    dispatch({ 
+      type: ACTIONS.SET_SCROLL_TOP, 
+      payload: scrollTop > 200 
+    });
+    
+    dispatch({ 
+      type: ACTIONS.SET_SCROLL_BOTTOM, 
+      payload: scrollHeight - scrollTop - clientHeight > 200 
+    });
+  }, [dispatch]);
 
   const scrollToTop = () => {
     messageAreaRef.current?.scrollTo({
@@ -1072,6 +1150,21 @@ function MultiAgentChat() {
   const debouncedFn = debounce((fn) => fn(), 100);
 
   useEffect(() => {
+    const debouncedFn = debounce(() => {
+      handleScroll({ target: messageAreaRef.current });
+    }, 200);
+
+    const messageArea = messageAreaRef.current;
+    if (messageArea) {
+      messageArea.addEventListener('scroll', debouncedFn);
+      return () => {
+        messageArea.removeEventListener('scroll', debouncedFn);
+        debouncedFn.cancel();
+      };
+    }
+  }, [handleScroll]);
+
+  useEffect(() => {
     if (state.bookmarkedMessages?.length > 0) {
       debouncedFn(debouncedCalculatePositions);
     }
@@ -1087,7 +1180,7 @@ function MultiAgentChat() {
       window.removeEventListener('resize', handleResize);
       debouncedFn.cancel();
     };
-  }, [state.bookmarkedMessages, debouncedCalculatePositions, messages]);
+  }, [state.bookmarkedMessages, debouncedCalculatePositions, messages, debouncedFn]);
 
   const handleBookmark = (message) => {
     const container = messageAreaRef.current;
