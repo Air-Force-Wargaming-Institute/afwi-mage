@@ -113,7 +113,10 @@ function Header() {
                 <Link 
                   to="/multi-agent" 
                   className={activeTab === 'multi-agent' ? 'active' : ''}
-                  onClick={() => setActiveTab('multi-agent')}
+                  onClick={() => {
+                    setActiveTab('multi-agent');
+                    history.push('/multi-agent/chat');
+                  }}
                 >
                   <GroupWorkIcon /> Multi-Agent Portal
                 </Link>
@@ -213,8 +216,8 @@ function Header() {
           <ul>
             <li>
               <Link 
-                to="/multi-agent" 
-                className={location.pathname === '/multi-agent' ? 'active' : ''}
+                to="/multi-agent/guide" 
+                className={location.pathname === '/multi-agent/guide' ? 'active' : ''}
               >
                 <HelpOutlineIcon /> Guide
               </Link>
