@@ -157,20 +157,17 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   userMessage: {
-    alignSelf: 'flex-end',
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
-    borderBottomRightRadius: '4px',
-    '& .copyButton': {
+    marginLeft: 'auto',
+    borderRadius: '20px 20px 0 20px',
+    '& $messageContent': {
       color: '#ffffff',
-      '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      },
     },
-    '& .messageContent': {
+    '& p, & div': {
       color: '#ffffff !important',
     },
-    '& div': {
+    '& .MuiTypography-root': {
       color: '#ffffff !important',
     },
   },
@@ -313,6 +310,12 @@ const useStyles = makeStyles((theme) => ({
   messageWrapper: {
     position: 'relative',
     width: '100%',
+    '&:hover $topActions': {
+      opacity: 1,
+    },
+    '&:hover $messageActions': {
+      opacity: 1,
+    },
   },
   messageContainer: {
     position: 'relative',
@@ -657,28 +660,31 @@ const useStyles = makeStyles((theme) => ({
   bookmarkTrack: {
     position: 'absolute',
     left: 0,
-    top: '64px',
-    height: 'calc(100% - 64px)',
-    width: '10px',
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderRight: '1px solid rgba(0,0,0,0.1)',
-    zIndex: 1,
+    top: 44,
+    bottom: 70,
+    width: '15px',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    '&:hover $bookmarkTick': {
+      width: '24px',
+      height: '10px',
+      left: 0,
+    },
+    '&:hover $bookmarkPreviewContainer': {
+      opacity: 1,
+    },
   },
   bookmarkTick: {
     position: 'absolute',
-    left: 0,
-    width: '20px',
-    height: '8px',
+    width: '15px',
+    height: '4px',
     backgroundColor: theme.palette.primary.main,
-    cursor: 'pointer',
+    left: '0px',
     transform: 'translateY(-50%)',
     transition: 'all 0.2s ease',
-    '&:hover': {
-      width: '32px',
-      backgroundColor: theme.palette.primary.dark,
-      height: '12px',
-      borderRadius: '0 4px 4px 0',
-    },
+    cursor: 'pointer',
+    zIndex: 1000,
   },
   bookmarkButton: {
     padding: 0,
@@ -706,19 +712,22 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '0.875rem',
   },
   messageActions: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    bottom: theme.spacing(1),
     display: 'flex',
-    gap: theme.spacing(0.5),
+    gap: theme.spacing(1),
     opacity: 0,
     transition: 'opacity 0.2s ease',
-    '$messageContainer:hover &': {
-      opacity: 1,
-    },
   },
   topActions: {
     position: 'absolute',
     top: theme.spacing(1),
     right: theme.spacing(1),
-    zIndex: 1,
+    display: 'flex',
+    gap: theme.spacing(1),
+    opacity: 0,
+    transition: 'opacity 0.2s ease',
   },
   bookmarkRibbon: {
     position: 'absolute',
@@ -758,6 +767,32 @@ const useStyles = makeStyles((theme) => ({
       transform: 'rotate(180deg) scaleY(1)',
     },
   },
+  bookmarkPreviewContainer: {
+    position: 'absolute',
+    left: '24px',
+    top: 0,
+    bottom: 0,
+    width: '300px',
+    pointerEvents: 'auto',
+    opacity: 0,
+    transition: 'opacity 0.2s ease',
+  },
+  bookmarkPreview: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: theme.spacing(1),
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.shadows[2],
+    maxWidth: '280px',
+    fontSize: '0.875rem',
+    transform: 'translateY(-50%)',
+    zIndex: 2,
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 1)',
+    },
+  },
 }));
 
 const CodeBlock = ({ inline, className, children }) => {
@@ -781,64 +816,24 @@ const CodeBlock = ({ inline, className, children }) => {
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
   const [copied, setCopied] = useState(false);
+  const isErrorMessage = !isUser && content.includes('Error:');
 
-  const handleCopy = async (content) => {
-    if (content) {
-      try {
-        // Create a temporary div to handle HTML content
-        const tempDiv = document.createElement('div');
-        const clonedContent = content.cloneNode(true);
-        
-        // Function to recursively apply computed styles
-        const applyComputedStyles = (original, clone) => {
-          const style = window.getComputedStyle(original);
-          clone.style.cssText = Array.from(style).reduce((css, property) => {
-            return `${css}${property}:${style.getPropertyValue(property)};`;
-          }, '');
-          
-          // Recursively apply styles to children
-          Array.from(original.children).forEach((child, i) => {
-            if (clone.children[i]) {
-              applyComputedStyles(child, clone.children[i]);
-            }
-          });
-        };
-        
-        applyComputedStyles(content, clonedContent);
-        tempDiv.appendChild(clonedContent);
-
-        // Create ClipboardItem with both HTML and plain text
-        const clipboardItem = new ClipboardItem({
-          'text/html': new Blob([tempDiv.innerHTML], { type: 'text/html' }),
-          'text/plain': new Blob([content.textContent], { type: 'text/plain' })
-        });
-        
-        await navigator.clipboard.write([clipboardItem]);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy formatted text:', err);
-        // Fallback to plain text copy if rich copy fails
-        try {
-          await navigator.clipboard.writeText(content.textContent);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        } catch (fallbackErr) {
-          console.error('Fallback copy failed:', fallbackErr);
-        }
-      }
-    }
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
-
-  const textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
   return (
     <div className={classes.messageContainer}>
-      {isBookmarked && !isUser && (
-        <div className={`${classes.bookmarkRibbon} ${classes.topRibbon}`} />
+      {isBookmarked && (
+        <>
+          <div className={`${classes.bookmarkRibbon} ${classes.topRibbon}`} />
+          <div className={`${classes.bookmarkRibbon} ${classes.bottomRibbon}`} />
+        </>
       )}
-
-      {!isUser && (
+      
+      {!isUser && !isErrorMessage && (
         <div className={`${classes.messageActions} ${classes.topActions}`}>
           <IconButton
             className={classes.copyButton}
@@ -861,15 +856,24 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
 
       <div className={classes.messageContent}>
         {isUser ? (
-          <div>{textContent}</div>
+          <Typography 
+            variant="body1" 
+            style={{ 
+              color: 'inherit',
+              whiteSpace: 'pre-wrap'
+            }}
+          >
+            {content}
+          </Typography>
         ) : (
           <ReactMarkdown
-            children={content}
-            className={classes.markdown}
             components={{
-              code: CodeBlock
+              code: CodeBlock,
+              p: ({ children }) => <Typography variant="body1">{children}</Typography>,
             }}
-          />
+          >
+            {content}
+          </ReactMarkdown>
         )}
       </div>
 
@@ -882,7 +886,7 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
           })}
         </Typography>
         
-        {!isUser && (
+        {(!isErrorMessage || isUser) && (
           <div className={classes.messageActions}>
             <IconButton
               className={classes.copyButton}
@@ -892,34 +896,51 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
             >
               {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>
-            <IconButton
-              className={classes.copyButton}
-              onClick={onBookmark}
-              size="small"
-              title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-            >
-              {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
-            </IconButton>
+            {!isUser && (
+              <IconButton
+                className={classes.copyButton}
+                onClick={onBookmark}
+                size="small"
+                title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+              >
+                {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+              </IconButton>
+            )}
           </div>
         )}
         
-        {onRetry && (
-          <IconButton
-            className={classes.copyButton}
-            onClick={onRetry}
-            size="small"
-            title="Retry last message"
-          >
-            <ReplayIcon fontSize="small" />
-          </IconButton>
+        {onRetry && isErrorMessage && (
+          <div className={classes.messageActions}>
+            <IconButton
+              className={classes.retryButton}
+              onClick={onRetry}
+              size="small"
+              title="Retry last message"
+            >
+              <ReplayIcon fontSize="small" />
+            </IconButton>
+          </div>
         )}
       </div>
-
-      {isBookmarked && !isUser && (
-        <div className={`${classes.bookmarkRibbon} ${classes.bottomRibbon}`} />
-      )}
     </div>
   );
+};
+
+const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
+  const messageArea = messageAreaRef.current;
+  if (!messageArea) return bookmarkedMessages;
+  
+  const totalHeight = messageArea.scrollHeight;
+  
+  return bookmarkedMessages.map(bookmark => {
+    const messageElement = document.getElementById(`message-${bookmark.messageId}`);
+    if (messageElement) {
+      const messageTop = messageElement.offsetTop;
+      const position = (messageTop / totalHeight) * 100;
+      return { ...bookmark, position };
+    }
+    return bookmark;
+  });
 };
 
 function MultiAgentChat() {
@@ -942,6 +963,9 @@ function MultiAgentChat() {
   const messageEndRef = useRef(null);
   const messageAreaRef = useRef(null);
 
+  // Add a ref to track if we need to update positions
+  const shouldUpdatePositions = useRef(false);
+  
   const handleInputChange = (event) => {
     dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
   };
@@ -1111,95 +1135,84 @@ function MultiAgentChat() {
     }
   };
 
-  const calculateBookmarkPositions = useCallback(() => {
-    if (!messageAreaRef.current) return;
+  const handleBookmark = useCallback((message) => {
+    const messageArea = messageAreaRef.current;
+    const messageElement = document.getElementById(`message-${message.id}`);
     
-    const container = messageAreaRef.current;
-    const containerHeight = container.scrollHeight;
-    
-    const positions = {};
-    let hasChanges = false;
-
-    (state.bookmarkedMessages || []).forEach(bookmark => {
-      const element = document.getElementById(`message-${bookmark.messageId}`);
-      if (element) {
-        const elementTop = element.offsetTop;
-        const newPosition = elementTop / containerHeight;
-        
-        if (newPosition !== bookmark.position) {
-          positions[bookmark.messageId] = newPosition;
-          hasChanges = true;
-        }
-      }
-    });
-
-    if (hasChanges) {
-      dispatch({ type: ACTIONS.UPDATE_BOOKMARK_POSITIONS, payload: positions });
+    if (messageArea && messageElement) {
+      const totalHeight = messageArea.scrollHeight;
+      const messageTop = messageElement.offsetTop;
+      const position = (messageTop / totalHeight) * 100;
+      
+      const bookmarkData = {
+        messageId: message.id,
+        text: message.text,
+        position: position
+      };
+      
+      dispatch({ 
+        type: ACTIONS.TOGGLE_BOOKMARK, 
+        payload: bookmarkData
+      });
+      shouldUpdatePositions.current = true;
     }
-  }, [dispatch, state.bookmarkedMessages, messageAreaRef]);
+  }, [dispatch]);
 
-  // Create a debounced version of the calculation
-  const debouncedCalculatePositions = useCallback(
-    () => {
-      calculateBookmarkPositions();
-    },
-    [calculateBookmarkPositions]
+  // Create a debounced update function
+  const debouncedUpdate = useCallback(
+    debounce(() => {
+      if (shouldUpdatePositions.current) {
+        const updatedBookmarks = calculateBookmarkPositions(messageAreaRef, state.bookmarkedMessages);
+        dispatch({ type: ACTIONS.UPDATE_BOOKMARK_POSITIONS, payload: updatedBookmarks });
+        shouldUpdatePositions.current = false;
+      }
+    }, 100),
+    [state.bookmarkedMessages]
   );
 
-  // Create the debounced function outside of the component
-  const debouncedFn = debounce((fn) => fn(), 100);
-
+  // Update positions when necessary
   useEffect(() => {
-    const debouncedFn = debounce(() => {
-      handleScroll({ target: messageAreaRef.current });
-    }, 200);
-
-    const messageArea = messageAreaRef.current;
-    if (messageArea) {
-      messageArea.addEventListener('scroll', debouncedFn);
-      return () => {
-        messageArea.removeEventListener('scroll', debouncedFn);
-        debouncedFn.cancel();
-      };
+    if (shouldUpdatePositions.current) {
+      debouncedUpdate();
     }
-  }, [handleScroll]);
+  }, [debouncedUpdate]);
 
+  // Handle initial load and new messages
   useEffect(() => {
-    if (state.bookmarkedMessages?.length > 0) {
-      debouncedFn(debouncedCalculatePositions);
-    }
-    
+    shouldUpdatePositions.current = true;
+    debouncedUpdate();
+  }, [messages, debouncedUpdate]);
+
+  // Handle window resize
+  useEffect(() => {
     const handleResize = () => {
-      if (state.bookmarkedMessages?.length > 0) {
-        debouncedFn(debouncedCalculatePositions);
-      }
+      shouldUpdatePositions.current = true;
+      debouncedUpdate();
     };
 
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      debouncedFn.cancel();
+      debouncedUpdate.cancel();
     };
-  }, [state.bookmarkedMessages, debouncedCalculatePositions, messages, debouncedFn]);
+  }, [debouncedUpdate]);
 
-  const handleBookmark = (message) => {
-    const container = messageAreaRef.current;
-    const element = document.getElementById(`message-${message.id}`);
-    
-    if (container && element) {
-      const position = element.offsetTop / container.scrollHeight;
-      
-      dispatch({ 
-        type: ACTIONS.TOGGLE_BOOKMARK, 
-        payload: { 
-          messageId: message.id,
-          text: message.text,
-          timestamp: message.timestamp,
-          position: position
-        } 
-      });
+  // Handle scroll events
+  useEffect(() => {
+    const handleScroll = debounce(() => {
+      shouldUpdatePositions.current = true;
+      debouncedUpdate();
+    }, 100);
+
+    const messageArea = messageAreaRef.current;
+    if (messageArea) {
+      messageArea.addEventListener('scroll', handleScroll);
+      return () => {
+        messageArea.removeEventListener('scroll', handleScroll);
+        handleScroll.cancel();
+      };
     }
-  };
+  }, [debouncedUpdate]);
 
   useEffect(() => {
     messageEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -1271,23 +1284,33 @@ function MultiAgentChat() {
             onScroll={handleScroll}
           >
             <div className={classes.bookmarkTrack}>
-              {(state.bookmarkedMessages || []).map((bookmark) => (
-                <Tooltip
-                  key={bookmark.messageId}
-                  title={bookmark.text.substring(0, 100) + (bookmark.text.length > 100 ? '...' : '')}
-                  placement="left"
-                  classes={{ tooltip: classes.bookmarkTooltip }}
-                >
+              {state.bookmarkedMessages.map((bookmark, index) => (
+                <React.Fragment key={index}>
                   <div
                     className={classes.bookmarkTick}
-                    style={{ top: `${bookmark.position * 100}%` }}
+                    style={{ top: `${bookmark.position}%` }}
                     onClick={() => {
                       const element = document.getElementById(`message-${bookmark.messageId}`);
                       element?.scrollIntoView({ behavior: 'smooth' });
                     }}
                   />
-                </Tooltip>
+                </React.Fragment>
               ))}
+              <div className={classes.bookmarkPreviewContainer}>
+                {state.bookmarkedMessages.map((bookmark, index) => (
+                  <div
+                    key={index}
+                    className={classes.bookmarkPreview}
+                    style={{ top: `${bookmark.position}%` }}
+                    onClick={() => {
+                      const element = document.getElementById(`message-${bookmark.messageId}`);
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    {bookmark.text.substring(0, 100) + (bookmark.text.length > 100 ? '...' : '')}
+                  </div>
+                ))}
+              </div>
             </div>
             
             {messages.map((message, index) => (
