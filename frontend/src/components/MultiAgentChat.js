@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -40,6 +40,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
+import { useChat, ACTIONS } from '../contexts/ChatContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -784,20 +785,24 @@ const MessageContent = ({ content, isUser, timestamp }) => {
 
 function MultiAgentChat() {
   const classes = useStyles();
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [chatSessions, setChatSessions] = useState([{ id: 1, name: 'New Chat' }]);
+  const { state, dispatch } = useChat();
+  const {
+    input,
+    messages,
+    chatSessions,
+    isLoading,
+    isFullscreen,
+    helpDialogOpen,
+    promptHelpOpen,
+    showScrollTop,
+    showScrollBottom
+  } = state;
+
   const messageEndRef = useRef(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-  const [promptHelpOpen, setPromptHelpOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const messageAreaRef = useRef(null);
 
   const handleInputChange = (event) => {
-    setInput(event.target.value);
+    dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
   };
 
   const handleKeyPress = (event) => {
@@ -810,14 +815,14 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
-    const newMessages = [...messages, { 
-      text: input.trim(), 
-      sender: 'user',
-      timestamp: new Date()  // Add timestamp
-    }];
-    setMessages(newMessages);
-    setInput('');
-    setIsLoading(true);
+    dispatch({ 
+      type: ACTIONS.ADD_MESSAGE, 
+      payload: { text: input.trim(), sender: 'user', timestamp: new Date() }
+    });
+    
+    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
+    
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
@@ -828,27 +833,29 @@ function MultiAgentChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      setMessages([...newMessages, { 
-        text: aiResponse, 
-        sender: 'ai',
-        timestamp: new Date()  // Add timestamp
-      }]);
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { text: aiResponse, sender: 'ai', timestamp: new Date() }
+      });
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages([...newMessages, { 
-        text: 'Error: Failed to get response from AI', 
-        sender: 'system',
-        timestamp: new Date()  // Add timestamp
-      }]);
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          text: 'Error: Failed to get response from AI', 
+          sender: 'system', 
+          timestamp: new Date() 
+        }
+      });
     } finally {
-      setIsLoading(false);
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
     }
   };
 
   const handleNewChat = () => {
     const newSession = { id: chatSessions.length + 1, name: `New Chat ${chatSessions.length + 1}` };
-    setChatSessions([newSession, ...chatSessions]);
-    setMessages([]);
+    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
   };
 
   const handleEditSession = (sessionId) => {
@@ -867,23 +874,23 @@ function MultiAgentChat() {
   };
 
   const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !isFullscreen });
   };
 
   const handleHelpOpen = () => {
-    setHelpDialogOpen(true);
+    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: true });
   };
 
   const handleHelpClose = () => {
-    setHelpDialogOpen(false);
+    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: false });
   };
 
   const handlePromptHelpOpen = () => {
-    setPromptHelpOpen(true);
+    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: true });
   };
 
   const handlePromptHelpClose = () => {
-    setPromptHelpOpen(false);
+    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
   };
 
   const handleScroll = (event) => {
@@ -892,9 +899,8 @@ function MultiAgentChat() {
     const scrollHeight = element.scrollHeight;
     const clientHeight = element.clientHeight;
     
-    setShowScrollTop(scrollTop > 500);
-    // Show scroll bottom when not at bottom and has scrollable content
-    setShowScrollBottom(scrollTop < scrollHeight - clientHeight - 100);
+    dispatch({ type: ACTIONS.SET_SCROLL_TOP, payload: scrollTop > 500 });
+    dispatch({ type: ACTIONS.SET_SCROLL_BOTTOM, payload: scrollTop < scrollHeight - clientHeight - 100 });
   };
 
   const scrollToTop = () => {
