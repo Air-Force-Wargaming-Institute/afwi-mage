@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import axios from 'axios';
 import '../App.css';
 import { getApiUrl } from '../config';
-import { Box, Grid, Paper, Button, TextField, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, CircularProgress, Typography, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Grid, Paper, Button, TextField, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, CircularProgress, Typography, List, ListItem, ListItemText } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -12,6 +12,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import { DataGrid } from '@mui/x-data-grid';
 import { keyframes } from '@emotion/react';
 import { styled } from '@mui/material/styles';
+import { useExtraction, ACTIONS } from '../contexts/ExtractionContext';
 
 // Add the pulsing animation keyframes
 const pulseAnimation = keyframes`
@@ -43,74 +44,110 @@ const PulsingButton = styled(Button)(({ theme, isextracting }) => ({
 }));
 
 function ExtractComponent() {
-  const [files, setFiles] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [message, setMessage] = useState('');
-  const [currentFolder, setCurrentFolder] = useState('');
-  const [csvFilename, setCsvFilename] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [csvFiles, setCsvFiles] = useState([]);
-  const [selectedCsvFile, setSelectedCsvFile] = useState('');
-  const [newlyCreatedCsvFile, setNewlyCreatedCsvFile] = useState('');
-  const [editingCsvFile, setEditingCsvFile] = useState(null);
-  const [newCsvFileName, setNewCsvFileName] = useState('');
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState(null);
-  const [error, setError] = useState(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState([]);
-  const [metadataOpen, setMetadataOpen] = useState(false);
-  const [metadataContent, setMetadataContent] = useState(null);
+  const { state, dispatch } = useExtraction();
+  
+  const {
+    files,
+    selectedFiles = [], // Add default empty array
+    message,
+    currentFolder,
+    csvFilename,
+    isLoading,
+    isExtracting,
+    csvFiles,
+    selectedCsvFile,
+    newlyCreatedCsvFile,
+    editingCsvFile,
+    newCsvFileName,
+    error,
+    previewOpen,
+    previewData,
+    metadataOpen,
+    metadataContent
+  } = state;
 
-  useEffect(() => {
-    fetchFiles(currentFolder);
-    fetchCsvFiles();
-  }, [currentFolder]);
+  // Keep only the dispatch functions that are actually used
+  const setSelectedFiles = (files) => dispatch({ type: ACTIONS.SET_SELECTED_FILES, payload: files });
+  const setMessage = (msg) => dispatch({ type: ACTIONS.SET_MESSAGE, payload: msg });
+  const setCurrentFolder = (folder) => dispatch({ type: ACTIONS.SET_CURRENT_FOLDER, payload: folder });
+  const setCsvFilename = (filename) => dispatch({ type: ACTIONS.SET_CSV_FILENAME, payload: filename });
+  const setIsExtracting = (extracting) => dispatch({ type: ACTIONS.SET_EXTRACTING, payload: extracting });
+  const setSelectedCsvFile = (file) => dispatch({ type: ACTIONS.SET_SELECTED_CSV_FILE, payload: file });
+  const setNewlyCreatedCsvFile = (file) => dispatch({ type: ACTIONS.SET_NEWLY_CREATED_CSV_FILE, payload: file });
+  const setEditingCsvFile = (file) => dispatch({ type: ACTIONS.SET_EDITING_CSV_FILE, payload: file });
+  const setNewCsvFileName = (filename) => dispatch({ type: ACTIONS.SET_NEW_CSV_FILENAME, payload: filename });
+  const setError = (err) => dispatch({ type: ACTIONS.SET_ERROR, payload: err });
+  const setPreviewOpen = (open) => dispatch({ type: ACTIONS.SET_PREVIEW_OPEN, payload: open });
+  const setPreviewData = (data) => dispatch({ type: ACTIONS.SET_PREVIEW_DATA, payload: data });
+  const setMetadataOpen = (open) => dispatch({ type: ACTIONS.SET_METADATA_OPEN, payload: open });
+  const setMetadataContent = (content) => dispatch({ type: ACTIONS.SET_METADATA_CONTENT, payload: content });
 
-  const fetchFiles = (folder) => {
-    setIsLoading(true);
-    setError(null);
+  const fetchFiles = React.useCallback((folder) => {
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+    dispatch({ type: ACTIONS.SET_ERROR, payload: null });
     
     axios.get(getApiUrl('EXTRACTION', `/api/extraction/files/?folder=${folder}`))
       .then(response => {
-        console.log('Files response:', response.data);  // Debug log
         if (Array.isArray(response.data)) {
-          setFiles(response.data);
+          dispatch({ type: ACTIONS.SET_FILES, payload: response.data });
           if (response.data.length === 0) {
-            setError('No PDF files found in the document library.');
+            dispatch({ type: ACTIONS.SET_ERROR, payload: 'No PDF files found in the document library.' });
           }
         } else {
           console.error('Unexpected response format:', response.data);
-          setError('Error: Unexpected response format from server');
+          dispatch({ type: ACTIONS.SET_ERROR, payload: 'Error: Unexpected response format from server' });
         }
       })
       .catch(error => {
         console.error('Error fetching files:', error);
-        console.error('Error details:', error.response?.data);  // Debug log
-        setError(error.response?.data?.detail || 'Error loading files from document library. Please try again.');
+        dispatch({ type: ACTIONS.SET_ERROR, payload: error.response?.data?.detail || 'Error loading files from document library. Please try again.' });
       })
       .finally(() => {
-        setIsLoading(false);
+        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
       });
-  };
+  }, [dispatch]);
 
-  const fetchCsvFiles = async () => {
+  const fetchCsvFiles = React.useCallback(async () => {
     try {
       const response = await axios.get(getApiUrl('EXTRACTION', '/api/extraction/csv-files/'));
-      setCsvFiles(response.data);
+      dispatch({ type: ACTIONS.SET_CSV_FILES, payload: response.data });
     } catch (error) {
       console.error('Error fetching CSV files:', error);
     }
-  };
+  }, [dispatch]);
+
+  React.useEffect(() => {
+    fetchFiles(currentFolder);
+    fetchCsvFiles();
+  }, [currentFolder, fetchFiles, fetchCsvFiles]);
+
+  React.useEffect(() => {
+    if (newlyCreatedCsvFile) {
+      dispatch({ type: ACTIONS.SET_SELECTED_CSV_FILE, payload: newlyCreatedCsvFile });
+    }
+  }, [newlyCreatedCsvFile, dispatch]);
+
+  React.useEffect(() => {
+    if (csvFiles.length > 0 && newlyCreatedCsvFile) {
+      dispatch({ type: ACTIONS.SET_SELECTED_CSV_FILE, payload: newlyCreatedCsvFile });
+      dispatch({ type: ACTIONS.SET_NEWLY_CREATED_CSV_FILE, payload: '' }); // Reset after selection
+    }
+  }, [csvFiles, newlyCreatedCsvFile, dispatch]);
 
   const handleFileSelection = (event, filePath) => {
     const fullPath = currentFolder ? `${currentFolder}/${filePath}` : filePath;
+    const currentSelected = Array.isArray(selectedFiles) ? selectedFiles : [];
+    
     if (event.target.checked) {
-      setSelectedFiles(prev => [...prev, fullPath]);
+      setSelectedFiles([...currentSelected, fullPath]);
     } else {
-      setSelectedFiles(prev => prev.filter(path => path !== fullPath));
+      setSelectedFiles(currentSelected.filter(path => path !== fullPath));
     }
+  };
+
+  const isFileSelected = (filePath) => {
+    const currentSelected = Array.isArray(selectedFiles) ? selectedFiles : [];
+    return currentSelected.includes(currentFolder ? `${currentFolder}/${filePath}` : filePath);
   };
 
   const handleExtract = async () => {
@@ -163,19 +200,6 @@ function ExtractComponent() {
     }
   };
 
-  useEffect(() => {
-    if (newlyCreatedCsvFile) {
-      setSelectedCsvFile(newlyCreatedCsvFile);
-    }
-  }, [newlyCreatedCsvFile]);
-
-  useEffect(() => {
-    if (csvFiles.length > 0 && newlyCreatedCsvFile) {
-      setSelectedCsvFile(newlyCreatedCsvFile);
-      setNewlyCreatedCsvFile(''); // Reset after selection
-    }
-  }, [csvFiles, newlyCreatedCsvFile]);
-
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -222,24 +246,23 @@ function ExtractComponent() {
   };
 
   const handleDeleteCsvFile = async (filename) => {
-    setFileToDelete(filename);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
+    setError(null);
+    setSelectedCsvFile(null);
+    setNewlyCreatedCsvFile(null);
+    setEditingCsvFile(null);
+    setNewCsvFileName('');
+    setPreviewData([]);
+    setPreviewOpen(false);
+    setMetadataOpen(false);
+    setMetadataContent(null);
     try {
-      await axios.delete(getApiUrl('EXTRACTION', `/api/extraction/delete-csv/${fileToDelete}`));
-      setMessage(`CSV file '${fileToDelete}' deleted successfully`);
+      await axios.delete(getApiUrl('EXTRACTION', `/api/extraction/delete-csv/${filename}`));
+      setMessage(`CSV file '${filename}' deleted successfully`);
       fetchCsvFiles();
-      if (selectedCsvFile === fileToDelete) {
-        setSelectedCsvFile('');
-      }
     } catch (error) {
       console.error('Error deleting CSV file:', error);
-      setMessage('Error deleting CSV file. Please try again.');
+      setError('Error deleting CSV file. Please try again.');
     }
-    setDeleteConfirmOpen(false);
-    setFileToDelete(null);
   };
 
   const handlePreviewClick = async (filename) => {
@@ -374,7 +397,6 @@ function ExtractComponent() {
           <Paper className="extract-section" elevation={3}>
             <h3>Step 1: Select Files for Extraction</h3>
             
-            {/* Folder Navigation with flexShrink: 0 */}
             <div style={{ 
               marginBottom: '16px', 
               display: 'flex', 
@@ -467,7 +489,6 @@ function ExtractComponent() {
                         <TableBody>
                           {sortedFiles.map((file, index) => (
                             <React.Fragment key={file.path}>
-                              {/* Add a visual separator between folders and non-folders */}
                               {index > 0 && 
                                sortedFiles[index].type !== 'folder' && 
                                sortedFiles[index - 1].type === 'folder' && (
@@ -477,7 +498,7 @@ function ExtractComponent() {
                               )}
                               <TableRow 
                                 hover
-                                selected={selectedFiles.includes(currentFolder ? `${currentFolder}/${file.name}` : file.name)}
+                                selected={isFileSelected(file.name)}
                                 style={{ 
                                   height: '36px', 
                                   cursor: file.type === 'folder' ? 'pointer' : 'default',
@@ -494,7 +515,7 @@ function ExtractComponent() {
                                   {file.type !== 'folder' && (
                                     <input
                                       type="checkbox"
-                                      checked={selectedFiles.includes(currentFolder ? `${currentFolder}/${file.name}` : file.name)}
+                                      checked={isFileSelected(file.name)}
                                       onChange={(e) => handleFileSelection(e, file.name)}
                                       onClick={(e) => e.stopPropagation()}
                                       style={{ padding: 0 }}
@@ -619,7 +640,6 @@ function ExtractComponent() {
           <Paper className="extract-section" elevation={3}>
             <h3>Step 3: Start Extraction</h3>
             
-            {/* Input and button section with flexShrink: 0 */}
             <div style={{ flexShrink: 0 }}>
               <TextField
                 fullWidth
@@ -648,7 +668,6 @@ function ExtractComponent() {
               </PulsingButton>
             </div>
 
-            {/* CSV Files section with flex: 1 and overflow */}
             <div style={{ 
               flex: 1,
               minHeight: 0,
@@ -764,43 +783,6 @@ function ExtractComponent() {
         </Grid>
       </Grid>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: '8px',
-            padding: '8px'
-          }
-        }}
-      >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the CSV file "{fileToDelete}"?
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} color="primary">
-            Cancel
-          </Button>
-          <Button 
-            onClick={confirmDelete} 
-            sx={{ 
-              color: '#d32f2f',
-              '&:hover': {
-                backgroundColor: 'rgba(211, 47, 47, 0.04)'
-              }
-            }}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Preview Dialog */}
       <Dialog
         open={previewOpen}
         onClose={handleClosePreview}
@@ -1006,7 +988,6 @@ function ExtractComponent() {
         </DialogActions>
       </Dialog>
 
-      {/* Metadata Dialog */}
       <Dialog
         open={metadataOpen}
         onClose={handleCloseMetadata}

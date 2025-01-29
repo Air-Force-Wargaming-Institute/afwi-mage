@@ -1,51 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Container, Typography, Grid, Paper, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@material-ui/core';
 import axios from 'axios';
 import '../App.css';
 import CSVPreview from './CSVPreview';
 import { getApiUrl } from '../config';
+import { useGeneration, ACTIONS } from '../contexts/GenerationContext';
 
 function GenerateDataset() {
-  const [csvFiles, setCsvFiles] = useState([]);
-  const [selectedCsv, setSelectedCsv] = useState('');
-  const [datasetName, setDatasetName] = useState('');
-  const [finalDatasetName, setFinalDatasetName] = useState('');
-  const [trainingDatasets, setTrainingDatasets] = useState([]);
-  const [selectedTrainingDataset, setSelectedTrainingDataset] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const { state, dispatch } = useGeneration();
+  
+  const {
+    csvFiles,
+    selectedCsv,
+    datasetName,
+    finalDatasetName,
+    trainingDatasets,
+    selectedTrainingDataset,
+    selectedFile
+  } = state;
 
-  useEffect(() => {
-    fetchCsvFiles();
-    fetchTrainingDatasets();
-  }, []);
+  const setSelectedCsv = (csv) => dispatch({ type: ACTIONS.SET_SELECTED_CSV, payload: csv });
+  const setDatasetName = (name) => dispatch({ type: ACTIONS.SET_DATASET_NAME, payload: name });
+  const setSelectedTrainingDataset = (dataset) => dispatch({ type: ACTIONS.SET_SELECTED_TRAINING_DATASET, payload: dataset });
+  const setSelectedFile = (file) => dispatch({ type: ACTIONS.SET_SELECTED_FILE, payload: file });
 
-  useEffect(() => {
-    if (datasetName) {
-      const currentDate = new Date().toISOString().split('T')[0];
-      setFinalDatasetName(`TrainingData_${datasetName}_${currentDate}`);
-    } else {
-      setFinalDatasetName('');
-    }
-  }, [datasetName]);
-
-  const fetchCsvFiles = async () => {
+  const fetchCsvFiles = React.useCallback(async () => {
     try {
       const response = await axios.get(getApiUrl('EXTRACTION', '/api/extraction/csv-files/'));
-      setCsvFiles(response.data);
+      dispatch({ type: ACTIONS.SET_CSV_FILES, payload: response.data });
     } catch (error) {
       console.error('Error fetching CSV files:', error);
     }
-  };
+  }, [dispatch]);
 
-  const fetchTrainingDatasets = async () => {
+  const fetchTrainingDatasets = React.useCallback(async () => {
     try {
       const response = await axios.get(getApiUrl('GENERATION', '/api/generate/training-datasets/'));
       console.log('Training datasets:', response.data); 
-      setTrainingDatasets(response.data);
+      dispatch({ type: ACTIONS.SET_TRAINING_DATASETS, payload: response.data });
     } catch (error) {
       console.error('Error fetching training datasets:', error);
     }
-  };
+  }, [dispatch]);
+
+  React.useEffect(() => {
+    fetchCsvFiles();
+    fetchTrainingDatasets();
+  }, [fetchCsvFiles, fetchTrainingDatasets]);
+
+  React.useEffect(() => {
+    if (datasetName) {
+      const currentDate = new Date().toISOString().split('T')[0];
+      dispatch({ type: ACTIONS.SET_FINAL_DATASET_NAME, payload: `TrainingData_${datasetName}_${currentDate}` });
+    } else {
+      dispatch({ type: ACTIONS.SET_FINAL_DATASET_NAME, payload: '' });
+    }
+  }, [datasetName, dispatch]);
 
   const handleCsvSelect = (event) => {
     setSelectedCsv(event.target.value);
