@@ -38,7 +38,10 @@ const AuthenticatedRoutes = () => {
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
-          <Route exact path="/multi-agent" component={UserGuide} />
+          <Route exact path="/multi-agent">
+            <Redirect to="/multi-agent/chat" />
+          </Route>
+          <Route path="/multi-agent/guide" component={UserGuide} />
           <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
           <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
           <Route path="/multi-agent/chat" component={MultiAgentChat} />
