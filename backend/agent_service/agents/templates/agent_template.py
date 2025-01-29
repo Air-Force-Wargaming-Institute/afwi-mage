@@ -25,6 +25,20 @@ def {{AGENT_FILE_NAME}}_expert(state: GraphState, llm: ChatOpenAI) -> GraphState
     question = state_dict["question"]
     whoami = "{{AGENT_FILE_NAME}}"
     config = load_config()
+    if bool(config["SOLO_AGENT"]):
+        prompt = PromptTemplate(
+            input_variables=["question"],
+            template="You are the {{AGENT_NAME}} expert. Here is your job description: {{AGENT_INSTRUCTIONS}}. You have been asked this question: {question}. Please provide a detailed and comprehensive answer to the question, to the best of your abilities."
+        )
+
+        chain = prompt | llm | StrOutputParser()
+        analysis = chain.invoke({
+            "question": question,
+        })
+
+        # Although this looks wonky and wrong, this is the easiest way to implement direct chat
+        return {"keys": {**state_dict, "synthesized_report": analysis, "last_actor": whoami}}
+
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])

@@ -997,7 +997,7 @@ function MultiAgentChat() {
     try {
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
-        team_name: 'team_one_two_three'
+        team_name: 'PRC_Team'
       });
 
       const aiResponse = Array.isArray(response.data.response) 

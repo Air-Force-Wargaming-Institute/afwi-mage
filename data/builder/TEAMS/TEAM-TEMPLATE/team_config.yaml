@@ -57,3 +57,6 @@ EXPERT_AGENTS: [{{AGENT_FILE_NAMES}}]
 
 # Expert agent instructions
 EXPERT_INSTRUCTIONS: [{{AGENT_FILE_INSTRUCTIONS}}]
+
+# Direct Chat
+SOLO_AGENT: {{SOLO_AGENT}}
