@@ -20,6 +20,7 @@ import './App.css';
 import { ExtractionProvider } from './contexts/ExtractionContext';
 import { GenerationProvider } from './contexts/GenerationContext';
 import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
+import { ChatProvider } from './contexts/ChatContext';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -69,11 +70,13 @@ function App() {
     <ExtractionProvider>
       <GenerationProvider>
         <DocumentLibraryProvider>
-          <AuthProvider>
-            <Router>
-              <AuthenticatedRoutes />
-            </Router>
-          </AuthProvider>
+          <ChatProvider>
+            <AuthProvider>
+              <Router>
+                <AuthenticatedRoutes />
+              </Router>
+            </AuthProvider>
+          </ChatProvider>
         </DocumentLibraryProvider>
       </GenerationProvider>
     </ExtractionProvider>
