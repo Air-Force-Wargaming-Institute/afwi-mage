@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   Container,
   Paper,
@@ -47,6 +47,7 @@ import {
 import FilePreview from './FilePreview';
 import axios from 'axios';
 import { getApiUrl } from '../config';
+import { useDocumentLibrary, ACTIONS } from '../contexts/DocumentLibraryContext';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -98,29 +99,65 @@ const getFileNameWithoutExtension = (fileName) => {
 };
 
 function DocumentLibrary() {
-  const [documents, setDocuments] = useState([]);
-  const [selectedDocs, setSelectedDocs] = useState([]);
-  const [previewFile, setPreviewFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [operationProgress, setOperationProgress] = useState({});
-  const [error, setError] = useState(null);
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
-  const [currentPath, setCurrentPath] = useState("");
-  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [breadcrumbs, setBreadcrumbs] = useState([{ name: "Root", path: "" }]);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [itemToRename, setItemToRename] = useState(null);
-  const [newName, setNewName] = useState("");
-  const [draggedItem, setDraggedItem] = useState(null);
-  const [dropTarget, setDropTarget] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState(null);
-  const [deleteContents, setDeleteContents] = useState([]);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-  const [bulkDeleteContents, setBulkDeleteContents] = useState([]);
+  const { state, dispatch } = useDocumentLibrary();
+  
+  const {
+    documents = [],
+    selectedDocs = [],
+    previewFile,
+    dragOver,
+    isLoading,
+    isRefreshing,
+    operationProgress,
+    error,
+    openConfirmDialog,
+    currentPath,
+    newFolderDialogOpen,
+    newFolderName,
+    breadcrumbs,
+    renameDialogOpen,
+    itemToRename,
+    newName,
+    draggedItem,
+    dropTarget,
+    deleteConfirmOpen,
+    fileToDelete,
+    deleteContents,
+    bulkDeleteDialogOpen,
+    bulkDeleteContents
+  } = state;
+
+  // Replace all setState calls with dispatch
+  const setDocuments = (docs) => dispatch({ type: ACTIONS.SET_DOCUMENTS, payload: docs });
+  const setSelectedDocs = (docs) => dispatch({ type: ACTIONS.SET_SELECTED_DOCS, payload: docs });
+  const setPreviewFile = (file) => dispatch({ type: ACTIONS.SET_PREVIEW_FILE, payload: file });
+  const setDragOver = (isDragOver) => dispatch({ type: ACTIONS.SET_DRAG_OVER, payload: isDragOver });
+  const setIsLoading = (loading) => dispatch({ type: ACTIONS.SET_LOADING, payload: loading });
+  const setIsRefreshing = (refreshing) => dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: refreshing });
+  const setOperationProgress = (progress) => {
+    // Ensure progress has the correct structure
+    const formattedProgress = typeof progress === 'string' 
+      ? { status: progress, processed_items: undefined, total_items: undefined }
+      : { ...progress };
+      
+    dispatch({ type: ACTIONS.SET_OPERATION_PROGRESS, payload: formattedProgress });
+  };
+  const setError = (err) => dispatch({ type: ACTIONS.SET_ERROR, payload: err });
+  const setOpenConfirmDialog = (open) => dispatch({ type: ACTIONS.SET_OPEN_CONFIRM_DIALOG, payload: open });
+  const setCurrentPath = (path) => dispatch({ type: ACTIONS.SET_CURRENT_PATH, payload: path });
+  const setNewFolderDialogOpen = (open) => dispatch({ type: ACTIONS.SET_CREATE_FOLDER_DIALOG_OPEN, payload: open });
+  const setNewFolderName = (name) => dispatch({ type: ACTIONS.SET_NEW_FOLDER_NAME, payload: name });
+  const setBreadcrumbs = (crumbs) => dispatch({ type: ACTIONS.SET_BREADCRUMBS, payload: crumbs });
+  const setRenameDialogOpen = (open) => dispatch({ type: ACTIONS.SET_RENAME_DIALOG_OPEN, payload: open });
+  const setItemToRename = (item) => dispatch({ type: ACTIONS.SET_ITEM_TO_RENAME, payload: item });
+  const setNewName = (name) => dispatch({ type: ACTIONS.SET_NEW_NAME, payload: name });
+  const setDraggedItem = (item) => dispatch({ type: ACTIONS.SET_DRAGGED_ITEM, payload: item });
+  const setDropTarget = (target) => dispatch({ type: ACTIONS.SET_DROP_TARGET, payload: target });
+  const setDeleteConfirmOpen = (open) => dispatch({ type: ACTIONS.SET_DELETE_CONFIRM_OPEN, payload: open });
+  const setFileToDelete = (file) => dispatch({ type: ACTIONS.SET_FILE_TO_DELETE, payload: file });
+  const setDeleteContents = (contents) => dispatch({ type: ACTIONS.SET_DELETE_CONTENTS, payload: contents });
+  const setBulkDeleteDialogOpen = (open) => dispatch({ type: ACTIONS.SET_BULK_DELETE_DIALOG_OPEN, payload: open });
+  const setBulkDeleteContents = (contents) => dispatch({ type: ACTIONS.SET_BULK_DELETE_CONTENTS, payload: contents });
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -346,13 +383,18 @@ function DocumentLibrary() {
   };
 
   const handleSelectDoc = (docId) => {
-    setSelectedDocs(prev => {
-      if (prev.includes(docId)) {
-        return prev.filter(id => id !== docId);
-      } else {
-        return [...prev, docId];
-      }
-    });
+    const currentSelected = Array.isArray(selectedDocs) ? selectedDocs : [];
+    if (currentSelected.includes(docId)) {
+      setSelectedDocs(currentSelected.filter(id => id !== docId));
+    } else {
+      setSelectedDocs([...currentSelected, docId]);
+    }
+  };
+
+  // Update the checkbox checked state with safety check
+  const isSelected = (docId) => {
+    const currentSelected = Array.isArray(selectedDocs) ? selectedDocs : [];
+    return currentSelected.includes(docId);
   };
 
   // Bulk Action Handlers
@@ -848,13 +890,17 @@ function DocumentLibrary() {
       });
 
       if (response.status === 200) {
-        // Update the documents list to reflect the new classification
-        setDocuments(prevDocs => prevDocs.map(doc => 
+        // Just update the UI to reflect the change without using state management
+        const updatedDocuments = documents.map(doc => 
           doc.id === item.id 
             ? { ...doc, securityClassification: newClassification }
             : doc
-        ));
+        );
+        
+        // Update documents directly
+        dispatch({ type: ACTIONS.SET_DOCUMENTS, payload: updatedDocuments });
 
+        // Show success message
         setOperationProgress({
           status: `Successfully updated classification for ${item.name}`,
           processed_items: undefined,
@@ -1252,7 +1298,7 @@ function DocumentLibrary() {
                       >
                         <TableCell padding="checkbox" style={{ width: '60px' }} className="checkbox-cell">
                           <Checkbox
-                            checked={selectedDocs.includes(item.id)}
+                            checked={isSelected(item.id)}
                             onChange={(e) => {
                               e.stopPropagation();
                               handleSelectDoc(item.id);
@@ -1509,7 +1555,7 @@ function DocumentLibrary() {
       </Dialog>
 
       {/* Operation Progress */}
-      {operationProgress.status && (
+      {operationProgress?.status && (
         <div style={{
           position: 'fixed',
           bottom: 16,

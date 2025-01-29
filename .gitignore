@@ -111,3 +111,10 @@ dist/
 config.local.js
 
 __langchain+graph_documentation/
+
+# Conversation logs
+backend/chat_service/conversation_logs/*.json
+backend/chat_service/conversation_logs/**/*
+
+# But keep the directory itself
+!backend/chat_service/conversation_logs/.gitkeep
