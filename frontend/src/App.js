@@ -1,8 +1,6 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Route, Switch, Redirect, useLocation } from 'react-router-dom';
-import { AuthProvider, AuthContext } from './contexts/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
-import Login from './components/Login';
+import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import Home from './components/Home';
 import AdminDashboard from './components/AdminDashboard';
@@ -19,22 +17,16 @@ import LibrarianAgents from './components/LibrarianAgents';
 import DocumentLibrary from './components/DocumentLibrary';
 import UserGuide from './components/UserGuide';
 import './App.css';
+import { ExtractionProvider } from './contexts/ExtractionContext';
+import { GenerationProvider } from './contexts/GenerationContext';
+import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
+import { ChatProvider } from './contexts/ChatContext';
+import DirectChat from './components/DirectChat';
+import { DirectChatProvider } from './contexts/DirectChatContext';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
-  //const { isAuthenticated } = useContext(AuthContext);
   const location = useLocation();
-
-  // If not authenticated and not on login page, redirect to login
-  // if (!isAuthenticated && location.pathname !== '/login') {
-  //   return <Redirect to="/login" />;
-  // }
-
-  // If authenticated and on login page, redirect to home
-  // if (isAuthenticated && location.pathname === '/login') {
-  //   return <Redirect to="/home" />;
-  // }
-
   const isLoginPage = location.pathname === '/login';
 
   return (
@@ -42,32 +34,20 @@ const AuthenticatedRoutes = () => {
       {!isLoginPage && <Header />}
       <main>
         <Switch>
-          {/* <Route exact path="/login" component={Login} />
-          <PrivateRoute exact path="/home" component={Home} />
-          <PrivateRoute path="/admin" component={AdminDashboard} adminOnly={true} />
-          <PrivateRoute path="/document-library" component={DocumentLibrary} />
-          <PrivateRoute exact path="/multi-agent" component={UserGuide} />
-          <PrivateRoute path="/multi-agent/builder" component={MultiAgentBuilder} />
-          <PrivateRoute exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
-          <PrivateRoute path="/multi-agent/chat" component={MultiAgentChat} />
-          <PrivateRoute exact path="/fine-tuning" component={FineTuneGuide} />
-          <PrivateRoute path="/fine-tuning/extract" component={ExtractComponent} />
-          <PrivateRoute path="/fine-tuning/generate" component={GenerateDataset} />
-          <PrivateRoute path="/fine-tuning/fine-tune" component={FineTune} />
-          <PrivateRoute path="/fine-tuning/test" component={Test} />
-          <PrivateRoute exact path="/retrieval" component={RetrievalGuide} />
-          <PrivateRoute path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
-          <PrivateRoute path="/retrieval/librarian-agents" component={LibrarianAgents} /> */}
           <Route exact path="/login">
             <Redirect to="/home" />
           </Route>
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
-          <Route exact path="/multi-agent" component={UserGuide} />
+          <Route exact path="/multi-agent">
+            <Redirect to="/multi-agent/chat" />
+          </Route>
+          <Route path="/multi-agent/guide" component={UserGuide} />
           <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
           <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
           <Route path="/multi-agent/chat" component={MultiAgentChat} />
+          <Route path="/multi-agent/direct-chat" component={DirectChat} />
           <Route exact path="/fine-tuning" component={FineTuneGuide} />
           <Route path="/fine-tuning/extract" component={ExtractComponent} />
           <Route path="/fine-tuning/generate" component={GenerateDataset} />
@@ -78,9 +58,7 @@ const AuthenticatedRoutes = () => {
           <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
           <Route exact path="/">
             <Redirect to="/home" />
-            {/*<Redirect to={isAuthenticated ? "/home" : "/login"} />*/}
           </Route>
-          {/*<Redirect to={isAuthenticated ? "/home" : "/login"} />*/}
           <Redirect to="/home" />
         </Switch>
       </main>
@@ -95,11 +73,21 @@ const AuthenticatedRoutes = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AuthenticatedRoutes />
-      </Router>
-    </AuthProvider>
+    <ExtractionProvider>
+      <GenerationProvider>
+        <DocumentLibraryProvider>
+          <DirectChatProvider>
+            <ChatProvider>
+              <AuthProvider>
+                <Router>
+                  <AuthenticatedRoutes />
+                </Router>
+              </AuthProvider>
+            </ChatProvider>
+          </DirectChatProvider>
+        </DocumentLibraryProvider>
+      </GenerationProvider>
+    </ExtractionProvider>
   );
 }
 

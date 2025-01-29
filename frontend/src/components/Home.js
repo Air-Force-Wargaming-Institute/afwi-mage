@@ -144,8 +144,11 @@ function Home() {
 
         <Box className={classes.section}>
           <Typography variant="body1" className={classes.description}>
-            MAGE is a comprehensive platform designed for fine-tuning Local Language Models (LLMs) in air-gapped environments.
-            Select a portal below to get started with your AI development journey.
+            MAGE is a versatile platform that empowers wargame designers, participants, and analysts to build multi-agent systems that use fine-tuned Large Language Models (LLMs) in local secure environments and air-gapped systems. 
+            It offers a suite of tools for building AI multi-agent teams, fine-tune LLMs, build retrieval systems for AI agents, and manage a critical knowledge bases. 
+            Select a portal below to explore MAGE's capabilities.
+
+
           </Typography>
         </Box>
 

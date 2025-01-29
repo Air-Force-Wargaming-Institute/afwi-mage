@@ -40,7 +40,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
-import { useChat, ACTIONS } from '../contexts/ChatContext';
+import { useDirectChat, ACTIONS } from '../contexts/DirectChatContext';
 import ReplayIcon from '@mui/icons-material/Replay';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
@@ -943,22 +943,24 @@ const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
   });
 };
 
-function MultiAgentChat() {
+function DirectChat() {
   const classes = useStyles();
-  const { state, dispatch } = useChat();
-  console.log('MultiAgentChat - Current State:', state);
+  const { state, dispatch } = useDirectChat();
+  console.log('DirectChat - Current State:', state);
 
   const {
     input,
-    messages,
-    chatSessions,
-    isLoading,
-    isFullscreen,
-    helpDialogOpen,
-    promptHelpOpen,
-    showScrollTop,
-    showScrollBottom
-  } = state;
+    messages = [],
+    chatSessions = [],
+    isLoading = false,
+    isFullscreen = false,
+    helpDialogOpen = false,
+    promptHelpOpen = false,
+    showScrollTop = false,
+    showScrollBottom = false,
+    selectedAgent = null,
+    availableAgents = []
+  } = state || {};
 
   const messageEndRef = useRef(null);
   const messageAreaRef = useRef(null);
@@ -995,10 +997,7 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: input.trim(), 
-        team_name: 'team_one_two_three'
-      });
+      const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
 
       const aiResponse = Array.isArray(response.data.response) 
         ? response.data.response[0] 
@@ -1539,4 +1538,4 @@ function MultiAgentChat() {
   );
 }
 
-export default MultiAgentChat;
+export default DirectChat;
