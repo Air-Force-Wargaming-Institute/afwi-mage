@@ -11,7 +11,11 @@ const initialState = {
   draggedItem: null,
   isLoading: false,
   error: null,
-  operationProgress: null,
+  operationProgress: {
+    status: '',
+    processed_items: undefined,
+    total_items: undefined
+  },
   previewFile: null,
   fileToDelete: null,
   deleteContents: [],
@@ -28,7 +32,13 @@ const initialState = {
   sortConfig: {
     key: 'name',
     direction: 'asc'
-  }
+  },
+  dragOver: false,
+  isRefreshing: false,
+  openConfirmDialog: false,
+  dropTarget: null,
+  bulkDeleteDialogOpen: false,
+  bulkDeleteContents: []
 };
 
 // Action types
@@ -55,7 +65,13 @@ const ACTIONS = {
   SET_UPLOAD_STATUS: 'SET_UPLOAD_STATUS',
   SET_UPLOAD_ERROR: 'SET_UPLOAD_ERROR',
   SET_SORT_CONFIG: 'SET_SORT_CONFIG',
-  RESET_STATE: 'RESET_STATE'
+  RESET_STATE: 'RESET_STATE',
+  SET_DRAG_OVER: 'SET_DRAG_OVER',
+  SET_IS_REFRESHING: 'SET_IS_REFRESHING',
+  SET_OPEN_CONFIRM_DIALOG: 'SET_OPEN_CONFIRM_DIALOG',
+  SET_DROP_TARGET: 'SET_DROP_TARGET',
+  SET_BULK_DELETE_DIALOG_OPEN: 'SET_BULK_DELETE_DIALOG_OPEN',
+  SET_BULK_DELETE_CONTENTS: 'SET_BULK_DELETE_CONTENTS'
 };
 
 // Reducer
@@ -107,6 +123,18 @@ function documentLibraryReducer(state, action) {
       return { ...state, sortConfig: action.payload };
     case ACTIONS.RESET_STATE:
       return initialState;
+    case ACTIONS.SET_DRAG_OVER:
+      return { ...state, dragOver: action.payload };
+    case ACTIONS.SET_IS_REFRESHING:
+      return { ...state, isRefreshing: action.payload };
+    case ACTIONS.SET_OPEN_CONFIRM_DIALOG:
+      return { ...state, openConfirmDialog: action.payload };
+    case ACTIONS.SET_DROP_TARGET:
+      return { ...state, dropTarget: action.payload };
+    case ACTIONS.SET_BULK_DELETE_DIALOG_OPEN:
+      return { ...state, bulkDeleteDialogOpen: action.payload };
+    case ACTIONS.SET_BULK_DELETE_CONTENTS:
+      return { ...state, bulkDeleteContents: action.payload };
     default:
       return state;
   }
