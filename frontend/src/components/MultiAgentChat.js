@@ -653,17 +653,17 @@ const useStyles = makeStyles((theme) => ({
   },
   bookmarkTrack: {
     position: 'absolute',
-    right: 0,
+    left: 0,
     top: '64px',
     height: 'calc(100% - 64px)',
     width: '10px',
     backgroundColor: 'rgba(0,0,0,0.05)',
-    borderLeft: '1px solid rgba(0,0,0,0.1)',
+    borderRight: '1px solid rgba(0,0,0,0.1)',
     zIndex: 1,
   },
   bookmarkTick: {
     position: 'absolute',
-    right: 0,
+    left: 0,
     width: '20px',
     height: '8px',
     backgroundColor: theme.palette.primary.main,
@@ -674,7 +674,7 @@ const useStyles = makeStyles((theme) => ({
       width: '32px',
       backgroundColor: theme.palette.primary.dark,
       height: '12px',
-      borderRadius: '4px 0 0 4px',
+      borderRadius: '0 4px 4px 0',
     },
   },
   bookmarkButton: {
@@ -709,11 +709,51 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
   const contentRef = useRef(null);
   const [copied, setCopied] = useState(false);
   
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (contentRef.current) {
-      navigator.clipboard.writeText(contentRef.current.textContent);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        // Create a temporary div to handle HTML content
+        const tempDiv = document.createElement('div');
+        const clonedContent = contentRef.current.cloneNode(true);
+        
+        // Function to recursively apply computed styles
+        const applyComputedStyles = (original, clone) => {
+          const style = window.getComputedStyle(original);
+          clone.style.cssText = Array.from(style).reduce((css, property) => {
+            return `${css}${property}:${style.getPropertyValue(property)};`;
+          }, '');
+          
+          // Recursively apply styles to children
+          Array.from(original.children).forEach((child, i) => {
+            if (clone.children[i]) {
+              applyComputedStyles(child, clone.children[i]);
+            }
+          });
+        };
+        
+        applyComputedStyles(contentRef.current, clonedContent);
+        tempDiv.appendChild(clonedContent);
+
+        // Create ClipboardItem with both HTML and plain text
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([tempDiv.innerHTML], { type: 'text/html' }),
+          'text/plain': new Blob([contentRef.current.textContent], { type: 'text/plain' })
+        });
+        
+        await navigator.clipboard.write([clipboardItem]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy formatted text:', err);
+        // Fallback to plain text copy if rich copy fails
+        try {
+          await navigator.clipboard.writeText(contentRef.current.textContent);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr);
+        }
+      }
     }
   };
 
@@ -1024,27 +1064,32 @@ function MultiAgentChat() {
 
   // Create a debounced version of the calculation
   const debouncedCalculatePositions = useCallback(
-    debounce(() => calculateBookmarkPositions(), 100),
+    () => {
+      calculateBookmarkPositions();
+    },
     [calculateBookmarkPositions]
   );
 
+  // Create the debounced function outside of the component
+  const debouncedFn = debounce((fn) => fn(), 100);
+
   useEffect(() => {
     if (state.bookmarkedMessages?.length > 0) {
-      debouncedCalculatePositions();
+      debouncedFn(debouncedCalculatePositions);
     }
     
     const handleResize = () => {
       if (state.bookmarkedMessages?.length > 0) {
-        debouncedCalculatePositions();
+        debouncedFn(debouncedCalculatePositions);
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      debouncedCalculatePositions.cancel();
+      debouncedFn.cancel();
     };
-  }, [state.bookmarkedMessages, debouncedCalculatePositions]);
+  }, [state.bookmarkedMessages, debouncedCalculatePositions, messages]);
 
   const handleBookmark = (message) => {
     const container = messageAreaRef.current;
