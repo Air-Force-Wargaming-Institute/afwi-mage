@@ -21,6 +21,8 @@ import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
 import StorageIcon from '@material-ui/icons/Storage';
 import robotIcon from '../assets/robot-icon.png';
 import { AuthContext } from '../contexts/AuthContext';
+import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
+import agentTeamIcon from '../assets/agent-team.png';
 
 function Header() {
   const location = useLocation();
@@ -96,12 +98,20 @@ function Header() {
                 <Link 
                   to="/multi-agent" 
                   className={activeTab === 'multi-agent' ? 'active' : ''}
-                  onClick={() => {
-                    setActiveTab('multi-agent');
-                    history.push('/multi-agent/chat');
-                  }}
+                  onClick={() => setActiveTab('multi-agent')}
                 >
-                  <GroupWorkIcon /> Multi-Agent Portal
+                  <img 
+                    src={agentTeamIcon} 
+                    alt="Multi-Agent Portal" 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      filter: 'invert(1)',
+                      marginRight: '5px',
+                      verticalAlign: 'middle'
+                    }} 
+                  /> 
+                  Multi-Agent Portal
                 </Link>
               </li>
               <li>
@@ -218,7 +228,7 @@ function Header() {
                 to="/multi-agent/chat" 
                 className={isActive('/multi-agent/chat')}
               >
-                <ChatIcon /> Multi-Agent Chat
+                <QuestionAnswerIcon /> Multi-Agent Chat
               </Link>
             </li>
             <li>
