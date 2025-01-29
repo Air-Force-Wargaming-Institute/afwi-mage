@@ -1,15 +1,3 @@
-import functools
-
-from multiagent.agents import *
-from config import load_config
-from multiagent.graphState import GraphState
-from multiagent.graph.routers import router_expert_input_still_needed, router_check_requester, router_dynamic_librarian, router_check_collaborator, router_expert_reflected, router_dynamic_expert, router_dynamic_collab
-
-from langgraph.graph import StateGraph, END
-from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain_core.callbacks.manager import CallbackManager
-from langchain_openai import ChatOpenAI
-
 # Add these lines near the top of the file, after the existing imports
 TEAM_NAME = "{{TEAM_NAME}}"
 TEAM_FILE_NAME = "{{TEAM_FILE_NAME}}"
@@ -29,6 +17,38 @@ AGENT_FIVE = "{{AGENT_FIVE}}"       #default is null_5
 AGENT_SIX = "{{AGENT_SIX}}"         #default is null_6
 AGENT_SEVEN = "{{AGENT_SEVEN}}"     #default is null_7
 AGENT_FILE_NAMES = [{{AGENT_FILE_NAMES}}]
+AGENT_FILE_INSTRUCTIONS = [{{AGENT_FILE_INSTRUCTIONS}}]
+
+import functools
+from multiagent.system_agents.conversation_history_manager import conversation_history_manager
+from multiagent.system_agents.user_proxy_moderator import user_proxy_moderator
+from multiagent.system_agents.librarian_agent import librarian_agent
+from multiagent.system_agents.synthesis_agent import synthesis_agent
+if AGENT_ZERO != "null_0":
+    from multiagent.agent_experts.{{AGENT_ZERO}}_expert import {{AGENT_ZERO}}_expert, {{AGENT_ZERO}}_requester, {{AGENT_ZERO}}_collaborator
+if AGENT_ONE != "null_1":
+    from multiagent.agent_experts.{{AGENT_ONE}}_expert import {{AGENT_ONE}}_expert, {{AGENT_ONE}}_requester, {{AGENT_ONE}}_collaborator
+if AGENT_TWO != "null_2":
+    from multiagent.agent_experts.{{AGENT_TWO}}_expert import {{AGENT_TWO}}_expert, {{AGENT_TWO}}_requester, {{AGENT_TWO}}_collaborator
+if AGENT_THREE != "null_3":
+    from multiagent.agent_experts.{{AGENT_THREE}}_expert import {{AGENT_THREE}}_expert, {{AGENT_THREE}}_requester, {{AGENT_THREE}}_collaborator
+if AGENT_FOUR != "null_4":
+    from multiagent.agent_experts.{{AGENT_FOUR}}_expert import {{AGENT_FOUR}}_expert, {{AGENT_FOUR}}_requester, {{AGENT_FOUR}}_collaborator
+if AGENT_FIVE != "null_5":
+    from multiagent.agent_experts.{{AGENT_FIVE}}_expert import {{AGENT_FIVE}}_expert, {{AGENT_FIVE}}_requester, {{AGENT_FIVE}}_collaborator
+if AGENT_SIX != "null_6":
+    from multiagent.agent_experts.{{AGENT_SIX}}_expert import {{AGENT_SIX}}_expert, {{AGENT_SIX}}_requester, {{AGENT_SIX}}_collaborator
+if AGENT_SEVEN != "null_7":
+    from multiagent.agent_experts.{{AGENT_SEVEN}}_expert import {{AGENT_SEVEN}}_expert, {{AGENT_SEVEN}}_requester, {{AGENT_SEVEN}}_collaborator
+
+from config import load_config
+from multiagent.graphState import GraphState
+from multiagent.team.routers import router_expert_input_still_needed, router_check_requester, router_dynamic_librarian, router_check_collaborator, router_expert_reflected, router_dynamic_expert, router_dynamic_collab
+
+from langgraph.graph import StateGraph, END
+from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain_core.callbacks.manager import CallbackManager
+from langchain_openai import ChatOpenAI
 
 def {{TEAM_FILE_NAME}}_graph() -> StateGraph:
     """

@@ -11,3 +11,5 @@ pydantic
 pyyaml
 flask
 flask-cors
+pathlib
+pytest-shutil

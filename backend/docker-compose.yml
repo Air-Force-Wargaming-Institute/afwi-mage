@@ -42,6 +42,7 @@ services:
     environment:
       - CORE_SERVICE_URL=http://core:8000
     volumes:
+      - ../data:/app/data
       - ./chat_service:/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -55,6 +56,7 @@ services:
     ports:
       - "8001:8001"
     volumes:
+      - ../data:/app/data
       - ./models:/app/models
       - ./agent_service:/app
       - ./agent_service/agents:/app/agents
