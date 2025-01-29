@@ -4,7 +4,7 @@ TEAM_FILE_NAME = "direct_chat"
 TEAM_DESCRIPTION = """direct chat test agent"""
 TEAM_COLOR = "#32CD32"
 CREATED_AT = "2025-01-29T21:06:36.905444"
-MODIFIED_AT = "2025-01-29T21:18:59.151895"
+MODIFIED_AT = "2025-01-29T21:59:21.512862"
 TEAM_INSTRUCTIONS = """""" # Do we actually need team instructions? Where would they be used?
 MEMORY_TYPE = "ConversationBufferMemory"
 MEMORY_KWARGS = {"max_token_limit": 2000}
@@ -138,8 +138,8 @@ def direct_chat_graph() -> StateGraph:
     #     workflow.add_node("null_7_collaborator", functools.partial(null_7_collaborator, llm=streaming_llm))
 
     # Start at user proxy
-    workflow.set_entry_point("direct_agent_1_expert")
-    workflow.set_finish_point("direct_agent_1_expert")
+    workflow.set_entry_point("direct_agent_1")
+    workflow.set_finish_point("direct_agent_1")
 
     #workflow.add_edge("conversation_history_manager", "user_proxy_moderator")
 
