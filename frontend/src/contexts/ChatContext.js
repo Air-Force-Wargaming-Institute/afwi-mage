@@ -19,6 +19,7 @@ const getInitialState = () => {
     promptHelpOpen: false,
     showScrollTop: false,
     showScrollBottom: false,
+    bookmarkedMessages: [],
   };
 };
 
@@ -36,10 +37,15 @@ const ACTIONS = {
   SET_PROMPT_HELP: 'SET_PROMPT_HELP',
   SET_SCROLL_TOP: 'SET_SCROLL_TOP',
   SET_SCROLL_BOTTOM: 'SET_SCROLL_BOTTOM',
-  RESET_STATE: 'RESET_STATE'
+  RESET_STATE: 'RESET_STATE',
+  TOGGLE_BOOKMARK: 'TOGGLE_BOOKMARK',
+  UPDATE_BOOKMARK_POSITIONS: 'UPDATE_BOOKMARK_POSITIONS',
 };
 
 function chatReducer(state, action) {
+  console.log('ChatReducer - Current State:', state);
+  console.log('ChatReducer - Action:', action);
+  
   let newState;
   
   switch (action.type) {
@@ -91,6 +97,30 @@ function chatReducer(state, action) {
       break;
     case ACTIONS.RESET_STATE:
       newState = getInitialState();
+      break;
+    case ACTIONS.TOGGLE_BOOKMARK:
+      console.log('TOGGLE_BOOKMARK - bookmarkedMessages:', state.bookmarkedMessages);
+      const messageExists = state.bookmarkedMessages?.some(
+        msg => msg.messageId === action.payload.messageId
+      );
+      console.log('TOGGLE_BOOKMARK - messageExists:', messageExists);
+      
+      newState = {
+        ...state,
+        bookmarkedMessages: messageExists
+          ? state.bookmarkedMessages.filter(msg => msg.messageId !== action.payload.messageId)
+          : [...(state.bookmarkedMessages || []), action.payload]
+      };
+      console.log('TOGGLE_BOOKMARK - New State:', newState);
+      break;
+    case ACTIONS.UPDATE_BOOKMARK_POSITIONS:
+      newState = {
+        ...state,
+        bookmarkedMessages: state.bookmarkedMessages.map(msg => ({
+          ...msg,
+          position: action.payload[msg.messageId] || msg.position
+        }))
+      };
       break;
     default:
       newState = state;

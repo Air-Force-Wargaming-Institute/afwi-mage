@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -42,6 +42,9 @@ import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
 import { useChat, ACTIONS } from '../contexts/ChatContext';
 import ReplayIcon from '@mui/icons-material/Replay';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import { debounce } from 'lodash';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -86,13 +89,16 @@ const useStyles = makeStyles((theme) => ({
     scrollBehavior: 'smooth',
     '&::-webkit-scrollbar': {
       width: '8px',
+      zIndex: 2,
     },
     '&::-webkit-scrollbar-track': {
       background: 'transparent',
+      zIndex: 2,
     },
     '&::-webkit-scrollbar-thumb': {
       background: theme.palette.grey[300],
       borderRadius: '4px',
+      zIndex: 2,
       '&:hover': {
         background: theme.palette.grey[400],
       },
@@ -318,16 +324,17 @@ const useStyles = makeStyles((theme) => ({
   },
   messageFooter: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: theme.spacing(1),
     paddingTop: theme.spacing(0.5),
+    gap: theme.spacing(0.5),
   },
   timestamp: {
     fontSize: '0.75rem',
     color: theme.palette.text.secondary,
     opacity: 0.8,
-    marginLeft: theme.spacing(1),
+    marginRight: 'auto',
   },
   userMessageTimestamp: {
     color: '#ffffff !important',
@@ -644,9 +651,60 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: 'rgba(244, 67, 54, 0.1)',
     },
   },
+  bookmarkTrack: {
+    position: 'absolute',
+    right: 0,
+    top: '64px',
+    height: 'calc(100% - 64px)',
+    width: '10px',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderLeft: '1px solid rgba(0,0,0,0.1)',
+    zIndex: 1,
+  },
+  bookmarkTick: {
+    position: 'absolute',
+    right: 0,
+    width: '20px',
+    height: '8px',
+    backgroundColor: theme.palette.primary.main,
+    cursor: 'pointer',
+    transform: 'translateY(-50%)',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      width: '32px',
+      backgroundColor: theme.palette.primary.dark,
+      height: '12px',
+      borderRadius: '4px 0 0 4px',
+    },
+  },
+  bookmarkButton: {
+    padding: 0,
+    minWidth: '32px',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.7,
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 1)',
+      opacity: 1,
+    },
+    zIndex: 1,
+    '& .MuiSvgIcon-root': {
+      fontSize: '18px',
+      margin: 'auto',
+    },
+  },
+  bookmarkTooltip: {
+    maxWidth: 300,
+    fontSize: '0.875rem',
+  },
 }));
 
-const MessageContent = ({ content, isUser, timestamp, sender, onRetry }) => {
+const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
   const contentRef = useRef(null);
   const [copied, setCopied] = useState(false);
@@ -720,15 +778,31 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry }) => {
             </IconButton>
           </Tooltip>
         )}
-        <IconButton 
-          className={`${classes.copyButton} copyButton`}
-          size="small"
-          onClick={handleCopy}
-          title="Copy message"
-          centerRipple
-        >
-          <ContentCopyIcon />
-        </IconButton>
+        {!isError && (
+          <>
+            <Tooltip title={copied ? "Copied!" : "Copy message"}>
+              <IconButton 
+                className={`${classes.copyButton} copyButton`}
+                size="small"
+                onClick={handleCopy}
+                centerRipple
+              >
+                <ContentCopyIcon />
+              </IconButton>
+            </Tooltip>
+            {!isUser && (
+              <Tooltip title={isBookmarked ? "Remove bookmark" : "Add bookmark"}>
+                <IconButton
+                  className={classes.bookmarkButton}
+                  size="small"
+                  onClick={() => onBookmark(messageId)}
+                >
+                  {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -737,6 +811,8 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry }) => {
 function MultiAgentChat() {
   const classes = useStyles();
   const { state, dispatch } = useChat();
+  console.log('MultiAgentChat - Current State:', state);
+
   const {
     input,
     messages,
@@ -768,11 +844,15 @@ function MultiAgentChat() {
 
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
-      payload: { text: input.trim(), sender: 'user', timestamp: new Date() }
+      payload: { 
+        id: Date.now(),
+        text: input.trim(), 
+        sender: 'user', 
+        timestamp: new Date() 
+      }
     });
     
     dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
-    
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
@@ -785,14 +865,27 @@ function MultiAgentChat() {
             : JSON.stringify(response.data.response));
 
       dispatch({ 
+        type: ACTIONS.SET_MESSAGES, 
+        payload: messages.filter(msg => 
+          !(msg.sender === 'system' && msg.text.includes('Error:'))
+        ) 
+      });
+
+      dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
-        payload: { text: aiResponse, sender: 'ai', timestamp: new Date() }
+        payload: { 
+          id: Date.now(),
+          text: aiResponse, 
+          sender: 'ai', 
+          timestamp: new Date() 
+        }
       });
     } catch (error) {
       console.error('Error sending message:', error);
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
+          id: Date.now(),
           text: 'Error: Failed to get response from AI', 
           sender: 'system', 
           timestamp: new Date() 
@@ -879,7 +972,6 @@ function MultiAgentChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      // Remove the error message
       dispatch({ 
         type: ACTIONS.SET_MESSAGES, 
         payload: messages.filter(msg => 
@@ -887,15 +979,89 @@ function MultiAgentChat() {
         ) 
       });
 
-      // Add the new AI response
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
-        payload: { text: aiResponse, sender: 'ai', timestamp: new Date() }
+        payload: { 
+          id: Date.now(),
+          text: aiResponse, 
+          sender: 'ai', 
+          timestamp: new Date() 
+        }
       });
     } catch (error) {
       console.error('Error retrying message:', error);
     } finally {
       dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+    }
+  };
+
+  const calculateBookmarkPositions = useCallback(() => {
+    if (!messageAreaRef.current) return;
+    
+    const container = messageAreaRef.current;
+    const containerHeight = container.scrollHeight;
+    
+    const positions = {};
+    let hasChanges = false;
+
+    (state.bookmarkedMessages || []).forEach(bookmark => {
+      const element = document.getElementById(`message-${bookmark.messageId}`);
+      if (element) {
+        const elementTop = element.offsetTop;
+        const newPosition = elementTop / containerHeight;
+        
+        if (newPosition !== bookmark.position) {
+          positions[bookmark.messageId] = newPosition;
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      dispatch({ type: ACTIONS.UPDATE_BOOKMARK_POSITIONS, payload: positions });
+    }
+  }, [dispatch, state.bookmarkedMessages, messageAreaRef]);
+
+  // Create a debounced version of the calculation
+  const debouncedCalculatePositions = useCallback(
+    debounce(() => calculateBookmarkPositions(), 100),
+    [calculateBookmarkPositions]
+  );
+
+  useEffect(() => {
+    if (state.bookmarkedMessages?.length > 0) {
+      debouncedCalculatePositions();
+    }
+    
+    const handleResize = () => {
+      if (state.bookmarkedMessages?.length > 0) {
+        debouncedCalculatePositions();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      debouncedCalculatePositions.cancel();
+    };
+  }, [state.bookmarkedMessages, debouncedCalculatePositions]);
+
+  const handleBookmark = (message) => {
+    const container = messageAreaRef.current;
+    const element = document.getElementById(`message-${message.id}`);
+    
+    if (container && element) {
+      const position = element.offsetTop / container.scrollHeight;
+      
+      dispatch({ 
+        type: ACTIONS.TOGGLE_BOOKMARK, 
+        payload: { 
+          messageId: message.id,
+          text: message.text,
+          timestamp: message.timestamp,
+          position: position
+        } 
+      });
     }
   };
 
@@ -968,9 +1134,30 @@ function MultiAgentChat() {
             className={classes.messageArea}
             onScroll={handleScroll}
           >
+            <div className={classes.bookmarkTrack}>
+              {(state.bookmarkedMessages || []).map((bookmark) => (
+                <Tooltip
+                  key={bookmark.messageId}
+                  title={bookmark.text.substring(0, 100) + (bookmark.text.length > 100 ? '...' : '')}
+                  placement="left"
+                  classes={{ tooltip: classes.bookmarkTooltip }}
+                >
+                  <div
+                    className={classes.bookmarkTick}
+                    style={{ top: `${bookmark.position * 100}%` }}
+                    onClick={() => {
+                      const element = document.getElementById(`message-${bookmark.messageId}`);
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  />
+                </Tooltip>
+              ))}
+            </div>
+            
             {messages.map((message, index) => (
               <Box 
-                key={index} 
+                key={index}
+                id={`message-${message.id}`}
                 className={`${classes.message} ${
                   message.sender === 'user' ? classes.userMessage : classes.aiMessage
                 }`}
@@ -987,6 +1174,9 @@ function MultiAgentChat() {
                         ? () => handleRetry(messages[messages.length - 2]?.text) 
                         : undefined
                     }
+                    messageId={message.id}
+                    onBookmark={() => handleBookmark(message)}
+                    isBookmarked={(state.bookmarkedMessages || []).some(msg => msg.messageId === message.id)}
                   />
                 </div>
               </Box>
