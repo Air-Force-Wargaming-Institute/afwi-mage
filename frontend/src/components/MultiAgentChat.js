@@ -156,7 +156,10 @@ function MultiAgentChat() {
     setInput('');
 
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { message: input.trim() });
+      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
+        message: input.trim(), 
+        team_name: 'team_one_two_three'
+      });
 
       setMessages([...newMessages, { text: response.data.response, sender: 'ai' }]);
     } catch (error) {

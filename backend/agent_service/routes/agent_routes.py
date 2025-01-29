@@ -5,8 +5,14 @@ import json
 from datetime import datetime
 import logging
 import re
+import shutil
+from pathlib import Path
 from typing import List, Dict, Optional
-from config import INDIVIDUAL_AGENTS_PATH, TEAMS_PATH, SYSTEM_AGENTS_PATH, TEMPLATES_PATH
+from config import INDIVIDUAL_AGENTS_PATH, TEAMS_PATH, TEMPLATES_PATH, BUILDER_DIR
+
+SHARED_TEAMS_PATH = BUILDER_DIR / "TEAMS"
+SHARED_STRUCTURE_PATH = SHARED_TEAMS_PATH / "TEAM-TEMPLATE"
+SHARED_AGENTS_PATH = BUILDER_DIR / "AGENTS"
 
 router = APIRouter()
 
@@ -94,6 +100,7 @@ logger = logging.getLogger(__name__)
 @router.post("/create_agent/")
 async def create_agent(agent_data: AgentCreate):
     try:
+
         # Format the agent name for file naming
         formatted_name = format_agent_name(agent_data.name)
         
@@ -125,6 +132,12 @@ async def create_agent(agent_data: AgentCreate):
         # Save the new agent file using the formatted name
         with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}_expert.py", "w") as f:
             f.write(agent_code)
+
+        # After creating the agent file, copy it over to the shared directory
+        local_agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{formatted_name}_expert.py"
+        shared_agent_file_path = SHARED_AGENTS_PATH / f"{formatted_name}_expert.py"
+        os.makedirs(os.path.dirname(shared_agent_file_path), exist_ok=True)
+        shutil.copyfile(local_agent_file_path, shared_agent_file_path)
         
         return {"message": f"Agent {agent_data.name} created successfully", "file_name": formatted_name}
     except Exception as e:
@@ -136,6 +149,12 @@ async def create_team(team_data: TeamCreate):
     try:
         # Format the team name for file naming
         formatted_name = format_team_name(team_data.name)
+
+        # Create the shared team directory and copy over the necessary structure
+        team_shared_path = SHARED_TEAMS_PATH / formatted_name # eg. app/shared/TEAMS/{team_file_name}
+        team_shared_path.mkdir(parents=True, exist_ok=True)
+        if SHARED_STRUCTURE_PATH.exists():
+            shutil.copytree(SHARED_STRUCTURE_PATH, team_shared_path, dirs_exist_ok=True)
         
         # Load the team template
         with open(TEMPLATES_PATH / "team_template.py", "r") as f:
@@ -145,6 +164,32 @@ async def create_team(team_data: TeamCreate):
         agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Take the first 8 agents and remove _expert suffix
         while len(agents) < 8:
             agents.append(f"null_{len(agents)}")
+
+        # For each agent, get the instructions and append them to the agent_file_instructions list
+        # while we are at it, for each agent file also copy it from AGENTS into TEAMS/{team_name}/multiagent/agent_experts
+        agent_instructions_list = []
+        for agent in team_data.agents:
+            agent_name = agent.replace('_expert', '')
+            agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{agent_name}_expert.py"
+            shutil.copyfile(agent_file_path, SHARED_TEAMS_PATH / formatted_name / "multiagent" / "agent_experts" / f"{agent_name}_expert.py")
+            try:
+                with open(agent_file_path, 'r') as f:
+                    content = f.read()
+                    # Use regex to extract AGENT_INSTRUCTIONS
+                    instructions_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
+                    if match := re.search(instructions_pattern, content, re.DOTALL):
+                        # Properly escape for YAML
+                        instructions = (match.group(1)
+                            .replace('"', '\\"')     # Escape double quotes
+                            .replace('\n', '\\n')    # Escape newlines
+                            .replace("'", "\\'"))    # Escape single quotes
+                        agent_instructions_list.append(f'"{instructions}"')
+                    else:
+                        logger.warning(f"Could not find AGENT_INSTRUCTIONS in {agent_file_path}")
+                        agent_instructions_list.append('""')
+            except Exception as e:
+                logger.error(f"Error reading agent file {agent_file_path}: {str(e)}")
+                agent_instructions_list.append('""')
         
         # Replace placeholders in the template
         team_code = template.replace("{{TEAM_NAME}}", team_data.name)
@@ -162,8 +207,12 @@ async def create_team(team_data: TeamCreate):
         team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
         team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
         team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
-        
+        agent_file_names = ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents])
+        agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
+        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
+        team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
+        #team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
+
         # Add creation and modification dates
         current_time = datetime.now().isoformat()
         team_code = team_code.replace("{{CREATED_AT}}", current_time)
@@ -173,6 +222,29 @@ async def create_team(team_data: TeamCreate):
         team_file_path = f"{TEAMS_PATH}/{formatted_name}.py"
         with open(team_file_path, "w") as f:
             f.write(team_code)
+
+        # After creating the team file, copy it over to the shared directory
+        local_team_file_path = TEAMS_PATH / f"{formatted_name}.py"
+        shared_team_file_path = team_shared_path / "multiagent" / "team" / f"{formatted_name}.py"
+        shutil.copyfile(local_team_file_path, shared_team_file_path)
+
+        # Do a find-replace for the team_config.yaml file in the shared directory
+        config_path = team_shared_path / "team_config.yaml"
+        with open(config_path, "r") as f:
+            config = f.read()
+        replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
+        replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
+        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
+        with open(config_path, "w") as f:
+            f.write(replaced_config)
+
+        # Update processQuestion.py
+        process_question_path = team_shared_path / "multiagent" / "processQuestion.py"
+        with open(process_question_path, "r") as f:
+            process_question = f.read()
+        replaced_process = process_question.replace("{{TEAM_FILE_NAME}}", formatted_name)
+        with open(process_question_path, "w") as f:
+            f.write(replaced_process)
         
         return {"message": f"Team {team_data.name} created successfully", "file_name": formatted_name}
     except Exception as e:
@@ -274,6 +346,10 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}_expert.py"
         print("NEW AGENT PATH: ", new_agent_path)
 
+        # Add paths for shared directory
+        old_shared_agent_path = SHARED_AGENTS_PATH / f"{old_formatted_name}_expert.py"
+        new_shared_agent_path = SHARED_AGENTS_PATH / f"{new_formatted_name}_expert.py"
+
         if not os.path.exists(old_agent_path):
             raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
 
@@ -313,10 +389,16 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
         # Save the updated agent file
         with open(new_agent_path, "w") as f:
             f.write(agent_code)
+
+        # Copy the updated file to the shared directory
+        os.makedirs(os.path.dirname(new_shared_agent_path), exist_ok=True)
+        shutil.copyfile(new_agent_path, new_shared_agent_path)
         
-        # If the name has changed, remove the old file
+        # If the name has changed, remove old files from both locations
         if old_formatted_name != new_formatted_name:
             os.remove(old_agent_path)
+            if old_shared_agent_path.exists():
+                old_shared_agent_path.unlink()
         
         return {"message": f"Agent {agent_data.name} updated successfully", "file_name": new_formatted_name}
     except Exception as e:
@@ -345,6 +427,12 @@ async def update_team(team_name: str, team_data: TeamCreate):
         old_team_path = f"{TEAMS_PATH}/{old_formatted_name}.py"
         new_team_path = f"{TEAMS_PATH}/{new_formatted_name}.py"
 
+        # Update shared directory if name changed
+        old_shared_path = SHARED_TEAMS_PATH / old_formatted_name
+        new_shared_path = SHARED_TEAMS_PATH / new_formatted_name
+        if old_formatted_name != new_formatted_name and old_shared_path.exists():
+            shutil.move(str(old_shared_path), str(new_shared_path))
+
         if not os.path.exists(old_team_path):
             raise HTTPException(status_code=404, detail=f"Team {team_name} not found")
 
@@ -362,6 +450,30 @@ async def update_team(team_name: str, team_data: TeamCreate):
         agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Remove _expert suffix
         while len(agents) < 8:
             agents.append(f"null_{len(agents)}")
+
+        agent_instructions_list = []
+        for agent in team_data.agents:
+            agent_name = agent.replace('_expert', '')
+            agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{agent_name}_expert.py"
+            #shared_agent_file_path = SHARED_TEAMS_PATH / "multiagent" / "agent_experts" / f"{new_formatted_name}_expert.py"
+            shutil.copyfile(agent_file_path, SHARED_TEAMS_PATH / new_formatted_name / "multiagent" / "agent_experts" / f"{agent_name}_expert.py")
+            try:
+                with open(agent_file_path, 'r') as f:
+                    content = f.read()
+                    # Use regex to extract AGENT_INSTRUCTIONS
+                    instructions_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
+                    if match := re.search(instructions_pattern, content, re.DOTALL):
+                        instructions = (match.group(1)
+                            .replace('"', '\\"')     # Escape double quotes
+                            .replace('\n', '\\n')    # Escape newlines
+                            .replace("'", "\\'"))    # Escape single quotes
+                        agent_instructions_list.append(f'"{instructions}"')
+                    else:
+                        logger.warning(f"Could not find AGENT_INSTRUCTIONS in {agent_file_path}")
+                        agent_instructions_list.append('""')
+            except Exception as e:
+                logger.error(f"Error reading agent file {agent_file_path}: {str(e)}")
+                agent_instructions_list.append('""')
         
         # Replace placeholders in the template
         team_code = template.replace("{{TEAM_NAME}}", team_data.name)
@@ -379,7 +491,10 @@ async def update_team(team_name: str, team_data: TeamCreate):
         team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
         team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
         team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
+        agent_file_names = ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents])
+        agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
+        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
+        team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
         
         # Set the created date and update modification date
         team_code = team_code.replace("{{CREATED_AT}}", created_date)
@@ -393,6 +508,41 @@ async def update_team(team_name: str, team_data: TeamCreate):
         # If the name has changed, remove the old file
         if old_formatted_name != new_formatted_name:
             os.remove(old_team_path)
+
+        # Update shared directory if name changed
+        old_shared_path = SHARED_TEAMS_PATH / old_formatted_name
+        new_shared_path = SHARED_TEAMS_PATH / new_formatted_name
+        if old_formatted_name != new_formatted_name and old_shared_path.exists():
+            shutil.move(str(old_shared_path), str(new_shared_path))
+
+        # Update the team file in shared directory
+        shared_team_file_path = new_shared_path / "multiagent" / "team" / f"{new_formatted_name}.py"
+        shutil.copyfile(new_team_path, shared_team_file_path)
+
+        # Do a find-replace for the team_config.yaml file in the shared directory
+        team_shared_path = SHARED_TEAMS_PATH / new_formatted_name
+        config_path = team_shared_path / "team_config.yaml"
+        with open(config_path, "r") as f:
+            config = f.read()
+        replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
+        replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
+        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
+        with open(config_path, "w") as f:
+            f.write(replaced_config)
+
+        # Update processQuestion.py
+        process_question_path = new_shared_path / "multiagent" / "processQuestion.py"
+        with open(process_question_path, "r") as f:
+            process_question = f.read()
+        replaced_process = process_question.replace("{{TEAM_FILE_NAME}}", new_formatted_name)
+        with open(process_question_path, "w") as f:
+            f.write(replaced_process)
+        
+        # If name changed, remove old team file from shared directory
+        if old_formatted_name != new_formatted_name:
+            old_shared_team_file = old_shared_path / "teams" / f"{old_formatted_name}.py"
+            if old_shared_team_file.exists():
+                old_shared_team_file.unlink()
         
         return {"message": f"Team {team_data.name} updated successfully", "file_name": new_formatted_name}
     except Exception as e:

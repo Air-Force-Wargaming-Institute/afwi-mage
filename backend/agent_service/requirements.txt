@@ -15,3 +15,7 @@ faiss-cpu==1.9.0 #https://github.com/kyamagu/faiss-wheels for GPU support
 # Utilities
 python-dotenv==1.0.0
 typing-extensions==4.12.2
+
+# Pathlib
+pathlib==1.0.1
+pytest-shutil==1.8.1

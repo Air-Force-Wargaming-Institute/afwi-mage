@@ -1,3 +1,15 @@
+# The following will be filled in programmatically when creating a new agent
+AGENT_NAME = "{{AGENT_NAME}}"
+AGENT_FILE_NAME = "{{AGENT_FILE_NAME}}"
+MEMORY_TYPE = "{{MEMORY_TYPE}}"
+MEMORY_KWARGS = {{MEMORY_KWARGS}}
+AGENT_DESCRIPTION = """{{AGENT_DESCRIPTION}}"""
+AGENT_INSTRUCTIONS = """{{AGENT_INSTRUCTIONS}}"""
+LLM_MODEL = "{{LLM_MODEL}}"
+COLOR = "{{COLOR}}"
+CREATED_AT = "{{CREATED_AT}}"
+MODIFIED_AT = "{{MODIFIED_AT}}"
+
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -231,28 +243,3 @@ LLM_MODEL = "{{LLM_MODEL}}"                                 #llama3.2
 COLOR = "{{COLOR}}"                                         #FF0000
 CREATED_AT = "{{CREATED_AT}}"                               #2024-12-15
 MODIFIED_AT = "{{MODIFIED_AT}}"                             #2025-01-23
-
-
-
-# class Agent:
-#     def __init__(self, name, description, llm, agent_instructions, memory_type="ConversationBufferMemory", memory_kwargs=None):
-#         self.name = name
-#         self.description = description
-#         self.llm = llm
-#         self.agent_instructions = agent_instructions
-        
-#         # Set up memory
-#         if memory_type == "ConversationBufferMemory":
-#             self.memory = ConversationBufferMemory(**(memory_kwargs or {}))
-#         else:
-#             raise ValueError(f"Unsupported memory type: {memory_type}")
-        
-#         # Set up prompt template
-#         template = f"{agent_instructions}\n\nHuman: {{human_input}}\nAI: "
-#         self.prompt = PromptTemplate(template=template, input_variables=["human_input"])
-        
-#         # Set up LLM chain
-#         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
-    
-#     async def run(self, human_input):
-#         return await self.chain.arun(human_input=human_input)
