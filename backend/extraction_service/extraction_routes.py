@@ -22,8 +22,12 @@ from nltk.tokenize.punkt import PunktSentenceTokenizer
 from nltk.chunk import ne_chunk
 from nltk.corpus import names
 
-#added the path the data was moved to because we couldn't get the docker image to move the data.
-nltk.data.path.append('/app/nltk_data')
+# Get the current file's directory
+current_dir = Path(__file__).parent
+nltk_data_dir = current_dir / 'nltk_data'
+
+# Configure NLTK data path
+nltk.data.path.append(str(nltk_data_dir))
 
 # Configure logging
 logging.basicConfig(filename=LOG_DIR / 'extraction_service.log', level=logging.INFO)
@@ -191,37 +195,82 @@ class ExtractionRequest(BaseModel):
     csv_filename: str
 
 def extract_text_with_layout(file_path):
+    """Extract text while preserving layout information."""
     _, ext = os.path.splitext(file_path)
-    if ext.lower() == '.pdf':
-        return extract_from_pdf(file_path)
-    elif ext.lower() == '.docx':
-        return extract_from_docx(file_path)
-    elif ext.lower() == '.txt':
-        return extract_from_txt(file_path)
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
+    logger.info(f"=== Starting text extraction for file: {file_path} ===")
+    logger.info(f"File extension: {ext.lower()}")
+    
+    try:
+        if ext.lower() == '.pdf':
+            content = extract_from_pdf(file_path)
+        elif ext.lower() == '.docx':
+            content = extract_from_docx(file_path)
+        elif ext.lower() == '.txt':
+            content = extract_from_txt(file_path)
+        else:
+            raise ValueError(f"Unsupported file type: {ext}")
+            
+        logger.info(f"Extraction completed. Content sections: {len(content)}")
+        logger.info(f"First section preview: {content[0][:200] if content else 'No content'}")
+        return content
+    except Exception as e:
+        logger.error(f"Error in text extraction: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
 def extract_from_pdf(file_path):
+    logger.info(f"=== Extracting from PDF: {file_path} ===")
     extracted_content = []
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                extracted_content.append(text)
-    return extracted_content
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            logger.info(f"PDF opened successfully. Total pages: {len(pdf.pages)}")
+            for page_num, page in enumerate(pdf.pages, 1):
+                text = page.extract_text()
+                if text:
+                    logger.info(f"Page {page_num}: Extracted {len(text)} characters")
+                    extracted_content.append(text)
+                else:
+                    logger.warning(f"Page {page_num}: No text extracted")
+        
+        logger.info(f"PDF extraction complete. Total sections: {len(extracted_content)}")
+        return extracted_content
+    except Exception as e:
+        logger.error(f"Error extracting PDF: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
 def extract_from_docx(file_path):
-    doc = Document(file_path)
+    logger.info(f"=== Extracting from DOCX: {file_path} ===")
     extracted_content = []
-    for para in doc.paragraphs:
-        if para.text.strip():
-            extracted_content.append(para.text.strip())
-    return extracted_content
+    try:
+        doc = Document(file_path)
+        logger.info(f"DOCX opened successfully. Total paragraphs: {len(doc.paragraphs)}")
+        
+        for i, para in enumerate(doc.paragraphs, 1):
+            if para.text.strip():
+                logger.info(f"Paragraph {i}: Extracted {len(para.text)} characters")
+                extracted_content.append(para.text.strip())
+            else:
+                logger.debug(f"Paragraph {i}: Empty or whitespace only")
+        
+        logger.info(f"DOCX extraction complete. Total sections: {len(extracted_content)}")
+        return extracted_content
+    except Exception as e:
+        logger.error(f"Error extracting DOCX: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
 def extract_from_txt(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
-    return [content]
+    logger.info(f"=== Extracting from TXT: {file_path} ===")
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+            logger.info(f"TXT file read successfully. Total characters: {len(content)}")
+            return [content]
+    except Exception as e:
+        logger.error(f"Error extracting TXT: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
 def extract_paragraphs(text):
     return text.split('\n\n')
@@ -398,44 +447,56 @@ def extract_portion_marking(text):
 
 @router.post("/extract/")
 async def extract_file_content(request_data: ExtractionRequest):
+    logger.info("=== Starting new extraction process ===")
+    logger.info(f"Files to process: {request_data.filenames}")
+    logger.info(f"Output CSV filename: {request_data.csv_filename}")
+    
     results = []
     extracted_content = []
-    source_classifications = []  # Store classifications for metadata
+    source_classifications = []
 
     for filename in request_data.filenames:
         try:
-            # Handle potential folder paths in filename
             file_path = UPLOAD_DIR / filename.replace('/', os.sep).replace('\\', os.sep)
-            logger.info(f"Processing file: {filename}")
+            logger.info(f"\n=== Processing file: {filename} ===")
             logger.info(f"Full file path: {file_path}")
             logger.info(f"File exists: {file_path.exists()}")
             
             if not file_path.exists():
+                logger.error(f"File not found: {file_path}")
                 results.append({"filename": filename, "status": "File not found"})
                 continue
 
-            # Get the security classification for this file
+            # Get security classification
             file_security_classification = get_file_security_classification(filename)
             source_classifications.append(file_security_classification)
-            logger.info(f"File security classification for {filename}: {file_security_classification}")
+            logger.info(f"File security classification: {file_security_classification}")
 
-            # Extract content with layout information
+            # Extract content
             raw_content = extract_text_with_layout(str(file_path))
-            logger.info(f"Raw content extracted from {filename}: {len(raw_content)} items")
+            logger.info(f"Raw content extracted: {len(raw_content)} sections")
 
-            # First pass: Extract paragraphs
+            # Process paragraphs
+            logger.info("=== Processing paragraphs ===")
+            paragraph_count = 0
+            meaningful_paragraph_count = 0
+            
             for content in raw_content:
                 cleaned_content = clean_text(content)
                 paragraphs = extract_paragraphs(cleaned_content)
+                logger.info(f"Found {len(paragraphs)} paragraphs in section")
+                
                 for para in paragraphs:
+                    paragraph_count += 1
                     if is_meaningful_text(para):
-                        # Extract portion marking if present
+                        meaningful_paragraph_count += 1
                         content_classification, clean_para = extract_portion_marking(para)
                         
-                        logger.info(f"Processing paragraph: {para[:100]}...")  # Log first 100 chars
-                        logger.info(f"File Classification: {file_security_classification}")
+                        logger.info(f"Processing paragraph {paragraph_count}:")
+                        logger.info(f"Original length: {len(para)}")
+                        logger.info(f"Cleaned length: {len(clean_para)}")
+                        logger.info(f"Classification found: {content_classification}")
                         
-                        # Use the portion marking if found, otherwise use file classification
                         final_classification = content_classification if content_classification else file_security_classification
                         
                         extracted_content.append({
@@ -445,26 +506,33 @@ async def extract_file_content(request_data: ExtractionRequest):
                             "content_security_classification": final_classification,
                             "type": "paragraph"
                         })
+                    else:
+                        logger.debug(f"Paragraph {paragraph_count} filtered out as not meaningful")
 
-            # Second pass: Extract sentences while maintaining portion marking context
+            logger.info(f"Paragraph processing complete:")
+            logger.info(f"Total paragraphs: {paragraph_count}")
+            logger.info(f"Meaningful paragraphs: {meaningful_paragraph_count}")
+
+            # Process sentences
+            logger.info("=== Processing sentences ===")
+            sentence_count = 0
+            meaningful_sentence_count = 0
+            
             for content in raw_content:
                 cleaned_content = clean_text(content)
                 paragraphs = extract_paragraphs(cleaned_content)
                 
                 for para in paragraphs:
                     if is_meaningful_text(para):
-                        # Get the paragraph's portion marking and its sentences
                         para_classification, sentences = extract_sentences_with_context(para)
-                        
-                        # Use paragraph classification or fall back to file classification
                         para_final_classification = para_classification if para_classification else file_security_classification
                         
-                        # Process each sentence with the paragraph's classification context
+                        logger.info(f"Found {len(sentences)} sentences in paragraph")
+                        
                         for sentence in sentences:
+                            sentence_count += 1
                             if is_meaningful_text(sentence):
-                                logger.info(f"Processing sentence: {sentence[:100]}...")
-                                logger.info(f"Using paragraph classification: {para_final_classification}")
-                                
+                                meaningful_sentence_count += 1
                                 extracted_content.append({
                                     "answer": sentence,
                                     "source": filename,
@@ -472,51 +540,83 @@ async def extract_file_content(request_data: ExtractionRequest):
                                     "content_security_classification": para_final_classification,
                                     "type": "sentence"
                                 })
+                            else:
+                                logger.debug(f"Sentence {sentence_count} filtered out as not meaningful")
+
+            logger.info(f"Sentence processing complete:")
+            logger.info(f"Total sentences: {sentence_count}")
+            logger.info(f"Meaningful sentences: {meaningful_sentence_count}")
 
             results.append({"filename": filename, "status": "Content extracted successfully"})
+            
         except Exception as e:
-            logger.error(f"Error extracting content from {filename}: {str(e)}")
+            logger.error(f"Error processing file {filename}: {str(e)}")
             logger.exception("Full traceback:")
             results.append({"filename": filename, "status": f"Error: {str(e)}"})
 
+    # Prepare CSV output
+    logger.info("\n=== Preparing CSV Output ===")
     logger.info(f"Total extracted items: {len(extracted_content)}")
-    logger.info(f"Sample of extracted content: {extracted_content[:2] if extracted_content else []}")
+    if extracted_content:
+        logger.info("Sample of extracted content:")
+        for i, item in enumerate(extracted_content[:2]):
+            logger.info(f"Item {i + 1}:")
+            logger.info(f"  Type: {item['type']}")
+            logger.info(f"  Source: {item['source']}")
+            logger.info(f"  Answer preview: {item['answer'][:100]}...")
+            logger.info(f"  Classification: {item['content_security_classification']}")
 
     # Create CSV file
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     csv_filename = f"{request_data.csv_filename}_{current_date}.csv"
     csv_path = EXTRACTION_DIR / csv_filename
 
-    # Create metadata file
-    create_csv_metadata(
-        csv_filename=csv_filename,
-        original_name=csv_filename,
-        source_files=request_data.filenames,
-        source_classifications=source_classifications
-    )
-
-    with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow([
-            "question", 
-            "answer", 
-            "source", 
-            "file security classification",
-            "content security classification",
-            "type"
-        ])
-        for item in extracted_content:
+    try:
+        logger.info(f"Writing CSV file: {csv_path}")
+        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            csv_writer = csv.writer(csvfile)
             csv_writer.writerow([
-                "",  # question (empty for now)
-                item["answer"],
-                item["source"],
-                item["file_security_classification"],
-                item["content_security_classification"],
-                item["type"]
+                "question", 
+                "answer", 
+                "source", 
+                "file security classification",
+                "content security classification",
+                "type"
             ])
+            rows_written = 0
+            for item in extracted_content:
+                csv_writer.writerow([
+                    "",  # question
+                    item["answer"],
+                    item["source"],
+                    item["file_security_classification"],
+                    item["content_security_classification"],
+                    item["type"]
+                ])
+                rows_written += 1
+            
+            logger.info(f"CSV file written successfully. Total rows: {rows_written}")
+    except Exception as e:
+        logger.error(f"Error writing CSV file: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
-    logger.info(f"CSV file created: {csv_path}")
+    # Create metadata file
+    try:
+        logger.info("Creating metadata file")
+        create_csv_metadata(
+            csv_filename=csv_filename,
+            original_name=csv_filename,
+            source_files=request_data.filenames,
+            source_classifications=source_classifications
+        )
+        logger.info("Metadata file created successfully")
+    except Exception as e:
+        logger.error(f"Error creating metadata file: {str(e)}")
+        logger.exception("Full traceback:")
+        raise
 
+    logger.info("=== Extraction process completed ===")
     return {
         "status": "Extraction process completed",
         "results": results,
