@@ -16,7 +16,12 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -959,7 +964,8 @@ function DirectChat() {
     showScrollTop = false,
     showScrollBottom = false,
     selectedAgent = null,
-    availableAgents = []
+    availableAgents = [],
+    currentSessionId
   } = state || {};
 
   const messageEndRef = useRef(null);
@@ -968,6 +974,13 @@ function DirectChat() {
   // Add a ref to track if we need to update positions
   const shouldUpdatePositions = useRef(false);
   
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [newSessionName, setNewSessionName] = useState('');
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
+  const [teamError, setTeamError] = useState('');
+
   const handleInputChange = (event) => {
     dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
   };
@@ -982,7 +995,6 @@ function DirectChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
-    // Add user message
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
@@ -997,9 +1009,12 @@ function DirectChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
+      const currentSession = chatSessions.find(session => session.id === currentSessionId);
+      const teamName = currentSession?.team || 'direct_chat';
+
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(),
-        team_name: 'direct_chat' 
+        team_name: teamName
       });
 
       const aiResponse = Array.isArray(response.data.response) 
@@ -1008,10 +1023,8 @@ function DirectChat() {
             ? response.data.response 
             : JSON.stringify(response.data.response));
 
-      // Remove any error messages before adding new AI response
       dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
 
-      // Add AI response
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
@@ -1037,10 +1050,19 @@ function DirectChat() {
     }
   };
 
-  const handleNewChat = () => {
-    const newSession = { id: chatSessions.length + 1, name: `New Chat ${chatSessions.length + 1}` };
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
-    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+  const handleNewChat = async () => {
+    setIsLoadingTeams(true);
+    setTeamError('');
+    try {
+      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+      setAvailableTeams(response.data.teams);
+      setDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      setTeamError('Failed to load available teams. Please try again.');
+    } finally {
+      setIsLoadingTeams(false);
+    }
   };
 
   const handleEditSession = (sessionId) => {
@@ -1222,6 +1244,28 @@ function DirectChat() {
   useEffect(() => {
     messageEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleCreateNewChat = () => {
+    if (!selectedTeam || !newSessionName.trim()) {
+      setTeamError('Please select a team and enter a session name');
+      return;
+    }
+    
+    const newSession = { 
+      id: Date.now(), // Using timestamp as unique ID
+      name: newSessionName.trim(),
+      team: selectedTeam
+    };
+    
+    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
+    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+    
+    setDialogOpen(false);
+    setNewSessionName('');
+    setSelectedTeam('');
+    setTeamError('');
+  };
 
   return (
     <Container className={classes.root} maxWidth="xl">
@@ -1534,6 +1578,76 @@ function DirectChat() {
             style={{ borderRadius: '20px', textTransform: 'none' }}
           >
             Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog 
+        open={dialogOpen} 
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create New Chat Session</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Session Name"
+              fullWidth
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              error={teamError && !newSessionName.trim()}
+              helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Select Team</InputLabel>
+              <Select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                error={teamError && !selectedTeam}
+              >
+                {isLoadingTeams ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> Loading teams...
+                  </MenuItem>
+                ) : (
+                  availableTeams.map(team => (
+                    <MenuItem key={team.id} value={team.file_name}>
+                      {team.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {teamError && !selectedTeam && (
+                <Typography color="error" variant="caption">
+                  Please select a team
+                </Typography>
+              )}
+            </FormControl>
+            {teamError && (
+              <Typography color="error" variant="body2">
+                {teamError}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDialogOpen(false);
+            setTeamError('');
+            setNewSessionName('');
+            setSelectedTeam('');
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateNewChat}
+            color="primary"
+            variant="contained"
+            disabled={isLoadingTeams}
+          >
+            Create
           </Button>
         </DialogActions>
       </Dialog>
