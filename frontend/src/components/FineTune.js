@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import '../App.css';
-import { Typography, Button, Paper, Grid, Container, FormControl, InputLabel, Select, MenuItem } from '@material-ui/core';
+import { 
+  Typography, 
+  Button, 
+  Paper, 
+  Grid, 
+  Container, 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  MenuItem,
+  LinearProgress,
+  Box
+} from '@material-ui/core';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 
@@ -66,20 +78,27 @@ function FineTune() {
   };
 
   return (
-    <Container maxWidth="xl" className="container">
-      <h2>Fine-Tune Model</h2>
+    <Container maxWidth="xl" className="main-content">
+      <Typography variant="h4" className="section-title" gutterBottom>
+        Fine-Tune Model
+      </Typography>
       
       <Grid container spacing={3}>
+        {/* Step 1: Select Dataset */}
         <Grid item xs={12} md={4}>
-          <Paper className="fine-tune-section">
-            <h3>Step 1: Select Fine-Tuning Dataset</h3>
-            <FormControl fullWidth>
-              <InputLabel id="dataset-select-label">Select Dataset</InputLabel>
+          <Paper className="paper" elevation={3}>
+            <Typography variant="h6" className="section-subtitle" gutterBottom>
+              Step 1: Select Fine-Tuning Dataset
+            </Typography>
+            <Typography variant="body2" className="text-secondary" paragraph>
+              Choose the training dataset to use for fine-tuning your model.
+            </Typography>
+            <FormControl fullWidth variant="outlined" size="small">
+              <InputLabel>Select Dataset</InputLabel>
               <Select
-                labelId="dataset-select-label"
-                id="dataset-select"
                 value={selectedDataset}
                 onChange={handleDatasetSelect}
+                label="Select Dataset"
               >
                 {datasets.map((dataset) => (
                   <MenuItem key={dataset.name} value={dataset.name}>
@@ -91,16 +110,21 @@ function FineTune() {
           </Paper>
         </Grid>
 
+        {/* Step 2: Select Base Model */}
         <Grid item xs={12} md={4}>
-          <Paper className="fine-tune-section">
-            <h3>Step 2: Select LLM Base-Model for Fine-Tuning</h3>
-            <FormControl fullWidth>
-              <InputLabel id="base-model-select-label">Select Base Model</InputLabel>
+          <Paper className="paper" elevation={3}>
+            <Typography variant="h6" className="section-subtitle" gutterBottom>
+              Step 2: Select Base Model
+            </Typography>
+            <Typography variant="body2" className="text-secondary" paragraph>
+              Choose the foundation model that will be fine-tuned with your dataset.
+            </Typography>
+            <FormControl fullWidth variant="outlined" size="small">
+              <InputLabel>Select Base Model</InputLabel>
               <Select
-                labelId="base-model-select-label"
-                id="base-model-select"
                 value={selectedBaseModel}
                 onChange={handleBaseModelSelect}
+                label="Select Base Model"
               >
                 {baseModels.map((model) => (
                   <MenuItem key={model} value={model}>
@@ -112,39 +136,64 @@ function FineTune() {
           </Paper>
         </Grid>
 
+        {/* Step 3: Start Fine-Tuning */}
         <Grid item xs={12} md={4}>
-          <Paper className="fine-tune-section">
-            <h3>Step 3: Start Fine-Tuning</h3>
+          <Paper className="paper" elevation={3}>
+            <Typography variant="h6" className="section-subtitle" gutterBottom>
+              Step 3: Start Fine-Tuning
+            </Typography>
+            <Typography variant="body2" className="text-secondary" paragraph>
+              Begin the fine-tuning process with your selected dataset and base model.
+            </Typography>
             <Button 
+              variant="contained"
+              color="primary"
+              fullWidth
               className="app-button"
               onClick={handleSubmit}
               disabled={!selectedDataset || !selectedBaseModel || isLoading}
             >
               {isLoading ? 'Fine-Tuning...' : 'Start Fine-Tuning'}
             </Button>
-            {message && <div className="message">{message}</div>}
           </Paper>
         </Grid>
       </Grid>
 
       {/* Fine-Tuning Process Display */}
-      <Container maxWidth="xl" className="fine-tuning-process-container">
-        <Paper className="fine-tune-section">
-          <h3>Fine-Tuning Process</h3>
-          {isLoading ? (
-            <div className="fine-tuning-process">
-              <Typography>Fine-tuning in progress...</Typography>
-              <div className="progress-bar">
-                <div className="progress" style={{ width: '50%' }}></div>
-              </div>
-            </div>
-          ) : (
-            <Typography>
-              Select a dataset and base model, then start the fine-tuning process to see progress here.
+      <Paper className="paper" elevation={3} sx={{ marginTop: 3 }}>
+        <Typography variant="h6" className="section-subtitle" gutterBottom>
+          Fine-Tuning Progress
+        </Typography>
+        
+        {message && (
+          <Box mb={2}>
+            <Typography 
+              variant="body2" 
+              className={message.includes('Error') ? 'error-message' : 'success-message'}
+            >
+              {message}
             </Typography>
-          )}
-        </Paper>
-      </Container>
+          </Box>
+        )}
+
+        {isLoading ? (
+          <Box>
+            <Typography variant="body2" className="text-secondary" paragraph>
+              Fine-tuning in progress. This may take several minutes...
+            </Typography>
+            <Box mb={2}>
+              <LinearProgress />
+            </Box>
+            <Typography variant="body2" className="text-secondary">
+              Please do not close this window during the fine-tuning process.
+            </Typography>
+          </Box>
+        ) : (
+          <Typography variant="body2" className="text-secondary">
+            Select a dataset and base model above, then start the fine-tuning process to see progress here.
+          </Typography>
+        )}
+      </Paper>
     </Container>
   );
 }
