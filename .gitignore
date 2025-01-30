@@ -38,8 +38,8 @@ Thumbs.db
 /backend/models/base_models/*
 /backend/extraction_service/nltk_data/*
 /backend/chat_service/chat_teams/*
-/backend/agent_service/agents/individual_agents/*
-/backend/agent_service/agents/teams/*
+/backend/agent_service/agents/individual_agents/*.py
+/backend/agent_service/agents/teams/*.py
 /data/builder/AGENTS/*
 /data/builder/TEAMS/*
 
