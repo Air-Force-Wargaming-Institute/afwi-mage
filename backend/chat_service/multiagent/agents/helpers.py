@@ -6,21 +6,18 @@ from langchain_core.messages import HumanMessage
 from utils.shared_state import shared_state
 from multiagent.graphState import GraphState
 import ast
+from multiagent.llm_manager import LLMManager
 
 def identify_experts(state: GraphState) -> GraphState:
+    print("identify_experts")
     """
     This function identifies the experts that are most relevant to the user's question.
     It uses the LLM to determine the experts that are most relevant to the user's question.
     """
     config = load_config()
-    TEMPERATURE = config['TEMPERATURE']
-    BASE_URL = config['BASE_URL']
-    API_KEY = config['API_KEY']
-    MAX_TOKENS = config['MAX_TOKENS']
-    LOCAL_LLM = config['LOCAL_LLM']
-
-    user_question = state['keys']['question']
-    expert_nodes = ["prc_government", "prc_military", "prc_economic", "regional_dynamics", "global_influence", "domestic_stability", "technology_innovation"]
+    EXPERT_LIST = config['EXPERT_AGENTS']
+    llm = LLMManager().llm
+    user_question = state['question']
     expert_descriptions = ["Expert on the structure, decision-making processes, and key figures within the PRC government.",
                         "Expert on the capabilities, doctrine, and strategic objectives of the People's Liberation Army (PLA).",
                         "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
@@ -30,9 +27,6 @@ def identify_experts(state: GraphState) -> GraphState:
                         "Expert on the PRC's recent advancements in key technologies."
                         
     ]
-
-    llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
-
     prompt_template = PromptTemplate(
         input_variables=["question", "experts"],
         template="""
@@ -50,7 +44,7 @@ def identify_experts(state: GraphState) -> GraphState:
         """
     )
 
-    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_nodes, expert_descriptions))
+    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(EXPERT_LIST, expert_descriptions))
     print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
 
     # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
@@ -70,40 +64,17 @@ def identify_experts(state: GraphState) -> GraphState:
             raise ValueError("Invalid response format")
     except:
         # If the LLM doesn't cooperate, return a list of all experts to be safe
-        #logging.info("\t***INFO: LLM provided improper response, falling back to all experts.***")
-        experts_list = expert_nodes
+        print("\t***INFO: LLM provided improper response, falling back to all experts.***")
+        experts_list = EXPERT_LIST
 
     # We don't want the LLM to have made up experts, so validate the list.
-    validated_experts = [expert for expert in experts_list if expert in expert_nodes]
+    validated_experts = [expert for expert in experts_list if expert in EXPERT_LIST]
     print("\tINFO: In identify_experts\n\tSelected Experts:\n\t"+str(validated_experts))
     #logging.info("\tINFO: In identify_experts\n\tSelected Experts:\n\t"+str(validated_experts))
     
     shared_state.EXPERT_LIST_GENERATED = True
 
-    return { 'keys': {**state['keys'], "selected_experts": validated_experts}}
-
-def update_expert_input(state: GraphState, expert_node= str):
-    """
-    This function is used by experts to update the graph state to reflect that they have provided input.
-    """
-    experts_with_input = set(state.get("experts_with_input", set()))
-    experts_with_input.add(expert_node)
-
-    return {'keys': {**state['keys'], "experts_with_input": experts_with_input}}
-
-
-# def write_to_docx(whoami: str, analysis: str):
-#     """
-#     This function is used to write the analysis to a Word document.
-#     """
-#     config = load_config()
-#     OUTPUT_DIR = config['OUTPUT_DIR']
-#     ITERATION = config['ITERATION']
-
-#     doc = DocxDocument()
-#     doc.add_heading(whoami.upper()+" Expert Analysis")
-#     doc.add_paragraph(analysis)
-#     doc.save(OUTPUT_DIR+"/"+str(ITERATION)+"_"+whoami+"_analysis.docx")
+    return {**state, "selected_experts": validated_experts}
 
 def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     print("determine_collaboration")
@@ -114,14 +85,9 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     expert_agents: The list of expert agents as a string (do some sort of `"".join(expert_agents)` to get it in the correct format)
     '''
     config = load_config()
-    TEMPERATURE = config['TEMPERATURE']
-    BASE_URL = config['BASE_URL']
-    API_KEY = config['API_KEY']
-    MAX_TOKENS = config['MAX_TOKENS']
-    LOCAL_LLM = config['LOCAL_LLM']
     EXPERT_LIST = config['EXPERT_AGENTS']
 
-    llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
+    llm = LLMManager().llm
     collab_template = PromptTemplate(
             input_variables=["reflection", "analysis", "expert_agents"],
             template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}. Return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n Again, return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic])"

@@ -13,16 +13,8 @@ def conversation_history_manager(state: GraphState) -> GraphState:
     print("\n\n\t---------------------------\n\n\t---CONVERSATION HISTORY MANAGER---\n\n\t---------------------------\n\n\t")
 
     # Validate state and get question
-    if not isinstance(state, dict) or 'keys' not in state:
-        raise ValueError("Invalid state format")
-    
-    keys = state.get('keys', {})
-    if not isinstance(keys, dict):
-        raise ValueError("Invalid keys format in state")
 
-    question = keys.get('question')
-    if not question:
-        raise ValueError("No question found in state")
+    question = state.get('question')
 
     llm = LLMManager().non_streaming
 
@@ -41,12 +33,10 @@ def conversation_history_manager(state: GraphState) -> GraphState:
 
         print(f"\n\t+++++++++++++++{new_question}")
 
-        # Ensure we're returning a valid state format
+        print(state)# Ensure we're returning a valid state format
         return {
-            'keys': {
-                **keys,
-                'question': new_question if new_question else question
-            }
+            **state,
+            'question': new_question if new_question else question
         }
 
     except Exception as e:
