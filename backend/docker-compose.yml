@@ -76,6 +76,7 @@ services:
       - ../data:/app/data
       - ./models:/app/models
       - ./extraction_service:/app
+      - nltk_data_volume:/app/nltk_data
     depends_on:
       - init-data
     networks:
@@ -205,3 +206,4 @@ services:
 
 volumes:
   postgres_data:
+  nltk_data_volume:

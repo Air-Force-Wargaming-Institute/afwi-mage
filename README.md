@@ -34,7 +34,7 @@ cd backend
 cp auth_service/.env.example auth_service/.env
 
 # If it's the first time running the app, you need to install the backend dependencies with:
-docker compose build
+docker compose build   # Note: First build will take longer due to NLTK data download (about 3.5GB)
 
 # Start all services
 docker compose up # Add the -d flag at the end to run in detached mode and hide the logs
@@ -55,6 +55,15 @@ npm start
 ### 6. Default AdminLog In
 - Username: `admin`
 - Password: `12345`
+
+## Important Build Notes
+
+### First Time Setup
+When building the application for the first time:
+1. The extraction service will download all NLTK data (approximately 3.5GB)
+2. This is a one-time process per development environment
+3. Subsequent builds will be much faster as the data is cached in a Docker volume
+4. No manual NLTK setup is required - everything is handled automatically
 
 ## Troubleshooting Guide
 
@@ -79,6 +88,22 @@ npm start
    # Or for a specific service
    docker compose logs auth
    ```
+
+4. **Extraction Service Issues**
+   - If you encounter NLTK-related errors:
+     ```bash
+     # Rebuild the extraction service
+     docker compose build extraction
+     # Check extraction service logs
+     docker compose logs extraction
+     ```
+   - The NLTK data is stored in a Docker volume, so it persists between container restarts
+   - If needed, you can recreate the NLTK data volume:
+     ```bash
+     docker compose down
+     docker volume rm afwi-multi-agent-generative-engine_nltk_data_volume
+     docker compose up -d
+     ```
 
 ### Database Issues
 1. **Database not initializing**
@@ -129,6 +154,7 @@ npm start
 - Backend Services:
   - Auth Service: User authentication (port 8010)
   - Database: PostgreSQL (port 5432)
+  - Extraction Service: Document processing with NLTK (port 8002)
 
 ### Security Notes
 1. **Change in Production**:
@@ -157,3 +183,4 @@ npm start
 - [Docker Documentation](https://docs.docker.com/)
 - [Node.js Documentation](https://nodejs.org/docs)
 - [React Documentation](https://reactjs.org/)
+- [NLTK Documentation](https://www.nltk.org/)
