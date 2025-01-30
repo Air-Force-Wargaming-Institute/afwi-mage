@@ -48,7 +48,8 @@ async def chat(message: ChatMessage):
             team_dir = Path(__file__).parent / "chat_teams" / message.team_name
             sys.path.append(str(team_dir))
 
-            module_path = f"chat_teams.{message.team_name}.multiagent.processQuestion"
+            #module_path = f"chat_teams.{message.team_name}.multiagent.processQuestion"
+            module_path = "multiagent.processQuestion"
             print(f"Attempting to import: {module_path}")
             process_question_module = importlib.import_module(module_path)
             print("Module imported successfully")
