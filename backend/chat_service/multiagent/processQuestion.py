@@ -2,15 +2,14 @@ from utils.shared_state import shared_state
 from multiagent.graph.createGraph import create_graph
 
 def process_question():
+    print("process_question!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     graph = create_graph()
+    print("graph!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     shared_state.ITERATION += 1
     shared_state.CONVERSATION += f"User Question {shared_state.ITERATION}: {shared_state.QUESTION},\n\n"
-
     inputs = {
-        'keys': {
-            "question": shared_state.QUESTION,
-            "conversation_history": shared_state.CONVERSATION,
-        }
+        "question": shared_state.QUESTION,
+        "conversation_history": shared_state.CONVERSATION
     }
 
     final_output = None

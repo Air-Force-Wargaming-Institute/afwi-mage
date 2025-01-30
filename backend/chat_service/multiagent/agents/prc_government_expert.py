@@ -1,7 +1,6 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from multiagent.graphState import GraphState
-from multiagent.agents.helpers import update_expert_input
+from multiagent.graphState import GraphState, ExpertState
 from config import load_config
 from utils.shared_state import shared_state
 from multiagent.agents.helpers import determine_collaboration
@@ -21,19 +20,32 @@ def expert_subgraph_report(state: GraphState):
     print(banner.upper())
     config = load_config()
     llm = LLMManager().llm
-    whoami = state['keys']['expert']
-    agent_instructions = state['keys']['expert']+"_AGENT_INSTRUCTIONS"
-    old_analysis = state['keys'][whoami+"_analysis"]
-    critique = state['keys'][whoami+"_reflection"]
-    collaborators = state.get(whoami+"_collaborators_list")
-    question = state['keys']['question']
+    whoami = state['expert']
+    agent_instructions = whoami+"_AGENT_INSTRUCTIONS"
+    old_analysis = next(
+        analysis[whoami] 
+        for analysis in state['expert_analysis'] 
+        if whoami in analysis
+    )
+    critique = next(
+        reflection[whoami] 
+        for reflection in state['expert_reflection'] 
+        if whoami in reflection
+    )
+    collaborators = next(
+        collab[whoami] 
+        for collab in state['expert_collaborators_list'] 
+        if whoami in collab
+    )
+
+    question = state['question']
     #Librarian request
     request = f"I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
     print(request)
     document_summary, relevant_documents = librarian(whoami, request)
 
     if collaborators:
-        collab_report = "\n\t".join(f"- {c}: {state['keys'][whoami+'_'+c+'_collab_report']}" for c in collaborators)
+        collab_report = "\n\t".join(f"- {c}: {state[whoami+'_'+c+'_collab_report']}" for c in collaborators)
         prompt = PromptTemplate(
             input_variables=["old_analysis", "critique", "question", "document_summary", "relevant_docs", "collab_report","agent_instructions"],
             template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions} You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n You also collaborated with other subject matter experts, and they provided the following feedback and suggestions to improve your report from their expert perspective: \n{collab_report}\n\n It is time to write your final report. While your focus is to speak to your own expertise, please remember to consider and incorporate the feedback and collaborative inputs of the perspectives from the other experts. Be sure not to simply rewrite your previous report. As appropriate, briefly site where you incorporated the inputs from the other experts. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes 'prc government FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your final report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query."
@@ -64,30 +76,34 @@ def expert_subgraph_report(state: GraphState):
             "whoami": whoami,
             "agent_instructions": agent_instructions
         })
-    
-    state = update_expert_input(state, whoami)
 
     shared_state.CONVERSATION += f"\t---{whoami} Analysis {shared_state.ITERATION}: {analysis},\n\n"
 
-    return {'keys': {**state['keys'], whoami+"_analysis": analysis}}
+    return {'expert_final_analysis': [analysis]}
 
 def collab_subgraph_entry(state: GraphState):
-    banner = "\n\n\t---------------------------\n\n\t---prc government REQUESTER---\n\n\t---------------------------\n\n\t"
+    banner = f"\n\n\t---------------------------\n\n\t---{state['expert']} Collaborator ENTRY---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
-    agent_instructions = state['keys']['collaborator']+"_AGENT_INSTRUCTIONS"
-    
+    agent_instructions = state['collaborator']+"_AGENT_INSTRUCTIONS"
     my_expert = state['expert']
     whoami = state['collaborator']
-    question = state["question"]
-    agent_reflection = state['keys'][my_expert+"_reflection"]
-    my_expert_analysis = state['keys'][my_expert+"_analysis"]
-    collab_areas = state['keys'][my_expert+"_collab_areas"]
+    print(my_expert + '\n\n\n-----\n\n\n' + whoami)
+    my_expert_analysis = next(
+            analysis[my_expert] 
+            for analysis in state['expert_analysis'] 
+            if my_expert in analysis
+        )
+    collab_areas = next(
+            areas[my_expert] 
+            for areas in state['expert_collab_areas'] 
+            if my_expert in areas
+        )
     #Librarian request
     request = f"Here is a report from {my_expert}:\n{my_expert_analysis}\n\nPlease consider the following areas that need work when retrieving documents:\n{collab_areas}\n\nProvide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
     print(request)
     document_summary, relevant_documents = librarian(whoami, request)
 
-    banner = "\n\n\t---------------------------\n\n\t---prc government COLLABORATOR---\n\n\t---------------------------\n\n\t"
+    banner = f"\n\n\t---------------------------\n\n\t---{whoami} COLLABORATOR---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
     llm = LLMManager().llm
     prompt = PromptTemplate(
@@ -102,16 +118,20 @@ def collab_subgraph_entry(state: GraphState):
         "agent_instructions": agent_instructions,
         "whoami": whoami
     })
-    return {'keys': {**state['keys'], my_expert+"_"+whoami+"_collab_report": collab_report}}
+    return {'expert_collaborator_analysis':[{my_expert:{whoami:collab_report}}]}
 
-def expert_subgraph_entry(state: GraphState):
+def expert_subgraph_entry(state: ExpertState):
     #This was the requester-->expert logic
     
     banner = f"\n\n\t---------------------------\n\n\t---{state['expert']} SUBGRAPH ENTRY---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
-    agent_instructions = state['keys']['expert']+"_AGENT_INSTRUCTIONS"
-    whoami = state['keys']['expert']
-    question = state['keys']['question']
+    
+    # Get the expert state from expert_data where name matches state['expert']
+    whoami = state['expert']
+    agent_instructions = whoami+"_AGENT_INSTRUCTIONS"
+    question = state['question']
+    #question = ""
+    print("Librarian")
     #Librarian request
     request = f"I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
     print(request)
@@ -121,7 +141,14 @@ def expert_subgraph_entry(state: GraphState):
     config = load_config()
     llm = LLMManager().llm
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
-    moderator_guidance = state['keys'][whoami+"_moderator_guidance"]
+    try:
+        moderator_guidance = next(
+            guidance[whoami] 
+            for guidance in state['expert_moderator_guidance'] 
+            if whoami in guidance
+        )
+    except StopIteration:
+        moderator_guidance = ""  # or handle the error case as needed
 
     banner = f"\n\n\t---------------------------\n\n\t---{whoami}---\n\n\t---------------------------\n\n\t"
     print(banner.upper())
@@ -161,7 +188,7 @@ def expert_subgraph_entry(state: GraphState):
     expert_agents = config["EXPERT_AGENTS"]
     expert_agents.remove(whoami)
     expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
-    print("\tINFO: {whoami} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
+    print(f"\tINFO: {whoami} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
     #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
     collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
     print("\n\n\n")
@@ -185,6 +212,5 @@ def expert_subgraph_entry(state: GraphState):
             "whoami": whoami,
             "agent_instructions": agent_instructions
         })
-
-        return {'keys': {**state['keys'], whoami+"_analysis": analysis, whoami+"_reflection": reflection, whoami+"_collab_areas": collab_areas, whoami+"_collaborators_list": collaborators}}
-    return {'keys': {**state['keys'], whoami+"_analysis": analysis, whoami+"_reflection": reflection}}
+        return{'expert_analysis': [{whoami: analysis}], 'expert_reflection': [{whoami: reflection}], 'expert_collab_areas': [{whoami: collab_areas}], 'expert_collaborators_list': [{whoami: collaborators}]}
+    return {'expert_analysis': [{whoami: analysis}], 'expert_reflection': [{whoami: reflection}]}

@@ -18,16 +18,39 @@ def synthesis_agent(state: GraphState) -> GraphState:
     llm = LLMManager().llm 
 
     
-    question = state['keys']['question']
+    question = state['question']
     whoami = "synthesis"
+
     analyses = {
-        "Government": state.get("keys", {}).get("prc_government_analysis", ""),
-        "Military": state.get("keys", {}).get("prc_military_analysis", ""),
-        "Economic": state.get("keys", {}).get("prc_economic_analysis", ""),
-        "Regional Dynamics": state.get("keys", {}).get("regional_dynamics_analysis", ""),
-        "Global Influence": state.get("keys", {}).get("global_influence_analysis", ""),
-        "Technology": state.get("keys", {}).get("technology_innovation_analysis", ""),
-        "Domestic Stability": state.get("keys", {}).get("domestic_stability_analysis", "")
+        "Government": next(analysis["prc_government"] for analysis in state['expert_final_analysis'] if "prc_government" in analysis),
+        "Military": next(analysis["prc_military"] for analysis in state['expert_final_analysis'] if "prc_military" in analysis),
+        "Economic": next(analysis["prc_economic"] for analysis in state['expert_final_analysis'] if "prc_economic" in analysis),
+        "Regional Dynamics": next(analysis["regional_dynamics"] for analysis in state['expert_final_analysis'] if "regional_dynamics" in analysis),
+        "Global Influence": next(analysis["global_influence"] for analysis in state['expert_final_analysis'] if "global_influence" in analysis),
+        "Technology": next(analysis["technology_innovation"] for analysis in state['expert_final_analysis'] if "technology_innovation" in analysis),
+        "Domestic Stability": next(analysis["domestic_stability"] for analysis in state['expert_final_analysis'] if "domestic_stability" in analysis)
+    }
+
+    # Define expert name mappings
+    EXPERT_NAMES = {
+        "Government": "prc_government",
+        "Military": "prc_military",
+        "Economic": "prc_economic",
+        "Regional Dynamics": "regional_dynamics",
+        "Global Influence": "global_influence",
+        "Technology": "technology_innovation",
+        "Domestic Stability": "domestic_stability"
+    }
+
+    # Get all analyses with empty string for missing experts
+    analyses = {
+        display_name: next(
+            (analysis[expert_id] 
+            for analysis in state['expert_final_analysis'] 
+            if expert_id in analysis),
+            ""  # Return empty string if expert not found
+        )
+        for display_name, expert_id in EXPERT_NAMES.items()
     }
     
     prompt = PromptTemplate(
@@ -67,4 +90,4 @@ def synthesis_agent(state: GraphState) -> GraphState:
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(conversation_data, f, indent=4, ensure_ascii=False)
     
-    return {'keys': {**state['keys'], 'synthesized_report': synthesized_report, 'last_actor': whoami}}
+    return {**state, 'synthesized_report': synthesized_report}
