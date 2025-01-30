@@ -416,11 +416,22 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
 @router.delete("/delete_agent/{agent_name}")
 async def delete_agent(agent_name: str):
     try:
-        agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{agent_name}.py"
+        # Format agent name and construct paths
+        formatted_name = format_agent_name(agent_name)
+        agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}.py"
+        shared_agent_path = SHARED_AGENTS_PATH / f"{formatted_name}.py"
+
+        # Check if agent exists
         if not os.path.exists(agent_path):
             raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
         
+        # Remove from individual agents directory
         os.remove(agent_path)
+
+        # Remove from shared directory if exists
+        if shared_agent_path.exists():
+            shared_agent_path.unlink()
+        
         return {"message": f"Agent {agent_name} deleted successfully"}
     except Exception as e:
         logger.error(f"Error deleting agent: {str(e)}")
@@ -569,12 +580,22 @@ async def update_team(team_name: str, team_data: TeamCreate):
 @router.delete("/delete_team/{team_name}")
 async def delete_team(team_name: str):
     try:
+        # Format team name and construct paths
         formatted_name = format_team_name(team_name)
         team_path = f"{TEAMS_PATH}/{formatted_name}.py"
+        shared_team_path = SHARED_TEAMS_PATH / formatted_name
+
+        # Check if team exists
         if not os.path.exists(team_path):
             raise HTTPException(status_code=404, detail=f"Team {team_name} not found")
         
+        # Remove team file from teams directory
         os.remove(team_path)
+
+        # Remove entire team directory from shared directory if exists
+        if shared_team_path.exists():
+            shutil.rmtree(shared_team_path)
+        
         return {"message": f"Team {team_name} deleted successfully"}
     except Exception as e:
         logger.error(f"Error deleting team: {str(e)}")
