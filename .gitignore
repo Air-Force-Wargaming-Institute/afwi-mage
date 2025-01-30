@@ -34,6 +34,14 @@ Thumbs.db
 /backend/models/fine_tuned_models/*
 /backend/models/base_models/*
 /backend/extraction_service/nltk_data/*
+/backend/chat_service/chat_teams/*
+/backend/agent_service/agents/individual_agents/*
+/backend/agent_service/agents/teams/*
+/data/builder/AGENTS/*
+/data/builder/TEAMS/*
+
+# Keep the TEAM-TEMPLATE directory
+!/data/builder/TEAMS/TEAM-TEMPLATE/*
 
 # Keep .gitkeep files
 !/**/.gitkeep

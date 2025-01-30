@@ -46,6 +46,8 @@ def processQuestion(question: str):
     #print("\n\n\t\t^^^^^^^^^CONVERSATION^^^^^^^^^\n\n")
     #print(shared_state.CONVERSATION)
 
+    if config['SOLO_AGENT']:
+        return final_output[config['EXPERT_AGENTS'][0]]['keys']['synthesized_report'], 
     if final_output and 'synthesis' in final_output and 'keys' in final_output['synthesis'] and 'synthesized_report' in final_output['synthesis']['keys']:
         return final_output['synthesis']['keys']['synthesized_report'], 
         #return final_output
