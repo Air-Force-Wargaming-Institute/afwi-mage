@@ -6,9 +6,10 @@ from multiagent.llm_manager import LLMManager
 from langchain_core.messages import AIMessage
 from typing import Set
 
-def get_Moderator_Guidance(state: GraphState):
+def get_Moderator_Guidance(state: ModGuidanceState):
     print("get_Moderator_Guidance")  
     whoami = state['expert']
+    print(whoami)
     llm = LLMManager().llm
     question = state['question']
     prompt = PromptTemplate(
@@ -19,4 +20,5 @@ def get_Moderator_Guidance(state: GraphState):
     guidance = chain.invoke({"question": question,
                                 "expert": whoami,
                                 })
-    return {'expert_moderator_guidance': [{whoami: guidance}]}
+    #print(guidance)
+    return {'expert_moderator_guidance': {whoami: guidance}}

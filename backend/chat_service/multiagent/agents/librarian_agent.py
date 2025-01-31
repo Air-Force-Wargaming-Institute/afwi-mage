@@ -33,7 +33,7 @@ def librarian(requester:str, agent_request:str):
     chain = prompt | llm | StrOutputParser()
     
     documents_text = "\n\n".join([doc.page_content for doc in relevant_docs[:TOP_N_DOCUMENTS]])
-    print("\tINFO: Relevant documents:\n\n"+documents_text)
+    #print("\tINFO: Relevant documents:\n\n"+documents_text)
 
     summary = chain.invoke({
         "relevant_docs": documents_text,
@@ -42,6 +42,6 @@ def librarian(requester:str, agent_request:str):
     })
 
     print("\n\n\t---------------------------\n\n\t\n\n\t---------------------------\n\n\tLibrarian Summary\n\n\t---------------------------\n\n\t")
-    print(summary)
+    #print(summary)
     
     return summary, relevant_docs

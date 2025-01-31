@@ -29,7 +29,7 @@ async def chat(message: ChatMessage):
         shared_state.QUESTION = message.message #TODO: add logic to ensure there is actually a question
 
         # TODO: Implement chat logic
-        response = process_question()
+        response = process_question(message.message)
         #response = {"response": f"Received message: {message.message}"}
         return {"response": response}
     except Exception as e:

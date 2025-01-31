@@ -1,6 +1,7 @@
 from typing import Dict
 from multiagent.agents import *
 from config import load_config
+import sys
 from multiagent.graph.routers import (
     router_expert_subgraphs,
     router_get_Moderator_Guidance,
@@ -8,25 +9,24 @@ from multiagent.graph.routers import (
     router_expert_report
 )
 from langgraph.graph import StateGraph, END
-from multiagent.graphState import GraphState, ExpertState
+from multiagent.graphState import GraphState, ExpertState, ModGuidanceState, CollabState
 
-def print_mod_guidance(state: GraphState):
-    print('--------------------------------moderator guidance--------------------------------')
-    print(state['expert_moderator_guidance'])
-    print('--------------------------------moderator guidance--------------------------------')
-    return state
+def collab_subgraph_start(state: CollabState):
+    sys.stdout.flush()
+    return
 
-def print_expert_analysis(state: GraphState):
-    print('--------------------------------expert analysis--------------------------------')
-    print(state['expert_analysis'])
-    print('--------------------------------expert analysis--------------------------------')
-    return state
+def expert_subgraph_start(state: ExpertState):
+    sys.stdout.flush()
+    return
 
-def print_mod_guidance(state: GraphState):
-    print('--------------------------------moderator guidance--------------------------------')
-    print(state['expert_moderator_guidance'])
-    print('--------------------------------moderator guidance--------------------------------')
-    return state
+def modguidance_subgraph_entry(state: ModGuidanceState):
+    sys.stdout.flush()
+    return
+
+def expert_subgraph_report_start(state: GraphState):
+    print(state)
+    sys.stdout.flush()
+    return
 
 def create_graph() -> StateGraph:
     """
@@ -34,33 +34,65 @@ def create_graph() -> StateGraph:
     Defines the process for streaming agent output instead of waiting for the entire output to be generated.
     """
     subworkflow = StateGraph(ExpertState)
+    subworkflow.add_node("expert_subgraph_entry", expert_subgraph_entry)
+    subworkflow.add_node("expert_subgraph_start", expert_subgraph_start)
+
+    subworkflow.set_entry_point("expert_subgraph_start")
+    subworkflow.add_conditional_edges("expert_subgraph_start", router_expert_subgraphs,["expert_subgraph_entry"])
+    subworkflow.add_edge("expert_subgraph_entry", END)
     
+    subworkflow4 = StateGraph(GraphState)
+    subworkflow4.add_node("expert_subgraph_report", expert_subgraph_report)
+    subworkflow4.add_node("expert_subgraph_report_start", expert_subgraph_report_start)
+
+    subworkflow4.set_entry_point("expert_subgraph_report_start")
+    subworkflow4.add_conditional_edges("expert_subgraph_report_start", router_expert_report,["expert_subgraph_report"])
+    subworkflow4.add_edge("expert_subgraph_report", END)
+
+    subworkflow2 = StateGraph(ModGuidanceState)
+    subworkflow2.add_node("modguidance_subgraph_entry", modguidance_subgraph_entry)
+    subworkflow2.add_node("get_Moderator_Guidance", get_Moderator_Guidance)
+
+    subworkflow2.set_entry_point("modguidance_subgraph_entry")
+    subworkflow2.add_conditional_edges("modguidance_subgraph_entry", router_get_Moderator_Guidance, ["get_Moderator_Guidance"])
+    subworkflow2.add_edge("get_Moderator_Guidance", END)
     
-    
-    
+    subworkflow3 = StateGraph(CollabState)
+    subworkflow3.add_node("collab_subgraph_entry", collab_subgraph_entry)
+    subworkflow3.add_node("collab_subgraph_start", collab_subgraph_start)
+
+    subworkflow3.set_entry_point("collab_subgraph_start")
+    subworkflow3.add_conditional_edges("collab_subgraph_start", router_collaboration_requested,["collab_subgraph_entry"])
+    subworkflow3.add_edge("collab_subgraph_entry", END)
     
     
     workflow = StateGraph(GraphState)
-
-
-
     # Add base nodes
     workflow.add_node("conversation_history_manager", conversation_history_manager)
     workflow.add_node("identify_experts", identify_experts)
     workflow.add_node("get_Moderator_Guidance", get_Moderator_Guidance)
+    workflow.add_node("modguidance_subgraph", subworkflow2.compile())
+    workflow.add_node("expert_subgraph", subworkflow.compile())
     workflow.add_node("expert_subgraph_entry", expert_subgraph_entry)
-    workflow.add_node("collab_subgraph_entry", collab_subgraph_entry)
-    workflow.add_node("expert_subgraph_report", expert_subgraph_report)
+    workflow.add_node("collab_subgraph", subworkflow3.compile())
+    workflow.add_node("expert_subgraph_report", subworkflow4.compile())
     workflow.add_node("synthesis", synthesis_agent)
-    
-    
     
     workflow.set_entry_point("conversation_history_manager")
     workflow.add_edge("conversation_history_manager", "identify_experts")
-    workflow.add_conditional_edges("identify_experts",router_get_Moderator_Guidance, ["get_Moderator_Guidance"])
-    workflow.add_conditional_edges("get_Moderator_Guidance", router_expert_subgraphs, ["expert_subgraph_entry"])
-    workflow.add_conditional_edges("expert_subgraph_entry", router_collaboration_requested,["collab_subgraph_entry"])
-    workflow.add_conditional_edges("collab_subgraph_entry", router_expert_report, ["expert_subgraph_report"])
+    #workflow.add_conditional_edges("identify_experts",router_get_Moderator_Guidance, ["get_Moderator_Guidance"])
+    #workflow.add_conditional_edges("get_Moderator_Guidance", router_expert_subgraphs, ["expert_subgraph_entry"])
+    workflow.add_edge("identify_experts", "modguidance_subgraph")
+    workflow.add_edge("modguidance_subgraph","expert_subgraph")
+
+    workflow.add_edge("expert_subgraph", "collab_subgraph")
+    workflow.add_edge("collab_subgraph", "expert_subgraph_report")
     workflow.add_edge("expert_subgraph_report", "synthesis")
     workflow.add_edge("synthesis", END)
+    #workflow.add_conditional_edges("expert_subgraph_entry", router_collaboration_requested,["collab_subgraph_entry"])
+    #workflow.add_conditional_edges("print_Graph", router_collaboration_requested,["collab_subgraph_entry"])
+    #workflow.add_conditional_edges("collab_subgraph_entry", router_expert_report, ["expert_subgraph_report"])
+    #workflow.add_edge("expert_subgraph_report", "synthesis")
+    #workflow.add_edge("synthesis", END)
+    
     return workflow.compile()
