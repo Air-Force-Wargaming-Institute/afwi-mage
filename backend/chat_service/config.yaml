@@ -7,8 +7,8 @@ LOCAL_LLM: "llama3.2"
 #LOCAL_LLM: "hermes3:8b"
 
 # Whether to use streaming LLM or not
-STREAMING_LLM: 0
-#STREAMING_LLM: 1
+#STREAMING_LLM: 0
+STREAMING_LLM: 1
 
 # API key for the LLM
 API_KEY: 'None'

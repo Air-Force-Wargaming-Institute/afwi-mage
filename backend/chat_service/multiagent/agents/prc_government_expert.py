@@ -118,24 +118,20 @@ def expert_subgraph_entry(state: ExpertState):
     print(banner.upper())
     # Get the expert state from expert_data where name matches state['expert']
     whoami = state['expert']
-    print(whoami + '\n\n\n-----\n\n\n' + str(time.time()))
     agent_instructions = whoami+"_AGENT_INSTRUCTIONS"
     question = state['question']
-    #question = ""
-    print("Librarian")
+    banner = f"\n\n\t---------------------------\n\n\t---{whoami} LIBRARIAN REQUEST---\n\n\t---------------------------\n\n\t"
+    print(banner.upper())
     #Librarian request
     request = f"I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. This is my role in the panel: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Please retrieve documents that are most related to this question: {question}. Please retrieve documents that are most related to the question and provide a summary without embellishment or personal interpertation. Also provide sources or references when possible."
-    #print(request)
     document_summary, relevant_documents = librarian(whoami, request)
-    '''============================================================================='''
     #Expert analysis -- Initial report
+    banner = f"\n\n\t---------------------------\n\n\t---{whoami} INITIAL REPORT---\n\n\t---------------------------\n\n\t"
+    print(banner.upper())
     config = load_config()
     llm = LLMManager().llm
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
-    moderator_guidance=state['expert_moderator_guidance'][whoami]
-    banner = f"\n\n\t---------------------------\n\n\t---{whoami}---\n\n\t---------------------------\n\n\t"
-    print(banner.upper())
-    
+    moderator_guidance=state['expert_moderator_guidance'][whoami]   
     prompt = PromptTemplate(
             input_variables=["question", "document_summary", "relevant_docs", "moderator_guidance","whoami","PRC_GOVERNMENT_AGENT_INSTRUCTIONS"],
             template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n The panel has been asked this question/query: \n{question}\n\n A moderator for your panel has provided the following guidance to panel members: \n{moderator_guidance}\n\n It is time to write your first draft report. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your initial report, please provide a short title that includes '{whoami} INITIAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your initial report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your initial report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query."
@@ -152,7 +148,7 @@ def expert_subgraph_entry(state: ExpertState):
         "agent_instructions": agent_instructions
     })
     print(whoami + '\n\n\n-----\n\n\n' + str(time.time()))
-    print("\n\t------\n\t---INITIAL REFLECTION---\n\t------\n")
+    print(f"\n\t------\n\t---{whoami} INITIAL REFLECTION---\n\t------\n")
     reflection_prompt = PromptTemplate(
         input_variables=["question", "analysis", "documents_text","whoami","agent_instructions"],
         template="You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\n You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had written the following report: \n{analysis}.\n\n It is time to write a critique of your first draft report. Write your critique, focusing on three main areas for improvement. 1.) CLARIFICATION: Potential clarification of mischaracterizations in the first draft. 2.) INNACCURACIES: Information that is not true or that you suspect may be innaccurate. 3.) FINAL REPORT CONSIDERATIONS: Create a succinct list of specific instructions for corrections or clarifications to incorporate in subsequent drafts of the report. Where appropriate, support your critique with relevant facts and examples found from these relevant documents: \n{documents_text}.\n\n At the start of your critique, please provide a short title that includes 'prc government INITIAL SELF-CRITIQUE on:' and then restate the question/query but paraphrased from your perspective. Your critique should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your critique to better support subsequent drafts of the report."
@@ -167,16 +163,16 @@ def expert_subgraph_entry(state: ExpertState):
         "agent_instructions": agent_instructions
     })
 
-    print("\n\t------\n\t---REQUEST COLLABORATION---\n\t------\n")
+    print(f"\n\t------\n\t---{whoami} REQUEST COLLABORATION---\n\t------\n")
     expert_agents = config["EXPERT_AGENTS"]
     expert_agents.remove(whoami)
     expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
     print(f"\tINFO: {whoami} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
     #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
     collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
-    print("\n\n\n")
-    print(collaborators)
-    print("\n\n\n")
+    #print("\n\n\n")
+    #print(collaborators)
+    #print("\n\n\n")
     #Request collaboration instructions for the individuals
     if collaborators:
         prompt = PromptTemplate(
