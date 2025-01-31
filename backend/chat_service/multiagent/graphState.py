@@ -7,26 +7,35 @@ class GraphState(TypedDict):
     question: str
     conversation_history: str
     selected_experts: list[str]
-    expert_moderator_guidance: Annotated[list[Dict[str, str]], operator.add]
-    expert_analysis: Annotated[list[Dict[str, str]], operator.add]
-    expert_reflection: Annotated[list[Dict[str, str]], operator.add]
-    expert_collab_areas: Annotated[list[Dict[str, list[str]]], operator.add]
-    expert_collaborators_list: Annotated[list[Dict[str, list[str]]], operator.add]
-    expert_collaborator_analysis: Annotated[list[Dict[str, Dict[str, str]]], operator.add]
-    expert_final_analysis: Annotated[list[Dict[str, str]], operator.add]
+    expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
+    expert_analysis: Annotated[Dict[str, str], operator.__ior__]
+    expert_reflection: Annotated[Dict[str, str], operator.__ior__]
+    expert_collab_areas: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_collaborators_list: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_collaborator_analysis: Annotated[list[Dict[str, str]], operator.add]
+    expert_final_analysis: Annotated[Dict[str, str], operator.__ior__]
     synthesized_report: str
 
 class ExpertState(TypedDict):
     question: str
     selected_experts: list[str]
-    expert_moderator_guidance: list[Dict[str, str]]
-    expert_analysis: Dict[str, str]
-    expert_reflection: Dict[str, str]
-    expert_collab_areas: Dict[str, list[str]]
-    expert_collaborators_list: Dict[str, list[str]]
+    expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
+    expert_analysis: Annotated[Dict[str, str], operator.__ior__]
+    expert_reflection: Annotated[Dict[str, str], operator.__ior__]      
+    expert_collab_areas: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_collaborators_list: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_collaborator_analysis: Annotated[list[Dict[str, str]], operator.add]
+    expert_final_analysis: Annotated[Dict[str, str], operator.__ior__]
 
 class ModGuidanceState(TypedDict):
     question: str
     selected_experts: list[str]
-    expert_moderator_guidance: Dict[str, str]
+    expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
 
+class CollabState(TypedDict):
+    question: str
+    selected_experts: list[str]
+    expert_collaborators_list: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_analysis: Annotated[Dict[str, str], operator.__ior__]
+    expert_collab_areas: Annotated[Dict[str, list[str]], operator.__ior__]
+    expert_collaborator_analysis: Annotated[list[Dict[str, str]], operator.add]

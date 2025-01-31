@@ -21,16 +21,6 @@ def synthesis_agent(state: GraphState) -> GraphState:
     question = state['question']
     whoami = "synthesis"
 
-    analyses = {
-        "Government": next(analysis["prc_government"] for analysis in state['expert_final_analysis'] if "prc_government" in analysis),
-        "Military": next(analysis["prc_military"] for analysis in state['expert_final_analysis'] if "prc_military" in analysis),
-        "Economic": next(analysis["prc_economic"] for analysis in state['expert_final_analysis'] if "prc_economic" in analysis),
-        "Regional Dynamics": next(analysis["regional_dynamics"] for analysis in state['expert_final_analysis'] if "regional_dynamics" in analysis),
-        "Global Influence": next(analysis["global_influence"] for analysis in state['expert_final_analysis'] if "global_influence" in analysis),
-        "Technology": next(analysis["technology_innovation"] for analysis in state['expert_final_analysis'] if "technology_innovation" in analysis),
-        "Domestic Stability": next(analysis["domestic_stability"] for analysis in state['expert_final_analysis'] if "domestic_stability" in analysis)
-    }
-
     # Define expert name mappings
     EXPERT_NAMES = {
         "Government": "prc_government",
@@ -41,17 +31,14 @@ def synthesis_agent(state: GraphState) -> GraphState:
         "Technology": "technology_innovation",
         "Domestic Stability": "domestic_stability"
     }
-
+    print("analyses")
     # Get all analyses with empty string for missing experts
     analyses = {
-        display_name: next(
-            (analysis[expert_id] 
-            for analysis in state['expert_final_analysis'] 
-            if expert_id in analysis),
-            ""  # Return empty string if expert not found
-        )
+        display_name: state['expert_final_analysis'].get(expert_id, "")
         for display_name, expert_id in EXPERT_NAMES.items()
     }
+    print("post analyses")
+    analyses_text = "\n\n".join([f"{key} Analysis:\n{value}" for key, value in analyses.items()])
     
     prompt = PromptTemplate(
         input_variables=["question", "analyses"],
@@ -60,7 +47,6 @@ def synthesis_agent(state: GraphState) -> GraphState:
     
     chain = prompt | llm | StrOutputParser()
     
-    analyses_text = "\n\n".join([f"{key} Analysis:\n{value}" for key, value in analyses.items()])
     synthesized_report = chain.invoke({
         "question": question,
         "analyses": analyses_text

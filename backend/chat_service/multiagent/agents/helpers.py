@@ -8,7 +8,7 @@ from multiagent.graphState import GraphState
 import ast
 from multiagent.llm_manager import LLMManager
 
-def identify_experts(state: GraphState) -> GraphState:
+def identify_experts(state: GraphState):
     print("identify_experts")
     """
     This function identifies the experts that are most relevant to the user's question.

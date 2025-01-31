@@ -33,7 +33,7 @@ def conversation_history_manager(state: GraphState) -> GraphState:
 
         print(f"\n\t+++++++++++++++{new_question}")
 
-        print(state)# Ensure we're returning a valid state format
+        #print(state)# Ensure we're returning a valid state format
         return {
             **state,
             'question': new_question if new_question else question
