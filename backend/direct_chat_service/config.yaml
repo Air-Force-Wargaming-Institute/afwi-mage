@@ -1,0 +1,57 @@
+service:
+  name: direct_chat_service
+  host: 0.0.0.0
+  port: 8011
+  debug: true
+
+ollama:
+  # Base URL for Ollama API
+  base_url: http://host.docker.internal:11434
+  
+  # Model identifier for Ollama
+  ollama_model: llama3.1
+  
+  # Controls randomness in the output (range: 0.0-1.0)
+  # Higher values = more creative, lower = more focused
+  temperature: 0.2
+  
+  # Maximum number of tokens in context window
+  # Determines how much previous conversation the model can see
+  context_window: 8000
+  
+  # Nucleus sampling, cumulative probability cutoff (range: 0.0-1.0)
+  # Lower values = more focused on likely tokens
+  top_p: 0.9
+  
+  # Limits number of tokens considered for sampling (range: 1-100)
+  # Lower values = more focused responses
+  top_k: 40
+  
+  # Penalizes repeated tokens (range: 1.0-2.0)
+  # Higher values reduce repetition more strongly
+  repeat_penalty: 1.1
+  
+  # GPU-specific settings
+  num_gpu: 99  # Use all available GPU layers
+  num_thread: 1  # Minimize CPU threading
+  f16: true  # Use half-precision for better GPU performance
+  
+  # Sequences where the model should stop generating
+  # Useful for maintaining conversation format
+  stop: ["Human:", "Assistant:"]
+
+api:
+  core_service_url: http://core:8000
+  prefix: /api/v1
+
+cors:
+  allowed_origins:
+    - http://localhost:3000
+    - http://127.0.0.1:3000
+  allowed_methods:
+    - GET
+    - POST
+    - OPTIONS
+  allowed_headers:
+    - Content-Type
+    - Authorization
