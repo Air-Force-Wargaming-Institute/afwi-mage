@@ -46,6 +46,13 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
+import { 
+  sendMessage, 
+  getChatHistory, 
+  createChatSession, 
+  deleteChatSession, 
+  getAllChatSessions 
+} from '../services/directChatService';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -943,139 +950,119 @@ const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
   });
 };
 
-function DirectChat() {
+const DirectChat = () => {
   const classes = useStyles();
   const { state, dispatch } = useDirectChat();
-  console.log('DirectChat - Current State:', state);
-
-  const {
-    input,
-    messages = [],
-    chatSessions = [],
-    isLoading = false,
-    isFullscreen = false,
-    helpDialogOpen = false,
-    promptHelpOpen = false,
-    showScrollTop = false,
-    showScrollBottom = false,
-    selectedAgent = null,
-    availableAgents = []
-  } = state || {};
-
   const messageEndRef = useRef(null);
-  const messageAreaRef = useRef(null);
+  const [error, setError] = useState(null);
 
-  // Add a ref to track if we need to update positions
-  const shouldUpdatePositions = useRef(false);
-  
+  // Load chat sessions on component mount
+  useEffect(() => {
+    const loadChatSessions = async () => {
+      try {
+        const sessions = await getAllChatSessions();
+        dispatch({ type: ACTIONS.SET_CHAT_SESSIONS, payload: sessions });
+      } catch (error) {
+        setError('Failed to load chat sessions');
+      }
+    };
+    loadChatSessions();
+  }, [dispatch]);
+
+  // Load chat history when session changes
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (state.currentSessionId) {
+        try {
+          const history = await getChatHistory(state.currentSessionId);
+          dispatch({ type: ACTIONS.SET_MESSAGES, payload: history });
+        } catch (error) {
+          setError('Failed to load chat history');
+        }
+      }
+    };
+    loadChatHistory();
+  }, [state.currentSessionId, dispatch]);
+
+  const handleSendMessage = async (event) => {
+    event.preventDefault();
+    const messageText = state.input.trim();
+    
+    if (!messageText) return;
+
+    // Add user message to UI immediately
+    const userMessage = {
+      id: Date.now(),
+      text: messageText,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    };
+    
+    dispatch({ type: ACTIONS.ADD_MESSAGE, payload: userMessage });
+    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+    try {
+      // Send message to backend
+      const response = await sendMessage(messageText);
+      
+      // Add AI response to UI
+      const aiMessage = {
+        id: Date.now() + 1,
+        text: response.message,
+        sender: 'ai',
+        timestamp: new Date().toISOString()
+      };
+      
+      dispatch({ type: ACTIONS.ADD_MESSAGE, payload: aiMessage });
+    } catch (error) {
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: 'Error: Failed to send message. Please try again.',
+        sender: 'system',
+        timestamp: new Date().toISOString()
+      };
+      dispatch({ type: ACTIONS.ADD_MESSAGE, payload: errorMessage });
+      setError('Failed to send message');
+    } finally {
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+    }
+  };
+
+  const handleNewChat = async () => {
+    try {
+      const newSession = await createChatSession();
+      dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    } catch (error) {
+      setError('Failed to create new chat');
+    }
+  };
+
+  const handleDeleteChat = async (sessionId) => {
+    try {
+      await deleteChatSession(sessionId);
+      dispatch({ type: ACTIONS.DELETE_CHAT_SESSION, payload: sessionId });
+      
+      // If we deleted the current session, switch to the first available session
+      if (sessionId === state.currentSessionId && state.chatSessions.length > 0) {
+        const nextSession = state.chatSessions.find(s => s.id !== sessionId);
+        if (nextSession) {
+          dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: nextSession.id });
+        }
+      }
+    } catch (error) {
+      setError('Failed to delete chat');
+    }
+  };
+
   const handleInputChange = (event) => {
     dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
   };
 
   const handleKeyPress = (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-      handleSubmit(event);
+      handleSendMessage(event);
     }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!input.trim()) return;
-
-    // Add user message
-    dispatch({ 
-      type: ACTIONS.ADD_MESSAGE, 
-      payload: { 
-        id: Date.now(),
-        text: input.trim(), 
-        sender: 'user', 
-        timestamp: new Date() 
-      }
-    });
-    
-    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
-    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-
-    try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: input.trim(),
-        team_name: 'direct_chat' 
-      });
-
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
-
-      // Remove any error messages before adding new AI response
-      dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
-
-      // Add AI response
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: aiResponse, 
-          sender: 'ai', 
-          timestamp: new Date() 
-        }
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: 'Error: Failed to get response from AI', 
-          sender: 'system', 
-          timestamp: new Date() 
-        }
-      });
-    } finally {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
-    }
-  };
-
-  const handleNewChat = () => {
-    const newSession = { id: chatSessions.length + 1, name: `New Chat ${chatSessions.length + 1}` };
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
-    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
-  };
-
-  const handleEditSession = (sessionId) => {
-    // TODO: Implement edit functionality
-    console.log(`Edit session ${sessionId}`);
-  };
-
-  const handleDeleteSession = (sessionId) => {
-    // TODO: Implement delete functionality
-    console.log(`Delete session ${sessionId}`);
-  };
-
-  const handleDownloadSession = (sessionId) => {
-    // TODO: Implement download functionality
-    console.log(`Download session ${sessionId}`);
-  };
-
-  const toggleFullscreen = () => {
-    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !isFullscreen });
-  };
-
-  const handleHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: true });
-  };
-
-  const handleHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: false });
-  };
-
-  const handlePromptHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: true });
-  };
-
-  const handlePromptHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
   };
 
   const handleScroll = useCallback(({ target }) => {
@@ -1093,10 +1080,7 @@ function DirectChat() {
   }, [dispatch]);
 
   const scrollToTop = () => {
-    messageAreaRef.current?.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const scrollToBottom = () => {
@@ -1119,7 +1103,7 @@ function DirectChat() {
 
       dispatch({ 
         type: ACTIONS.SET_MESSAGES, 
-        payload: messages.filter(msg => 
+        payload: state.messages.filter(msg => 
           !(msg.sender === 'system' && msg.text.includes('Error:'))
         ) 
       });
@@ -1141,7 +1125,7 @@ function DirectChat() {
   };
 
   const handleBookmark = useCallback((message) => {
-    const messageArea = messageAreaRef.current;
+    const messageArea = messageEndRef.current;
     const messageElement = document.getElementById(`message-${message.id}`);
     
     if (messageArea && messageElement) {
@@ -1159,74 +1143,57 @@ function DirectChat() {
         type: ACTIONS.TOGGLE_BOOKMARK, 
         payload: bookmarkData
       });
-      shouldUpdatePositions.current = true;
     }
   }, [dispatch]);
 
-  // Create a debounced update function
-  const debouncedUpdate = useCallback(
-    debounce(() => {
-      if (shouldUpdatePositions.current) {
-        const updatedBookmarks = calculateBookmarkPositions(messageAreaRef, state.bookmarkedMessages);
-        dispatch({ type: ACTIONS.UPDATE_BOOKMARK_POSITIONS, payload: updatedBookmarks });
-        shouldUpdatePositions.current = false;
-      }
-    }, 100),
-    [state.bookmarkedMessages]
-  );
+  const handleEditSession = (sessionId) => {
+    // TODO: Implement session editing functionality
+    console.log('Edit session:', sessionId);
+  };
 
-  // Update positions when necessary
-  useEffect(() => {
-    if (shouldUpdatePositions.current) {
-      debouncedUpdate();
+  const handleDownloadSession = async (sessionId) => {
+    try {
+      const history = await getChatHistory(sessionId);
+      const chatData = JSON.stringify(history, null, 2);
+      const blob = new Blob([chatData], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-session-${sessionId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      setError('Failed to download chat session');
+      console.error('Error downloading session:', error);
     }
-  }, [debouncedUpdate]);
+  };
 
-  // Handle initial load and new messages
-  useEffect(() => {
-    shouldUpdatePositions.current = true;
-    debouncedUpdate();
-  }, [messages, debouncedUpdate]);
+  const toggleFullscreen = () => {
+    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !state.isFullscreen });
+  };
 
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      shouldUpdatePositions.current = true;
-      debouncedUpdate();
-    };
+  const handleHelpOpen = () => {
+    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: true });
+  };
 
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      debouncedUpdate.cancel();
-    };
-  }, [debouncedUpdate]);
+  const handleHelpClose = () => {
+    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: false });
+  };
 
-  // Handle scroll events
-  useEffect(() => {
-    const handleScroll = debounce(() => {
-      shouldUpdatePositions.current = true;
-      debouncedUpdate();
-    }, 100);
+  const handlePromptHelpOpen = () => {
+    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: true });
+  };
 
-    const messageArea = messageAreaRef.current;
-    if (messageArea) {
-      messageArea.addEventListener('scroll', handleScroll);
-      return () => {
-        messageArea.removeEventListener('scroll', handleScroll);
-        handleScroll.cancel();
-      };
-    }
-  }, [debouncedUpdate]);
-
-  useEffect(() => {
-    messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const handlePromptHelpClose = () => {
+    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
+  };
 
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
-        {!isFullscreen && (
+        {!state.isFullscreen && (
           <Paper className={classes.chatLog} elevation={3}>
             <Button 
               variant="contained" 
@@ -1237,7 +1204,7 @@ function DirectChat() {
               Start New Chat Session
             </Button>
             <List>
-              {chatSessions.map((session) => (
+              {state.chatSessions.map((session) => (
                 <React.Fragment key={session.id}>
                   <ListItem button className={classes.chatSessionItem}>
                     <ListItemText primary={session.name} />
@@ -1248,7 +1215,7 @@ function DirectChat() {
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteSession(session.id)}>
+                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteChat(session.id)}>
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
@@ -1265,7 +1232,7 @@ function DirectChat() {
             </List>
           </Paper>
         )}
-        <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+        <Paper className={`${classes.chatArea} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           <div className={classes.buttonBar}>
             <div className={classes.agentsHeader}>
               <IconButton onClick={handleHelpOpen} size="small">
@@ -1280,11 +1247,11 @@ function DirectChat() {
                 onClick={toggleFullscreen}
                 size="small"
               >
-                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
               </IconButton>
           </div>
           <Box 
-            ref={messageAreaRef}
+            ref={messageEndRef}
             className={classes.messageArea}
             onScroll={handleScroll}
           >
@@ -1318,7 +1285,7 @@ function DirectChat() {
               </div>
             </div>
             
-            {messages.map((message, index) => (
+            {state.messages.map((message, index) => (
               <Box 
                 key={index}
                 id={`message-${message.id}`}
@@ -1335,7 +1302,7 @@ function DirectChat() {
                     sender={message.sender}
                     onRetry={
                       message.sender === 'system' && message.text.includes('Error:') 
-                        ? () => handleRetry(messages[messages.length - 2]?.text) 
+                        ? () => handleRetry(state.messages[state.messages.length - 2]?.text) 
                         : undefined
                     }
                     messageId={message.id}
@@ -1345,7 +1312,7 @@ function DirectChat() {
                 </div>
               </Box>
             ))}
-            {isLoading && (
+            {state.isLoading && (
               <div className={classes.typingIndicator}>
                 <Typography className="loading-header">
                   One moment...
@@ -1361,7 +1328,7 @@ function DirectChat() {
               </div>
             )}
             <div ref={messageEndRef} />
-            <Fade in={showScrollTop}>
+            <Fade in={state.showScrollTop}>
               <IconButton
                 className={classes.scrollTopButton}
                 onClick={scrollToTop}
@@ -1371,7 +1338,7 @@ function DirectChat() {
                 <KeyboardArrowUpIcon />
               </IconButton>
             </Fade>
-            <Fade in={showScrollBottom}>
+            <Fade in={state.showScrollBottom}>
               <IconButton
                 className={classes.scrollBottomButton}
                 onClick={scrollToBottom}
@@ -1382,7 +1349,7 @@ function DirectChat() {
               </IconButton>
             </Fade>
           </Box>
-          <form onSubmit={handleSubmit} className={classes.inputArea}>
+          <form onSubmit={handleSendMessage} className={classes.inputArea}>
             <IconButton 
               onClick={handlePromptHelpOpen}
               size="small"
@@ -1395,7 +1362,7 @@ function DirectChat() {
               className={classes.input}
               variant="outlined"
               placeholder="Type your message here... (Ctrl+Enter to send)"
-              value={input}
+              value={state.input}
               onChange={handleInputChange}
               onKeyDown={handleKeyPress}
               multiline
@@ -1415,7 +1382,7 @@ function DirectChat() {
         </Paper>
       </div>
       <Dialog
-        open={helpDialogOpen}
+        open={state.helpDialogOpen}
         onClose={handleHelpClose}
         className={classes.helpDialog}
         aria-labelledby="help-dialog-title"
@@ -1473,7 +1440,7 @@ function DirectChat() {
         </DialogActions>
       </Dialog>
       <Dialog
-        open={promptHelpOpen}
+        open={state.promptHelpOpen}
         onClose={handlePromptHelpClose}
         className={classes.promptHelpDialog}
         aria-labelledby="prompt-help-dialog-title"

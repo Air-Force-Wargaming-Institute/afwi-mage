@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from fastapi import APIRouter
+import uuid
 
 app = FastAPI(
     title="Direct Chat Service",
@@ -41,8 +42,17 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
 
 class ChatResponse(BaseModel):
-    response: str
+    message: str  # Changed from 'response' to match frontend expectation
     timestamp: datetime
+
+class ChatSession(BaseModel):
+    id: str
+    name: str
+    created_at: datetime
+    updated_at: datetime
+
+# Store active chat sessions
+chat_sessions: Dict[str, ChatSession] = {}
 
 # Initialize LangChain components
 llm = ChatOllama(
@@ -61,7 +71,7 @@ llm = ChatOllama(
 
 # Create chat prompt template
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful AI assistant."),
+    ("system", "You are a helpful and professional assistant that does not embellish, is not verbose, and does not use emojis. Write all of your responses in markdown format."),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])
@@ -95,7 +105,7 @@ async def health_check():
 async def root_health_check():
     return {"status": "healthy", "timestamp": datetime.now()}
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat/message", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
         # Get response using the runnable
@@ -105,29 +115,72 @@ async def chat(request: ChatRequest):
         )
         
         return ChatResponse(
-            response=response.content,
+            message=response.content,  # Changed from 'response' to 'message'
             timestamp=datetime.now()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/reset")
-async def reset_conversation(session_id: str = "default"):
+@router.get("/chat/history/{session_id}")
+async def get_chat_history(session_id: str):
     try:
-        if session_id in histories:
-            histories[session_id] = ChatMessageHistory()
-        return {"status": "success", "message": "Conversation reset successfully"}
+        history = get_or_create_history(session_id)
+        messages = []
+        for msg in history.messages:
+            if isinstance(msg, HumanMessage):
+                sender = "user"
+                text = msg.content
+            elif isinstance(msg, AIMessage):
+                sender = "ai"
+                text = msg.content
+            elif isinstance(msg, SystemMessage):
+                continue  # Skip system messages
+            else:
+                continue  # Skip unknown message types
+                
+            messages.append({
+                "id": str(uuid.uuid4()),  # Generate unique ID for each message
+                "text": text,
+                "sender": sender,
+                "timestamp": datetime.now().isoformat()
+            })
+        return messages
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/history")
-async def get_history(session_id: str = "default"):
+@router.post("/chat/session")
+async def create_chat_session():
     try:
-        history = get_or_create_history(session_id)
-        return {
-            "history": history.messages,
-            "timestamp": datetime.now()
-        }
+        session_id = str(uuid.uuid4())
+        now = datetime.now()
+        session = ChatSession(
+            id=session_id,
+            name=f"New Chat {len(chat_sessions) + 1}",
+            created_at=now,
+            updated_at=now
+        )
+        chat_sessions[session_id] = session
+        # Initialize message history for the session
+        get_or_create_history(session_id)
+        return session
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/chat/sessions")
+async def get_chat_sessions():
+    try:
+        return list(chat_sessions.values())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/chat/session/{session_id}")
+async def delete_chat_session(session_id: str):
+    try:
+        if session_id in chat_sessions:
+            del chat_sessions[session_id]
+        if session_id in histories:
+            del histories[session_id]
+        return {"status": "success", "message": "Chat session deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
