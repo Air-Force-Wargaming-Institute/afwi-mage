@@ -3,10 +3,8 @@ from multiagent.graph.createGraph import create_graph
 import time
 
 def process_question(question: str):
-    print("process_question!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     start_time = time.time()
     graph = create_graph()
-    print("graph!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     shared_state.ITERATION += 1
     shared_state.CONVERSATION += f"User Question {shared_state.ITERATION}: {shared_state.QUESTION},\n\n"
     inputs = {
@@ -17,7 +15,6 @@ def process_question(question: str):
     final_output = None
     for output in graph.stream(inputs, {"recursion_limit": 200}):
         final_output = output
-    print("final_output!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     print(final_output)
     # Reset for the next question from this user
     shared_state.EXPERT_LIST_GENERATED = False

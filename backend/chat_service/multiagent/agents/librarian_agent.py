@@ -4,9 +4,10 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.llm_manager import LLMManager
 from config import load_config
 from multiagent.retriever_manager import RetrieverManager
+from multiagent.agents.helpers import create_banner
 
 def librarian(requester:str, agent_request:str):
-    print("\n\n\t---------------------------\n\n\t---LIBRARIAN AGENT---\n\n\t---------------------------\n\n\t")
+    print(create_banner("LIBRARIAN AGENT"))
     """
     The Librarian Agent
     Retrieves the most relevant documents from the vector store based on the agent's request and user's question.

@@ -18,5 +18,4 @@ def router_collaboration_requested(state: CollabState):
 
 def router_expert_report(state: GraphState):
     print("\nrouter_expert_report\n")
-    print(state['expert_collaborator_analysis'])
     return [Send("expert_subgraph_report", {**state, "expert": e}) for e in state['selected_experts']]
