@@ -158,7 +158,6 @@ function directChatReducer(state, action) {
 
 export function DirectChatProvider({ children }) {
   const [state, dispatch] = useReducer(directChatReducer, getInitialState());
-  const pollingTimeoutRef = useRef(null);
   const isPollingRef = useRef(false);
   const lastActivityRef = useRef(Date.now());
 
@@ -266,9 +265,6 @@ export function DirectChatProvider({ children }) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-      }
       isPollingRef.current = false;
     };
   }, []);
@@ -276,8 +272,8 @@ export function DirectChatProvider({ children }) {
   const value = {
     state,
     dispatch,
-    refreshChatSessions, // Expose refresh function
-    updateActivity // Expose activity update function
+    refreshChatSessions,
+    updateActivity
   };
 
   return (

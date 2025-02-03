@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
+import { makeStyles, useTheme } from '@material-ui/core/styles';
 import { 
   Container, 
   Paper, 
@@ -53,6 +53,20 @@ import {
   deleteChatSession, 
   getAllChatSessions 
 } from '../services/directChatService';
+import Link from '@mui/material/Link';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import rehypePrism from 'rehype-prism-plus';
+import 'katex/dist/katex.min.css';
+import 'prismjs/themes/prism-tomorrow.css';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { useInView } from 'react-intersection-observer';
+import { List as VirtualizedList, AutoSizer } from 'react-virtualized';
+import Mermaid from 'mermaid';
+import { useMarkdownComponents } from '../styles/markdownStyles';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -76,6 +90,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     marginRight: theme.spacing(2),
+    flexShrink: 0,
   },
   chatArea: {
     flexGrow: 1,
@@ -83,17 +98,16 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     height: '100%',
     position: 'relative',
+    width: '70%',
   },
   messageArea: {
     flexGrow: 1,
+    width: '100%',
     overflowY: 'auto',
-    padding: theme.spacing(2),
-    marginBottom: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1),
-    textAlign: 'left',
-    fontSize: '0.7rem',
+    padding: theme.spacing(2),
+    gap: theme.spacing(2),
     scrollBehavior: 'smooth',
     '&::-webkit-scrollbar': {
       width: '8px',
@@ -158,6 +172,7 @@ const useStyles = makeStyles((theme) => ({
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.2s ease',
+    textAlign: 'left',
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
@@ -216,6 +231,7 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     bottom: 0,
     zIndex: 1300,
+    width: '100%',
     maxHeight: 'calc(100vh)',
   },
   buttonBar: {
@@ -231,87 +247,21 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1.1rem',
   },
-  markdown: {
-    '& h1, & h2, & h3, & h4, & h5, & h6': {
-      margin: '0.5em 0 0.3em',
-      lineHeight: 1,
-      color: theme.palette.text.primary,
-      fontSize: '1.1rem',
-    },
-    '& p': {
-      margin: '0.3em 0',
-      color: theme.palette.text.primary,
-      lineHeight: 1.3,
-      fontSize: '1rem',
-    },
-    '& ul, & ol': {
-      margin: '0.3em 0',
-      paddingLeft: theme.spacing(3),
-      color: theme.palette.text.primary,
-      '& li': {
-        marginTop: '0em',
-        marginBottom: '0.1em',
-        lineHeight: 1.3,
-      },
-      '& li:last-child': {
-        marginBottom: 0,
-      },
-    },
-    '& blockquote': {
-      margin: '0.8em 0',
-      padding: '0.4em 1em',
-      borderLeft: `4px solid ${theme.palette.grey[300]}`,
-      backgroundColor: theme.palette.grey[50],
-      color: theme.palette.text.secondary,
-    },
-    '& hr': {
-      margin: '.5em 0',
-    },
+  messageContent: {
+    fontSize: '1rem',
+    color: theme.palette.text.primary,
+    width: '100%',
     '& > *:first-child': {
       marginTop: 0,
     },
     '& > *:last-child': {
       marginBottom: 0,
     },
-    '& code': {
-      backgroundColor: 'rgba(0, 0, 0, 0.06)',
-      padding: '0.2em 0.4em',
-      borderRadius: 3,
-      fontSize: '85%',
-      color: theme.palette.text.primary,
-    },
-    '& pre': {
-      margin: '0.5em 0',
-      padding: theme.spacing(1),
-      backgroundColor: '#f5f5f5',
-      borderRadius: '4px',
-      overflow: 'auto',
-    },
-    '& table': {
-      borderCollapse: 'collapse',
-      width: '100%',
-      margin: '0.5em 0',
-      color: theme.palette.text.primary,
-    },
-    '& th, & td': {
-      border: `1px solid ${theme.palette.grey[300]}`,
-      padding: '0.4em',
-    },
-    '& a': {
-      color: theme.palette.primary.main,
-      textDecoration: 'none',
-      '&:hover': {
-        textDecoration: 'underline',
-      },
-    },
-  },
-  messageContent: {
-    fontSize: '1rem',
-    lineHeight: 1.5,
-    color: theme.palette.text.primary,
-    marginBottom: theme.spacing(2),
     '.userMessage & ': {
       color: '#ffffff !important',
+      '& *': {
+        color: 'inherit',
+      },
     },
   },
   messageWrapper: {
@@ -802,28 +752,11 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const CodeBlock = ({ inline, className, children }) => {
-  const match = /language-(\w+)/.exec(className || '');
-  const language = match ? match[1] : '';
-  
-  if (!inline && language) {
-    return (
-      <SyntaxHighlighter
-        style={materialDark}
-        language={language}
-        PreTag="div"
-      >
-        {String(children).replace(/\n$/, '')}
-      </SyntaxHighlighter>
-    );
-  }
-  return <code className={className}>{children}</code>;
-};
-
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
   const [copied, setCopied] = useState(false);
   const isErrorMessage = !isUser && content.includes('Error:');
+  const markdownComponents = useMarkdownComponents();
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -861,31 +794,44 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         </div>
       )}
 
-      <div className={classes.messageContent}>
+      <Box 
+        className={classes.messageContent}
+        sx={{
+          '& > *:first-child': { mt: 0 },
+          '& > *:last-child': { mb: 0 }
+        }}
+      >
         {isUser ? (
           <Typography 
             variant="body1" 
-            style={{ 
+            sx={{ 
               color: 'inherit',
-              whiteSpace: 'pre-wrap'
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.2,
+              my: 0,
+              textAlign: 'left',
+              width: '100%'
             }}
           >
             {content}
           </Typography>
         ) : (
           <ReactMarkdown
-            components={{
-              code: CodeBlock,
-              p: ({ children }) => <Typography variant="body1">{children}</Typography>,
-            }}
+            components={markdownComponents}
+            remarkPlugins={[remarkGfm]}
+            skipHtml={true}
+            unwrapDisallowed={true}
           >
-            {content}
+            {content.replace(/\n\s*\n/g, '\n\n').trim()}
           </ReactMarkdown>
         )}
-      </div>
+      </Box>
 
       <div className={classes.messageFooter}>
-        <Typography className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}>
+        <Typography 
+          className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}
+          sx={{ fontSize: '0.75rem', opacity: 0.8 }}
+        >
           {new Date(timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -917,16 +863,14 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         )}
         
         {onRetry && isErrorMessage && (
-          <div className={classes.messageActions}>
-            <IconButton
-              className={classes.retryButton}
-              onClick={onRetry}
-              size="small"
-              title="Retry last message"
-            >
-              <ReplayIcon fontSize="small" />
-            </IconButton>
-          </div>
+          <IconButton
+            className={classes.copyButton}
+            onClick={onRetry}
+            size="small"
+            title="Retry"
+          >
+            <ReplayIcon fontSize="small" />
+          </IconButton>
         )}
       </div>
     </div>
