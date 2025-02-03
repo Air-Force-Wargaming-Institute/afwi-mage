@@ -1,83 +1,15 @@
+from pydantic import BaseModel
 from config import load_config
-from typing import List
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from utils.shared_state import shared_state
-from multiagent.graphState import GraphState
-import ast
 from multiagent.llm_manager import LLMManager
 
-def identify_experts(state: GraphState):
-    print("identify_experts")
-    """
-    This function identifies the experts that are most relevant to the user's question.
-    It uses the LLM to determine the experts that are most relevant to the user's question.
-    """
-    config = load_config()
-    EXPERT_LIST = config['EXPERT_AGENTS']
-    llm = LLMManager().llm
-    user_question = state['question']
-    expert_descriptions = ["Expert on the structure, decision-making processes, and key figures within the PRC government.",
-                        "Expert on the capabilities, doctrine, and strategic objectives of the People's Liberation Army (PLA).",
-                        "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
-                        "Expert on the PRC's relationships with neighboring countries and regional powers.",
-                        "Expert on the PRC's efforts to expand its global influence.",
-                        "Expert on internal social, demographic, and political factors in the PRC.",
-                        "Expert on the PRC's recent advancements in key technologies."
-                        
-    ]
-    prompt_template = PromptTemplate(
-        input_variables=["question", "experts"],
-        template="""
-        Given the following question: {question}
 
-        And the following list of available experts and their area of expertise:
-        {experts_with_descriptions}
-
-        Please identify which expert or experts would be most relevant to answer this question. Only select experts from the available list. 
-        If the question has nothing to do with any of the expert agents available, simply do not return a list of strings.
-        Consider the specific knowledge areas of each expert and how they might contribute to answering the question. If the user requests all the experts, be sure to return a list of all the experts.
-        Return your answer as a Python list of strings, containing only the names of the relevant experts.
-        For example: ["prc_economic", "global_influence", "domestic_stability"]
-        Do not provide any further information and do not provide rational for your decision. Only return a Python list of strings.
-        """
-    )
-
-    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(EXPERT_LIST, expert_descriptions))
-    print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
-
-    # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
-    prompt = prompt_template.format(
-        question=user_question,
-        experts_with_descriptions = experts_with_descriptions
-    )
-
-    response = llm.invoke([HumanMessage(content=prompt)])
-
-    # Ensure that the LLM returned a valid python list.
-    # If not, we will return a list of all experts to be safe.
-    try:
-        #experts_list = eval(response.content)
-        experts_list = ast.literal_eval(response.content)
-        if not isinstance(experts_list, list) or not all(isinstance(expert, str) for expert in experts_list):
-            raise ValueError("Invalid response format")
-    except:
-        # If the LLM doesn't cooperate, return a list of all experts to be safe
-        print("\t***INFO: LLM provided improper response, falling back to all experts.***")
-        experts_list = EXPERT_LIST
-
-    # We don't want the LLM to have made up experts, so validate the list.
-    validated_experts = [expert for expert in experts_list if expert in EXPERT_LIST]
-    print("\tINFO: In identify_experts\n\tSelected Experts:\n\t"+str(validated_experts))
-    #logging.info("\tINFO: In identify_experts\n\tSelected Experts:\n\t"+str(validated_experts))
-    
-    shared_state.EXPERT_LIST_GENERATED = True
-
-    return {**state, "selected_experts": validated_experts}
+class CollabList(BaseModel):
+    collaborators:list[str]
 
 def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
-    print("determine_collaboration")
+    print(create_banner("determine_collaboration"))
     '''
     This function is used to determine if collaboration is needed and which expert to collaborate with. Arguments are:
     reflection: The reflection on the report as a string
@@ -90,22 +22,30 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     llm = LLMManager().llm
     collab_template = PromptTemplate(
             input_variables=["reflection", "analysis", "expert_agents"],
-            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}. Return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n Again, return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic])"
+            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n"
     )
 
     prompt = collab_template.format(
-        reflection = reflection,
-        analysis = analysis,
-        expert_agents = expert_agents
+        reflection=reflection,
+        analysis=analysis,
+        expert_agents=expert_agents
     )
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = llm.with_structured_output(CollabList).invoke([HumanMessage(content=prompt)])
 
-    print("\t\t*/*/*/*/*/*/*/*/*/"+response.content+"\*\*\*\*\*\*\*\*\*\*\*")
+    if response is None:
+        print("\t***INFO: LLM provided improper response, falling back to all experts.***")
+        collaborators = []
+    else:
+        collaborators = response.collaborators
 
-    collaborators = response.content
-    collaborators = collaborators.strip("[\"\']")
-    collaborators_list = collaborators.split(", ")
-    collaborators_list = [item.strip("[\"\']") for item in collaborators_list]
-    collaborators_list = [x for x in collaborators_list if x in EXPERT_LIST]
+        # We don't want the LLM to have made up experts, so validate the list.
+    collaborators_list = [expert for expert in collaborators if expert in EXPERT_LIST]
+
+
+    print("\tINFO: In determine_collaboration\n\tSelected Collaborators:\n\t"+str(collaborators_list))
     return collaborators_list
+
+def create_banner(text: str) -> str:
+    """Create a formatted banner for console output."""
+    return f"\n\n\t---------------------------\n\n\t---{text}---\n\n\t---------------------------\n\n\t"

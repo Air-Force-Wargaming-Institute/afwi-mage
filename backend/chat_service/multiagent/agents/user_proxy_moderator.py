@@ -9,7 +9,6 @@ from typing import Set
 def get_Moderator_Guidance(state: ModGuidanceState):
     print("get_Moderator_Guidance")  
     whoami = state['expert']
-    print(whoami)
     llm = LLMManager().llm
     question = state['question']
     prompt = PromptTemplate(
@@ -20,5 +19,4 @@ def get_Moderator_Guidance(state: ModGuidanceState):
     guidance = chain.invoke({"question": question,
                                 "expert": whoami,
                                 })
-    #print(guidance)
     return {'expert_moderator_guidance': {whoami: guidance}}

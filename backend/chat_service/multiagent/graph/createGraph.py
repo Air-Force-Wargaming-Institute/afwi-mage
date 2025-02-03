@@ -24,7 +24,6 @@ def modguidance_subgraph_entry(state: ModGuidanceState):
     return
 
 def expert_subgraph_report_start(state: GraphState):
-    print(state)
     sys.stdout.flush()
     return
 
