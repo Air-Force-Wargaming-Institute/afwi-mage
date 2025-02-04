@@ -19,5 +19,5 @@ COPY . .
 # Expose the port the app runs on
 EXPOSE 8011
 
-# Command to run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8011", "--reload"]
+# Update CMD to include connection optimization settings
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8011", "--reload", "--timeout-keep-alive", "75", "--limit-concurrency", "100", "--backlog", "100"]

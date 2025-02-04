@@ -1,283 +1,33 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
-import { getAllChatSessions } from '../services/directChatService';
+import React, { createContext, useContext, useReducer } from 'react';
 
+// Create context
 const DirectChatContext = createContext();
 
-const POLLING_INTERVAL = 10000; // 10 seconds between polls
-const INACTIVITY_TIMEOUT = 300000; // 5 minutes
+// Simplified initial state
+const getInitialState = () => ({
+  input: ''
+});
 
-// Get initial state from localStorage or use default
-const getInitialState = () => {
-  const savedState = localStorage.getItem('directChatState');
-  if (savedState) {
-    return JSON.parse(savedState);
-  }
-  return {
-    messages: [],
-    chatSessions: [{ id: 1, name: 'New Chat' }],
-    currentSessionId: 1,
-    input: '',
-    isLoading: false,
-    isFullscreen: false,
-    helpDialogOpen: false,
-    promptHelpOpen: false,
-    showScrollTop: false,
-    showScrollBottom: false,
-    bookmarkedMessages: [],
-    selectedAgent: null,
-    availableAgents: [],
-    lastPolled: null,
-    isRefreshing: false
-  };
-};
-
+// Simplified actions
 const ACTIONS = {
-  SET_MESSAGES: 'SET_MESSAGES',
-  ADD_MESSAGE: 'ADD_MESSAGE',
-  SET_CHAT_SESSIONS: 'SET_CHAT_SESSIONS',
-  ADD_CHAT_SESSION: 'ADD_CHAT_SESSION',
-  DELETE_CHAT_SESSION: 'DELETE_CHAT_SESSION',
-  SET_CURRENT_SESSION: 'SET_CURRENT_SESSION',
-  SET_INPUT: 'SET_INPUT',
-  SET_LOADING: 'SET_LOADING',
-  SET_FULLSCREEN: 'SET_FULLSCREEN',
-  SET_HELP_DIALOG: 'SET_HELP_DIALOG',
-  SET_PROMPT_HELP: 'SET_PROMPT_HELP',
-  SET_SCROLL_TOP: 'SET_SCROLL_TOP',
-  SET_SCROLL_BOTTOM: 'SET_SCROLL_BOTTOM',
-  RESET_STATE: 'RESET_STATE',
-  TOGGLE_BOOKMARK: 'TOGGLE_BOOKMARK',
-  UPDATE_BOOKMARK_POSITIONS: 'UPDATE_BOOKMARK_POSITIONS',
-  REMOVE_ERROR_MESSAGES: 'REMOVE_ERROR_MESSAGES',
-  SET_REFRESHING: 'SET_REFRESHING',
-  SET_LAST_POLLED: 'SET_LAST_POLLED',
+  SET_INPUT: 'SET_INPUT'
 };
 
+// Simplified reducer
 function directChatReducer(state, action) {
-  console.log('DirectChatReducer - Current State:', state);
-  console.log('DirectChatReducer - Action:', action);
-  
-  let newState;
-  
   switch (action.type) {
-    case ACTIONS.SET_MESSAGES:
-      newState = { ...state, messages: action.payload };
-      break;
-    case ACTIONS.ADD_MESSAGE:
-      newState = { ...state, messages: [...state.messages, action.payload] };
-      break;
-    case ACTIONS.SET_CHAT_SESSIONS:
-      newState = { ...state, chatSessions: action.payload };
-      break;
-    case ACTIONS.ADD_CHAT_SESSION:
-      newState = { 
-        ...state, 
-        chatSessions: [action.payload, ...state.chatSessions],
-        currentSessionId: action.payload.id
-      };
-      break;
-    case ACTIONS.DELETE_CHAT_SESSION:
-      newState = { 
-        ...state, 
-        chatSessions: state.chatSessions.filter(session => session.id !== action.payload) 
-      };
-      break;
-    case ACTIONS.SET_CURRENT_SESSION:
-      newState = { ...state, currentSessionId: action.payload };
-      break;
     case ACTIONS.SET_INPUT:
-      newState = { ...state, input: action.payload };
-      break;
-    case ACTIONS.SET_LOADING:
-      newState = { ...state, isLoading: action.payload };
-      break;
-    case ACTIONS.SET_FULLSCREEN:
-      newState = { ...state, isFullscreen: action.payload };
-      break;
-    case ACTIONS.SET_HELP_DIALOG:
-      newState = { ...state, helpDialogOpen: action.payload };
-      break;
-    case ACTIONS.SET_PROMPT_HELP:
-      newState = { ...state, promptHelpOpen: action.payload };
-      break;
-    case ACTIONS.SET_SCROLL_TOP:
-      newState = { ...state, showScrollTop: action.payload };
-      break;
-    case ACTIONS.SET_SCROLL_BOTTOM:
-      newState = { ...state, showScrollBottom: action.payload };
-      break;
-    case ACTIONS.RESET_STATE:
-      newState = getInitialState();
-      break;
-    case ACTIONS.TOGGLE_BOOKMARK:
-      console.log('TOGGLE_BOOKMARK - bookmarkedMessages:', state.bookmarkedMessages);
-      const messageExists = state.bookmarkedMessages?.some(
-        msg => msg.messageId === action.payload.messageId
-      );
-      console.log('TOGGLE_BOOKMARK - messageExists:', messageExists);
-      
-      newState = {
-        ...state,
-        bookmarkedMessages: messageExists
-          ? state.bookmarkedMessages.filter(msg => msg.messageId !== action.payload.messageId)
-          : [...(state.bookmarkedMessages || []), action.payload]
-      };
-      console.log('TOGGLE_BOOKMARK - New State:', newState);
-      break;
-    case ACTIONS.UPDATE_BOOKMARK_POSITIONS:
-      newState = {
-        ...state,
-        bookmarkedMessages: state.bookmarkedMessages.map(msg => ({
-          ...msg,
-          position: action.payload[msg.messageId] || msg.position
-        }))
-      };
-      break;
-    case ACTIONS.REMOVE_ERROR_MESSAGES:
-      newState = {
-        ...state,
-        messages: state.messages.filter(msg => 
-          !(msg.sender === 'system' && msg.text.includes('Error:'))
-        )
-      };
-      break;
-    case ACTIONS.SET_REFRESHING:
-      newState = { ...state, isRefreshing: action.payload };
-      break;
-    case ACTIONS.SET_LAST_POLLED:
-      newState = { ...state, lastPolled: action.payload };
-      break;
+      return { ...state, input: action.payload };
     default:
-      newState = state;
+      return state;
   }
-  
-  // Save state to localStorage after every action
-  localStorage.setItem('directChatState', JSON.stringify(newState));
-  return newState;
 }
 
 export function DirectChatProvider({ children }) {
   const [state, dispatch] = useReducer(directChatReducer, getInitialState());
-  const isPollingRef = useRef(false);
-  const lastActivityRef = useRef(Date.now());
-
-  // Function to check if polling is needed based on time since last poll
-  const shouldPoll = useCallback(() => {
-    const now = Date.now();
-    const timeSinceLastPoll = state.lastPolled ? now - state.lastPolled : Infinity;
-    const timeSinceLastActivity = now - lastActivityRef.current;
-    
-    return timeSinceLastPoll > POLLING_INTERVAL && timeSinceLastActivity < INACTIVITY_TIMEOUT;
-  }, [state.lastPolled]);
-
-  // Enhanced polling function with success callback
-  const pollChatSessions = useCallback(async (force = false) => {
-    if (!force && (isPollingRef.current || !shouldPoll())) return;
-    
-    try {
-      isPollingRef.current = true;
-      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      
-      const sessions = await getAllChatSessions();
-      dispatch({ type: ACTIONS.SET_CHAT_SESSIONS, payload: sessions });
-      dispatch({ type: ACTIONS.SET_LAST_POLLED, payload: Date.now() });
-      
-      return sessions; // Return sessions for callback usage
-    } catch (error) {
-      console.error('Error polling chat sessions:', error);
-    } finally {
-      isPollingRef.current = false;
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
-    }
-  }, [shouldPoll]);
-
-  // Manual refresh function for pull-to-refresh
-  const refreshChatSessions = useCallback(async () => {
-    dispatch({ type: ACTIONS.SET_REFRESHING, payload: true });
-    await pollChatSessions(true);
-    dispatch({ type: ACTIONS.SET_REFRESHING, payload: false });
-  }, [pollChatSessions]);
-
-  // Update activity timestamp
-  const updateActivity = useCallback(() => {
-    lastActivityRef.current = Date.now();
-  }, []);
-
-  // Handle visibility change
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        updateActivity();
-        pollChatSessions(true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [pollChatSessions, updateActivity]);
-
-  // Handle user activity
-  useEffect(() => {
-    const handleActivity = () => {
-      updateActivity();
-    };
-
-    // Track user activity
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('click', handleActivity);
-    window.addEventListener('scroll', handleActivity);
-
-    return () => {
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('click', handleActivity);
-      window.removeEventListener('scroll', handleActivity);
-    };
-  }, [updateActivity]);
-
-  // Poll when specific actions occur
-  useEffect(() => {
-    const shouldPollOnAction = async (action) => {
-      switch (action) {
-        case 'NEW_MESSAGE':
-        case 'MESSAGE_RECEIVED':
-        case 'NEW_SESSION':
-        case 'SESSION_SWITCH':
-        case 'SESSION_DELETE':
-        case 'SESSION_RENAME':
-          await pollChatSessions(true);
-          break;
-        default:
-          break;
-      }
-    };
-
-    // Example of triggering poll on specific state changes
-    if (state.messages.length > 0) {
-      const lastMessage = state.messages[state.messages.length - 1];
-      if (lastMessage.isNew) {
-        shouldPollOnAction('NEW_MESSAGE');
-      }
-    }
-  }, [state.messages, state.currentSessionId, pollChatSessions]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isPollingRef.current = false;
-    };
-  }, []);
-
-  const value = {
-    state,
-    dispatch,
-    refreshChatSessions,
-    updateActivity
-  };
 
   return (
-    <DirectChatContext.Provider value={value}>
+    <DirectChatContext.Provider value={{ state, dispatch }}>
       {children}
     </DirectChatContext.Provider>
   );

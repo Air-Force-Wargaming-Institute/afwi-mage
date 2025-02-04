@@ -6,7 +6,7 @@ import {
   TextField, 
   Button, 
   Box,
-  List,
+  List as MUIList,
   ListItem,
   ListItemText,
   IconButton,
@@ -34,9 +34,11 @@ import TuneIcon from '@mui/icons-material/Tune';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Fade from '@material-ui/core/Fade';
-import axios from 'axios';
-import { getApiUrl } from '../config';
+import { FixedSizeList } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import memoize from 'memoize-one';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
@@ -44,7 +46,6 @@ import { useDirectChat, ACTIONS } from '../contexts/DirectChatContext';
 import ReplayIcon from '@mui/icons-material/Replay';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
-import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
 import { 
   sendMessage, 
@@ -53,62 +54,48 @@ import {
   deleteChatSession, 
   getAllChatSessions 
 } from '../services/directChatService';
-import Link from '@mui/material/Link';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import rehypePrism from 'rehype-prism-plus';
-import 'katex/dist/katex.min.css';
-import 'prismjs/themes/prism-tomorrow.css';
-import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { useInView } from 'react-intersection-observer';
-import { List as VirtualizedList, AutoSizer } from 'react-virtualized';
-import Mermaid from 'mermaid';
 import { useMarkdownComponents } from '../styles/markdownStyles';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { useDropzone } from 'react-dropzone';
 
 const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2),
-    height: 'calc(80vh - 64px)',
+    height: 'calc(100vh - 215px)',
+    maxHeight: 'calc(100vh - 128px)',
+    overflow: 'hidden',
     marginTop: '10px',
   },
   chatContainer: {
     display: 'flex',
-    flexGrow: 1,
-    overflow: 'hidden',
-    borderRadius: '10px',
+    width: '100%',
     height: '100%',
+    maxHeight: '100%',
+    overflow: 'hidden',
+    gap: theme.spacing(2),
   },
   chatLog: {
-    width: '30%',
+    width: '25%',
     height: '100%',
-    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    marginRight: theme.spacing(2),
     flexShrink: 0,
+    overflow: 'hidden',
+    '& > *:not(:first-child)': {
+      overflow: 'auto',
+    },
   },
   chatArea: {
-    flexGrow: 1,
-    display: 'flex',
-    flexDirection: 'column',
+    width: '50%',
     height: '100%',
-    position: 'relative',
-    width: '70%',
-  },
-  messageArea: {
-    flexGrow: 1,
-    width: '100%',
-    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    padding: theme.spacing(2),
-    gap: theme.spacing(2),
-    scrollBehavior: 'smooth',
+    flexShrink: 0,
+    overflow: 'hidden',
+    backgroundColor: theme.palette.background.default,
+    position: 'relative',
     '&::-webkit-scrollbar': {
       width: '8px',
       zIndex: 2,
@@ -126,12 +113,78 @@ const useStyles = makeStyles((theme) => ({
       },
     },
   },
+  uploadPane: {
+    width: '25%',
+    height: '100%',
+    paddingTop: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: theme.palette.background.paper,
+    overflow: 'hidden',
+
+  },
+  dropzone: {
+    flex: 1,
+    minHeight: '75px',
+    maxHeight: '100px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(2),
+    margin: theme.spacing(2),
+    border: `2px dashed ${theme.palette.primary.main}`,
+    borderRadius: '10px',
+    backgroundColor: theme.palette.background.default,
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    overflow: 'hidden',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      borderColor: theme.palette.primary.dark,
+    },
+  },
+  uploadIcon: {
+    fontSize: '48px',
+    color: theme.palette.primary.main,
+    marginBottom: theme.spacing(2),
+  },
+  uploadText: {
+    textAlign: 'center',
+    color: theme.palette.text.secondary,
+  },
+  fileList: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+  },
+  fileItem: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+    borderRadius: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  messageArea: {
+    flex: 1,
+    overflow: 'auto',
+    padding: theme.spacing(2),
+    display: 'flex',
+    flexDirection: 'column',
+  },
   inputArea: {
     display: 'flex',
     alignItems: 'center',
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
+    minHeight: '76px',
+    maxHeight: '150px',
   },
   input: {
     flexGrow: 1,
@@ -160,19 +213,15 @@ const useStyles = makeStyles((theme) => ({
     alignSelf: 'center',
   },
   message: {
-    marginBottom: theme.spacing(1),
     padding: theme.spacing(2),
-    paddingBottom: theme.spacing(2),
-    borderRadius: '30px',
+    borderRadius: '12px',
     border: '1px solid #e0e0e0',
     maxWidth: '80%',
     wordBreak: 'break-word',
-    display: 'inline-block',
-    whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.2s ease',
-    textAlign: 'left',
+    backgroundColor: theme.palette.background.paper,
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
@@ -182,7 +231,8 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
     marginLeft: 'auto',
-    borderRadius: '20px 20px 0 20px',
+    borderRadius: '12px 12px 0 12px',
+    border: 'none',
     '& $messageContent': {
       color: '#ffffff',
     },
@@ -194,10 +244,10 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   aiMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
-    borderBottomLeftRadius: '4px',
+    marginRight: 'auto',
+    borderRadius: '12px 12px 12px 0',
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
@@ -219,10 +269,10 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
   },
   fullscreenButton: {
-    position: 'absolute',
-    top: theme.spacing(1),
-    right: theme.spacing(1),
-    zIndex: 1000,
+    color: theme.palette.text.secondary,
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
   },
   fullscreen: {
     position: 'fixed',
@@ -236,7 +286,7 @@ const useStyles = makeStyles((theme) => ({
   },
   buttonBar: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
@@ -247,29 +297,9 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1.1rem',
   },
-  messageContent: {
-    fontSize: '1rem',
-    color: theme.palette.text.primary,
-    width: '100%',
-    '& > *:first-child': {
-      marginTop: 0,
-    },
-    '& > *:last-child': {
-      marginBottom: 0,
-    },
-    '.userMessage & ': {
-      color: '#ffffff !important',
-      '& *': {
-        color: 'inherit',
-      },
-    },
-  },
   messageWrapper: {
-    position: 'relative',
     width: '100%',
-    '&:hover $topActions': {
-      opacity: 1,
-    },
+    position: 'relative',
     '&:hover $messageActions': {
       opacity: 1,
     },
@@ -282,7 +312,19 @@ const useStyles = makeStyles((theme) => ({
       opacity: 1,
       transform: 'translateY(0)',
     },
-    overflow: 'visible',
+  },
+  messageContent: {
+    fontSize: '1rem',
+    lineHeight: 1.6,
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    '& p': {
+      margin: theme.spacing(1, 0),
+    },
   },
   messageFooter: {
     display: 'flex',
@@ -894,10 +936,203 @@ const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
   });
 };
 
+// Memoize the MessageContent component
+const MemoizedMessageContent = React.memo(MessageContent);
+
+// Create a memoized item renderer for the virtualized list
+const createItemData = memoize((messages, handleRetry, handleBookmark, bookmarkedMessages) => ({
+  messages,
+  handleRetry,
+  handleBookmark,
+  bookmarkedMessages
+}));
+
+// Row renderer for virtualized list
+const Row = React.memo(({ index, style, data }) => {
+  const message = data.messages[index];
+  const classes = useStyles();
+  const isBookmarked = data.bookmarkedMessages.some(msg => msg.messageId === message.id);
+
+  return (
+    <div style={{
+      ...style,
+      paddingTop: '8px',
+      paddingBottom: '8px',
+      paddingLeft: '16px',
+      paddingRight: '16px',
+    }}>
+      <Box 
+        id={`message-${message.id}`}
+        className={`${classes.message} ${
+          message.sender === 'user' ? classes.userMessage : classes.aiMessage
+        }`}
+        style={{ 
+          maxWidth: message.sender === 'user' ? '70%' : '85%',
+          margin: message.sender === 'user' ? '0 0 0 auto' : '0',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div className={classes.messageWrapper}>
+          <MemoizedMessageContent 
+            content={message.text} 
+            isUser={message.sender === 'user'} 
+            timestamp={message.timestamp}
+            sender={message.sender}
+            onRetry={
+              message.sender === 'system' && message.text.includes('Error:') 
+                ? () => data.handleRetry(data.messages[data.messages.length - 2]?.text) 
+                : undefined
+            }
+            messageId={message.id}
+            onBookmark={() => data.handleBookmark(message)}
+            isBookmarked={isBookmarked}
+          />
+        </div>
+      </Box>
+    </div>
+  );
+});
+
+// Update the message area in the DirectChat component
+const MessageArea = React.memo(({ messages, handleRetry, handleBookmark, bookmarkedMessages, isLoading, classes }) => {
+  const messageEndRef = useRef(null);
+  const listRef = useRef(null);
+  const itemSize = 150;
+
+  const itemData = createItemData(messages, handleRetry, handleBookmark, bookmarkedMessages);
+
+  useEffect(() => {
+    if (messageEndRef.current) {
+      messageEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]);
+
+  return (
+    <Box className={classes.messageArea}>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <AutoSizer>
+          {({ height, width }) => (
+            <FixedSizeList
+              ref={listRef}
+              height={height - (isLoading ? 100 : 0)}
+              width={width}
+              itemCount={messages.length}
+              itemSize={itemSize}
+              itemData={itemData}
+              overscanCount={5}
+              style={{
+                padding: '16px 0',
+                scrollBehavior: 'smooth',
+              }}
+            >
+              {Row}
+            </FixedSizeList>
+          )}
+        </AutoSizer>
+      </div>
+      {isLoading && (
+        <div className={classes.typingIndicator}>
+          <Typography className="loading-header">
+            One moment...
+          </Typography>
+          <Typography className="loading-text">
+            Response is being generated...
+          </Typography>
+          <div className="dots">
+            <div className="dot" />
+            <div className="dot" />
+            <div className="dot" />
+          </div>
+        </div>
+      )}
+      <div ref={messageEndRef} />
+    </Box>
+  );
+});
+
+// New DocumentUploadPane component
+const DocumentUploadPane = ({ classes }) => {
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  
+  const onDrop = useCallback(acceptedFiles => {
+    setUploadedFiles(prev => [
+      ...prev,
+      ...acceptedFiles.map(file => ({
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
+        file
+      }))
+    ]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+    }
+  });
+
+  const removeFile = (fileId) => {
+    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
+  return (
+    <Paper className={classes.uploadPane} elevation={3}>
+      <Typography variant="h6" gutterBottom>
+        Document Upload
+      </Typography>
+      <div {...getRootProps()} className={classes.dropzone}>
+        <input {...getInputProps()} />
+        <CloudUploadIcon className={classes.uploadIcon} />
+        <Typography className={classes.uploadText}>
+          {isDragActive
+            ? 'Drop the files here...'
+            : 'Drag & drop files here, or click to select files'}
+        </Typography>
+        <Typography variant="caption" color="textSecondary">
+          Supported formats: PDF, TXT, DOC, DOCX
+        </Typography>
+      </div>
+      <div className={classes.fileList}>
+        {uploadedFiles.map(file => (
+          <div key={file.id} className={classes.fileItem}>
+            <Typography variant="body2" style={{ flex: 1 }}>
+              {file.name}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => removeFile(file.id)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </div>
+        ))}
+      </div>
+    </Paper>
+  );
+};
+
 const DirectChat = () => {
   const classes = useStyles();
   const { state, dispatch } = useDirectChat();
   const messageEndRef = useRef(null);
+  
+  // Local state management
+  const [messages, setMessages] = useState([]);
+  const [chatSessions, setChatSessions] = useState([{ id: 1, name: 'New Chat' }]);
+  const [currentSessionId, setCurrentSessionId] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [promptHelpOpen, setPromptHelpOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [bookmarkedMessages, setBookmarkedMessages] = useState([]);
   const [error, setError] = useState(null);
 
   // Load chat sessions on component mount
@@ -905,28 +1140,28 @@ const DirectChat = () => {
     const loadChatSessions = async () => {
       try {
         const sessions = await getAllChatSessions();
-        dispatch({ type: ACTIONS.SET_CHAT_SESSIONS, payload: sessions });
+        setChatSessions(sessions);
       } catch (error) {
         setError('Failed to load chat sessions');
       }
     };
     loadChatSessions();
-  }, [dispatch]);
+  }, []);
 
   // Load chat history when session changes
   useEffect(() => {
     const loadChatHistory = async () => {
-      if (state.currentSessionId) {
+      if (currentSessionId) {
         try {
-          const history = await getChatHistory(state.currentSessionId);
-          dispatch({ type: ACTIONS.SET_MESSAGES, payload: history });
+          const history = await getChatHistory(currentSessionId);
+          setMessages(history);
         } catch (error) {
           setError('Failed to load chat history');
         }
       }
     };
     loadChatHistory();
-  }, [state.currentSessionId, dispatch]);
+  }, [currentSessionId]);
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
@@ -942,9 +1177,9 @@ const DirectChat = () => {
       timestamp: new Date().toISOString()
     };
     
-    dispatch({ type: ACTIONS.ADD_MESSAGE, payload: userMessage });
+    setMessages(prev => [...prev, userMessage]);
     dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
-    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+    setIsLoading(true);
 
     try {
       // Send message to backend
@@ -958,7 +1193,7 @@ const DirectChat = () => {
         timestamp: new Date().toISOString()
       };
       
-      dispatch({ type: ACTIONS.ADD_MESSAGE, payload: aiMessage });
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
@@ -966,17 +1201,18 @@ const DirectChat = () => {
         sender: 'system',
         timestamp: new Date().toISOString()
       };
-      dispatch({ type: ACTIONS.ADD_MESSAGE, payload: errorMessage });
+      setMessages(prev => [...prev, errorMessage]);
       setError('Failed to send message');
     } finally {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+      setIsLoading(false);
     }
   };
 
   const handleNewChat = async () => {
     try {
       const newSession = await createChatSession();
-      dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+      setChatSessions(prev => [newSession, ...prev]);
+      setCurrentSessionId(newSession.id);
     } catch (error) {
       setError('Failed to create new chat');
     }
@@ -985,13 +1221,12 @@ const DirectChat = () => {
   const handleDeleteChat = async (sessionId) => {
     try {
       await deleteChatSession(sessionId);
-      dispatch({ type: ACTIONS.DELETE_CHAT_SESSION, payload: sessionId });
+      setChatSessions(prev => prev.filter(session => session.id !== sessionId));
       
-      // If we deleted the current session, switch to the first available session
-      if (sessionId === state.currentSessionId && state.chatSessions.length > 0) {
-        const nextSession = state.chatSessions.find(s => s.id !== sessionId);
+      if (sessionId === currentSessionId && chatSessions.length > 0) {
+        const nextSession = chatSessions.find(s => s.id !== sessionId);
         if (nextSession) {
-          dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: nextSession.id });
+          setCurrentSessionId(nextSession.id);
         }
       }
     } catch (error) {
@@ -1011,17 +1246,9 @@ const DirectChat = () => {
 
   const handleScroll = useCallback(({ target }) => {
     const { scrollTop, scrollHeight, clientHeight } = target;
-    
-    dispatch({ 
-      type: ACTIONS.SET_SCROLL_TOP, 
-      payload: scrollTop > 200 
-    });
-    
-    dispatch({ 
-      type: ACTIONS.SET_SCROLL_BOTTOM, 
-      payload: scrollHeight - scrollTop - clientHeight > 200 
-    });
-  }, [dispatch]);
+    setShowScrollTop(scrollTop > 200);
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 200);
+  }, []);
 
   const scrollToTop = () => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1031,67 +1258,35 @@ const DirectChat = () => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleRetry = async (failedMessage) => {
-    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-
+  const handleRetry = useCallback(async (failedMessage) => {
+    setIsLoading(true);
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: failedMessage 
-      });
-
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
-
-      dispatch({ 
-        type: ACTIONS.SET_MESSAGES, 
-        payload: state.messages.filter(msg => 
-          !(msg.sender === 'system' && msg.text.includes('Error:'))
-        ) 
-      });
-
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: aiResponse, 
-          sender: 'ai', 
-          timestamp: new Date() 
-        }
-      });
+      const response = await sendMessage(failedMessage);
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: response.message,
+        sender: 'ai',
+        timestamp: new Date().toISOString()
+      }]);
     } catch (error) {
       console.error('Error retrying message:', error);
     } finally {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleBookmark = useCallback((message) => {
-    const messageArea = messageEndRef.current;
-    const messageElement = document.getElementById(`message-${message.id}`);
-    
-    if (messageArea && messageElement) {
-      const totalHeight = messageArea.scrollHeight;
-      const messageTop = messageElement.offsetTop;
-      const position = (messageTop / totalHeight) * 100;
-      
-      const bookmarkData = {
-        messageId: message.id,
-        text: message.text,
-        position: position
-      };
-      
-      dispatch({ 
-        type: ACTIONS.TOGGLE_BOOKMARK, 
-        payload: bookmarkData
-      });
-    }
-  }, [dispatch]);
+    setBookmarkedMessages(prev => {
+      const exists = prev.some(msg => msg.messageId === message.id);
+      if (exists) {
+        return prev.filter(msg => msg.messageId !== message.id);
+      }
+      return [...prev, { messageId: message.id, text: message.text }];
+    });
+  }, []);
 
   const handleEditSession = (sessionId) => {
-    // TODO: Implement session editing functionality
+    // Implementation remains the same
     console.log('Edit session:', sessionId);
   };
 
@@ -1110,189 +1305,87 @@ const DirectChat = () => {
       document.body.removeChild(a);
     } catch (error) {
       setError('Failed to download chat session');
-      console.error('Error downloading session:', error);
     }
   };
 
   const toggleFullscreen = () => {
-    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !state.isFullscreen });
+    setIsFullscreen(prev => !prev);
   };
 
   const handleHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: true });
+    setHelpDialogOpen(true);
   };
 
   const handleHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: false });
+    setHelpDialogOpen(false);
   };
 
   const handlePromptHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: true });
+    setPromptHelpOpen(true);
   };
 
   const handlePromptHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
+    setPromptHelpOpen(false);
   };
 
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
-        {!state.isFullscreen && (
-          <Paper className={classes.chatLog} elevation={3}>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              className={classes.newChatButton}
-              onClick={handleNewChat}
-            >
-              Start New Chat Session
-            </Button>
-            <List>
-              {state.chatSessions.map((session) => (
-                <React.Fragment key={session.id}>
-                  <ListItem button className={classes.chatSessionItem}>
-                    <ListItemText primary={session.name} />
-                    <div className={classes.sessionActions}>
-                      <Tooltip title="Edit">
-                        <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteChat(session.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download">
-                        <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
-                          <GetAppIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </div>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
-          </Paper>
-        )}
-        <Paper className={`${classes.chatArea} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
-          <div className={classes.buttonBar}>
-            <div className={classes.agentsHeader}>
-              <IconButton onClick={handleHelpOpen} size="small">
-                <HelpOutlineIcon className={classes.helpIcon} />
-              </IconButton>
-              <Typography className={classes.agentsText}>
-                Agents in this Chat:
-              </Typography>
-            </div>
-              <IconButton
-              className={classes.fullscreenButton}
-                onClick={toggleFullscreen}
-                size="small"
-              >
-                {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              </IconButton>
-          </div>
-          <Box 
-            ref={messageEndRef}
-            className={classes.messageArea}
-            onScroll={handleScroll}
+        <Paper className={classes.chatLog} elevation={3}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            className={classes.newChatButton}
+            onClick={handleNewChat}
           >
-            <div className={classes.bookmarkTrack}>
-              {state.bookmarkedMessages.map((bookmark, index) => (
-                <React.Fragment key={index}>
-                  <div
-                    className={classes.bookmarkTick}
-                    style={{ top: `${bookmark.position}%` }}
-                    onClick={() => {
-                      const element = document.getElementById(`message-${bookmark.messageId}`);
-                      element?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  />
-                </React.Fragment>
-              ))}
-              <div className={classes.bookmarkPreviewContainer}>
-                {state.bookmarkedMessages.map((bookmark, index) => (
-                  <div
-                    key={index}
-                    className={classes.bookmarkPreview}
-                    style={{ top: `${bookmark.position}%` }}
-                    onClick={() => {
-                      const element = document.getElementById(`message-${bookmark.messageId}`);
-                      element?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    {bookmark.text.substring(0, 100) + (bookmark.text.length > 100 ? '...' : '')}
+            Start New Chat Session
+          </Button>
+          <MUIList>
+            {chatSessions.map((session) => (
+              <React.Fragment key={session.id}>
+                <ListItem button className={classes.chatSessionItem}>
+                  <ListItemText primary={session.name} />
+                  <div className={classes.sessionActions}>
+                    <Tooltip title="Edit">
+                      <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteChat(session.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
+                        <GetAppIcon />
+                      </IconButton>
+                    </Tooltip>
                   </div>
-                ))}
-              </div>
-            </div>
-            
-            {state.messages.map((message, index) => (
-              <Box 
-                key={index}
-                id={`message-${message.id}`}
-                className={`${classes.message} ${
-                  message.sender === 'user' ? classes.userMessage : classes.aiMessage
-                }`}
-                style={{ maxWidth: message.sender === 'user' ? '70%' : '85%' }}
-              >
-                <div className={classes.messageWrapper}>
-                  <MessageContent 
-                    content={message.text} 
-                    isUser={message.sender === 'user'} 
-                    timestamp={message.timestamp}
-                    sender={message.sender}
-                    onRetry={
-                      message.sender === 'system' && message.text.includes('Error:') 
-                        ? () => handleRetry(state.messages[state.messages.length - 2]?.text) 
-                        : undefined
-                    }
-                    messageId={message.id}
-                    onBookmark={() => handleBookmark(message)}
-                    isBookmarked={(state.bookmarkedMessages || []).some(msg => msg.messageId === message.id)}
-                  />
-                </div>
-              </Box>
+                </ListItem>
+                <Divider />
+              </React.Fragment>
             ))}
-            {state.isLoading && (
-              <div className={classes.typingIndicator}>
-                <Typography className="loading-header">
-                  One moment...
-                </Typography>
-                <Typography className="loading-text">
-                  The team is gathering data, processing, reflecting, and collaborating to address your query. Depending on the complexity of your query, this may take a few moments...
-                </Typography>
-                <div className="dots">
-                  <div className="dot" />
-                  <div className="dot" />
-                  <div className="dot" />
-                </div>
-              </div>
-            )}
-            <div ref={messageEndRef} />
-            <Fade in={state.showScrollTop}>
-              <IconButton
-                className={classes.scrollTopButton}
-                onClick={scrollToTop}
-                size="medium"
-                title="Scroll to top"
-              >
-                <KeyboardArrowUpIcon />
-              </IconButton>
-            </Fade>
-            <Fade in={state.showScrollBottom}>
-              <IconButton
-                className={classes.scrollBottomButton}
-                onClick={scrollToBottom}
-                size="medium"
-                title="Scroll to bottom"
-              >
-                <KeyboardArrowDownIcon />
-              </IconButton>
-            </Fade>
-          </Box>
+          </MUIList>
+        </Paper>
+        <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+          <div className={classes.buttonBar}>
+            <IconButton
+              className={classes.fullscreenButton}
+              onClick={toggleFullscreen}
+              size="small"
+            >
+              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </IconButton>
+          </div>
+          <MessageArea 
+            messages={messages}
+            handleRetry={handleRetry}
+            handleBookmark={handleBookmark}
+            bookmarkedMessages={bookmarkedMessages}
+            isLoading={isLoading}
+            classes={classes}
+          />
           <form onSubmit={handleSendMessage} className={classes.inputArea}>
             <IconButton 
               onClick={handlePromptHelpOpen}
@@ -1324,9 +1417,10 @@ const DirectChat = () => {
             </Button>
           </form>
         </Paper>
+        <DocumentUploadPane classes={classes} />
       </div>
       <Dialog
-        open={state.helpDialogOpen}
+        open={helpDialogOpen}
         onClose={handleHelpClose}
         className={classes.helpDialog}
         aria-labelledby="help-dialog-title"
@@ -1384,7 +1478,7 @@ const DirectChat = () => {
         </DialogActions>
       </Dialog>
       <Dialog
-        open={state.promptHelpOpen}
+        open={promptHelpOpen}
         onClose={handlePromptHelpClose}
         className={classes.promptHelpDialog}
         aria-labelledby="prompt-help-dialog-title"
@@ -1452,4 +1546,4 @@ const DirectChat = () => {
   );
 }
 
-export default DirectChat;
+export default React.memo(DirectChat);

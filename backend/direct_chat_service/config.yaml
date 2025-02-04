@@ -9,7 +9,7 @@ ollama:
   base_url: http://host.docker.internal:11434
   
   # Model identifier for Ollama
-  ollama_model: llama3.1
+  ollama_model: llama3.2:latest
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused
