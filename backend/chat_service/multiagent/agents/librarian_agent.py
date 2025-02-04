@@ -7,7 +7,7 @@ from multiagent.retriever_manager import RetrieverManager
 from multiagent.agents.helpers import create_banner
 
 def librarian(requester:str, agent_request:str):
-    print(create_banner("LIBRARIAN AGENT"))
+    print(create_banner("LIBRARIAN"))
     """
     The Librarian Agent
     Retrieves the most relevant documents from the vector store based on the agent's request and user's question.
@@ -16,7 +16,6 @@ def librarian(requester:str, agent_request:str):
     config = load_config()
     TOP_N_DOCUMENTS = config['TOP_N_DOCUMENTS']
 
-    
     retriever = RetrieverManager().retriever
     
     llm = LLMManager().non_streaming
@@ -34,7 +33,6 @@ def librarian(requester:str, agent_request:str):
     chain = prompt | llm | StrOutputParser()
     
     documents_text = "\n\n".join([doc.page_content for doc in relevant_docs[:TOP_N_DOCUMENTS]])
-    #print("\tINFO: Relevant documents:\n\n"+documents_text)
 
     summary = chain.invoke({
         "relevant_docs": documents_text,
@@ -42,7 +40,4 @@ def librarian(requester:str, agent_request:str):
         "requester": requester
     })
 
-    print("\n\n\t---------------------------\n\n\t\n\n\t---------------------------\n\n\tLibrarian Summary\n\n\t---------------------------\n\n\t")
-    #print(summary)
-    
     return summary, relevant_docs

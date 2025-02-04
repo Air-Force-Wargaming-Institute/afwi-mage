@@ -5,9 +5,10 @@ from multiagent.graphState import GraphState, ModGuidanceState
 from multiagent.llm_manager import LLMManager
 from langchain_core.messages import AIMessage
 from typing import Set
+from multiagent.agents.helpers import create_banner
 
 def get_Moderator_Guidance(state: ModGuidanceState):
-    print("get_Moderator_Guidance")  
+    print(create_banner(f"{state['expert']} get_Moderator_Guidance"))  
     whoami = state['expert']
     llm = LLMManager().llm
     question = state['question']
