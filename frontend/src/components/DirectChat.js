@@ -16,7 +16,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Checkbox
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -52,7 +53,13 @@ import {
   getChatHistory, 
   createChatSession, 
   deleteChatSession, 
-  getAllChatSessions 
+  getAllChatSessions,
+  uploadDocument,
+  getDocumentStatus,
+  getDocumentStates,
+  deleteDocument,
+  toggleDocumentState,
+  updateSessionName
 } from '../services/directChatService';
 import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -77,7 +84,7 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(2),
   },
   chatLog: {
-    width: '25%',
+    width: '20%',
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
@@ -88,7 +95,7 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   chatArea: {
-    width: '50%',
+    width: '60%',
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
@@ -96,6 +103,14 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     backgroundColor: theme.palette.background.default,
     position: 'relative',
+    transition: 'opacity 0.3s ease',
+    '&.disabled': {
+      opacity: 0.5,
+      pointerEvents: 'none',
+      '& .MuiInputBase-root': {
+        backgroundColor: theme.palette.action.disabledBackground,
+      }
+    },
     '&::-webkit-scrollbar': {
       width: '8px',
       zIndex: 2,
@@ -114,14 +129,19 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   uploadPane: {
-    width: '25%',
+    width: '20%',
     height: '100%',
     paddingTop: '10px',
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: theme.palette.background.paper,
     overflow: 'hidden',
-
+    transition: 'opacity 0.3s ease',
+    '&.disabled': {
+      opacity: 0.5,
+      pointerEvents: 'none',
+      filter: 'grayscale(50%)',
+    }
   },
   dropzone: {
     flex: 1,
@@ -792,6 +812,15 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: 'rgba(255, 255, 255, 1)',
     },
   },
+  noSessionsOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
 }));
 
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
@@ -1051,48 +1080,178 @@ const MessageArea = React.memo(({ messages, handleRetry, handleBookmark, bookmar
   );
 });
 
-// New DocumentUploadPane component
-const DocumentUploadPane = ({ classes }) => {
+// Update DocumentUploadPane component
+const DocumentUploadPane = ({ currentSessionId }) => {
+  const classes = useStyles();
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [pollingIds, setPollingIds] = useState(new Set());
   
-  const onDrop = useCallback(acceptedFiles => {
-    setUploadedFiles(prev => [
-      ...prev,
-      ...acceptedFiles.map(file => ({
-        id: Date.now() + Math.random(),
-        name: file.name,
-        size: file.size,
-        file
-      }))
-    ]);
-  }, []);
+  useEffect(() => {
+    const fetchDocumentStates = async () => {
+      if (!currentSessionId) {
+        setUploadedFiles([]);
+        return;
+      }
+      
+      try {
+        setUploadError(null);
+        const states = await getDocumentStates(currentSessionId);
+        const files = Object.entries(states).map(([docId, state]) => ({
+          id: docId,
+          name: state.originalName,
+          size: state.markdownSize,
+          status: state.status || 'pending',
+          isChecked: state.isChecked || false
+        }));
+        setUploadedFiles(files);
+        
+        // Start polling for pending documents
+        const pendingFiles = files.filter(file => file.status === 'pending');
+        if (pendingFiles.length > 0) {
+          setPollingIds(new Set(pendingFiles.map(file => file.id)));
+        }
+      } catch (error) {
+        console.error('Error fetching document states:', error);
+        setUploadError('Failed to load documents');
+      }
+    };
+
+    fetchDocumentStates();
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    if (!currentSessionId || pollingIds.size === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      const updatedPollingIds = new Set(pollingIds);
+      
+      for (const docId of pollingIds) {
+        try {
+          const status = await getDocumentStatus(currentSessionId, docId);
+          if (status.status !== 'pending') {
+            updatedPollingIds.delete(docId);
+            setUploadedFiles(prev => prev.map(file => 
+              file.id === docId 
+                ? { ...file, status: status.status } 
+                : file
+            ));
+          }
+        } catch (error) {
+          console.error(`Error polling document ${docId}:`, error);
+        }
+      }
+      
+      if (updatedPollingIds.size !== pollingIds.size) {
+        setPollingIds(updatedPollingIds);
+      }
+      
+      if (updatedPollingIds.size === 0) {
+        clearInterval(pollInterval);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [currentSessionId, pollingIds]);
+  
+  const handleCheckboxChange = async (docId) => {
+    try {
+      // Use the service function instead of direct fetch
+      const result = await toggleDocumentState(currentSessionId, docId);
+
+      // Update local state
+      setUploadedFiles(prev => prev.map(file => 
+        file.id === docId 
+          ? { ...file, isChecked: result.isChecked }
+          : file
+      ));
+    } catch (error) {
+      console.error('Error updating document state:', error);
+      setUploadError('Failed to update document state');
+    }
+  };
+
+  const handleUpload = useCallback(async (file) => {
+    if (!currentSessionId) {
+      setUploadError('No active session selected');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const response = await uploadDocument(currentSessionId, file);
+      setPollingIds(prev => new Set([...prev, response.docId]));
+      return response;
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(`Failed to upload ${file.name}: ${error.message}`);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [currentSessionId]);
+  
+  const onDrop = useCallback(async (acceptedFiles) => {
+    for (const file of acceptedFiles) {
+      try {
+        const response = await handleUpload(file);
+        setUploadedFiles(prev => [...prev, {
+          id: response.docId,
+          name: file.name,
+          size: file.size,
+          status: response.metadata.status || 'pending'
+        }]);
+      } catch (error) {
+        continue;
+      }
+    }
+  }, [handleUpload]);
+
+  const handleRemoveFile = useCallback(async (fileId) => {
+    try {
+      await deleteDocument(currentSessionId, fileId);
+      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+      setPollingIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(fileId);
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error removing file:', error);
+      setUploadError(`Failed to remove file: ${error.message}`);
+    }
+  }, [currentSessionId]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'text/plain': ['.txt'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
-    }
+    accept: '.pdf,.txt,.doc,.docx',
+    maxSize: 100 * 1024 * 1024,
+    disabled: !currentSessionId || isUploading
   });
 
-  const removeFile = (fileId) => {
-    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
-  };
-
   return (
-    <Paper className={classes.uploadPane} elevation={3}>
+    <Paper className={`${classes.uploadPane} ${!currentSessionId ? 'disabled' : ''}`} elevation={3}>
       <Typography variant="h6" gutterBottom>
         Document Upload
       </Typography>
+      {uploadError && (
+        <Typography color="error" variant="body2" style={{ margin: '8px' }}>
+          {uploadError}
+        </Typography>
+      )}
       <div {...getRootProps()} className={classes.dropzone}>
         <input {...getInputProps()} />
         <CloudUploadIcon className={classes.uploadIcon} />
         <Typography className={classes.uploadText}>
-          {isDragActive
-            ? 'Drop the files here...'
-            : 'Drag & drop files here, or click to select files'}
+          {!currentSessionId
+            ? 'Please select a chat session first'
+            : isDragActive
+              ? 'Drop the files here...'
+              : isUploading
+                ? 'Uploading...'
+                : 'Drag & drop files here, or click to select files'}
         </Typography>
         <Typography variant="caption" color="textSecondary">
           Supported formats: PDF, TXT, DOC, DOCX
@@ -1101,12 +1260,30 @@ const DocumentUploadPane = ({ classes }) => {
       <div className={classes.fileList}>
         {uploadedFiles.map(file => (
           <div key={file.id} className={classes.fileItem}>
+            <Checkbox
+              checked={file.isChecked}
+              onChange={() => handleCheckboxChange(file.id)}
+              color="primary"
+              size="small"
+              style={{ padding: '4px', marginRight: '8px' }}
+            />
             <Typography variant="body2" style={{ flex: 1 }}>
               {file.name}
             </Typography>
+            <Typography 
+              variant="caption" 
+              color="textSecondary" 
+              style={{ 
+                marginRight: '8px',
+                color: file.status === 'failed' ? 'red' : 'inherit'
+              }}
+            >
+              {file.status}
+            </Typography>
             <IconButton
               size="small"
-              onClick={() => removeFile(file.id)}
+              onClick={() => handleRemoveFile(file.id)}
+              disabled={isUploading}
             >
               <DeleteIcon fontSize="small" />
             </IconButton>
@@ -1124,8 +1301,8 @@ const DirectChat = () => {
   
   // Local state management
   const [messages, setMessages] = useState([]);
-  const [chatSessions, setChatSessions] = useState([{ id: 1, name: 'New Chat' }]);
-  const [currentSessionId, setCurrentSessionId] = useState(1);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
@@ -1134,6 +1311,9 @@ const DirectChat = () => {
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [bookmarkedMessages, setBookmarkedMessages] = useState([]);
   const [error, setError] = useState(null);
+  const [editingSession, setEditingSession] = useState(null);
+  const [editSessionName, setEditSessionName] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Load chat sessions on component mount
   useEffect(() => {
@@ -1141,12 +1321,16 @@ const DirectChat = () => {
       try {
         const sessions = await getAllChatSessions();
         setChatSessions(sessions);
+        // Set current session to the first one if none selected
+        if (sessions.length > 0 && !currentSessionId) {
+          setCurrentSessionId(sessions[0].id);
+        }
       } catch (error) {
         setError('Failed to load chat sessions');
       }
     };
     loadChatSessions();
-  }, []);
+  }, [currentSessionId]);
 
   // Load chat history when session changes
   useEffect(() => {
@@ -1167,7 +1351,7 @@ const DirectChat = () => {
     event.preventDefault();
     const messageText = state.input.trim();
     
-    if (!messageText) return;
+    if (!messageText || !currentSessionId) return;
 
     // Add user message to UI immediately
     const userMessage = {
@@ -1182,8 +1366,8 @@ const DirectChat = () => {
     setIsLoading(true);
 
     try {
-      // Send message to backend
-      const response = await sendMessage(messageText);
+      // Send message to backend with session ID
+      const response = await sendMessage(messageText, currentSessionId);
       
       // Add AI response to UI
       const aiMessage = {
@@ -1213,6 +1397,7 @@ const DirectChat = () => {
       const newSession = await createChatSession();
       setChatSessions(prev => [newSession, ...prev]);
       setCurrentSessionId(newSession.id);
+      setMessages([]); // Clear messages for new session
     } catch (error) {
       setError('Failed to create new chat');
     }
@@ -1223,15 +1408,24 @@ const DirectChat = () => {
       await deleteChatSession(sessionId);
       setChatSessions(prev => prev.filter(session => session.id !== sessionId));
       
-      if (sessionId === currentSessionId && chatSessions.length > 0) {
-        const nextSession = chatSessions.find(s => s.id !== sessionId);
-        if (nextSession) {
-          setCurrentSessionId(nextSession.id);
+      if (sessionId === currentSessionId) {
+        const remainingSessions = chatSessions.filter(s => s.id !== sessionId);
+        if (remainingSessions.length > 0) {
+          setCurrentSessionId(remainingSessions[0].id);
+        } else {
+          setCurrentSessionId(null);
+          setMessages([]);
         }
       }
     } catch (error) {
       setError('Failed to delete chat');
     }
+  };
+
+  const handleSelectSession = async (sessionId) => {
+    if (sessionId === currentSessionId) return;
+    setCurrentSessionId(sessionId);
+    setMessages([]); // Clear messages before loading new ones
   };
 
   const handleInputChange = (event) => {
@@ -1286,8 +1480,34 @@ const DirectChat = () => {
   }, []);
 
   const handleEditSession = (sessionId) => {
-    // Implementation remains the same
-    console.log('Edit session:', sessionId);
+    const session = chatSessions.find(s => s.id === sessionId);
+    if (session) {
+      setEditingSession(session);
+      setEditSessionName(session.name);
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleEditDialogClose = () => {
+    setEditDialogOpen(false);
+    setEditingSession(null);
+    setEditSessionName('');
+  };
+
+  const handleEditSessionSubmit = async () => {
+    if (!editingSession || !editSessionName.trim()) return;
+
+    try {
+      const response = await updateSessionName(editingSession.id, editSessionName.trim());
+      setChatSessions(prev => prev.map(session => 
+        session.id === editingSession.id 
+          ? response.session 
+          : session
+      ));
+      handleEditDialogClose();
+    } catch (error) {
+      setError('Failed to update session name');
+    }
   };
 
   const handleDownloadSession = async (sessionId) => {
@@ -1343,8 +1563,34 @@ const DirectChat = () => {
           <MUIList>
             {chatSessions.map((session) => (
               <React.Fragment key={session.id}>
-                <ListItem button className={classes.chatSessionItem}>
-                  <ListItemText primary={session.name} />
+                <ListItem 
+                  button 
+                  className={classes.chatSessionItem}
+                  selected={session.id === currentSessionId}
+                  onClick={() => handleSelectSession(session.id)}
+                >
+                  <div style={{ flex: 1 }}>
+                    <ListItemText 
+                      primary={session.name} 
+                      secondary={
+                        <Typography 
+                          variant="caption" 
+                          color="textSecondary" transparent
+                          style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
+                        >
+                          {new Date(session.created_at).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(session.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}    •••    ID: {session.id.split('-')[0]}
+                        </Typography>
+                      }
+                    />
+                  </div>
                   <div className={classes.sessionActions}>
                     <Tooltip title="Edit">
                       <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
@@ -1368,7 +1614,14 @@ const DirectChat = () => {
             ))}
           </MUIList>
         </Paper>
-        <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+        <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+          {!currentSessionId && (
+            <div className={classes.noSessionsOverlay}>
+              <Typography variant="h6" color="textSecondary">
+                Please create a new chat session to begin
+              </Typography>
+            </div>
+          )}
           <div className={classes.buttonBar}>
             <IconButton
               className={classes.fullscreenButton}
@@ -1417,7 +1670,7 @@ const DirectChat = () => {
             </Button>
           </form>
         </Paper>
-        <DocumentUploadPane classes={classes} />
+        <DocumentUploadPane currentSessionId={currentSessionId} />
       </div>
       <Dialog
         open={helpDialogOpen}
@@ -1539,6 +1792,39 @@ const DirectChat = () => {
             style={{ borderRadius: '20px', textTransform: 'none' }}
           >
             Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditDialogClose}
+        aria-labelledby="edit-session-dialog-title"
+      >
+        <DialogTitle id="edit-session-dialog-title">
+          Edit Session Name
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Session Name"
+            type="text"
+            fullWidth
+            value={editSessionName}
+            onChange={(e) => setEditSessionName(e.target.value)}
+            variant="outlined"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditDialogClose} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSessionSubmit} 
+            color="primary"
+            disabled={!editSessionName.trim() || editSessionName === editingSession?.name}
+          >
+            Save
           </Button>
         </DialogActions>
       </Dialog>
