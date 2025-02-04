@@ -89,10 +89,10 @@ class TeamCreate(BaseModel):
         return v
 
 def format_agent_name(name):
-    return re.sub(r'\s+', '_', name)
+    return re.sub(r'[\s\-]+', '_', name)
 
 def format_team_name(name):
-    return re.sub(r'\s+', '_', name)
+    return re.sub(r'[\s\-]+', '_', name)
 
 # Update the error handling to use logging
 logger = logging.getLogger(__name__)
@@ -546,16 +546,17 @@ async def update_team(team_name: str, team_data: TeamCreate):
         shared_team_file_path = new_shared_path / "multiagent" / "team" / f"{new_formatted_name}.py"
         shutil.copyfile(new_team_path, shared_team_file_path)
 
-        # Do a find-replace for the team_config.yaml file in the shared directory
+        # Replace the team_config.py with the template copy
         team_shared_path = SHARED_TEAMS_PATH / new_formatted_name
-        config_path = team_shared_path / "team_config.yaml"
-        with open(config_path, "r") as f:
+        team_config_path = team_shared_path / "team_config.yaml"
+        config_template_path = SHARED_STRUCTURE_PATH / "team_config.yaml"
+        with open(config_template_path, "r") as f:
             config = f.read()
         replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
         replaced_config = replaced_config.replace("{{SOLO_AGENT}}", str(solo_agent))
         replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
-        with open(config_path, "w") as f:
+        with open(team_config_path, "w") as f:
             f.write(replaced_config)
 
         # Update processQuestion.py
