@@ -120,10 +120,10 @@ def expert_subgraph_report(state: ExpertState):
     return {'expert_final_analysis': {whoami: analysis}}
 
 def collab_subgraph_entry(state: CollabState):
+    print(create_banner(f"{state['expert']} - {state['collaborator']} COLLABORATOR ENTRY"))
     """Process collaboration entry point for experts."""
     whoami = state['collaborator']
     my_expert = state['expert']
-    print(create_banner(f"{my_expert} Collaborator ENTRY").upper())
     
     # Get document summary with collaboration context
     context = f"Report from {my_expert}:\n{state['expert_analysis'][my_expert]}\nAreas needing work:\n{state['expert_collab_areas'][my_expert]}"
