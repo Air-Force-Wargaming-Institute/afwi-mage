@@ -151,4 +151,28 @@ export const updateSessionName = async (sessionId, newName) => {
     console.error('Error updating session name:', error);
     throw error;
   }
+};
+
+export const updateDocumentClassification = async (sessionId, docId, classification) => {
+  try {
+    const response = await fetch(
+      `${getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/classification`)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ classification }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to update document classification: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating document classification:', error);
+    throw error;
+  }
 }; 

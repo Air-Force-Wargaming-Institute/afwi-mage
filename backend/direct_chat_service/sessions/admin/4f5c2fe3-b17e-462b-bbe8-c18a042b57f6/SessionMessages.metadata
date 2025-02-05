@@ -1,0 +1,192 @@
+{
+  "session_info": {
+    "id": "4f5c2fe3-b17e-462b-bbe8-c18a042b57f6",
+    "name": "Chat Session 4f5c2fe3",
+    "created_at": "2025-02-05T19:48:08.926050",
+    "updated_at": "2025-02-05T19:48:32.931646"
+  },
+  "document_states": {
+    "412a4cb1-943c-4eba-b126-080b7a630612": {
+      "originalName": "2022-10-24 PLARF Organization.pdf",
+      "markdownSize": 5110564,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:27.707994",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "02ff2eb4-a79f-4d1a-8ef6-f904d611eea7": {
+      "originalName": "2022-12-05 Hypersonics Landscape.pdf",
+      "markdownSize": 8371983,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:28.073237",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "ddba33db-4f5f-4124-8a70-e200386b9f6f": {
+      "originalName": "2023-05-08 China Russia Space Cooperation-2.pdf",
+      "markdownSize": 1676564,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:28.250382",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "0d62cee9-934e-4fa8-a168-eca8d39712a9": {
+      "originalName": "2024-01-22-avic-organization-v2.pdf",
+      "markdownSize": 4992254,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:29.923727",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "65ecd5a8-c96f-4c1d-ae7f-a8be92a1ed4d": {
+      "originalName": "2024-01-16 China-Russia Nuclear Cooperation.pdf",
+      "markdownSize": 1870661,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:30.251421",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "908f3cb4-2c8c-48bb-a62e-4747037c8e50": {
+      "originalName": "2023-12-11 Counterspace- web version.pdf",
+      "markdownSize": 2410304,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:30.478674",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "4ba719e1-1e3b-4b7e-8a3c-cdb50d8e2cc4": {
+      "originalName": "2024-02-12-3 ITOW - On Maritime Strategic Access.pdf",
+      "markdownSize": 2802783,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:30.875379",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "e125692e-5079-4b4e-ad31-b55065714822": {
+      "originalName": "2024-02-20 Complex Systems Engineering.pdf",
+      "markdownSize": 1487720,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:31.185831",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "a7fec4f7-4220-475a-8306-3b64e0667678": {
+      "originalName": "2024-02-26 Coercive Space Activities.pdf",
+      "markdownSize": 841987,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:31.319768",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "f73f5563-8271-4df8-85cc-ac242b7b8e53": {
+      "originalName": "2024-06-10 ITOW PLA Air Force Tactical Logistics.pdf",
+      "markdownSize": 3680650,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:31.757567",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "bdfff87e-1d2e-4150-93f1-6e56f42cded1": {
+      "originalName": "2024-05-20 To Be More Precise - Beidou.pdf",
+      "markdownSize": 3201373,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:32.381710",
+      "classification": "SELECT CLASSIFICATION"
+    },
+    "49664f79-75e8-46a2-bd38-b215ae58290b": {
+      "originalName": "2024-03-11 Chinese Nuclear Command and Control.pdf",
+      "markdownSize": 5163018,
+      "markdownPath": null,
+      "isChecked": false,
+      "lastModified": "2025-02-05T19:48:32.931604",
+      "classification": "SELECT CLASSIFICATION"
+    }
+  },
+  "document_metadata": {
+    "412a4cb1-943c-4eba-b126-080b7a630612": {
+      "originalName": "2022-10-24 PLARF Organization.pdf",
+      "uploadedAt": "2025-02-05T19:48:27.708090",
+      "markdownSize": 5110564,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "02ff2eb4-a79f-4d1a-8ef6-f904d611eea7": {
+      "originalName": "2022-12-05 Hypersonics Landscape.pdf",
+      "uploadedAt": "2025-02-05T19:48:28.073329",
+      "markdownSize": 8371983,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "ddba33db-4f5f-4124-8a70-e200386b9f6f": {
+      "originalName": "2023-05-08 China Russia Space Cooperation-2.pdf",
+      "uploadedAt": "2025-02-05T19:48:28.250447",
+      "markdownSize": 1676564,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "0d62cee9-934e-4fa8-a168-eca8d39712a9": {
+      "originalName": "2024-01-22-avic-organization-v2.pdf",
+      "uploadedAt": "2025-02-05T19:48:29.923816",
+      "markdownSize": 4992254,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "65ecd5a8-c96f-4c1d-ae7f-a8be92a1ed4d": {
+      "originalName": "2024-01-16 China-Russia Nuclear Cooperation.pdf",
+      "uploadedAt": "2025-02-05T19:48:30.251491",
+      "markdownSize": 1870661,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "908f3cb4-2c8c-48bb-a62e-4747037c8e50": {
+      "originalName": "2023-12-11 Counterspace- web version.pdf",
+      "uploadedAt": "2025-02-05T19:48:30.478723",
+      "markdownSize": 2410304,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "4ba719e1-1e3b-4b7e-8a3c-cdb50d8e2cc4": {
+      "originalName": "2024-02-12-3 ITOW - On Maritime Strategic Access.pdf",
+      "uploadedAt": "2025-02-05T19:48:30.875473",
+      "markdownSize": 2802783,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "e125692e-5079-4b4e-ad31-b55065714822": {
+      "originalName": "2024-02-20 Complex Systems Engineering.pdf",
+      "uploadedAt": "2025-02-05T19:48:31.185902",
+      "markdownSize": 1487720,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "a7fec4f7-4220-475a-8306-3b64e0667678": {
+      "originalName": "2024-02-26 Coercive Space Activities.pdf",
+      "uploadedAt": "2025-02-05T19:48:31.319828",
+      "markdownSize": 841987,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "f73f5563-8271-4df8-85cc-ac242b7b8e53": {
+      "originalName": "2024-06-10 ITOW PLA Air Force Tactical Logistics.pdf",
+      "uploadedAt": "2025-02-05T19:48:31.757644",
+      "markdownSize": 3680650,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "bdfff87e-1d2e-4150-93f1-6e56f42cded1": {
+      "originalName": "2024-05-20 To Be More Precise - Beidou.pdf",
+      "uploadedAt": "2025-02-05T19:48:32.381803",
+      "markdownSize": 3201373,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    },
+    "49664f79-75e8-46a2-bd38-b215ae58290b": {
+      "originalName": "2024-03-11 Chinese Nuclear Command and Control.pdf",
+      "uploadedAt": "2025-02-05T19:48:32.931701",
+      "markdownSize": 5163018,
+      "status": "failed",
+      "error": "Conversion not implemented for .pdf files"
+    }
+  }
+}

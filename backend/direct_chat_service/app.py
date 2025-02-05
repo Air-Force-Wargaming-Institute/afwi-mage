@@ -65,6 +65,7 @@ class DocumentState(BaseModel):
     markdownSize: int = 0
     originalName: str
     markdownPath: Optional[str] = None
+    classification: str = "SELECT CLASSIFICATION"  # Add new field with default value
 
 class DocumentMetadata(BaseModel):
     originalName: str
@@ -438,7 +439,8 @@ def save_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> None:
                     "markdownSize": state.markdownSize,
                     "markdownPath": state.markdownPath,
                     "isChecked": state.isChecked,
-                    "lastModified": state.lastModified.isoformat()
+                    "lastModified": state.lastModified.isoformat(),
+                    "classification": state.classification
                 }
                 for doc_id, state in session.documentStates.items()
             },
@@ -480,6 +482,9 @@ def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[
                 # Convert datetime string back to datetime object
                 if "lastModified" in state:
                     state["lastModified"] = datetime.fromisoformat(state["lastModified"])
+                # Ensure classification has a default value if not present
+                if "classification" not in state:
+                    state["classification"] = "SELECT CLASSIFICATION"
                 converted_states[doc_id] = DocumentState(**state)
             metadata["document_states"] = converted_states
             
@@ -854,6 +859,43 @@ async def update_session_name(
         
     except Exception as e:
         print(f"Error in update_session_name: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add this Pydantic model for the request body
+class UpdateDocumentClassificationRequest(BaseModel):
+    classification: str
+
+@router.put("/chat/session/{session_id}/documents/{doc_id}/classification")
+async def update_document_classification(
+    session_id: str,
+    doc_id: str,
+    request: UpdateDocumentClassificationRequest,
+    user_id: str = DEFAULT_USER
+):
+    """Update the classification level of a document"""
+    try:
+        if session_id not in chat_sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = chat_sessions[session_id]
+        
+        if doc_id not in session.documentStates:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Update the classification
+        doc_state = session.documentStates[doc_id]
+        doc_state.classification = request.classification
+        doc_state.lastModified = datetime.now()
+        
+        # Save the updated metadata
+        save_session_metadata(session_id, user_id)
+        
+        return {"docId": doc_id, "classification": doc_state.classification}
+        
+    except Exception as e:
+        print(f"Error in update_document_classification: {str(e)}")
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))

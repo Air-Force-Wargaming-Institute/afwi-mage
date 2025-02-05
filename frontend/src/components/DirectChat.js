@@ -17,7 +17,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Checkbox
+  Checkbox,
+  Select,
+  MenuItem,
+  FormControl,
+  FormControlLabel,
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -59,7 +63,8 @@ import {
   getDocumentStates,
   deleteDocument,
   toggleDocumentState,
-  updateSessionName
+  updateSessionName,
+  updateDocumentClassification,
 } from '../services/directChatService';
 import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -181,13 +186,25 @@ const useStyles = makeStyles((theme) => ({
   },
   fileItem: {
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: theme.spacing(1),
     borderRadius: theme.spacing(1),
     marginBottom: theme.spacing(1),
     backgroundColor: theme.palette.background.default,
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
+    },
+  },
+  fileItemRow: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+  },
+  classificationSelect: {
+    marginTop: theme.spacing(1),
+    minWidth: '100%',
+    '& .MuiSelect-select': {
+      padding: theme.spacing(0.5, 1),
     },
   },
   messageArea: {
@@ -199,12 +216,54 @@ const useStyles = makeStyles((theme) => ({
   },
   inputArea: {
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
     minHeight: '76px',
-    maxHeight: '150px',
+  },
+  classificationSection: {
+    marginTop: theme.spacing(0.25),
+    padding: theme.spacing(0.25),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    '& .MuiTypography-subtitle2': {
+      fontSize: '0.7rem',
+      marginBottom: '2px',
+    },
+  },
+  classificationRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(0.25),
+    '& .MuiFormControlLabel-root': {
+      marginRight: theme.spacing(0.25),
+      marginLeft: 0,
+      marginY: 0,
+    },
+    '& .MuiCheckbox-root': {
+      padding: '2px',
+    },
+  },
+  classificationLabel: {
+    minWidth: '80px',
+    fontWeight: 500,
+    fontSize: '0.75rem',
+    color: theme.palette.text.secondary,
+    marginRight: theme.spacing(0.5),
+  },
+  checkboxGroup: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 0,
+    '& .MuiFormControlLabel-label': {
+      fontSize: '0.75rem',
+      lineHeight: 1,
+    },
+  },
+  checkboxLabel: {
+    fontSize: '0.75rem',
+    marginRight: 0,
+    lineHeight: 1,
   },
   input: {
     flexGrow: 1,
@@ -393,8 +452,7 @@ const useStyles = makeStyles((theme) => ({
   },
   helpIcon: {
     color: theme.palette.text.secondary,
-    fontSize: '1.1rem',
-    cursor: 'pointer',
+    marginRight: theme.spacing(1),
     '&:hover': {
       color: theme.palette.primary.main,
     },
@@ -1080,7 +1138,6 @@ const MessageArea = React.memo(({ messages, handleRetry, handleBookmark, bookmar
   );
 });
 
-// Update DocumentUploadPane component
 const DocumentUploadPane = ({ currentSessionId }) => {
   const classes = useStyles();
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -1088,6 +1145,13 @@ const DocumentUploadPane = ({ currentSessionId }) => {
   const [uploadError, setUploadError] = useState(null);
   const [pollingIds, setPollingIds] = useState(new Set());
   
+  const CLASSIFICATION_LEVELS = {
+    SELECT: "SELECT CLASSIFICATION",
+    UNCLASSIFIED: "Unclassified",
+    SECRET: "Secret",
+    TOP_SECRET: "Top Secret"
+  };
+
   useEffect(() => {
     const fetchDocumentStates = async () => {
       if (!currentSessionId) {
@@ -1103,11 +1167,11 @@ const DocumentUploadPane = ({ currentSessionId }) => {
           name: state.originalName,
           size: state.markdownSize,
           status: state.status || 'pending',
-          isChecked: state.isChecked || false
+          isChecked: state.isChecked || false,
+          classification: state.classification || CLASSIFICATION_LEVELS.SELECT
         }));
         setUploadedFiles(files);
         
-        // Start polling for pending documents
         const pendingFiles = files.filter(file => file.status === 'pending');
         if (pendingFiles.length > 0) {
           setPollingIds(new Set(pendingFiles.map(file => file.id)));
@@ -1172,6 +1236,20 @@ const DocumentUploadPane = ({ currentSessionId }) => {
     }
   };
 
+  const handleClassificationChange = async (docId, newClassification) => {
+    try {
+      await updateDocumentClassification(currentSessionId, docId, newClassification);
+      setUploadedFiles(prev => prev.map(file => 
+        file.id === docId 
+          ? { ...file, classification: newClassification }
+          : file
+      ));
+    } catch (error) {
+      console.error('Error updating classification:', error);
+      setUploadError('Failed to update document classification');
+    }
+  };
+
   const handleUpload = useCallback(async (file) => {
     if (!currentSessionId) {
       setUploadError('No active session selected');
@@ -1226,7 +1304,7 @@ const DocumentUploadPane = ({ currentSessionId }) => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: '.pdf,.txt,.doc,.docx',
+    accept: '.pdf,.txt,.doc,.docx, .xlsx, .csv',
     maxSize: 100 * 1024 * 1024,
     disabled: !currentSessionId || isUploading
   });
@@ -1254,39 +1332,52 @@ const DocumentUploadPane = ({ currentSessionId }) => {
                 : 'Drag & drop files here, or click to select files'}
         </Typography>
         <Typography variant="caption" color="textSecondary">
-          Supported formats: PDF, TXT, DOC, DOCX
+          Supported formats: PDF, TXT, DOC, DOCX, XLSX, CSV
         </Typography>
       </div>
       <div className={classes.fileList}>
         {uploadedFiles.map(file => (
           <div key={file.id} className={classes.fileItem}>
-            <Checkbox
-              checked={file.isChecked}
-              onChange={() => handleCheckboxChange(file.id)}
-              color="primary"
-              size="small"
-              style={{ padding: '4px', marginRight: '8px' }}
-            />
-            <Typography variant="body2" style={{ flex: 1 }}>
-              {file.name}
-            </Typography>
-            <Typography 
-              variant="caption" 
-              color="textSecondary" 
-              style={{ 
-                marginRight: '8px',
-                color: file.status === 'failed' ? 'red' : 'inherit'
-              }}
-            >
-              {file.status}
-            </Typography>
-            <IconButton
-              size="small"
-              onClick={() => handleRemoveFile(file.id)}
-              disabled={isUploading}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            <div className={classes.fileItemRow}>
+              <Checkbox
+                checked={file.isChecked}
+                onChange={() => handleCheckboxChange(file.id)}
+                color="primary"
+                size="small"
+                style={{ padding: '4px', marginRight: '8px' }}
+              />
+              <Typography variant="body2" style={{ flex: 1 }}>
+                {file.name}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => handleRemoveFile(file.id)}
+                disabled={isUploading}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </div>
+            <FormControl className={classes.classificationSelect} size="small">
+              <Select
+                value={file.classification || CLASSIFICATION_LEVELS.SELECT}
+                onChange={(e) => handleClassificationChange(file.id, e.target.value)}
+                variant="outlined"
+                disabled={file.status === 'pending'}
+              >
+                <MenuItem value={CLASSIFICATION_LEVELS.SELECT} disabled>
+                  {CLASSIFICATION_LEVELS.SELECT}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.UNCLASSIFIED}>
+                  {CLASSIFICATION_LEVELS.UNCLASSIFIED}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.SECRET}>
+                  {CLASSIFICATION_LEVELS.SECRET}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.TOP_SECRET}>
+                  {CLASSIFICATION_LEVELS.TOP_SECRET}
+                </MenuItem>
+              </Select>
+            </FormControl>
           </div>
         ))}
       </div>
@@ -1640,34 +1731,114 @@ const DirectChat = () => {
             classes={classes}
           />
           <form onSubmit={handleSendMessage} className={classes.inputArea}>
-            <IconButton 
-              onClick={handlePromptHelpOpen}
-              size="small"
-              className={classes.inputHelpIcon}
-              title="Prompt Engineering Tips"
-            >
-              <HelpOutlineIcon />
-            </IconButton>
-            <TextField
-              className={classes.input}
-              variant="outlined"
-              placeholder="Type your message here... (Ctrl+Enter to send)"
-              value={state.input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyPress}
-              multiline
-              minRows={1}
-              maxRows={5}
-              fullWidth
-            />
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary" 
-              endIcon={<SendIcon />}
-            >
-              Send
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+              <IconButton 
+                onClick={handlePromptHelpOpen}
+                size="small"
+                className={classes.inputHelpIcon}
+                title="Prompt Engineering Tips"
+              >
+                <HelpOutlineIcon />
+              </IconButton>
+              <TextField
+                className={classes.input}
+                variant="outlined"
+                placeholder="Type your message here... (Ctrl+Enter to send)"
+                value={state.input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
+                multiline
+                minRows={1}
+                maxRows={5}
+                fullWidth
+              />
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary" 
+                endIcon={<SendIcon />}
+              >
+                Send
+              </Button>
+            </div>
+            
+            <div className={classes.classificationSection}>
+              <Typography variant="subtitle2" gutterBottom>
+                Chat Classification & Caveats
+              </Typography>
+              
+              <div className={classes.classificationRow}>
+                <Typography className={classes.classificationLabel}>
+                  Classification:
+                </Typography>
+                <div className={classes.checkboxGroup}>
+                  <FormControlLabel
+                    control={<Checkbox size="small" defaultChecked />}
+                    label={<Typography className={classes.checkboxLabel}>Unclassified</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>Secret</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>Top Secret</Typography>}
+                  />
+                </div>
+              </div>
+              
+              <div className={classes.classificationRow}>
+                <Typography className={classes.classificationLabel}>
+                  Caveats:
+                </Typography>
+                <div className={classes.checkboxGroup}>
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NOFORN</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>FVEY</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>USA</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>UK</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>AUS</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NZ</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>CAN</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NATO</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>HCS</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>SAP</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>TK</Typography>}
+                  />
+                </div>
+              </div>
+            </div>
           </form>
         </Paper>
         <DocumentUploadPane currentSessionId={currentSessionId} />
