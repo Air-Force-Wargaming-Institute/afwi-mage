@@ -69,6 +69,7 @@ import {
 import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useDropzone } from 'react-dropzone';
+import Slider from '@material-ui/core/Slider';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -879,6 +880,46 @@ const useStyles = makeStyles((theme) => ({
     zIndex: 1,
     pointerEvents: 'none',
   },
+  classificationSlider: {
+    width: '100%',
+    padding: '10px 0 0',
+    marginTop: theme.spacing(0.8),
+    '& .MuiSlider-rail': {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: '#e0e0e0',
+    },
+    '& .MuiSlider-track': {
+      height: 4,
+      borderRadius: 2,
+      transition: 'background-color 0.3s ease',
+    },
+    '& .MuiSlider-thumb': {
+      width: 16,
+      height: 16,
+      marginTop: -6,
+      marginLeft: -8,
+      backgroundColor: '#fff',
+      border: '2px solid',
+      transition: 'border-color 0.3s ease',
+      '&:hover, &.Mui-focusVisible': {
+        boxShadow: '0 0 0 8px rgba(0, 0, 0, 0.1)',
+      },
+    },
+    '& .MuiSlider-mark': {
+      width: 2,
+      height: 8,
+      marginTop: -2,
+      backgroundColor: '#bdbdbd',
+    },
+    '& .MuiSlider-markLabel': {
+      fontSize: '0.7rem',
+      fontWeight: 500,
+      top: -10,
+      transform: 'translate(-50%, 0)',
+      color: theme.palette.text.secondary,
+    },
+  },
 }));
 
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
@@ -1387,6 +1428,7 @@ const DocumentUploadPane = ({ currentSessionId }) => {
 
 const DirectChat = () => {
   const classes = useStyles();
+  const theme = useTheme();
   const { state, dispatch } = useDirectChat();
   const messageEndRef = useRef(null);
   
@@ -1405,6 +1447,7 @@ const DirectChat = () => {
   const [editingSession, setEditingSession] = useState(null);
   const [editSessionName, setEditSessionName] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [classificationLevel, setClassificationLevel] = useState(0);
 
   // Load chat sessions on component mount
   useEffect(() => {
@@ -1639,6 +1682,10 @@ const DirectChat = () => {
     setPromptHelpOpen(false);
   };
 
+  const handleClassificationChange = (event, newValue) => {
+    setClassificationLevel(newValue);
+  };
+
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
@@ -1771,18 +1818,23 @@ const DirectChat = () => {
                 <Typography className={classes.classificationLabel}>
                   Classification:
                 </Typography>
-                <div className={classes.checkboxGroup}>
-                  <FormControlLabel
-                    control={<Checkbox size="small" defaultChecked />}
-                    label={<Typography className={classes.checkboxLabel}>Unclassified</Typography>}
-                  />
-                  <FormControlLabel
-                    control={<Checkbox size="small" />}
-                    label={<Typography className={classes.checkboxLabel}>Secret</Typography>}
-                  />
-                  <FormControlLabel
-                    control={<Checkbox size="small" />}
-                    label={<Typography className={classes.checkboxLabel}>Top Secret</Typography>}
+                <div style={{ flex: .25, marginLeft: theme.spacing(1), marginRight: theme.spacing(2) }}>
+                  <Slider
+                    className={classes.classificationSlider}
+                    value={classificationLevel}
+                    onChange={handleClassificationChange}
+                    step={null}
+                    min={0}
+                    max={2}
+                    marks={[
+                      { value: 0, label: 'Unclassified' },
+                      { value: 1, label: 'Secret' },
+                      { value: 2, label: 'Top Secret' },
+                    ]}
+                    style={{
+                      color: classificationLevel === 0 ? '#4caf50' :
+                            classificationLevel === 1 ? '#f44336' : '#ff9800'
+                    }}
                   />
                 </div>
               </div>
