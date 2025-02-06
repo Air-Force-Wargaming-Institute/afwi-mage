@@ -3,7 +3,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
-from config import load_config
+from team_config import load_config
 from utils.shared_state import shared_state
 
 def librarian_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:

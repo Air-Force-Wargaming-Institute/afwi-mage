@@ -438,7 +438,10 @@ function AgentTeams() {
 
   const handleDeleteConfirm = async () => {
     try {
+      // Delete from agent and chat service
       await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.file_name}`));
+      await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
+      
       setDeleteConfirmOpen(false);
       setSnackbar({
         open: true,
@@ -479,10 +482,18 @@ function AgentTeams() {
 
   const handleDuplicateClick = async (team) => {
     try {
-      const response = await axios.post(getApiUrl('AGENT', `/api/agents/duplicate_team/${team.file_name}`));
+      // Create a new team object based on the existing team
+      const duplicateTeam = {
+        name: `Copy of ${team.name}`,
+        description: team.description,
+        color: team.color,
+        agents: team.agents, // Backend will handle _expert suffix
+      };
+
+      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
       setSnackbar({
         open: true,
-        message: `Team "${response.data.message}" duplicated successfully`,
+        message: 'Team duplicated successfully!',
         severity: 'success'
       });
       fetchTeams(); // Refresh the list of teams

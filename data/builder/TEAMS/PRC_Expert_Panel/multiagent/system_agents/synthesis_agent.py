@@ -7,7 +7,7 @@ from datetime import datetime
 
 from utils.shared_state import shared_state
 from multiagent.graphState import GraphState
-from utils.helpers import load_config
+from team_config import load_config
 
 def synthesis_agent(state: GraphState, llm: ChatOpenAI) -> GraphState:
     """

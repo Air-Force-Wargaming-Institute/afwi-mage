@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#008000"
 CREATED_AT = "2025-02-04T14:36:41.030688"
-MODIFIED_AT = "2025-02-04T18:08:49.492770"
+MODIFIED_AT = "2025-02-06T17:11:34.129987"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -16,7 +16,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
 from utils.helpers import update_expert_input
-from config import load_config
+from team_config import load_config
 from utils.shared_state import shared_state
 from utils.helpers import determine_collaboration
 
@@ -144,9 +144,8 @@ def NATO_Regional_Dynamics_expert(state: GraphState, llm: ChatOpenAI) -> GraphSt
         expert_agents = config["EXPERT_AGENTS"]
         expert_agents.remove(whoami)
         expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
-        print("\tINFO: NATO Regional Dynamics is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
-        #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
-        collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
+        # print("\tINFO: NATO Regional Dynamics is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
+        collaborators = determine_collaboration(reflection, analysis, expert_agents)
         print("\n\n\n")
         print(collaborators)
         print("\n\n\n")
@@ -256,4 +255,4 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#008000"                                         #FF0000
 CREATED_AT = "2025-02-04T14:36:41.030688"                               #2024-12-15
-MODIFIED_AT = "2025-02-04T18:08:49.492770"                             #2025-01-23
+MODIFIED_AT = "2025-02-06T17:11:34.129987"                             #2025-01-23

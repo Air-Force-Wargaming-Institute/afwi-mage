@@ -44,6 +44,7 @@ Thumbs.db
 /data/builder/TEAMS/*
 
 # Keep the TEAM-TEMPLATE directory
+!/data/builder/AGENTS/system_agents/*
 !/data/builder/TEAMS/TEAM-TEMPLATE/*
 
 # Keep .gitkeep files

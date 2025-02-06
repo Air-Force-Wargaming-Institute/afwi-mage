@@ -86,6 +86,24 @@ async def chat(message: ChatMessage):
         print(f"Error processing message: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/delete_team/{team_name}")
+async def delete_team(team_name: str):
+    try:
+        # Get path to team directory in chat_teams
+        chat_teams_dir = Path(__file__).parent / "chat_teams"
+        team_dir = chat_teams_dir / team_name
+
+        # Remove team directory if it exists
+        if team_dir.exists():
+            shutil.rmtree(team_dir)
+            return {"message": f"Team {team_name} deleted successfully from chat service"}
+        else:
+            return {"message": f"Team {team_name} not found in chat service"}
+
+    except Exception as e:
+        print(f"Error deleting team: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Chat Service API"}

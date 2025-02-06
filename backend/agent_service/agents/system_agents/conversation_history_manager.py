@@ -3,13 +3,11 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
-from multiagent.llm_manager import LLMManager
 #from webProject.utils.setup_logging import setup_logging
 from utils.helpers import identify_experts
-from team_config import load_config
 from utils.shared_state import shared_state
 
-def conversation_history_manager(state: GraphState) -> GraphState:
+def conversation_history_manager(state: GraphState, llm: ChatOpenAI) -> GraphState:
     """
     Is the true first step in the conversation. This agent looks at the users question and the conversation history, and then decides if the user is asking about something that has been previously discussed. If so, it will return the user's question with the relevant parts included. If not, it will return the user's question verbatim.
     """
@@ -19,8 +17,6 @@ def conversation_history_manager(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     whoami = "conversation_history_manager"
     question = state_dict["question"]
-
-    llm = LLMManager().non_streaming
 
     # Determine if the user's question is related to anything they have asked previously. If it is, the LLM will return portion that is closest to it
     prompt = PromptTemplate(

@@ -1,7 +1,7 @@
 from utils.shared_state import shared_state
 from multiagent.team.US_NATO_Coalition import US_NATO_Coalition_graph
 
-from config import load_config
+from team_config import load_config
 from utils.vector_store.vectorstore import check_for_vectorstore, load_local_vectorstore, create_retriever
 
 def processQuestion(question: str):

@@ -79,20 +79,72 @@ class TeamCreate(BaseModel):
             raise ValueError('Description must be between 10 and 140 characters')
         return v
 
-    @field_validator('team_instructions')
-    @classmethod
-    def validate_instructions(cls, v: str) -> str:
-        v = re.sub(r'<[^>]*>', '', v)
-        v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
-        if len(v) < 10:
-            raise ValueError('Instructions must be at least 10 characters')
-        return v
+    # @field_validator('team_instructions')
+    # @classmethod
+    # def validate_instructions(cls, v: str) -> str:
+    #     v = re.sub(r'<[^>]*>', '', v)
+    #     v = re.sub(r'[^\w\s.,!?()\-\'"\\]', '', v)
+    #     if len(v) < 10:
+    #         raise ValueError('Instructions must be at least 10 characters')
+    #     return v
 
 def format_agent_name(name):
     return re.sub(r'[\s\-]+', '_', name)
 
 def format_team_name(name):
     return re.sub(r'[\s\-]+', '_', name)
+
+async def update_teams_containing_agent(old_agent_name: str, new_agent_name: str):
+    """Updates teams that contain the specified agent, handling name changes."""
+    try:
+        # Get all team files
+        for filename in os.listdir(TEAMS_PATH):
+            if not filename.endswith('.py'):
+                continue
+                
+            team_name = filename[:-3]  # Remove .py extension
+            team_path = TEAMS_PATH / filename
+            
+            # Read the team file
+            with open(team_path, 'r') as f:
+                content = f.read()
+            
+            # Check if this team contains the modified agent
+            agents_pattern = r'AGENT_FILE_NAMES\s*=\s*\[(.*?)\]'
+            if match := re.search(agents_pattern, content):
+                agents_list = [a.strip().strip("'") for a in match.group(1).split(',') if a.strip()]
+                
+                # If the agent is in this team, update the team
+                if old_agent_name in agents_list:
+                    # Extract team data using regex
+                    name_pattern = r'TEAM_NAME\s*=\s*"([^"]*)"'
+                    desc_pattern = r'TEAM_DESCRIPTION\s*=\s*"""([^"]*)"""'
+                    color_pattern = r'TEAM_COLOR\s*=\s*"([^"]*)"'
+                    memory_type_pattern = r'MEMORY_TYPE\s*=\s*"([^"]*)"'
+                    memory_kwargs_pattern = r'MEMORY_KWARGS\s*=\s*(\{[^}]*\})'
+                    #instructions_pattern = r'TEAM_INSTRUCTIONS\s*=\s*"""([^"]*)"""'
+                    
+                    # Replace old agent name with new one in the list
+                    agents_list = [new_agent_name if a == old_agent_name else a for a in agents_list]
+                    
+                    # Create TeamCreate object
+                    team_data = TeamCreate(
+                        name=re.search(name_pattern, content).group(1),
+                        description=re.search(desc_pattern, content).group(1),
+                        color=re.search(color_pattern, content).group(1),
+                        memory_type=re.search(memory_type_pattern, content).group(1),
+                        memory_kwargs=json.loads(re.search(memory_kwargs_pattern, content).group(1)),
+                        team_instructions="",
+                        agents=[f"{a}_expert" for a in agents_list]
+                    )
+                    
+                    # Update the team
+                    await update_team(team_name, team_data)
+                    print(f"Updated team {team_name} containing agent {old_agent_name}")
+                    
+    except Exception as e:
+        logger.error(f"Error updating teams containing agent {old_agent_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating teams: {str(e)}")
 
 # Update the error handling to use logging
 logger = logging.getLogger(__name__)
@@ -218,7 +270,7 @@ async def create_team(team_data: TeamCreate):
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
         team_code = team_code.replace("{{SOLO_AGENT}}", str(solo_agent))
-        #team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
+        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
 
         # Add creation and modification dates
         current_time = datetime.now().isoformat()
@@ -242,9 +294,10 @@ async def create_team(team_data: TeamCreate):
         replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
         replaced_config = replaced_config.replace("{{SOLO_AGENT}}", str(solo_agent))
-        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
+        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions) # This has to happen at runtime
         with open(config_path, "w") as f:
             f.write(replaced_config)
+
 
         # Update processQuestion.py
         process_question_path = team_shared_path / "multiagent" / "processQuestion.py"
@@ -408,6 +461,9 @@ async def update_agent(agent_name: str, agent_data: AgentCreate):
             if old_shared_agent_path.exists():
                 old_shared_agent_path.unlink()
         
+        # Now update all teams that contain the agent
+        await update_teams_containing_agent(old_formatted_name, new_formatted_name)
+
         return {"message": f"Agent {agent_data.name} updated successfully", "file_name": new_formatted_name}
     except Exception as e:
         logger.error(f"Error updating agent: {str(e)}")
@@ -460,6 +516,12 @@ async def update_team(team_name: str, team_data: TeamCreate):
             content = f.read()
             created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
             created_date = re.search(created_pattern, content, re.DOTALL).group(1)
+            
+            agents_pattern = r'AGENT_FILE_NAMES\s*=\s*\[(.*?)\]'
+            if match := re.search(agents_pattern, content):
+                old_agents = [a.strip().strip("'") for a in match.group(1).split(',') if a.strip()]
+            else:
+                old_agents = []
 
         # Load the team template
         # If users only submit one agent, use the direct-team_template.py template, otherwise we have a multi-agent team
@@ -543,7 +605,19 @@ async def update_team(team_name: str, team_data: TeamCreate):
             shutil.move(str(old_shared_path), str(new_shared_path))
 
         # Update the team file in shared directory
-        shared_team_file_path = new_shared_path / "multiagent" / "team" / f"{new_formatted_name}.py"
+        team_folder_path = new_shared_path / "multiagent" / "team"
+        # Clear the team folder first
+        if team_folder_path.exists():
+            # Remove old team file if name changed
+            if old_formatted_name != new_formatted_name:
+                old_team_file = team_folder_path / f"{old_formatted_name}.py"
+                if old_team_file.exists():
+                    old_team_file.unlink()
+        else:
+            team_folder_path.mkdir(parents=True, exist_ok=True)
+        
+        # Now copy the team file
+        shared_team_file_path = team_folder_path / f"{new_formatted_name}.py"
         shutil.copyfile(new_team_path, shared_team_file_path)
 
         # Replace the team_config.py with the template copy
@@ -560,8 +634,9 @@ async def update_team(team_name: str, team_data: TeamCreate):
             f.write(replaced_config)
 
         # Update processQuestion.py
+        process_question_template = SHARED_STRUCTURE_PATH / "multiagent" / "processQuestion.py"
         process_question_path = new_shared_path / "multiagent" / "processQuestion.py"
-        with open(process_question_path, "r") as f:
+        with open(process_question_template, "r") as f:
             process_question = f.read()
         replaced_process = process_question.replace("{{TEAM_FILE_NAME}}", new_formatted_name)
         with open(process_question_path, "w") as f:
@@ -573,6 +648,18 @@ async def update_team(team_name: str, team_data: TeamCreate):
             if old_shared_team_file.exists():
                 old_shared_team_file.unlink()
         
+        # Get the new list of agents (without _expert suffix)
+        new_agents = [agent.replace('_expert', '') for agent in team_data.agents]
+
+        # Clean up removed agent files from the shared directory
+        experts_dir = new_shared_path / "multiagent" / "agent_experts"
+        if experts_dir.exists():
+            for old_agent in old_agents:
+                if old_agent not in new_agents:
+                    old_agent_file = experts_dir / f"{old_agent}_expert.py"
+                    if old_agent_file.exists():
+                        old_agent_file.unlink()
+
         return {"message": f"Team {team_data.name} updated successfully", "file_name": new_formatted_name}
     except Exception as e:
         logger.error(f"Error updating team: {str(e)}")
