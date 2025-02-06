@@ -5,7 +5,6 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import GraphState
 #from webProject.utils.setup_logging import setup_logging
 from utils.helpers import identify_experts
-from team_config import load_config
 from utils.shared_state import shared_state
 
 def conversation_history_manager(state: GraphState, llm: ChatOpenAI) -> GraphState:

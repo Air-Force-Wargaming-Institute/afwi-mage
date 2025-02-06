@@ -4,7 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
 from utils.helpers import identify_experts
-from config import load_config
+from team_config import load_config
 from utils.shared_state import shared_state
 
 def user_proxy_moderator(state: GraphState, llm: ChatOpenAI) -> GraphState:

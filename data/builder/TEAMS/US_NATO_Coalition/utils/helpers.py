@@ -1,4 +1,4 @@
-from config import load_config
+from team_config import load_config
 
 #from docx import Document as DocxDocument
 
@@ -44,13 +44,13 @@ def identify_experts(state: GraphState) -> GraphState:
         If the question has nothing to do with any of the expert agents available, simply do not return a list of strings.
         Consider the specific knowledge areas of each expert and how they might contribute to answering the question. If the user requests all the experts, be sure to return a list of all the experts.
         Return your answer as a Python list of strings, containing only the names of the relevant experts.
-        For example: ["prc_economic", "global_influence", "domestic_stability"]
-        Do not provide any further information and do not provide rational for your decision. Only return a Python list of strings.
+        For example: ["item_1", "item_2", "item_3"]
+        Do not provide any further information and do not provide rational or commentary for your decision. Only return a Python list of strings.
         """
     )
 
     experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(EXPERT_NODES, EXPERT_INSTRUCTIONS))
-    print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
+    # print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
 
     # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
     prompt = prompt_template.format(
@@ -105,12 +105,23 @@ def update_expert_input(state: GraphState, expert_node= str):
 #     doc.add_paragraph(analysis)
 #     doc.save(OUTPUT_DIR+"/"+str(ITERATION)+"_"+whoami+"_analysis.docx")
 
-def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
+def find_different_index(list1, list2):
+    for i, (item1, item2) in enumerate(zip(list1, list2)):
+        if item1 != item2:
+            return i
+
+
+    # If we get here and lists are different lengths, the difference is at the end
+    if len(list1) > len(list2):
+        return len(list2)
+    return None
+
+def determine_collaboration(reflection: str, analysis: str, expert_agents: list):
     '''
     This function is used to determine if collaboration is needed and which expert to collaborate with. Arguments are:
     reflection: The reflection on the report as a string
     analysis: The analysis of the report as a string
-    expert_agents: The list of expert agents as a string (do some sort of `"".join(expert_agents)` to get it in the correct format)
+    expert_agents: The list of expert agents
     '''
     config = load_config()
     TEMPERATURE = config['TEMPERATURE']
@@ -119,18 +130,30 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     MAX_TOKENS = config['MAX_TOKENS']
     LOCAL_LLM = config['LOCAL_LLM']
     EXPERT_LIST = config['EXPERT_AGENTS']
+    EXPERT_INSTRUCTIONS = config['EXPERT_INSTRUCTIONS']
+
+    missing_agent = find_different_index(EXPERT_LIST, expert_agents)
+    if missing_agent:
+        del EXPERT_INSTRUCTIONS[missing_agent]
+    else:
+        print("\tINFO: No missing agents found...")
+
 
     llm = ChatOpenAI(temperature=TEMPERATURE, base_url=BASE_URL, api_key=API_KEY, max_tokens=MAX_TOKENS, model=LOCAL_LLM)
     collab_template = PromptTemplate(
-            input_variables=["reflection", "analysis", "expert_agents"],
-            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}. Return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic]). If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n Again, return only the name of the expert(s) as a Python list (e.g. [prc_government, prc_economic])"
+            input_variables=["reflection", "analysis", "expert_agents_with_descriptions"],
+            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents_with_descriptions}. Return only the name of the expert(s) as a Python list (e.g. [item_1, item_2] or [item_1], or []). Only use experts contained in the list. If no expert is needed or none of the experts seem applicable, return an empty Python list and nothing else. Do not provide any further information.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n Again, return only the name of the expert(s) as a Python list; do not provide commentary or any other information."
     )
+
+    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_agents, EXPERT_INSTRUCTIONS))
+    print("\tINFO: In determine_collaboration\n\tAvailable Experts:\n\t"+experts_with_descriptions)
 
     prompt = collab_template.format(
         reflection = reflection,
         analysis = analysis,
-        expert_agents = expert_agents
+        expert_agents_with_descriptions = experts_with_descriptions
     )
+
 
     response = llm.invoke([HumanMessage(content=prompt)])
 

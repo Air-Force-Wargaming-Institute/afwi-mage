@@ -5,7 +5,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.retrievers import BaseRetriever
 from langchain_openai import OpenAIEmbeddings
 
-from config import load_config
+from team_config import load_config
 
 
 def check_for_vectorstore(vector_store_path: str) -> bool:

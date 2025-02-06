@@ -3,8 +3,8 @@ TEAM_NAME = "US-NATO Coalition"
 TEAM_FILE_NAME = "US_NATO_Coalition"
 TEAM_DESCRIPTION = """Coalition of US and NATO Experts"""
 TEAM_COLOR = "#800080"
-CREATED_AT = "2025-02-04T15:51:02.076791"
-MODIFIED_AT = "2025-02-04T15:51:02.076791"
+CREATED_AT = "2025-02-06T16:54:10.187741"
+MODIFIED_AT = "2025-02-06T17:12:44.233977"
 TEAM_INSTRUCTIONS = """""" # Do we actually need team instructions? Where would they be used?
 MEMORY_TYPE = "ConversationBufferMemory"
 MEMORY_KWARGS = {"max_token_limit": 2000}
@@ -41,7 +41,7 @@ if AGENT_SIX != "null_6":
 if AGENT_SEVEN != "null_7":
     from multiagent.agent_experts.null_7_expert import null_7_expert, null_7_requester, null_7_collaborator
 
-from config import load_config
+from team_config import load_config
 from multiagent.graphState import GraphState
 from multiagent.team.routers import router_expert_input_still_needed, router_check_requester, router_dynamic_librarian, router_check_collaborator, router_expert_reflected, router_dynamic_expert, router_dynamic_collab
 
