@@ -1,7 +1,7 @@
 from utils.shared_state import shared_state
 from multiagent.team.{{TEAM_FILE_NAME}} import {{TEAM_FILE_NAME}}_graph
 
-from config import load_config
+from team_config import load_config
 from utils.vector_store.vectorstore import check_for_vectorstore, load_local_vectorstore, create_retriever
 
 def processQuestion(question: str):
@@ -46,10 +46,17 @@ def processQuestion(question: str):
     #print("\n\n\t\t^^^^^^^^^CONVERSATION^^^^^^^^^\n\n")
     #print(shared_state.CONVERSATION)
 
-    if config['SOLO_AGENT']:
-        return final_output[config['EXPERT_AGENTS'][0]]['keys']['synthesized_report'], 
-    if final_output and 'synthesis' in final_output and 'keys' in final_output['synthesis'] and 'synthesized_report' in final_output['synthesis']['keys']:
-        return final_output['synthesis']['keys']['synthesized_report'], 
-        #return final_output
+    synthesized_report = final_output.get('synthesis', {}).get('keys', {}).get('synthesized_report')
+    if final_output and synthesized_report:
+        # Format the response with collapsible markdown
+        response = synthesized_report
+        response += "\n\n<details><summary>Expert Analyses</summary>\n\n"
+        for expert in config['EXPERT_AGENTS']:
+            expert_analysis = final_output['synthesis']['keys'].get(f'{expert}_analysis', "")
+            if expert_analysis:
+                response += f"<details><summary>{expert.replace('_', ' ').title()} Analysis</summary>\n\n{expert_analysis}\n\n</details>\n\n"
+        response += "</details>"
+
+        return response
     else:
         return "Error: No synthesized report generated."

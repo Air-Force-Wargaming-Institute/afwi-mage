@@ -50,4 +50,4 @@ MAX_TOKENS: 8000
 TEMPERATURE: 0.2
 
 # Expert agents to use in the multi agent system
-EXPERT_AGENTS: ["prc_economic", "prc_military", "prc_government", "regional_dynamics", "global_influence", "technology_innovation", "domestic_stability"]
+# EXPERT_AGENTS: ["prc_economic", "prc_military", "prc_government", "regional_dynamics", "global_influence", "technology_innovation", "domestic_stability"]

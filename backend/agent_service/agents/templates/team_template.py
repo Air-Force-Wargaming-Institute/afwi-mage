@@ -41,7 +41,7 @@ if AGENT_SIX != "null_6":
 if AGENT_SEVEN != "null_7":
     from multiagent.agent_experts.{{AGENT_SEVEN}}_expert import {{AGENT_SEVEN}}_expert, {{AGENT_SEVEN}}_requester, {{AGENT_SEVEN}}_collaborator
 
-from config import load_config
+from team_config import load_config
 from multiagent.graphState import GraphState
 from multiagent.team.routers import router_expert_input_still_needed, router_check_requester, router_dynamic_librarian, router_check_collaborator, router_expert_reflected, router_dynamic_expert, router_dynamic_collab
 

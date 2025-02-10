@@ -46,26 +46,62 @@ async def chat(message: ChatMessage):
 
             # Add the team's directory to Python's path
             team_dir = Path(__file__).parent / "chat_teams" / message.team_name
-            sys.path.append(str(team_dir))
+            team_dir_str = str(team_dir)
+            sys.path.insert(0, team_dir_str)
 
-            #module_path = f"chat_teams.{message.team_name}.multiagent.processQuestion"
-            module_path = "multiagent.processQuestion"
-            print(f"Attempting to import: {module_path}")
-            process_question_module = importlib.import_module(module_path)
-            print("Module imported successfully")
-            process_question = process_question_module.processQuestion
-            print("Function accessed successfully")
+            try:
+                # Clean up any existing modules before importing
+                for key in list(sys.modules.keys()):
+                    module = sys.modules[key]
+                    # Check if module has a __file__ attribute and if it's from our team directory
+                    if hasattr(module, '__file__') and module.__file__ and \
+                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
+                        del sys.modules[key]
+                
+                # Import and process
+                module_name = "multiagent.processQuestion"
+                process_question_module = importlib.import_module(module_name)
+                process_question = process_question_module.processQuestion
+                
+                response = process_question(message.message)
+                return {"response": response}
+            finally:
+                # Clean up: remove the team's directory from sys.path
+                sys.path.remove(team_dir_str)
+                # Clean up all modules that were loaded from the team directory
+                for key in list(sys.modules.keys()):
+                    module = sys.modules[key]
+                    # Check if module has a __file__ attribute and if it's from our team directory
+                    if hasattr(module, '__file__') and module.__file__ and \
+                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
+                        del sys.modules[key]
+                
         except ImportError as e:
             raise HTTPException(
                 status_code=500, 
                 detail=f"Could not load process_question for team: {message.team_name}. Error: {str(e)}"
             )
 
-        response = process_question(message.message)
-        #response = {"response": f"Received message: {message.message}"}
-        return {"response": response}
     except Exception as e:
         print(f"Error processing message: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete_team/{team_name}")
+async def delete_team(team_name: str):
+    try:
+        # Get path to team directory in chat_teams
+        chat_teams_dir = Path(__file__).parent / "chat_teams"
+        team_dir = chat_teams_dir / team_name
+
+        # Remove team directory if it exists
+        if team_dir.exists():
+            shutil.rmtree(team_dir)
+            return {"message": f"Team {team_name} deleted successfully from chat service"}
+        else:
+            return {"message": f"Team {team_name} not found in chat service"}
+
+    except Exception as e:
+        print(f"Error deleting team: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")

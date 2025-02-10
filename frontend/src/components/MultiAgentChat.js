@@ -51,6 +51,7 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
+import rehypeRaw from 'rehype-raw';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -251,9 +252,6 @@ const useStyles = makeStyles((theme) => ({
         marginBottom: '0.1em',
         lineHeight: 1.3,
       },
-      '& li:last-child': {
-        marginBottom: 0,
-      },
     },
     '& blockquote': {
       margin: '0.8em 0',
@@ -261,15 +259,6 @@ const useStyles = makeStyles((theme) => ({
       borderLeft: `4px solid ${theme.palette.grey[300]}`,
       backgroundColor: theme.palette.grey[50],
       color: theme.palette.text.secondary,
-    },
-    '& hr': {
-      margin: '.5em 0',
-    },
-    '& > *:first-child': {
-      marginTop: 0,
-    },
-    '& > *:last-child': {
-      marginBottom: 0,
     },
     '& code': {
       backgroundColor: 'rgba(0, 0, 0, 0.06)',
@@ -284,6 +273,30 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: '#f5f5f5',
       borderRadius: '4px',
       overflow: 'auto',
+    },
+    '& details': {
+      margin: '1em 0',
+      padding: '0.5em',
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius,
+      boxShadow: theme.shadows[1],
+      
+      '& summary': {
+        cursor: 'pointer',
+        fontWeight: 500,
+        marginBottom: '0.5em',
+        padding: '0.5em',
+        
+        '&:hover': {
+          color: theme.palette.primary.main,
+        },
+      },
+      
+      '& details': {
+        margin: '0.5em 0',
+        padding: '0.5em',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      },
     },
     '& table': {
       borderCollapse: 'collapse',
@@ -785,6 +798,41 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: 'rgba(255, 255, 255, 1)',
     },
   },
+  expertAnalyses: {
+    margin: '1em 0',
+    padding: '0.5em',
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.shadows[1],
+    
+    '& summary': {
+      cursor: 'pointer',
+      fontWeight: 500,
+      marginBottom: '0.5em',
+      padding: '0.5em',
+      
+      '&:hover': {
+        color: theme.palette.primary.main,
+      },
+    },
+  },
+  expertAnalysis: {
+    margin: '0.5em 0',
+    padding: '0.5em',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: theme.shape.borderRadius,
+    
+    '& summary': {
+      cursor: 'pointer',
+      fontWeight: 500,
+      marginBottom: '0.5em',
+      padding: '0.5em',
+      
+      '&:hover': {
+        color: theme.palette.primary.main,
+      },
+    },
+  },
 }));
 
 const CodeBlock = ({ inline, className, children }) => {
@@ -810,10 +858,40 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
   const [copied, setCopied] = useState(false);
   const isErrorMessage = !isUser && content.includes('Error:');
 
+  // Parse the expert analyses into a structured format
+  const parseContent = () => {
+    const parts = content.split('<details><summary>Expert Analyses</summary>');
+    if (parts.length !== 2) {
+      return { mainContent: content, experts: [] };
+    }
+
+    const mainContent = parts[0];
+    const expertsSection = parts[1];
+
+    // Extract individual expert analyses
+    const expertRegex = /<details><summary>(.*?)<\/summary>\n\n([\s\S]*?)<\/details>/g;
+    const experts = [];
+    let match;
+    while ((match = expertRegex.exec(expertsSection)) !== null) {
+      experts.push({
+        title: match[1],
+        content: match[2].trim()
+      });
+    }
+
+    return { mainContent, experts };
+  };
+
+  const { mainContent, experts } = parseContent();
+
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const processContent = (text) => {
+    return text.replace(/\n/g, '<br>');
   };
 
   return (
@@ -858,14 +936,39 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
             {content}
           </Typography>
         ) : (
-          <ReactMarkdown
-            components={{
-              code: CodeBlock,
-              p: ({ children }) => <Typography variant="body1">{children}</Typography>,
-            }}
-          >
-            {content}
-          </ReactMarkdown>
+          <>
+            <ReactMarkdown
+              className={classes.markdown}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                code: CodeBlock,
+                p: ({ children }) => <Typography variant="body1">{children}</Typography>,
+              }}
+            >
+              {mainContent}
+            </ReactMarkdown>
+            
+            {experts.length > 0 && (
+              <details className={classes.expertAnalyses}>
+                <summary>Expert Analyses</summary>
+                {experts.map((expert, index) => (
+                  <details key={index} className={classes.expertAnalysis}>
+                    <summary>{expert.title}</summary>
+                    <ReactMarkdown
+                      className={classes.markdown}
+                      rehypePlugins={[rehypeRaw]}
+                      components={{
+                        code: CodeBlock,
+                        p: ({ children }) => <Typography variant="body1">{children}</Typography>,
+                      }}
+                    >
+                      {expert.content}
+                    </ReactMarkdown>
+                  </details>
+                ))}
+              </details>
+            )}
+          </>
         )}
       </div>
 
