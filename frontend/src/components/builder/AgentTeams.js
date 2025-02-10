@@ -205,6 +205,8 @@ function AgentTeams() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState(null);
   const [agentDescriptions, setAgentDescriptions] = useState({});
+  const [nameError, setNameError] = useState(false);
+  const [nameErrorMessage, setNameErrorMessage] = useState('');
 
   useEffect(() => {
     fetchTeams();
@@ -259,6 +261,32 @@ function AgentTeams() {
 
   const handleChange = (event, isEditing = false) => {
     const { name, value } = event.target;
+    
+    // Validate team name
+    if (name === 'name') {
+      if (!value.match(/^[a-zA-Z0-9\s_-]*$/)) {
+        setNameError(true);
+        setNameErrorMessage('Team name can only contain letters, numbers, spaces, underscores, and hyphens');
+        // Still update the form state so user sees what they typed
+        if (isEditing) {
+          setEditingTeam(prevState => ({
+            ...prevState,
+            [name]: value
+          }));
+        } else {
+          setNewTeam(prevState => ({
+            ...prevState,
+            [name]: value
+          }));
+        }
+        return;
+      } else {
+        setNameError(false);
+        setNameErrorMessage('');
+      }
+    }
+
+    // Validate description length
     if (name === 'description' && value.length > 140) {
       setDescriptionError(true);
     } else {
@@ -308,8 +336,24 @@ function AgentTeams() {
   };
 
   const handleSubmit = async () => {
+    if (nameError || descriptionError) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix all errors before submitting',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), newTeam);
+      // Filter out empty agent slots and create a compact list
+      const compactAgents = newTeam.agents.filter(agent => agent !== '');
+      const submissionData = {
+        ...newTeam,
+        agents: compactAgents
+      };
+
+      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), submissionData);
       setTeams([...teams, response.data]);
       setOpen(false);
       setSnackbar({
@@ -322,15 +366,34 @@ function AgentTeams() {
       console.error('Error creating team:', error);
       setSnackbar({
         open: true,
-        message: 'Error creating team. Please try again.',
+        message: error.response?.data?.detail || 'Error creating team. Please try again.',
         severity: 'error'
       });
     }
   };
 
   const handleEditSubmit = async () => {
+    if (nameError || descriptionError) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix all errors before submitting',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.file_name}`), editingTeam);
+      // Filter out empty agent slots and remove _expert suffix
+      const compactAgents = editingTeam.agents
+        .filter(agent => agent !== '')
+        .map(agent => agent.replace('_expert', ''));
+        
+      const submissionData = {
+        ...editingTeam,
+        agents: compactAgents
+      };
+
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.file_name}`), submissionData);
       setEditOpen(false);
       setSnackbar({
         open: true,
@@ -342,7 +405,7 @@ function AgentTeams() {
       console.error('Error updating team:', error);
       setSnackbar({
         open: true,
-        message: 'Error updating team. Please try again.',
+        message: error.response?.data?.detail || 'Error updating team. Please try again.',
         severity: 'error'
       });
     }
@@ -357,8 +420,15 @@ function AgentTeams() {
 
   // Modify this function to work for both new and editing teams
   const getAvailableAgentsForDropdown = (index, team) => {
-    const selectedAgents = team.agents.filter((agent, i) => i !== index && agent !== '');
-    return allAgents.filter(agent => !selectedAgents.includes(agent.file_name));
+    // Ensure team.agents is an array
+    const agentsList = Array.isArray(team.agents) 
+      ? team.agents 
+      : typeof team.agents === 'string' 
+        ? [team.agents]
+        : [];
+        
+    const selectedAgents = agentsList.filter((agent, i) => i !== index && agent !== '');
+    return allAgents.filter(agent => !selectedAgents.includes(agent.file_name.replace('_expert', '')));
   };
 
   const handleDeleteClick = (team) => {
@@ -368,7 +438,10 @@ function AgentTeams() {
 
   const handleDeleteConfirm = async () => {
     try {
+      // Delete from agent and chat service
       await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.file_name}`));
+      await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
+      
       setDeleteConfirmOpen(false);
       setSnackbar({
         open: true,
@@ -387,19 +460,40 @@ function AgentTeams() {
   };
 
   const handleEditClick = (team) => {
-    setEditingTeam({
+    // Ensure team.agents is an array
+    const agentsList = Array.isArray(team.agents) 
+      ? team.agents 
+      : typeof team.agents === 'string' 
+        ? [team.agents]
+        : [];
+
+    // Create a copy of the team with all 8 agent slots
+    const fullTeam = {
       ...team,
-      agents: [...team.agents, ...Array(8 - team.agents.length).fill('')]
-    });
+      // Map each agent filename to the full agent filename with _expert suffix
+      agents: [
+        ...agentsList.map(agentName => `${agentName}_expert`),
+        ...Array(8 - agentsList.length).fill('')
+      ]
+    };
+    setEditingTeam(fullTeam);
     setEditOpen(true);
   };
 
   const handleDuplicateClick = async (team) => {
     try {
-      const response = await axios.post(getApiUrl('AGENT', `/api/agents/duplicate_team/${team.file_name}`));
+      // Create a new team object based on the existing team
+      const duplicateTeam = {
+        name: `Copy of ${team.name}`,
+        description: team.description,
+        color: team.color,
+        agents: team.agents, // Backend will handle _expert suffix
+      };
+
+      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
       setSnackbar({
         open: true,
-        message: `Team "${response.data.message}" duplicated successfully`,
+        message: 'Team duplicated successfully!',
         severity: 'success'
       });
       fetchTeams(); // Refresh the list of teams
@@ -449,58 +543,67 @@ function AgentTeams() {
       </Box>
 
       <Grid container spacing={3}>
-        {teams.map((team, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <Card 
-              className={classes.card} 
-              style={{ borderColor: team.color }}
-              onClick={(event) => handleCardClick(event, team)}
-            >
-              <CardHeader
-                className={classes.cardHeader}
-                avatar={
-                  <Box display="flex" alignItems="center">
-                    <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
-                      <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
-                    </div>
-                  </Box>
-                }
-                title={team.name}
-              />
-              <CardContent className={classes.cardContent}>
-                <Typography variant="body2" color="textSecondary" component="p">
-                  {team.description}
-                </Typography>
-              </CardContent>
-              <CardActions className={classes.cardActions}>
-                <Tooltip title="Duplicate Team">
-                  <IconButton 
-                    aria-label="duplicate" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDuplicateClick(team);
-                    }}
-                    className={`${classes.duplicateIcon} action-button`}
-                  >
-                    <FileCopyIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete Team">
-                  <IconButton 
-                    aria-label="delete" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(team);
-                    }}
-                    className={`${classes.deleteIcon} action-button`}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
+        {teams.map((team, index) => {
+          // Ensure team.agents is an array at the start of the mapping
+          team.agents = Array.isArray(team.agents) 
+            ? team.agents 
+            : typeof team.agents === 'string' 
+              ? [team.agents]
+              : [];
+              
+          return (
+            <Grid item xs={12} sm={6} md={4} key={index}>
+              <Card 
+                className={classes.card} 
+                style={{ borderColor: team.color }}
+                onClick={(event) => handleCardClick(event, team)}
+              >
+                <CardHeader
+                  className={classes.cardHeader}
+                  avatar={
+                    <Box display="flex" alignItems="center">
+                      <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
+                        <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
+                      </div>
+                    </Box>
+                  }
+                  title={team.name}
+                />
+                <CardContent className={classes.cardContent}>
+                  <Typography variant="body2" color="textSecondary" component="p">
+                    {team.description}
+                  </Typography>
+                </CardContent>
+                <CardActions className={classes.cardActions}>
+                  <Tooltip title="Duplicate Team">
+                    <IconButton 
+                      aria-label="duplicate" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateClick(team);
+                      }}
+                      className={`${classes.duplicateIcon} action-button`}
+                    >
+                      <FileCopyIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete Team">
+                    <IconButton 
+                      aria-label="delete" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(team);
+                      }}
+                      className={`${classes.deleteIcon} action-button`}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
 
       <Dialog 
@@ -538,6 +641,8 @@ function AgentTeams() {
             value={newTeam.name}
             onChange={handleChange}
             className={classes.formControl}
+            error={nameError}
+            helperText={nameErrorMessage}
           />
           <Box display="flex" flexDirection="column">
             <TextField
@@ -651,6 +756,8 @@ function AgentTeams() {
             value={editingTeam ? editingTeam.name : ''}
             onChange={(e) => handleChange(e, true)}
             className={classes.formControl}
+            error={nameError}
+            helperText={nameErrorMessage}
           />
           <Box display="flex" flexDirection="column">
             <TextField

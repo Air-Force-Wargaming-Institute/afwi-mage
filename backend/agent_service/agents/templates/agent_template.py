@@ -1,10 +1,22 @@
+# The following will be filled in programmatically when creating a new agent
+AGENT_NAME = "{{AGENT_NAME}}"
+AGENT_FILE_NAME = "{{AGENT_FILE_NAME}}"
+MEMORY_TYPE = "{{MEMORY_TYPE}}"
+MEMORY_KWARGS = {{MEMORY_KWARGS}}
+AGENT_DESCRIPTION = """{{AGENT_DESCRIPTION}}"""
+AGENT_INSTRUCTIONS = """{{AGENT_INSTRUCTIONS}}"""
+LLM_MODEL = "{{LLM_MODEL}}"
+COLOR = "{{COLOR}}"
+CREATED_AT = "{{CREATED_AT}}"
+MODIFIED_AT = "{{MODIFIED_AT}}"
+
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
 from utils.helpers import update_expert_input
-from config import load_config
+from team_config import load_config
 from utils.shared_state import shared_state
 from utils.helpers import determine_collaboration
 
@@ -36,7 +48,7 @@ def {{AGENT_FILE_NAME}}_expert(state: GraphState, llm: ChatOpenAI) -> GraphState
 
             prompt = PromptTemplate(
                 input_variables=["old_analysis", "critique", "question", "document_summary", "relevant_docs", "collab_report"],
-                template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_INSTRUCTIONS}}. You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n You also collaborated with other subject matter experts, and they provided the following feedback and suggestions to improve your report from their expert perspective: \n{collab_report}\n\n It is time to write your final report. While your focus is to speak to your own expertise, please remember to consider and incorporate the feedback and collaborative inputs of the perspectives from the other experts. Be sure not to simply rewrite your previous report. As appropriate, briefly site where you incorporated the inputs from the other experts. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{{AGENT_NAME}} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your final report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query."
+                template="You are the {{AGENT_NAME}} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {{AGENT_INSTRUCTIONS}}. You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n You also collaborated with other subject matter experts, and they provided the following feedback and suggestions to improve your report from their expert perspective: \n{collab_report}\n\n It is time to write your final report. While your focus is to speak to your own expertise, please remember to consider and incorporate the feedback and collaborative inputs of the perspectives from the other experts. Be sure not to simply rewrite your previous report. As appropriate, briefly site where you incorporated the inputs from the other experts. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{{AGENT_NAME}} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your final report should be well organized, thorough, and comprehensive. Write your report in Markdown format. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query."
             )
 
             chain = prompt | llm | StrOutputParser()
@@ -118,9 +130,8 @@ def {{AGENT_FILE_NAME}}_expert(state: GraphState, llm: ChatOpenAI) -> GraphState
         expert_agents = config["EXPERT_AGENTS"]
         expert_agents.remove(whoami)
         expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
-        print("\tINFO: {{AGENT_NAME}} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
-        #TODO: zip experts and their area of expertise together and pass, instead of just passing the list of experts
-        collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
+        # print("\tINFO: {{AGENT_NAME}} is using this list of experts while choosing collaborators: \n\t"+expert_agents_str)
+        collaborators = determine_collaboration(reflection, analysis, expert_agents)
         print("\n\n\n")
         print(collaborators)
         print("\n\n\n")
@@ -231,28 +242,3 @@ LLM_MODEL = "{{LLM_MODEL}}"                                 #llama3.2
 COLOR = "{{COLOR}}"                                         #FF0000
 CREATED_AT = "{{CREATED_AT}}"                               #2024-12-15
 MODIFIED_AT = "{{MODIFIED_AT}}"                             #2025-01-23
-
-
-
-# class Agent:
-#     def __init__(self, name, description, llm, agent_instructions, memory_type="ConversationBufferMemory", memory_kwargs=None):
-#         self.name = name
-#         self.description = description
-#         self.llm = llm
-#         self.agent_instructions = agent_instructions
-        
-#         # Set up memory
-#         if memory_type == "ConversationBufferMemory":
-#             self.memory = ConversationBufferMemory(**(memory_kwargs or {}))
-#         else:
-#             raise ValueError(f"Unsupported memory type: {memory_type}")
-        
-#         # Set up prompt template
-#         template = f"{agent_instructions}\n\nHuman: {{human_input}}\nAI: "
-#         self.prompt = PromptTemplate(template=template, input_variables=["human_input"])
-        
-#         # Set up LLM chain
-#         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
-    
-#     async def run(self, human_input):
-#         return await self.chain.arun(human_input=human_input)

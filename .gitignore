@@ -37,6 +37,15 @@ Thumbs.db
 /backend/models/fine_tuned_models/*
 /backend/models/base_models/*
 /backend/extraction_service/nltk_data/*
+/backend/chat_service/chat_teams/*
+/backend/agent_service/agents/individual_agents/*.py
+/backend/agent_service/agents/teams/*.py
+/data/builder/AGENTS/*
+/data/builder/TEAMS/*
+
+# Keep the TEAM-TEMPLATE directory
+!/data/builder/AGENTS/system_agents/*
+!/data/builder/TEAMS/TEAM-TEMPLATE/*
 
 # Keep .gitkeep files
 !/**/.gitkeep
@@ -114,3 +123,10 @@ dist/
 config.local.js
 
 __langchain+graph_documentation/
+
+# Conversation logs
+backend/chat_service/conversation_logs/*.json
+backend/chat_service/conversation_logs/**/*
+
+# But keep the directory itself
+!backend/chat_service/conversation_logs/.gitkeep

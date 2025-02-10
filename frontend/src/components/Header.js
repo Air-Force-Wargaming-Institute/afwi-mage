@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Link, useLocation, useHistory } from 'react-router-dom';
-import { IconButton, Menu, MenuItem, Avatar, Typography } from '@material-ui/core';
+import { IconButton, Avatar } from '@material-ui/core';
 import AccountCircleIcon from '@material-ui/icons/AccountCircle';
 import SettingsIcon from '@material-ui/icons/Settings';
 import HelpIcon from '@material-ui/icons/Help';
@@ -8,13 +8,10 @@ import SupervisorAccountIcon from '@material-ui/icons/SupervisorAccount';
 import ExitToAppIcon from '@material-ui/icons/ExitToApp';
 import logo from '../assets/afwi_logo.png';
 import HomeIcon from '@material-ui/icons/Home';
-import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import CallSplitIcon from '@material-ui/icons/CallSplit';
-import RateReviewIcon from '@material-ui/icons/RateReview';
 import TuneIcon from '@material-ui/icons/Tune';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import ArrowForwardIcon from '@material-ui/icons/ArrowForward';
-import { FaDatabase } from 'react-icons/fa';
 import GroupWorkIcon from '@material-ui/icons/GroupWork';
 import BuildIcon from '@material-ui/icons/Build';
 import ChatIcon from '@material-ui/icons/Chat';
@@ -24,12 +21,14 @@ import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
 import StorageIcon from '@material-ui/icons/Storage';
 import robotIcon from '../assets/robot-icon.png';
 import { AuthContext } from '../contexts/AuthContext';
+import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
+import agentTeamIcon from '../assets/agent-team.png';
 
 function Header() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const { isAuthenticated, logout, user } = useContext(AuthContext);
+  const { logout, user } = useContext(AuthContext);
   const history = useHistory();
 
   useEffect(() => {
@@ -46,21 +45,21 @@ function Header() {
     }
   }, [location.pathname]);
 
-  const handleClick = () => {
+  const handleClick = React.useCallback(() => {
     setMenuOpen(!menuOpen);
-  };
+  }, [menuOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = React.useCallback(() => {
     logout();
     history.push('/login');
-  };
+  }, [logout, history]);
 
-  const handleAdminClick = () => {
+  const handleAdminClick = React.useCallback(() => {
     history.push('/admin');
     setMenuOpen(false);
-  };
+  }, [history]);
 
-  const isActive = (path) => {
+  const isActive = React.useCallback((path) => {
     if (path === '/fine-tuning' || path === '/retrieval' || path === '/multi-agent') {
       return location.pathname === path ? 'active' : '';
     }
@@ -70,21 +69,7 @@ function Header() {
     }
     
     return location.pathname === path ? 'active' : '';
-  };
-
-  const subMenuItems = [
-    { label: 'Generate Dataset', path: '/generate-dataset' },
-    { label: 'Fine-Tune', path: '/fine-tune' },
-  ];
-
-  const navigationItems = [
-    {
-      title: 'Home',
-      path: '/home',
-      icon: <HomeIcon />,
-    },
-    // ... rest of the navigation items
-  ];
+  }, [location.pathname]);
 
   return (
     <header className="app-header">
@@ -115,7 +100,18 @@ function Header() {
                   className={activeTab === 'multi-agent' ? 'active' : ''}
                   onClick={() => setActiveTab('multi-agent')}
                 >
-                  <GroupWorkIcon /> Multi-Agent Portal
+                  <img 
+                    src={agentTeamIcon} 
+                    alt="Multi-Agent Portal" 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      filter: 'invert(1)',
+                      marginRight: '5px',
+                      verticalAlign: 'middle'
+                    }} 
+                  /> 
+                  Multi-Agent Portal
                 </Link>
               </li>
               <li>
@@ -213,8 +209,8 @@ function Header() {
           <ul>
             <li>
               <Link 
-                to="/multi-agent" 
-                className={location.pathname === '/multi-agent' ? 'active' : ''}
+                to="/multi-agent/guide" 
+                className={location.pathname === '/multi-agent/guide' ? 'active' : ''}
               >
                 <HelpOutlineIcon /> Guide
               </Link>
@@ -232,7 +228,15 @@ function Header() {
                 to="/multi-agent/chat" 
                 className={isActive('/multi-agent/chat')}
               >
-                <ChatIcon /> Chat
+                <QuestionAnswerIcon /> Multi-Agent Chat
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/multi-agent/direct-chat" 
+                className={isActive('/multi-agent/direct-chat')}
+              >
+                <ChatIcon /> Direct Chat
               </Link>
             </li>
           </ul>

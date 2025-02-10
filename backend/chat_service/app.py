@@ -1,22 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-from utils.shared_state import shared_state
-from config import load_config
-from utils.vector_store.vectorstore import check_for_vectorstore, load_local_vectorstore, create_retriever
-from multiagent.processQuestion import process_question
+from pathlib import Path
+import shutil
+import sys
+from config_ import BUILDER_DIR
 
 
 class ChatMessage(BaseModel):
     message: str
+    team_name: str
 
 app = FastAPI()
-
-config = load_config()
-VS_PERSIST_DIR = config['VS_PERSIST_DIR']
-SEARCH_TYPE = config['SEARCH_TYPE']
-K = config['K']
 
 # Configure CORS
 app.add_middleware(
@@ -27,30 +22,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Check if a vector store exists at the VS_PERSIST_DIR location
-if check_for_vectorstore(VS_PERSIST_DIR):
-    shared_state.VECTOR_STORE = load_local_vectorstore(VS_PERSIST_DIR)
-else:
-    shared_state.VECTOR_STORE = None
-
-# If a vector store exists, create a retriever
-if shared_state.VECTOR_STORE:
-    shared_state.RETRIEVER = create_retriever(type=SEARCH_TYPE, vector_store=shared_state.VECTOR_STORE, k=K)
-else:
-    shared_state.RETRIEVER = None
-
 @app.post("/chat")
 async def chat(message: ChatMessage):
     try:
         print(f"Received message: {message.message}")
-        shared_state.QUESTION = message.message #TODO: add logic to ensure there is actually a question
+        print(f"Team name: {message.team_name}")
+        #shared_state.QUESTION = message.message
 
-        # TODO: Implement chat logic
-        response = process_question()
-        #response = {"response": f"Received message: {message.message}"}
-        return {"response": response}
+        # Now that we have a team name, we want to copy that team from the data directory
+        source_team_dir = BUILDER_DIR / "TEAMS" / message.team_name
+        chat_teams_dir = Path(__file__).parent / "chat_teams"
+        target_team_dir = chat_teams_dir / message.team_name
+        if not source_team_dir.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Team directory not found: {message.team_name}"
+            )
+
+        shutil.copytree(source_team_dir, target_team_dir, dirs_exist_ok=True)
+
+        try:
+            import importlib
+
+            # Add the team's directory to Python's path
+            team_dir = Path(__file__).parent / "chat_teams" / message.team_name
+            team_dir_str = str(team_dir)
+            sys.path.insert(0, team_dir_str)
+
+            try:
+                # Clean up any existing modules before importing
+                for key in list(sys.modules.keys()):
+                    module = sys.modules[key]
+                    # Check if module has a __file__ attribute and if it's from our team directory
+                    if hasattr(module, '__file__') and module.__file__ and \
+                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
+                        del sys.modules[key]
+                
+                # Import and process
+                module_name = "multiagent.processQuestion"
+                process_question_module = importlib.import_module(module_name)
+                process_question = process_question_module.processQuestion
+                
+                response = process_question(message.message)
+                return {"response": response}
+            finally:
+                # Clean up: remove the team's directory from sys.path
+                sys.path.remove(team_dir_str)
+                # Clean up all modules that were loaded from the team directory
+                for key in list(sys.modules.keys()):
+                    module = sys.modules[key]
+                    # Check if module has a __file__ attribute and if it's from our team directory
+                    if hasattr(module, '__file__') and module.__file__ and \
+                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
+                        del sys.modules[key]
+                
+        except ImportError as e:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Could not load process_question for team: {message.team_name}. Error: {str(e)}"
+            )
+
     except Exception as e:
         print(f"Error processing message: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete_team/{team_name}")
+async def delete_team(team_name: str):
+    try:
+        # Get path to team directory in chat_teams
+        chat_teams_dir = Path(__file__).parent / "chat_teams"
+        team_dir = chat_teams_dir / team_name
+
+        # Remove team directory if it exists
+        if team_dir.exists():
+            shutil.rmtree(team_dir)
+            return {"message": f"Team {team_name} deleted successfully from chat service"}
+        else:
+            return {"message": f"Team {team_name} not found in chat service"}
+
+    except Exception as e:
+        print(f"Error deleting team: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
