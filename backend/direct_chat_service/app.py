@@ -18,6 +18,7 @@ import asyncio
 import subprocess
 import shutil
 import json
+from chat_logger import ChatLogger
 
 app = FastAPI(
     title="Direct Chat Service",
@@ -44,6 +45,9 @@ SESSIONS_DIR = Path("sessions")
 
 # Add after SESSIONS_DIR constant
 DEFAULT_USER = "admin"
+
+# Initialize ChatLogger
+chat_logger = ChatLogger(SESSIONS_DIR)
 
 # Pydantic models
 class Message(BaseModel):
@@ -123,10 +127,32 @@ chat_with_history = RunnableWithMessageHistory(
     history_messages_key="history"
 )
 
-def get_or_create_history(session_id: str) -> ChatMessageHistory:
+async def reconstruct_chat_history(session_id: str, user_id: str = DEFAULT_USER) -> ChatMessageHistory:
+    """Reconstruct a ChatMessageHistory object from the JSONL log file."""
+    try:
+        history = ChatMessageHistory()
+        messages = await chat_logger.load_history(user_id, session_id)
+        
+        for msg in messages:
+            if msg["sender"] == "user":
+                history.add_user_message(msg["content"])
+            elif msg["sender"] == "ai":
+                history.add_ai_message(msg["content"])
+            # Skip system messages or unknown types
+        
+        return history
+    except Exception as e:
+        print(f"Error reconstructing chat history for session {session_id}: {str(e)}")
+        return ChatMessageHistory()  # Return empty history on error
+
+def get_or_create_history(session_id: str, user_id: str = DEFAULT_USER) -> ChatMessageHistory:
     """Get or create a message history for a session ID."""
     if session_id not in histories:
-        histories[session_id] = ChatMessageHistory()
+        # Try to load existing history from file
+        loop = asyncio.get_event_loop()
+        histories[session_id] = loop.run_until_complete(
+            reconstruct_chat_history(session_id, user_id)
+        )
     return histories[session_id]
 
 # Add before the router definitions
@@ -594,19 +620,64 @@ async def root_health_check():
     return {"status": "healthy", "timestamp": datetime.now()}
 
 @router.post("/chat/message", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
     try:
+        # Ensure we have a valid history for this session
+        if request.session_id not in histories:
+            # Try to load existing history first
+            histories[request.session_id] = await reconstruct_chat_history(request.session_id, user_id)
+
+        # Create message data for logging
+        user_message_data = {
+            "message_id": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+            "sender": "user",
+            "content": request.message,
+            "metadata": {
+                "session_id": request.session_id,
+                "user_id": user_id
+            }
+        }
+
+        # Log user message (don't await yet to avoid delaying the response)
+        log_task = asyncio.create_task(
+            chat_logger.log_message(user_id, request.session_id, user_message_data)
+        )
+
         # Get response using the runnable
         response = chat_with_history.invoke(
             {"input": request.message},
             {"configurable": {"session_id": request.session_id}}
         )
-        
+
+        # Create AI response data for logging
+        ai_message_data = {
+            "message_id": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+            "sender": "ai",
+            "content": response.content,
+            "metadata": {
+                "session_id": request.session_id,
+                "user_id": user_id
+            }
+        }
+
+        # Log AI response
+        await log_task  # Ensure user message is logged first
+        await chat_logger.log_message(user_id, request.session_id, ai_message_data)
+
         return ChatResponse(
-            message=response.content,  # Changed from 'response' to 'message'
+            message=response.content,
             timestamp=datetime.now()
         )
     except Exception as e:
+        # Log error if logging task exists and hasn't completed
+        try:
+            if 'log_task' in locals() and not log_task.done():
+                await log_task
+        except Exception:
+            pass
+        print(f"Error in chat endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/chat/history/{session_id}")
@@ -617,36 +688,35 @@ async def get_chat_history(session_id: str, user_id: str = DEFAULT_USER):
         if not is_valid:
             raise HTTPException(status_code=404, detail=f"Invalid session: {error}")
         
-        history = get_or_create_history(session_id)
-        messages = []
-        for msg in history.messages:
-            if isinstance(msg, HumanMessage):
-                sender = "user"
-                text = msg.content
-            elif isinstance(msg, AIMessage):
-                sender = "ai"
-                text = msg.content
-            elif isinstance(msg, SystemMessage):
-                continue  # Skip system messages
-            else:
-                continue  # Skip unknown message types
-                
-            messages.append({
-                "id": str(uuid.uuid4()),
-                "text": text,
-                "sender": sender,
-                "timestamp": datetime.now().isoformat()
+        # Load messages directly from JSONL file using chat_logger
+        messages = await chat_logger.load_history(user_id, session_id)
+        
+        # Convert the loaded messages to the expected format
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append({
+                "id": msg["message_id"],
+                "text": msg["content"],
+                "sender": msg["sender"],
+                "timestamp": msg["timestamp"]
             })
-        return messages
-    except HTTPException:
-        raise
+        
+        # Reconstruct chat history for future interactions
+        if session_id not in histories:
+            histories[session_id] = await reconstruct_chat_history(session_id, user_id)
+            print(f"Loaded chat history for session: {session_id}")
+            
+        return formatted_messages
+        
     except Exception as e:
+        print(f"Error in get_chat_history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/session")
 async def create_chat_session(user_id: str = DEFAULT_USER):
+    """Create a new chat session"""
+    session_id = str(uuid.uuid4())  # Move this outside the try block
     try:
-        session_id = str(uuid.uuid4())
         now = datetime.now()
         
         # Create session directories with user ID
@@ -661,9 +731,6 @@ async def create_chat_session(user_id: str = DEFAULT_USER):
             updated_at=now
         )
         chat_sessions[session_id] = session
-        
-        # Initialize message history
-        get_or_create_history(session_id)
         
         # Initialize and save session metadata
         metadata = {
@@ -685,6 +752,9 @@ async def create_chat_session(user_id: str = DEFAULT_USER):
     except Exception as e:
         # Clean up on error
         cleanup_session_files(session_id, user_id)
+        print(f"Error creating chat session: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/chat/sessions")
@@ -749,9 +819,9 @@ def validate_session_directory(session_id: str, user_id: str = DEFAULT_USER) -> 
 # Add after the chat_sessions dictionary definition but before the router definitions
 
 async def load_existing_sessions():
-    """Load existing sessions from disk on startup"""
+    """Load existing sessions metadata from disk on startup"""
     try:
-        print("Starting to load existing sessions...")
+        print("Starting to load existing sessions metadata...")
         if not SESSIONS_DIR.exists():
             print("No sessions directory found")
             return
@@ -762,7 +832,7 @@ async def load_existing_sessions():
                 continue
                 
             user_id = user_dir.name
-            print(f"Loading sessions for user: {user_id}")
+            print(f"Loading session metadata for user: {user_id}")
             
             # Scan for session directories
             for session_dir in user_dir.iterdir():
@@ -802,16 +872,13 @@ async def load_existing_sessions():
                     if "document_metadata" in metadata:
                         document_metadata[session_id] = metadata["document_metadata"]
                     
-                    # Initialize message history
-                    get_or_create_history(session_id)
-                    
-                    print(f"Successfully loaded session: {session_id}")
+                    print(f"Successfully loaded session metadata: {session_id}")
                     
                 except Exception as e:
                     print(f"Error loading session {session_id}: {str(e)}")
                     continue
                     
-        print(f"Finished loading sessions. Total sessions loaded: {len(chat_sessions)}")
+        print(f"Finished loading session metadata. Total sessions loaded: {len(chat_sessions)}")
         
     except Exception as e:
         print(f"Error loading existing sessions: {str(e)}")
@@ -825,7 +892,7 @@ async def startup_event():
         # Ensure base sessions directory exists
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         
-        # Load existing sessions
+        # Load existing sessions metadata only
         await load_existing_sessions()
         
     except Exception as e:

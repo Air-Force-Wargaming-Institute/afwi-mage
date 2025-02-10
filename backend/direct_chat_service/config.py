@@ -35,11 +35,18 @@ class CorsConfig(BaseModel):
     allowed_methods: List[str]
     allowed_headers: List[str]
 
+class ChatLoggingConfig(BaseModel):
+    enabled: bool = True
+    base_path: str = "sessions"
+    history_window: int = Field(ge=1, default=100)
+    max_token_window: int = Field(ge=1, default=8000)
+
 class Config(BaseModel):
     service: ServiceConfig
     ollama: OllamaConfig
     api: ApiConfig
     cors: CorsConfig
+    chat_logging: ChatLoggingConfig
 
 def load_config() -> Config:
     config_path = os.getenv('CONFIG_PATH', 'config.yaml')
