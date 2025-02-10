@@ -208,15 +208,8 @@ async def create_team(team_data: TeamCreate):
         if SHARED_STRUCTURE_PATH.exists():
             shutil.copytree(SHARED_STRUCTURE_PATH, team_shared_path, dirs_exist_ok=True)
         
-        # If users only submit one agent, use the direct-team_template.py template, otherwise we have a multi-agent team
-        if len(team_data.agents) == 1:
-            solo_agent = True
-            with open(TEMPLATES_PATH / "direct-team_template.py", "r") as f:
-                template = f.read()
-        else:# Load the team template
-            solo_agent = False
-            with open(TEMPLATES_PATH / "team_template.py", "r") as f:
-                template = f.read()
+        with open(TEMPLATES_PATH / "team_template.py", "r") as f:
+            template = f.read()
 
         # Create a list of 8 agents, filling empty slots with "null_X"
         agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Take the first 8 agents and remove _expert suffix
@@ -269,7 +262,6 @@ async def create_team(team_data: TeamCreate):
         agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
-        team_code = team_code.replace("{{SOLO_AGENT}}", str(solo_agent))
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
 
         # Add creation and modification dates
@@ -293,7 +285,6 @@ async def create_team(team_data: TeamCreate):
             config = f.read()
         replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
-        replaced_config = replaced_config.replace("{{SOLO_AGENT}}", str(solo_agent))
         replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions) # This has to happen at runtime
         with open(config_path, "w") as f:
             f.write(replaced_config)
@@ -524,16 +515,10 @@ async def update_team(team_name: str, team_data: TeamCreate):
                 old_agents = []
 
         # Load the team template
-        # If users only submit one agent, use the direct-team_template.py template, otherwise we have a multi-agent team
-        if len(team_data.agents) == 1:
-            solo_agent = True
-            with open(TEMPLATES_PATH / "direct-team_template.py", "r") as f:
-                template = f.read()
-        else:# Load the team template
-            solo_agent = False
-            with open(TEMPLATES_PATH / "team_template.py", "r") as f:
-                template = f.read()
+        with open(TEMPLATES_PATH / "team_template.py", "r") as f:
+            template = f.read()
         
+
         # Create a list of 8 agents, filling empty slots with "null_X"
         agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Remove _expert suffix
         while len(agents) < 8:
@@ -583,7 +568,6 @@ async def update_team(team_name: str, team_data: TeamCreate):
         agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
         team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
-        team_code = team_code.replace("{{SOLO_AGENT}}", str(solo_agent))
 
         # Set the created date and update modification date
         team_code = team_code.replace("{{CREATED_AT}}", created_date)
@@ -628,7 +612,6 @@ async def update_team(team_name: str, team_data: TeamCreate):
             config = f.read()
         replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
         replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
-        replaced_config = replaced_config.replace("{{SOLO_AGENT}}", str(solo_agent))
         replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
         with open(team_config_path, "w") as f:
             f.write(replaced_config)
