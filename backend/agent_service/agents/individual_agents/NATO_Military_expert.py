@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the NATO Military Expert in a multi-agent system
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#008000"
 CREATED_AT = "2025-02-04T14:45:55.393696"
-MODIFIED_AT = "2025-02-07T20:21:12.454361"
+MODIFIED_AT = "2025-02-10T16:31:01.379930"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -25,20 +25,6 @@ def NATO_Military_expert(state: GraphState, llm: ChatOpenAI) -> GraphState:
     question = state_dict["question"]
     whoami = "NATO_Military"
     config = load_config()
-    if bool(config["SOLO_AGENT"]):
-        prompt = PromptTemplate(
-            input_variables=["question"],
-            template="You are the NATO Military expert. Here is your job description: You are the NATO Military Expert in a multi-agent system. Concentrate on the capabilities, doctrine, and strategic objectives of NATO armed\n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Assess potential military actions or responses related to the query. \n2. Provide details on relevant military capabilities, technologies, or strategies. \n3. Explain how military considerations influence NATO\'s approach to the issue at hand. \n4. Discuss any recent military developments or exercises relevant to the query. Provide concrete examples and data from the documents to support your analysis.. You have been asked this question: {question}. Please provide a detailed and comprehensive answer to the question, to the best of your abilities."
-        )
-
-        chain = prompt | llm | StrOutputParser()
-        analysis = chain.invoke({
-            "question": question,
-        })
-
-        # Although this looks wonky and wrong, this is the easiest way to implement direct chat
-        return {"keys": {**state_dict, "synthesized_report": analysis, "last_actor": whoami}}
-
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -255,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the NATO Military Expert in a multi-agent system
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#008000"                                         #FF0000
 CREATED_AT = "2025-02-04T14:45:55.393696"                               #2024-12-15
-MODIFIED_AT = "2025-02-07T20:21:12.454361"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T16:31:01.379930"                             #2025-01-23

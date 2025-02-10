@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Domestic Stability expert in a multi-agent s
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#FF0000"
 CREATED_AT = "2025-02-03T21:46:07.835768"
-MODIFIED_AT = "2025-02-07T20:21:16.196981"
+MODIFIED_AT = "2025-02-10T16:31:05.451811"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -25,20 +25,6 @@ def PRC_Domestic_Stability_expert(state: GraphState, llm: ChatOpenAI) -> GraphSt
     question = state_dict["question"]
     whoami = "PRC_Domestic_Stability"
     config = load_config()
-    if bool(config["SOLO_AGENT"]):
-        prompt = PromptTemplate(
-            input_variables=["question"],
-            template="You are the PRC Domestic Stability expert. Here is your job description: You are the Domestic Stability expert in a multi-agent system.\n\nEvaluate internal social, demographic, and political factors in the PRC. \n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Explain how domestic issues influence PRC\'s approach to the query topic. \n2. Discuss relevant public opinion trends, ethnic tensions, or domestic challenges.\n3. Analyze how internal stability concerns affect PRCs decision-making. \n4. Identify any recent domestic developments that impact the issue. Provide specific examples from the documents of domestic factors and their effects.. You have been asked this question: {question}. Please provide a detailed and comprehensive answer to the question, to the best of your abilities."
-        )
-
-        chain = prompt | llm | StrOutputParser()
-        analysis = chain.invoke({
-            "question": question,
-        })
-
-        # Although this looks wonky and wrong, this is the easiest way to implement direct chat
-        return {"keys": {**state_dict, "synthesized_report": analysis, "last_actor": whoami}}
-
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -255,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the Domestic Stability expert in a multi-agent s
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#FF0000"                                         #FF0000
 CREATED_AT = "2025-02-03T21:46:07.835768"                               #2024-12-15
-MODIFIED_AT = "2025-02-07T20:21:16.196981"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T16:31:05.451811"                             #2025-01-23

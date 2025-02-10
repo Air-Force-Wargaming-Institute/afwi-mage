@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#008000"
 CREATED_AT = "2025-02-04T14:36:41.030688"
-MODIFIED_AT = "2025-02-07T20:21:14.301658"
+MODIFIED_AT = "2025-02-10T16:31:03.683871"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -25,20 +25,6 @@ def NATO_Regional_Dynamics_expert(state: GraphState, llm: ChatOpenAI) -> GraphSt
     question = state_dict["question"]
     whoami = "NATO_Regional_Dynamics"
     config = load_config()
-    if bool(config["SOLO_AGENT"]):
-        prompt = PromptTemplate(
-            input_variables=["question"],
-            template="You are the NATO Regional Dynamics expert. Here is your job description: You are the Regional Dynamics Expert in a multi-agent system. Examine NATO\'s relationships with neighboring countries, regional powers, and member-nation relationships. \n\nYour task is to use the moderator guidance and provided documents to answer the question.\n\nYour analysis should\n1. Explain how regional dynamics affect NATO\'s approach to the issue in the query.\n2. Discuss relevant historical context, territorial disputes, or shifting alliances. \n3. Analyze the positions and potential reactions of key regional players. \n4. Identify any recent regional developments or agreements that impact the issue. Provide specific examples of regional interactions from the documents and their implications.. You have been asked this question: {question}. Please provide a detailed and comprehensive answer to the question, to the best of your abilities."
-        )
-
-        chain = prompt | llm | StrOutputParser()
-        analysis = chain.invoke({
-            "question": question,
-        })
-
-        # Although this looks wonky and wrong, this is the easiest way to implement direct chat
-        return {"keys": {**state_dict, "synthesized_report": analysis, "last_actor": whoami}}
-
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -255,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#008000"                                         #FF0000
 CREATED_AT = "2025-02-04T14:36:41.030688"                               #2024-12-15
-MODIFIED_AT = "2025-02-07T20:21:14.301658"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T16:31:03.683871"                             #2025-01-23

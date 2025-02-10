@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Technology and Innovation Expert in a multi-
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#FF0000"
 CREATED_AT = "2025-02-03T21:52:37.092529"
-MODIFIED_AT = "2025-02-07T20:21:28.935636"
+MODIFIED_AT = "2025-02-10T16:31:22.112012"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -25,20 +25,6 @@ def PRC_Technology_and_Innovation_expert(state: GraphState, llm: ChatOpenAI) -> 
     question = state_dict["question"]
     whoami = "PRC_Technology_and_Innovation"
     config = load_config()
-    if bool(config["SOLO_AGENT"]):
-        prompt = PromptTemplate(
-            input_variables=["question"],
-            template="You are the PRC Technology and Innovation expert. Here is your job description: You are the Technology and Innovation Expert in a multi-agent system. Monitor the PRCs advancements in key technologies.\n\nYour task is to use the moderator guidance and provided documents to answer the question.\n\nYour analysis should\n1. Explain how technological factors relate to the issue in the query.\n2. Provide details on relevant advancements in AI, quantum computing, biotechnology, etc.\n3. Assess potential military and economic applications of these technologies.\n4. Discuss any recent technological breakthroughs or initiatives that impact the issue. Use specific examples from the documents of China\'s technological developments and their implications.. You have been asked this question: {question}. Please provide a detailed and comprehensive answer to the question, to the best of your abilities."
-        )
-
-        chain = prompt | llm | StrOutputParser()
-        analysis = chain.invoke({
-            "question": question,
-        })
-
-        # Although this looks wonky and wrong, this is the easiest way to implement direct chat
-        return {"keys": {**state_dict, "synthesized_report": analysis, "last_actor": whoami}}
-
     document_summary = state_dict[whoami+"_document_summary"]
     relevant_documents = state_dict["relevant_documents"]
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -255,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the Technology and Innovation Expert in a multi-
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#FF0000"                                         #FF0000
 CREATED_AT = "2025-02-03T21:52:37.092529"                               #2024-12-15
-MODIFIED_AT = "2025-02-07T20:21:28.935636"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T16:31:22.112012"                             #2025-01-23
