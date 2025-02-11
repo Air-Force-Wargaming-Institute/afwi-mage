@@ -10,6 +10,13 @@ const API_URLS = {
   UPLOAD: `${API_BASE_URL}:${process.env.REACT_APP_UPLOAD_SERVICE_PORT}`,
   EMBEDDING: `${API_BASE_URL}:${process.env.REACT_APP_EMBEDDING_SERVICE_PORT}`,
   AUTH: `${API_BASE_URL}:${process.env.REACT_APP_AUTH_SERVICE_PORT}`,
+  DIRECT_CHAT: `${API_BASE_URL}:${process.env.REACT_APP_DIRECT_CHAT_SERVICE_PORT}`,
 };
 
-export const getApiUrl = (service, endpoint) => `${API_URLS[service]}${endpoint}`;
+export const getApiUrl = (service, endpoint) => {
+  const baseUrl = API_URLS[service];
+  if (service === 'DIRECT_CHAT') {
+    return `${baseUrl}/api/v1${endpoint}`;
+  }
+  return `${baseUrl}${endpoint}`;
+};
