@@ -8,6 +8,8 @@ import re
 import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
+from agents.templates.agent_class_template import Agent
+from agents.templates.team_class_template import Team
 from config import INDIVIDUAL_AGENTS_PATH, TEAMS_PATH, TEMPLATES_PATH, BUILDER_DIR
 
 SHARED_TEAMS_PATH = BUILDER_DIR / "TEAMS"
@@ -152,13 +154,19 @@ logger = logging.getLogger(__name__)
 @router.post("/create_agent/")
 async def create_agent(agent_data: AgentCreate):
     try:
-
         # Format the agent name for file naming
-        formatted_name = format_agent_name(agent_data.name)
+        # formatted_name = format_agent_name(agent_data.name)
         
         # Load the agent template
-        with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
-            template = f.read()
+        # with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
+        #     template = f.read()
+
+        agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
+        try:
+            with open(agents_file, "r") as f:
+                agents = json.load(f.read())
+        except FileNotFoundError:
+            agents = []
         
         description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
         instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
@@ -166,32 +174,45 @@ async def create_agent(agent_data: AgentCreate):
         description = description.replace('\n', '\\n')
         instructions = instructions.replace('\n', '\\n')
 
+        agent = Agent.create(
+            name=agent_data.name,
+            description=description,
+            instructions=instructions,
+            llm_model=agent_data.llm_model,
+            color=agent_data.color,
+            vectorstores=[] # TODO: Add vectorstore selection in frontend and pass it to the backend
+        )
+        agent_json = agent.model_dump_json()
+        agents.append(json.loads(agent_json))
+
+        with open(agents_file, "w") as f:
+            json.dump(agents, f, indent=4)
         # Replace placeholders in the template
-        agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
-        agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", formatted_name)
-        agent_code = agent_code.replace("""{{AGENT_DESCRIPTION}}""", description)
-        agent_code = agent_code.replace("""{{AGENT_INSTRUCTIONS}}""", instructions)
-        agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
-        agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
-        agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
-        agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
+        # agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
+        # agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", formatted_name)
+        # agent_code = agent_code.replace("""{{AGENT_DESCRIPTION}}""", description)
+        # agent_code = agent_code.replace("""{{AGENT_INSTRUCTIONS}}""", instructions)
+        # agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
+        # agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
+        # agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
+        # agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
         
         # Add creation and modification dates
-        current_time = datetime.now().isoformat()
-        agent_code = agent_code.replace("{{CREATED_AT}}", current_time)
-        agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
+        # current_time = datetime.now().isoformat()
+        # agent_code = agent_code.replace("{{CREATED_AT}}", current_time)
+        # agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
         
         # Save the new agent file using the formatted name
-        with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}_expert.py", "w") as f:
-            f.write(agent_code)
+        # with open(f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}_expert.py", "w") as f:
+        #     f.write(agent_code)
 
         # After creating the agent file, copy it over to the shared directory
-        local_agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{formatted_name}_expert.py"
-        shared_agent_file_path = SHARED_AGENTS_PATH / f"{formatted_name}_expert.py"
-        os.makedirs(os.path.dirname(shared_agent_file_path), exist_ok=True)
-        shutil.copyfile(local_agent_file_path, shared_agent_file_path)
+        # local_agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{formatted_name}_expert.py"
+        # shared_agent_file_path = SHARED_AGENTS_PATH / f"{formatted_name}_expert.py"
+        # os.makedirs(os.path.dirname(shared_agent_file_path), exist_ok=True)
+        # shutil.copyfile(local_agent_file_path, shared_agent_file_path)
         
-        return {"message": f"Agent {agent_data.name} created successfully", "file_name": formatted_name}
+        return {"message": f"Agent {agent_data.name} created successfully", "file_name": str(agent.unique_id)}
     except Exception as e:
         logger.error(f"Error creating agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating agent: {str(e)}")

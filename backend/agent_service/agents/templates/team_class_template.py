@@ -11,8 +11,8 @@ class Team(BaseModel):
     description: str
     agents: Dict[str, Agent]
     color: str
-    created_at: datetime = Field(datetime.now(datetime.UTC))
-    last_modified: datetime = Field(datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    last_modified: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
 
     @property
     def unique_id(self) -> UUID:
