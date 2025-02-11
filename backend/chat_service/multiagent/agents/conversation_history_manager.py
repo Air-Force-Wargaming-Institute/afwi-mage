@@ -4,7 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
 #from webProject.utils.setup_logging import setup_logging
-from utils.shared_state import shared_state
+
 
 def conversation_history_manager(state: GraphState) -> GraphState:
     """
@@ -22,13 +22,13 @@ def conversation_history_manager(state: GraphState) -> GraphState:
     try:
         prompt = PromptTemplate(
             input_variables=["question", "conversation_history"],
-            template="You are the User-Proxy Moderator in a multi-agent system. Your role is to analyze the user's query and determine if it is related so something they mentioned previously, or something that one of your agents reported previously. It may be the case that there is no reference in their query, in which case you should simply return the user's query verbatim; do not write anything besides the user's query.\nHere is the contents of the conversation history:\n\n{conversation_history}\n\nHere is the user's query: {question}\nGiven this information, determine if the user's query references anything in the conversation history. If it does not, return the user's query verbatim. If it does, identify the most relevant parts of the conversation history that are related to the user's query, and then re-write the user's query to include those parts. Do not embellish or add extraneous or irrelevant information. Simply return the user's query with the relevant parts included. Make sure that anything you return is well written text that can be stored as a Python string." 
+            template="You are the User-Proxy Moderator in a multi-agent system. Your role is to analyze the user's query and determine if it is related so something they mentioned previously, or something that one of your agents reported previously. It may be the case that there is no reference in their query, in which case you should simply return the user's query verbatim; do not write anything besides the user's query. Absolutely do not explain your reasoning, or anything else if you have decided to return the user's query verbatim. \nHere is the contents of the conversation history:\n\n{conversation_history}\n\nHere is the user's new query: {question}\nGiven this information, determine if the user's query references anything in the conversation history. If it does not, return the user's query verbatim. If it does, identify the most relevant parts of the conversation history that are related to the user's query, and then re-write the user's query to include those parts. Do not embellish or add extraneous or irrelevant information. Simply return the user's query with the relevant parts included. Make sure that anything you return is well written text that can be stored as a Python string. Again, your response should be a single string that is a query and nothing else." 
         )
 
         chain = prompt | llm | StrOutputParser()
         new_question = chain.invoke({
             "question": question,
-            "conversation_history": shared_state.CONVERSATION or ""
+            "conversation_history": "\n\n".join([f"Question: {chat.question}\n" + "\n".join([f"{expert} Analysis: {analysis}" for expert, analysis in chat.expert_analyses.items()]) + "\n" + "-"*40 for chat in state.get('conversation_history', [])])
         })
 
         print(f"\n\t+++++++++++++++{new_question}")

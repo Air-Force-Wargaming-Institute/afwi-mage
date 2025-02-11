@@ -256,9 +256,8 @@ function MultiAgentChat() {
                 className={`${classes.message} ${
                   message.sender === 'user' ? classes.userMessage : classes.aiMessage
                 }`}
-              >
-                {message.text}
-              </Box>
+                dangerouslySetInnerHTML={{ __html: message.text }}
+              />
             ))}
             <div ref={messageEndRef} />
           </Box>
