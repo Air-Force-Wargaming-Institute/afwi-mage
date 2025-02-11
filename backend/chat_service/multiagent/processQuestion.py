@@ -4,7 +4,7 @@ from multiagent.graph.createGraph import create_graph
 from multiagent.session_manager import SessionManager
 import time
 from typing import Dict, Any
-from multiagent.chat import Chat
+from multiagent.support_models.chat import Chat
 from threading import Lock
 import threading
 import asyncio
