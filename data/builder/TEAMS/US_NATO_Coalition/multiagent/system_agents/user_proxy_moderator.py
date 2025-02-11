@@ -3,11 +3,12 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
+from multiagent.llm_manager import LLMManager
 from utils.helpers import identify_experts
 from team_config import load_config
 from utils.shared_state import shared_state
 
-def user_proxy_moderator(state: GraphState, llm: ChatOpenAI) -> GraphState:
+def user_proxy_moderator(state: GraphState) -> GraphState:
     """
     The User-Proxy Moderator
     This agent determines the best experts to pose the user's question to, based on the user's question and the experts available.
@@ -23,6 +24,8 @@ def user_proxy_moderator(state: GraphState, llm: ChatOpenAI) -> GraphState:
     state_dict = state["keys"]
     whoami = "moderator"
     question = state_dict["question"]
+
+    llm = LLMManager().llm
 
     prompt = PromptTemplate(
                 input_variables=["question", "next_expert"],

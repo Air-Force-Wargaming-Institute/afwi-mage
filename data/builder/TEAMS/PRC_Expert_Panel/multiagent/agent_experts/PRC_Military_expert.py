@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the PRC Military Expert in a multi-agent system.
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#FF0000"
 CREATED_AT = "2025-02-03T21:51:40.182777"
-MODIFIED_AT = "2025-02-10T16:31:15.667917"
+MODIFIED_AT = "2025-02-10T21:10:06.735569"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -241,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the PRC Military Expert in a multi-agent system.
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#FF0000"                                         #FF0000
 CREATED_AT = "2025-02-03T21:51:40.182777"                               #2024-12-15
-MODIFIED_AT = "2025-02-10T16:31:15.667917"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T21:10:06.735569"                             #2025-01-23

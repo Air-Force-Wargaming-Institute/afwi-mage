@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#008000"
 CREATED_AT = "2025-02-04T14:36:41.030688"
-MODIFIED_AT = "2025-02-10T16:31:03.683871"
+MODIFIED_AT = "2025-02-10T21:09:59.168714"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -241,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the Regional Dynamics Expert in a multi-agent sy
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#008000"                                         #FF0000
 CREATED_AT = "2025-02-04T14:36:41.030688"                               #2024-12-15
-MODIFIED_AT = "2025-02-10T16:31:03.683871"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T21:09:59.168714"                             #2025-01-23

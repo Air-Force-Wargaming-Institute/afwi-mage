@@ -3,8 +3,8 @@ TEAM_NAME = "PRC Expert Panel"
 TEAM_FILE_NAME = "PRC_Expert_Panel"
 TEAM_DESCRIPTION = """Panel of PRC domain experts"""
 TEAM_COLOR = "#FF0000"
-CREATED_AT = "2025-02-07T19:58:00.887437"
-MODIFIED_AT = "2025-02-10T16:31:22.188267"
+CREATED_AT = "2025-02-10T21:36:20.826808"
+MODIFIED_AT = "2025-02-10T21:36:33.091685"
 TEAM_INSTRUCTIONS = """""" # Do we actually need team instructions? Where would they be used?
 MEMORY_TYPE = "ConversationBufferMemory"
 MEMORY_KWARGS = {"max_token_limit": 2000}
@@ -78,9 +78,13 @@ def PRC_Expert_Panel_graph() -> StateGraph:
     # We don't stream the librarian because half of what it does (retrieving documents) cannot be streamed.
 
     #--------------------System Agents--------------------
-    workflow.add_node("conversation_history_manager", functools.partial(conversation_history_manager, llm=non_streaming_llm))
-    workflow.add_node("user_proxy_moderator", functools.partial(user_proxy_moderator, llm=streaming_llm))
-    workflow.add_node("librarian", functools.partial(librarian_agent, llm=non_streaming_llm))
+    # workflow.add_node("conversation_history_manager", functools.partial(conversation_history_manager, llm=non_streaming_llm))
+    # workflow.add_node("user_proxy_moderator", functools.partial(user_proxy_moderator, llm=streaming_llm))
+    # workflow.add_node("librarian", functools.partial(librarian_agent, llm=non_streaming_llm))
+    # workflow.add_node("synthesis", functools.partial(synthesis_agent, llm=streaming_llm))
+    workflow.add_node("conversation_history_manager", conversation_history_manager)
+    workflow.add_node("user_proxy_moderator", user_proxy_moderator)
+    workflow.add_node("librarian", librarian_agent)
     workflow.add_node("synthesis", functools.partial(synthesis_agent, llm=streaming_llm))
 
     #--------------------Expert Agents--------------------

@@ -40,19 +40,17 @@ def identify_experts(state: GraphState) -> GraphState:
         And the following list of available experts and their area of expertise:
         {experts_with_descriptions}
 
-        Please identify which expert or experts would be most relevant to answer this question. Only select experts from the available list. 
+        Please identify which expert or experts would be most relevant to answer this question. Only select experts from the available list. The number of experts you select should be between 1 and 8. Prefer to select more experts than fewer.
         If the question has nothing to do with any of the expert agents available, simply do not return a list of strings.
-        Consider the specific knowledge areas of each expert and how they might contribute to answering the question. If the user requests all the experts, be sure to return a list of all the experts.
+        Consider the specific knowledge areas of each expert and how they might contribute to answering the question. If the user requests all the experts or says something like "all the experts", or "all the agents", be sure to return a list of all the experts.
         Return your answer as a Python list of strings, containing only the names of the relevant experts.
-        For example: ["item_1", "item_2", "item_3"]
+        For example: ["item_1", "item_2", "item_3", "item_4", "item_5", "item_6", "item_7", "item_8"]
         Do not provide any further information and do not provide rational or commentary for your decision. Only return a Python list of strings.
         """
     )
 
-    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(EXPERT_NODES, EXPERT_INSTRUCTIONS))
-    # print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
+    experts_with_descriptions = "\n".join(f"\n- {expert}: {description}," for expert, description in zip(EXPERT_NODES, EXPERT_INSTRUCTIONS))
 
-    # Build the prompt, with the format of a bulleted list (eg. - prc_government: Expert on the structure, decision-making processes...).
     prompt = prompt_template.format(
         question=user_question,
         experts_with_descriptions = experts_with_descriptions

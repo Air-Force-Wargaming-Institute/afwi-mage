@@ -8,7 +8,7 @@ AGENT_INSTRUCTIONS = """You are the Global Influence Expert in a multi-agent sys
 LLM_MODEL = "gpt-3.5-turbo"
 COLOR = "#FF0000"
 CREATED_AT = "2025-02-03T21:49:41.795773"
-MODIFIED_AT = "2025-02-10T16:31:09.319055"
+MODIFIED_AT = "2025-02-10T21:10:10.193653"
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
@@ -241,4 +241,4 @@ AGENT_INSTRUCTIONS = """You are the Global Influence Expert in a multi-agent sys
 LLM_MODEL = "gpt-3.5-turbo"                                 #llama3.2
 COLOR = "#FF0000"                                         #FF0000
 CREATED_AT = "2025-02-03T21:49:41.795773"                               #2024-12-15
-MODIFIED_AT = "2025-02-10T16:31:09.319055"                             #2025-01-23
+MODIFIED_AT = "2025-02-10T21:10:10.193653"                             #2025-01-23
