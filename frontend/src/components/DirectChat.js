@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, memo } from 'react';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -6,7 +6,7 @@ import {
   TextField, 
   Button, 
   Box,
-  List as MUIList,
+  List,
   ListItem,
   ListItemText,
   IconButton,
@@ -39,7 +39,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Fade from '@material-ui/core/Fade';
-import { FixedSizeList } from 'react-window';
+import { FixedSizeList, VariableSizeList } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import memoize from 'memoize-one';
 import ReactMarkdown from 'react-markdown';
@@ -210,10 +210,12 @@ const useStyles = makeStyles((theme) => ({
   },
   messageArea: {
     flex: 1,
-    overflow: 'auto',
-    padding: theme.spacing(2),
-    display: 'flex',
-    flexDirection: 'column',
+    overflow: 'hidden',
+    height: '100%',
+    position: 'relative',
+    '& .ReactVirtualized__List': {
+      outline: 'none',
+    }
   },
   inputArea: {
     display: 'flex',
@@ -296,7 +298,6 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     borderRadius: '12px',
     border: '1px solid #e0e0e0',
-    maxWidth: '80%',
     wordBreak: 'break-word',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -310,7 +311,7 @@ const useStyles = makeStyles((theme) => ({
   userMessage: {
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
-    marginLeft: 'auto',
+    alignSelf: 'flex-end',
     borderRadius: '12px 12px 0 12px',
     border: 'none',
     '& $messageContent': {
@@ -326,7 +327,6 @@ const useStyles = makeStyles((theme) => ({
   aiMessage: {
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
-    marginRight: 'auto',
     borderRadius: '12px 12px 12px 0',
     '& pre': {
       margin: '8px 0',
@@ -387,7 +387,8 @@ const useStyles = makeStyles((theme) => ({
   messageContainer: {
     position: 'relative',
     width: '100%',
-    padding: theme.spacing(1),
+    display: 'flex',
+    flexDirection: 'column',
     '&:hover .copyButton': {
       opacity: 1,
       transform: 'translateY(0)',
@@ -1123,42 +1124,104 @@ const Row = React.memo(({ index, style, data }) => {
 });
 
 // Update the message area in the DirectChat component
-const MessageArea = React.memo(({ messages, handleRetry, handleBookmark, bookmarkedMessages, isLoading, classes }) => {
+const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMessages, isLoading, classes }) => {
   const messageEndRef = useRef(null);
   const listRef = useRef(null);
-  const itemSize = 150;
+  const [scrollToIndex, setScrollToIndex] = useState(undefined);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  
+  const getItemSize = useCallback((index) => {
+    const message = messages[index];
+    let height = 80; // Base height
+    const lines = message.text.split('\n').length;
+    height += lines * 20; // Add height for each line
+    if (message.text.includes('```')) {
+      height += 100; // Extra height for code blocks
+    }
+    return height;
+  }, [messages]);
 
-  const itemData = createItemData(messages, handleRetry, handleBookmark, bookmarkedMessages);
-
-  useEffect(() => {
-    if (messageEndRef.current) {
-      messageEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback(() => {
+    if (listRef.current && messages.length > 0) {
+      listRef.current.scrollToItem(messages.length - 1);
     }
   }, [messages.length]);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, scrollToBottom]);
+
+  const renderMessage = useCallback(({ index, style }) => {
+    const message = messages[index];
+    const isBookmarked = bookmarkedMessages.some(msg => msg.messageId === message.id);
+
+    return (
+      <ListItem 
+        style={{
+          ...style,
+          display: 'flex',
+          padding: '8px 0',
+          width: '100%',
+          justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
+          alignItems: 'flex-start'
+        }}
+        disableGutters
+      >
+        <Box 
+          id={`message-${message.id}`}
+          className={`${classes.message} ${
+            message.sender === 'user' ? classes.userMessage : classes.aiMessage
+          }`}
+          style={{ 
+            width: 'auto',
+            maxWidth: '80%',
+            marginLeft: message.sender === 'user' ? 'auto' : '0',
+            marginRight: message.sender === 'user' ? '0' : 'auto'
+          }}
+        >
+          <MemoizedMessageContent 
+            content={message.text} 
+            isUser={message.sender === 'user'} 
+            timestamp={message.timestamp}
+            sender={message.sender}
+            onRetry={
+              message.sender === 'system' && message.text.includes('Error:') 
+                ? () => handleRetry(messages[messages.length - 2]?.text) 
+                : undefined
+            }
+            messageId={message.id}
+            onBookmark={() => handleBookmark(message)}
+            isBookmarked={isBookmarked}
+          />
+        </Box>
+      </ListItem>
+    );
+  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages]);
+
   return (
     <Box className={classes.messageArea}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <AutoSizer>
-          {({ height, width }) => (
-            <FixedSizeList
-              ref={listRef}
-              height={height - (isLoading ? 100 : 0)}
-              width={width}
-              itemCount={messages.length}
-              itemSize={itemSize}
-              itemData={itemData}
-              overscanCount={5}
-              style={{
-                padding: '16px 0',
-                scrollBehavior: 'smooth',
-              }}
-            >
-              {Row}
-            </FixedSizeList>
-          )}
-        </AutoSizer>
-      </div>
+      <AutoSizer>
+        {({ height, width }) => (
+          <VariableSizeList
+            ref={listRef}
+            height={height - (isLoading ? 100 : 0)}
+            width={width}
+            itemCount={messages.length}
+            itemSize={getItemSize}
+            overscanCount={5}
+            onItemsRendered={({ visibleStartIndex }) => {
+              const isAtTop = visibleStartIndex === 0;
+              const isAtBottom = visibleStartIndex + 10 >= messages.length;
+              setShowScrollTop(!isAtTop);
+              setShowScrollBottom(!isAtBottom);
+            }}
+          >
+            {renderMessage}
+          </VariableSizeList>
+        )}
+      </AutoSizer>
+
       {isLoading && (
         <div className={classes.typingIndicator}>
           <Typography className="loading-header">
@@ -1174,6 +1237,18 @@ const MessageArea = React.memo(({ messages, handleRetry, handleBookmark, bookmar
           </div>
         </div>
       )}
+
+      {showScrollBottom && (
+        <Button
+          className={classes.scrollBottomButton}
+          onClick={scrollToBottom}
+          variant="contained"
+          size="small"
+        >
+          <KeyboardArrowDownIcon />
+        </Button>
+      )}
+
       <div ref={messageEndRef} />
     </Box>
   );
@@ -1686,6 +1761,14 @@ const DirectChat = () => {
     setClassificationLevel(newValue);
   };
 
+  useEffect(() => {
+    return () => {
+      setMessages([]);
+      setChatSessions([]);
+      setBookmarkedMessages([]);
+    };
+  }, []);
+
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
@@ -1698,7 +1781,7 @@ const DirectChat = () => {
           >
             Start New Chat Session
           </Button>
-          <MUIList>
+          <List>
             {chatSessions.map((session) => (
               <React.Fragment key={session.id}>
                 <ListItem 
@@ -1750,7 +1833,7 @@ const DirectChat = () => {
                 <Divider />
               </React.Fragment>
             ))}
-          </MUIList>
+          </List>
         </Paper>
         <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           {!currentSessionId && (
