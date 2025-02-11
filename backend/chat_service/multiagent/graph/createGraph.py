@@ -1,3 +1,4 @@
+import logging
 from typing import Dict
 from multiagent.agents import *
 from config import load_config
@@ -11,20 +12,18 @@ from multiagent.graph.routers import (
 from langgraph.graph import StateGraph, END
 from multiagent.graphState import GraphState, ExpertState, ModGuidanceState, CollabState
 
+logger = logging.getLogger(__name__)
+
 def collab_subgraph_start(state: CollabState):
-    sys.stdout.flush()
     return
 
 def expert_subgraph_start(state: ExpertState):
-    sys.stdout.flush()
     return
 
 def modguidance_subgraph_entry(state: ModGuidanceState):
-    sys.stdout.flush()
     return
 
 def expert_subgraph_report_start(state: GraphState):
-    sys.stdout.flush()
     return
 
 def create_graph() -> StateGraph:
@@ -32,7 +31,10 @@ def create_graph() -> StateGraph:
     Creates the agent graph for the multi-agent system.
     Defines the process for streaming agent output instead of waiting for the entire output to be generated.
     """
+    logger.info("Creating new agent graph")
+    
     subworkflow = StateGraph(ExpertState)
+    logger.debug("Adding expert subgraph nodes")
     subworkflow.add_node("expert_subgraph_entry", expert_subgraph_entry)
     subworkflow.add_node("expert_subgraph_start", expert_subgraph_start)
 
@@ -94,4 +96,5 @@ def create_graph() -> StateGraph:
     #workflow.add_edge("expert_subgraph_report", "synthesis")
     #workflow.add_edge("synthesis", END)
     
+    logger.info("Agent graph creation complete")
     return workflow.compile()

@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from config import load_config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from utils.shared_state import shared_state
 from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
 from multiagent.agents.helpers import create_banner
@@ -18,18 +17,10 @@ def identify_experts(state: GraphState):
     It uses the LLM to determine the experts that are most relevant to the user's question.
     """
     config = load_config()
-    EXPERT_LIST = config['EXPERT_AGENTS']
+    expert_list = config['EXPERT_AGENTS']
     llm = LLMManager().llm
     user_question = state['question']
-    expert_descriptions = [
-        "Expert on the structure, decision-making processes, and key figures within the PRC government.",
-        "Expert on the capabilities, doctrine, and strategic objectives of the People's Liberation Army (PLA).",
-        "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
-        "Expert on the PRC's relationships with neighboring countries and regional powers.",
-        "Expert on the PRC's efforts to expand its global influence.",
-        "Expert on internal social, demographic, and political factors in the PRC.",
-        "Expert on the PRC's recent advancements in key technologies."
-    ]
+    expert_descriptions = config['EXPERT_DESCRIPTIONS']
     
     prompt_template = PromptTemplate(
         input_variables=["question", "experts_with_descriptions"],
@@ -45,7 +36,7 @@ def identify_experts(state: GraphState):
         """
     )
 
-    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(EXPERT_LIST, expert_descriptions))
+    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_list, expert_descriptions))
     print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
 
     prompt = prompt_template.format(
@@ -57,14 +48,12 @@ def identify_experts(state: GraphState):
     
     if response is None:
         print("\t***INFO: LLM provided improper response, falling back to all experts.***")
-        experts_list = EXPERT_LIST
+        selected_experts = expert_list
     else:
-        experts_list = response.experts
+        selected_experts = response.experts
     
     # We don't want the LLM to have made up experts, so validate the list.
-    validated_experts = [expert for expert in experts_list if expert in EXPERT_LIST]
+    validated_experts = [expert for expert in selected_experts if expert in expert_list]
     print("\tINFO: In identify_experts\n\tSelected Experts:\n\t"+str(validated_experts))
-    
-    shared_state.EXPERT_LIST_GENERATED = True
 
     return {**state, "selected_experts": validated_experts} 

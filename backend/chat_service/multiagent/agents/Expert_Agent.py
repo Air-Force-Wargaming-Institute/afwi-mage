@@ -2,7 +2,6 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import GraphState, ExpertState, CollabState
 from config import load_config
-from utils.shared_state import shared_state
 from multiagent.agents.helpers import determine_collaboration, create_banner
 from multiagent.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
@@ -115,7 +114,6 @@ def expert_subgraph_report(state: ExpertState):
         analysis_inputs["collab_report"] = collab_report
     
     analysis = create_chain(prompt, **analysis_inputs)
-    shared_state.CONVERSATION += f"\t---{whoami} Analysis {shared_state.ITERATION}: {analysis},\n\n"
     
     return {'expert_final_analysis': {whoami: analysis}}
 
@@ -132,8 +130,8 @@ def collab_subgraph_entry(state: CollabState):
     
     # Generate collaboration analysis
     prompt = PromptTemplate(
-        input_variables=["my_expert_analysis", "collab_areas", "agent_instructions", "whoami"],
-        template="""You are the {whoami} expert in a in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.. Your task is to review the report and add to, or rewrite, the areas of the report you were asked to assist with, in order to strengthen the report. You also have access to a set of documents to help you with your task.\n\nReport: {my_expert_analysis}\n\nAreas of the report to improve: {collab_areas}\n\nAnalysis:"""
+        input_variables=["my_expert_analysis", "collab_areas", "agent_instructions", "whoami", "document_summary", "relevant_docs"],
+        template="""You are the {whoami} expert in a in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions}\n\nYour task is to use the moderator guidance and provided documents to answer the question. \nYour analysis should \n1. Provide insights into political motivations and likely policy directions relevant to the query. \n2. Explain the roles and influences of key government bodies and officials. \n3. Discuss recent policy decisions or shifts that relate to the user\'s question. \n4. Analyze how the government\'s structure affects the issue at hand. Be detailed and specific. Support your points with relevant facts and examples found in the document summary and relevant documents.Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n Your task is to review the report and add to, or rewrite, the areas of the report you were asked to assist with, in order to strengthen the report. You also have access to a set of documents to help you with your task.\n\nReport: {my_expert_analysis}\n\nAreas of the report to improve: {collab_areas}\n\nAnalysis:"""
     )
     
     collab_report = create_chain(
@@ -141,7 +139,9 @@ def collab_subgraph_entry(state: CollabState):
         my_expert_analysis=state['expert_analysis'][my_expert],
         collab_areas=state['expert_collab_areas'][my_expert],
         agent_instructions=whoami + "_AGENT_INSTRUCTIONS",
-        whoami=whoami
+        whoami=whoami,
+        document_summary=document_summary,
+        relevant_docs=relevant_documents
     )
     
     return {'expert_collaborator_analysis': [{"report": collab_report, "name": whoami, "expert": my_expert}]}
