@@ -3,32 +3,9 @@ from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState, ModGuidanceState
 from multiagent.llm_manager import LLMManager
-<<<<<<< HEAD:data/builder/TEAMS/PRC_Expert_Panel/multiagent/system_agents/user_proxy_moderator.py
-from utils.helpers import identify_experts
-from team_config import load_config
-from utils.shared_state import shared_state
-
-def user_proxy_moderator(state: GraphState) -> GraphState:
-    """
-    The User-Proxy Moderator
-    This agent determines the best experts to pose the user's question to, based on the user's question and the experts available.
-    Then it acts as a router to keep to program flowing from one expert to the next.
-    Once all the selected experts have provided their analysis, the program will flow to the Synthesis Agent, who will provide a final answer.
-    """
-
-    if shared_state.PASS_THROUGH:
-        shared_state.PASS_THROUGH = False
-        return state
-
-    print("\n\n\t---------------------------\n\n\t---USER-PROXY MODERATOR---\n\n\t---------------------------\n\n\t")
-    state_dict = state["keys"]
-    whoami = "moderator"
-    question = state_dict["question"]
-=======
 from langchain_core.messages import AIMessage
 from typing import Set
 from multiagent.agents.helpers import create_banner
->>>>>>> origin/Agent-Parallelization:backend/chat_service/multiagent/agents/user_proxy_moderator.py
 
 def get_Moderator_Guidance(state: ModGuidanceState):
     print(create_banner(f"{state['expert']} get_Moderator_Guidance"))  

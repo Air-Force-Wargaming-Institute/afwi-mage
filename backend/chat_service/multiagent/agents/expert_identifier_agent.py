@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from config import load_config
+from config_ import load_config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from multiagent.graphState import GraphState

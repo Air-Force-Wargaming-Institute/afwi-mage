@@ -1,7 +1,7 @@
 from langchain_core.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.callbacks.manager import CallbackManager
 from langchain_openai import ChatOpenAI
-from team_config import load_config
+from config_ import load_config
 from typing import AsyncGenerator, Union, Any, Coroutine
 
 class LLMManager:

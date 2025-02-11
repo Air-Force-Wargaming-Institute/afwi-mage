@@ -1,7 +1,7 @@
 import logging
 from typing import Dict
 from multiagent.agents import *
-from config import load_config
+from config_ import load_config
 import sys
 from multiagent.graph.routers import (
     router_expert_subgraphs,

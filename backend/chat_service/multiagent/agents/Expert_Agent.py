@@ -1,7 +1,7 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import GraphState, ExpertState, CollabState
-from config import load_config
+from config_ import load_config
 from multiagent.agents.helpers import determine_collaboration, create_banner
 from multiagent.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
