@@ -4,7 +4,7 @@ from datetime import datetime
 import logging
 from pathlib import Path
 from typing import Dict, Optional, Any
-from config import load_config
+from config_ import load_config
 from threading import Lock
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import FAISS
 from langchain_core.retrievers import BaseRetriever
-from config import load_config
+from config_ import load_config
 from utils.vector_store.vectorstore import check_for_vectorstore, load_local_vectorstore, create_retriever
 
 class RetrieverManager:

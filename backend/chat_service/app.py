@@ -6,8 +6,8 @@ from pathlib import Path
 import os
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-
-from config import load_config
+import shutil
+from config_ import load_config
 from multiagent.processQuestion import process_question
 
 config = load_config()
