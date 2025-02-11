@@ -1,0 +1,19 @@
+[
+    {
+        "name": "PRC_Expert_Panel",
+        "_unique_id": "f47ac10b-58cc-4372-a567-0e02b2c3d490",
+        "description": "Comprehensive analysis team focusing on PRC government, military, economic, regional, global, domestic, and technological developments",
+        "color": "#3498DB",
+        "agents": [
+            "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d480",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d481",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d482",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d483",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d484",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d485"
+        ],
+        "created_at": "2024-03-20T00:00:00Z",
+        "last_modified": "2024-03-20T00:00:00Z"
+    }
+]
