@@ -1,11 +1,28 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import logging
 from pathlib import Path
-import shutil
-import sys
-from config_ import BUILDER_DIR
+import os
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
+from config import load_config
+from multiagent.processQuestion import process_question
+
+config = load_config()
+
+# Ensure log directory exists
+log_dir = Path(config['LOG_PATH'])
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=log_dir / 'chat_service.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class ChatMessage(BaseModel):
     message: str
@@ -22,69 +39,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Increase the number of workers based on your server capacity
+executor = ThreadPoolExecutor(max_workers=20)
+
+# Create a semaphore to limit concurrent API calls if needed
+MAX_CONCURRENT_REQUESTS = 10
+semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
 @app.post("/chat")
-async def chat(message: ChatMessage):
-    try:
-        print(f"Received message: {message.message}")
-        print(f"Team name: {message.team_name}")
-        #shared_state.QUESTION = message.message
-
-        # Now that we have a team name, we want to copy that team from the data directory
-        source_team_dir = BUILDER_DIR / "TEAMS" / message.team_name
-        chat_teams_dir = Path(__file__).parent / "chat_teams"
-        target_team_dir = chat_teams_dir / message.team_name
-        if not source_team_dir.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Team directory not found: {message.team_name}"
-            )
-
-        shutil.copytree(source_team_dir, target_team_dir, dirs_exist_ok=True)
-
+async def chat_endpoint(request_data: dict):
+    message = request_data.get("message")
+    user_id = request_data.get("user_id")
+    session_id = request_data.get("session_id")
+    
+    logger.info(f"Received chat message: {message}")
+    
+    async with semaphore:  # Limit concurrent requests
         try:
-            import importlib
-
-            # Add the team's directory to Python's path
-            team_dir = Path(__file__).parent / "chat_teams" / message.team_name
-            team_dir_str = str(team_dir)
-            sys.path.insert(0, team_dir_str)
-
-            try:
-                # Clean up any existing modules before importing
-                for key in list(sys.modules.keys()):
-                    module = sys.modules[key]
-                    # Check if module has a __file__ attribute and if it's from our team directory
-                    if hasattr(module, '__file__') and module.__file__ and \
-                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
-                        del sys.modules[key]
-                
-                # Import and process
-                module_name = "multiagent.processQuestion"
-                process_question_module = importlib.import_module(module_name)
-                process_question = process_question_module.processQuestion
-                
-                response = process_question(message.message)
-                return {"response": response}
-            finally:
-                # Clean up: remove the team's directory from sys.path
-                sys.path.remove(team_dir_str)
-                # Clean up all modules that were loaded from the team directory
-                for key in list(sys.modules.keys()):
-                    module = sys.modules[key]
-                    # Check if module has a __file__ attribute and if it's from our team directory
-                    if hasattr(module, '__file__') and module.__file__ and \
-                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
-                        del sys.modules[key]
-                
-        except ImportError as e:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Could not load process_question for team: {message.team_name}. Error: {str(e)}"
+            # Process the question in a thread pool
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                executor,
+                lambda: asyncio.run(process_question(
+                    question=message,
+                    user_id=user_id,
+                    session_id=session_id
+                ))
             )
-
-    except Exception as e:
-        print(f"Error processing message: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+            
+            logger.info(f"Generated response with session {response.get('session_id')}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error processing message: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/delete_team/{team_name}")
 async def delete_team(team_name: str):
