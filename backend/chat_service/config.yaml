@@ -28,10 +28,10 @@ FOLDER_PATH: './pdfs'
 WORD_PATH: './word_docs'
 
 # Path to log folder
-LOG_PATH: './logs'
+LOG_PATH: '/app/data/logs'
 
 # Path to session storage
-SESSION_PATH: './data/multiagent_sessions'
+SESSION_PATH: '/app/data/multiagent_sessions'
 
 # Location to persist the vector store 
 VS_PERSIST_DIR: './vectorstore2'

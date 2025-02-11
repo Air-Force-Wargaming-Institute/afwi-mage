@@ -8,7 +8,8 @@ class GraphState(TypedDict):
     conversation_history: str
     iteration: int
     expert_list: list[str]
-    expert_descriptions: list[str]
+    expert_descriptions: Dict[str, str]
+    expert_instructions: Dict[str, str]
     selected_experts: list[str]
     expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
     expert_analysis: Annotated[Dict[str, str], operator.__ior__]

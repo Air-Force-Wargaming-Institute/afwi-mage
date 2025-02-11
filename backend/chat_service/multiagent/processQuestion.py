@@ -2,6 +2,7 @@ import logging
 from multiagent.graphState import GraphState
 from multiagent.graph.createGraph import create_graph
 from multiagent.session_manager import SessionManager
+from multiagent.support_models.team_class import Team
 import time
 from typing import Dict, Any
 from multiagent.support_models.chat import Chat
@@ -9,6 +10,8 @@ from threading import Lock
 import threading
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from uuid import UUID
+from multiagent.support_models.agent_class import Agent
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +71,24 @@ def format_conversation_entry(question: str, state: GraphState) -> str:
     conversation_entry += "\n" + "-"*80 + "\n"  # Add separator between conversations
     return conversation_entry
 
-async def process_question(question: str, user_id: str = None, session_id: str = None):
+async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None):
     """
     Process a question through the multiagent system, maintaining session state
     Thread-safe and async-ready version
+    
+    Args:
+        question: The question to process
+        user_id: Optional user ID
+        session_id: Optional session ID
+        team_id: Required UUID of the team to use (as string)
+        
+    Raises:
+        ValueError: If team_id is not provided or invalid
+        Exception: If team is not found or other processing errors occur
     """
+    if not team_id:
+        raise ValueError("team_id is required")
+        
     conversation_history = []
     iteration = 0
     
@@ -80,6 +96,53 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         start_time = time.time()
         session_manager = SessionManager()
         
+        # Load required team
+        try:
+            # First load all available agents
+            available_agents = Agent.load_agents()
+            logger.info(f"Loaded {len(available_agents)} available agents")
+            
+            # Then load teams (which will use the loaded agents)
+            teams = Team.load_teams()
+            team_uuid = UUID(team_id)
+            team = next((t for t in teams.values() if t._unique_id == team_uuid), None)
+            if not team:
+                raise Exception(f"Team with UUID {team_id} not found")
+            logger.info(f"Loaded team: {team.name}")
+            
+            # Extract agent names and instructions from the team's agents
+            agent_names = []
+            agent_instructions = {}
+            agent_descriptions = {}
+            for agent_uuid in team.agents:
+                agent = available_agents.get(agent_uuid)
+                if agent:
+                    agent_names.append(agent.name)
+                    agent_instructions[agent.name] = agent.instructions
+                    agent_descriptions[agent.name] = agent.description
+                else:
+                    logger.warning(f"Agent {agent_uuid} not found in available agents")
+            
+            if not agent_names:
+                raise Exception(f"No valid agents found for team {team.name}")
+                
+            logger.info(f"Loaded agents: {', '.join(agent_names)}")
+            
+            # Add to inputs for graph processing
+            inputs = {
+                "question": question,
+                "conversation_history": conversation_history,
+                "iteration": iteration,
+                "expert_list": agent_names,
+                "expert_descriptions": agent_descriptions,
+                "expert_instructions": agent_instructions
+            }
+            
+        except ValueError:
+            raise ValueError(f"Invalid UUID format for team_id: {team_id}")
+        except Exception as e:
+            raise Exception(f"Error loading team: {str(e)}")
+
         # Session management with thread-safe locks
         if session_id:
             session_data = session_manager.get_session(session_id)
@@ -99,12 +162,6 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         graph = get_or_create_graph()
         iteration += 1
         
-        inputs = {
-            "question": question,
-            "conversation_history": conversation_history,
-            "iteration": iteration
-        }
-
         # Process graph stream asynchronously
         final_output = await process_graph_stream(graph, inputs)
         

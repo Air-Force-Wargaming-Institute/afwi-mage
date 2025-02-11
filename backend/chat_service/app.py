@@ -51,6 +51,7 @@ async def chat_endpoint(request_data: dict):
     message = request_data.get("message")
     user_id = request_data.get("user_id")
     session_id = request_data.get("session_id")
+    team_id = request_data.get("team_id")
     
     logger.info(f"Received chat message: {message}")
     
@@ -63,7 +64,8 @@ async def chat_endpoint(request_data: dict):
                 lambda: asyncio.run(process_question(
                     question=message,
                     user_id=user_id,
-                    session_id=session_id
+                    session_id=session_id,
+                    team_id=team_id
                 ))
             )
             
