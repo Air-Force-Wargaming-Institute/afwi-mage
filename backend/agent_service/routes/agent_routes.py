@@ -102,58 +102,6 @@ def format_agent_name(name):
 def format_team_name(name):
     return re.sub(r'[\s\-]+', '_', name)
 
-async def update_teams_containing_agent(old_agent_name: str, new_agent_name: str):
-    """Updates teams that contain the specified agent, handling name changes."""
-    try:
-        # Get all team files
-        for filename in os.listdir(TEAMS_PATH):
-            if not filename.endswith('.py'):
-                continue
-                
-            team_name = filename[:-3]  # Remove .py extension
-            team_path = TEAMS_PATH / filename
-            
-            # Read the team file
-            with open(team_path, 'r') as f:
-                content = f.read()
-            
-            # Check if this team contains the modified agent
-            agents_pattern = r'AGENT_FILE_NAMES\s*=\s*\[(.*?)\]'
-            if match := re.search(agents_pattern, content):
-                agents_list = [a.strip().strip("'") for a in match.group(1).split(',') if a.strip()]
-                
-                # If the agent is in this team, update the team
-                if old_agent_name in agents_list:
-                    # Extract team data using regex
-                    name_pattern = r'TEAM_NAME\s*=\s*"([^"]*)"'
-                    desc_pattern = r'TEAM_DESCRIPTION\s*=\s*"""([^"]*)"""'
-                    color_pattern = r'TEAM_COLOR\s*=\s*"([^"]*)"'
-                    memory_type_pattern = r'MEMORY_TYPE\s*=\s*"([^"]*)"'
-                    memory_kwargs_pattern = r'MEMORY_KWARGS\s*=\s*(\{[^}]*\})'
-                    #instructions_pattern = r'TEAM_INSTRUCTIONS\s*=\s*"""([^"]*)"""'
-                    
-                    # Replace old agent name with new one in the list
-                    agents_list = [new_agent_name if a == old_agent_name else a for a in agents_list]
-                    
-                    # Create TeamCreate object
-                    team_data = TeamCreate(
-                        name=re.search(name_pattern, content).group(1),
-                        description=re.search(desc_pattern, content).group(1),
-                        color=re.search(color_pattern, content).group(1),
-                        memory_type=re.search(memory_type_pattern, content).group(1),
-                        memory_kwargs=json.loads(re.search(memory_kwargs_pattern, content).group(1)),
-                        team_instructions="",
-                        agents=[f"{a}_expert" for a in agents_list]
-                    )
-                    
-                    # Update the team
-                    await update_team(team_name, team_data)
-                    print(f"Updated team {team_name} containing agent {old_agent_name}")
-                    
-    except Exception as e:
-        logger.error(f"Error updating teams containing agent {old_agent_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating teams: {str(e)}")
-
 # Update the error handling to use logging
 logger = logging.getLogger(__name__)
 
@@ -167,13 +115,13 @@ async def create_agent(agent_data: AgentCreate):
         except FileNotFoundError:
             agents = []
         
-        description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
-        instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
+        # description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
+        # instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
 
         agent = Agent.create(
             name=agent_data.name,
-            description=description,
-            instructions=instructions,
+            description=agent_data.description,
+            instructions=agent_data.agent_instructions,
             llm_model=agent_data.llm_model,
             color=agent_data.color,
             vectorstores=[] # TODO: Add vectorstore selection in frontend and pass it to the backend
@@ -187,7 +135,6 @@ async def create_agent(agent_data: AgentCreate):
         except IOError as e:
             logger.error(f"Failed to write agents file: {e}")
             raise HTTPException(status_code=500, detail="Failed to save agent")
-        
         return {"message": f"Agent {agent_data.name} created successfully", "file_name": str(agent.unique_id)}
     except Exception as e:
         logger.error(f"Error creating agent: {str(e)}")
@@ -196,106 +143,28 @@ async def create_agent(agent_data: AgentCreate):
 @router.post("/create_team/")
 async def create_team(team_data: TeamCreate):
     try:
-        # Format the team name for file naming
-        formatted_name = format_team_name(team_data.name)
+        teams_file = TEAMS_PATH / "teams.json"
+        try:
+            with open(teams_file, "r") as f:
+                teams = json.load(f)
+        except FileNotFoundError:
+            teams = []
 
-        # Create the shared team directory and copy over the necessary structure
-        team_shared_path = SHARED_TEAMS_PATH / formatted_name # eg. app/shared/TEAMS/{team_file_name}
-        team_shared_path.mkdir(parents=True, exist_ok=True)
-        if SHARED_STRUCTURE_PATH.exists():
-            shutil.copytree(SHARED_STRUCTURE_PATH, team_shared_path, dirs_exist_ok=True)
+        team = Team.create(
+            name=team_data.name,
+            description=team_data.description,
+            color=team_data.color,
+            agents=team_data.agents
+        )
+        teams.append(json.loads(team.model_dump_json()))
         
-        with open(TEMPLATES_PATH / "team_template.py", "r") as f:
-            template = f.read()
-
-        # Create a list of 8 agents, filling empty slots with "null_X"
-        agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Take the first 8 agents and remove _expert suffix
-        while len(agents) < 8:
-            agents.append(f"null_{len(agents)}")
-
-        # For each agent, get the instructions and append them to the agent_file_instructions list
-        # while we are at it, for each agent file also copy it from AGENTS into TEAMS/{team_name}/multiagent/agent_experts
-        agent_instructions_list = []
-        for agent in team_data.agents:
-            agent_name = agent.replace('_expert', '')
-            agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{agent_name}_expert.py"
-            shutil.copyfile(agent_file_path, SHARED_TEAMS_PATH / formatted_name / "multiagent" / "agent_experts" / f"{agent_name}_expert.py")
-            try:
-                with open(agent_file_path, 'r') as f:
-                    content = f.read()
-                    # Use regex to extract AGENT_INSTRUCTIONS
-                    instructions_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
-                    if match := re.search(instructions_pattern, content, re.DOTALL):
-                        # Properly escape for YAML
-                        instructions = (match.group(1)
-                            .replace('"', '\\"')     # Escape double quotes
-                            .replace('\n', '\\n')    # Escape newlines
-                            .replace("'", "\\'"))    # Escape single quotes
-                        agent_instructions_list.append(f'"{instructions}"')
-                    else:
-                        logger.warning(f"Could not find AGENT_INSTRUCTIONS in {agent_file_path}")
-                        agent_instructions_list.append('""')
-            except Exception as e:
-                logger.error(f"Error reading agent file {agent_file_path}: {str(e)}")
-                agent_instructions_list.append('""')
-        
-        # Replace placeholders in the template
-        team_code = template.replace("{{TEAM_NAME}}", team_data.name)
-        team_code = team_code.replace("{{TEAM_FILE_NAME}}", formatted_name)
-        team_code = team_code.replace("{{TEAM_DESCRIPTION}}", team_data.description)
-        team_code = team_code.replace("{{TEAM_COLOR}}", team_data.color)
-        team_code = team_code.replace("{{TEAM_INSTRUCTIONS}}", team_data.team_instructions)
-        team_code = team_code.replace("{{MEMORY_TYPE}}", team_data.memory_type)
-        team_code = team_code.replace("{{MEMORY_KWARGS}}", json.dumps(team_data.memory_kwargs))
-        team_code = team_code.replace("{{AGENT_ZERO}}", agents[0])
-        team_code = team_code.replace("{{AGENT_ONE}}", agents[1])
-        team_code = team_code.replace("{{AGENT_TWO}}", agents[2])
-        team_code = team_code.replace("{{AGENT_THREE}}", agents[3])
-        team_code = team_code.replace("{{AGENT_FOUR}}", agents[4])
-        team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
-        team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
-        team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        agent_file_names = ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents])
-        agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
-        team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents]))
-
-        # Add creation and modification dates
-        current_time = datetime.now().isoformat()
-        team_code = team_code.replace("{{CREATED_AT}}", current_time)
-        team_code = team_code.replace("{{MODIFIED_AT}}", current_time)
-        
-        # Save the new team file
-        team_file_path = f"{TEAMS_PATH}/{formatted_name}.py"
-        with open(team_file_path, "w") as f:
-            f.write(team_code)
-
-        # After creating the team file, copy it over to the shared directory
-        local_team_file_path = TEAMS_PATH / f"{formatted_name}.py"
-        shared_team_file_path = team_shared_path / "multiagent" / "team" / f"{formatted_name}.py"
-        shutil.copyfile(local_team_file_path, shared_team_file_path)
-
-        # Do a find-replace for the team_config.yaml file in the shared directory
-        config_path = team_shared_path / "team_config.yaml"
-        with open(config_path, "r") as f:
-            config = f.read()
-        replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
-        replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
-        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions) # This has to happen at runtime
-        with open(config_path, "w") as f:
-            f.write(replaced_config)
-
-
-        # Update processQuestion.py
-        process_question_path = team_shared_path / "multiagent" / "processQuestion.py"
-        with open(process_question_path, "r") as f:
-            process_question = f.read()
-        replaced_process = process_question.replace("{{TEAM_FILE_NAME}}", formatted_name)
-        with open(process_question_path, "w") as f:
-            f.write(replaced_process)
-        
-        return {"message": f"Team {team_data.name} created successfully", "file_name": formatted_name}
+        try:
+            with open(teams_file, "w") as f:
+                json.dump(teams, f, indent=4)
+        except IOError as e:
+            logger.error(f"Failed to write teams file: {e}")
+            raise HTTPException(status_code=500, detail="Failed to save team")        
+        return {"message": f"Team {team_data.name} created successfully", "file_name": str(team.unique_id)}
     except Exception as e:
         logger.error(f"Error creating team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating team: {str(e)}")
@@ -320,7 +189,7 @@ async def list_agents():
         for agent in agents_data:
             agent_details = {
                 "name": agent["name"],
-                "file_name": agent["unique_id"],
+                "unique_id": agent["unique_id"],
                 "description": agent["description"],
                 "llm_model": agent["llm_model"],
                 "agent_instructions": agent["instructions"],
@@ -341,294 +210,183 @@ async def list_teams():
     logger = logging.getLogger(__name__)
     logger.info(f"Listing teams from directory: {TEAMS_PATH}")
     try:
-        for filename in os.listdir(TEAMS_PATH):
-            if filename.endswith('.py'):
-                team_path = os.path.join(TEAMS_PATH, filename)
-                logger.info(f"Processing team file: {team_path}")
-                with open(team_path, 'r') as f:
-                    content = f.read()
-                    try:
-                        team_details = {
-                            "name": content.split('TEAM_NAME = "')[1].split('"')[0],
-                            "file_name": filename[:-3],  # Remove .py extension
-                            "description": content.split('TEAM_DESCRIPTION = """')[1].split('"""')[0],
-                            "color": content.split('TEAM_COLOR = "')[1].split('"')[0],
-                            "agents": eval(content.split('AGENT_FILE_NAMES = [')[1].split(']')[0]),
-                            "createdAt": content.split('CREATED_AT = "')[1].split('"')[0],
-                            "modifiedAt": content.split('MODIFIED_AT = "')[1].split('"')[0]
+        # Load agents into a dictionary with unique_id as key
+        agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
+        agents_dict = {}
+        if agents_file.exists():
+            try:
+                with open(agents_file, "r") as f:
+                    agents_data = json.load(f)
+                    agents_dict = {
+                        agent["unique_id"]: {
+                            k: v for k, v in agent.items() 
+                            if k != "unique_id"
                         }
-                        teams.append(team_details)
-                        logger.info(f"Successfully processed team: {team_details['name']}")
-                    except Exception as e:
-                        logger.error(f"Error processing team {filename}: {str(e)}")
+                        for agent in agents_data
+                    }
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding agents.json: {str(e)}")
+
+        teams_file = TEAMS_PATH / "teams.json"
+        if not teams_file.exists():
+            logger.info("No teams.json file found; no teams exist")
+            return {"teams": []}
+        try:
+            with open(teams_file, "r") as f:
+                teams_data = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding teams.json: {str(e)}")
+            return {"teams": []}
+        
+        for team in teams_data:
+            # Get full agent details using the dictionary
+            agent_details = [
+                agents_dict.get(agent_id, {"name": agent_id})
+                for agent_id in team["agents"]
+            ]
+            # Extract just the names for the response
+            agent_names = [agent["name"] for agent in agent_details]
+            
+            team_details = {
+                "name": team["name"],
+                "unique_id": team["unique_id"],
+                "description": team["description"],
+                "color": team["color"],
+                "agents": agent_names,
+                "createdAt": team["created_at"],
+                "modifiedAt": team["last_modified"]
+            }
+            teams.append(team_details)
         logger.info(f"Total teams found: {len(teams)}")
         return {"teams": teams}
     except Exception as e:
         logger.error(f"Error listing teams: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing teams: {str(e)}")
 
-@router.put("/update_agent/{agent_name}")
-async def update_agent(agent_name: str, agent_data: AgentCreate):
+@router.put("/update_agent/{unique_id}")
+async def update_agent(unique_id: str, agent_data: AgentCreate):
     try:
-        # Format the new agent name for file naming
-        new_formatted_name = format_agent_name(agent_data.name)
-        old_formatted_name = format_agent_name(agent_name)
-        
-        # Remove _expert suffix if it exists in the old name before adding it again
-        old_formatted_name = old_formatted_name.replace('_expert', '')
-        new_formatted_name = new_formatted_name.replace('_expert', '')
-        
-        old_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{old_formatted_name}_expert.py"
-        print("OLD AGENT PATH: ", old_agent_path)
-        new_agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{new_formatted_name}_expert.py"
-        print("NEW AGENT PATH: ", new_agent_path)
+        agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
+        if not agents_file.exists():
+            raise HTTPException(status_code=404, detail=f"Agents file not found")
 
-        # Add paths for shared directory
-        old_shared_agent_path = SHARED_AGENTS_PATH / f"{old_formatted_name}_expert.py"
-        new_shared_agent_path = SHARED_AGENTS_PATH / f"{new_formatted_name}_expert.py"
+        # Load existing agents
+        with open(agents_file, "r") as f:
+            agents = json.load(f)
 
-        if not os.path.exists(old_agent_path):
-            raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
-
-        # Open the old agent file and grab the created date
-        with open(old_agent_path, 'r') as f:
-            content = f.read()
-            created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
-            created_date = re.search(created_pattern, content, re.DOTALL).group(1)
+        # Find the agent to update; 
+        agent_index = None
+        for i, agent in enumerate(agents):
+            if str(agent["unique_id"]) == unique_id:
+                agent_index = i
+                break
+        if agent_index is None:
+            raise HTTPException(status_code=404, detail=f"Agent with ID {unique_id} not found")
     
-        # Load the agent template
-        with open(TEMPLATES_PATH / "agent_template.py", "r") as f:
-            template = f.read()
-        
-        description = agent_data.description.replace('\r\n', '\n').replace('\r', '\n')
-        instructions = agent_data.agent_instructions.replace('\r\n', '\n').replace('\r', '\n')
-         # Create the escaped strings
-        description = description.replace('\n', '\\n')
-        instructions = instructions.replace('\n', '\\n')
+        # Find the agent being modified and fit it back into an agent class
+        selected_agent = Agent(**agents[agent_index])
+        selected_agent.name = agent_data.name
+        selected_agent.description = agent_data.description
+        selected_agent.instructions = agent_data.agent_instructions
+        selected_agent.llm_model = agent_data.llm_model
+        selected_agent.color = agent_data.color
+        selected_agent.vectorstores = [] # TODO: Add vectorstore selection in frontend and pass it to the backend
 
-        # Replace placeholders in the template
-        agent_code = template.replace("{{AGENT_NAME}}", agent_data.name)
-        agent_code = agent_code.replace("{{AGENT_FILE_NAME}}", new_formatted_name)
-        agent_code = agent_code.replace("{{AGENT_DESCRIPTION}}", description)
-        agent_code = agent_code.replace("{{AGENT_INSTRUCTIONS}}", instructions)
-        agent_code = agent_code.replace("{{LLM_MODEL}}", agent_data.llm_model)
-        agent_code = agent_code.replace("{{MEMORY_TYPE}}", agent_data.memory_type)
-        agent_code = agent_code.replace("{{MEMORY_KWARGS}}", json.dumps(agent_data.memory_kwargs))
-        agent_code = agent_code.replace("{{COLOR}}", agent_data.color)
+        agents[agent_index] = json.loads(selected_agent.model_dump_json())
         
-        # Set the created date
-        agent_code = agent_code.replace("{{CREATED_AT}}", created_date)
+        # Save the updated agents
+        with open(agents_file, "w") as f:
+            json.dump(agents, f, indent=4)
 
-        # Update modification date
-        current_time = datetime.now().isoformat()
-        agent_code = agent_code.replace("{{MODIFIED_AT}}", current_time)
-        
-        # Save the updated agent file
-        with open(new_agent_path, "w") as f:
-            f.write(agent_code)
-
-        # Copy the updated file to the shared directory
-        os.makedirs(os.path.dirname(new_shared_agent_path), exist_ok=True)
-        shutil.copyfile(new_agent_path, new_shared_agent_path)
-        
-        # If the name has changed, remove old files from both locations
-        if old_formatted_name != new_formatted_name:
-            os.remove(old_agent_path)
-            if old_shared_agent_path.exists():
-                old_shared_agent_path.unlink()
-        
-        # Now update all teams that contain the agent
-        await update_teams_containing_agent(old_formatted_name, new_formatted_name)
-
-        return {"message": f"Agent {agent_data.name} updated successfully", "file_name": new_formatted_name}
+        return {"message": f"Agent {unique_id} updated successfully", "file_name": agent_data.name}
     except Exception as e:
         logger.error(f"Error updating agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating agent: {str(e)}")
 
-@router.delete("/delete_agent/{agent_name}")
-async def delete_agent(agent_name: str):
+@router.delete("/delete_agent/{unique_id}")
+async def delete_agent(unique_id: str):
     try:
-        # Format agent name and construct paths
-        formatted_name = format_agent_name(agent_name)
-        agent_path = f"{INDIVIDUAL_AGENTS_PATH}/{formatted_name}.py"
-        shared_agent_path = SHARED_AGENTS_PATH / f"{formatted_name}.py"
+        agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
+        if not agents_file.exists():
+            raise HTTPException(status_code=404, detail=f"Agents file not found")
 
-        # Check if agent exists
-        if not os.path.exists(agent_path):
-            raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
-        
-        # Remove from individual agents directory
-        os.remove(agent_path)
+        # Load existing agents
+        with open(agents_file, "r") as f:
+            agents = json.load(f)
 
-        # Remove from shared directory if exists
-        if shared_agent_path.exists():
-            shared_agent_path.unlink()
-        
-        return {"message": f"Agent {agent_name} deleted successfully"}
+        # Find the agent to delete
+        agent_index = None
+        for i, agent in enumerate(agents):
+            if str(agent["unique_id"]) == unique_id:
+                agent_index = i
+                break
+        if agent_index is None:
+            raise HTTPException(status_code=404, detail=f"Agent with ID {unique_id} not found")
+
+        # Remove the agent from the list
+        agents.pop(agent_index)
+
+        # Save the updated agents
+        with open(agents_file, "w") as f:
+            json.dump(agents, f, indent=4)
+
+        return {"message": f"Agent {unique_id} deleted successfully"}
     except Exception as e:
         logger.error(f"Error deleting agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting agent: {str(e)}")
 
-@router.put("/update_team/{team_name}")
-async def update_team(team_name: str, team_data: TeamCreate):
+@router.put("/update_team/{unique_id}")
+async def update_team(unique_id: str, team_data: TeamCreate):
     try:
-        old_formatted_name = format_team_name(team_name)
-        new_formatted_name = format_team_name(team_data.name)
-        
-        old_team_path = f"{TEAMS_PATH}/{old_formatted_name}.py"
-        new_team_path = f"{TEAMS_PATH}/{new_formatted_name}.py"
-
-        # Update shared directory if name changed
-        old_shared_path = SHARED_TEAMS_PATH / old_formatted_name
-        new_shared_path = SHARED_TEAMS_PATH / new_formatted_name
-        if old_formatted_name != new_formatted_name and old_shared_path.exists():
-            shutil.move(str(old_shared_path), str(new_shared_path))
-
-        if not os.path.exists(old_team_path):
-            raise HTTPException(status_code=404, detail=f"Team {team_name} not found")
-
-        # Get the original created date
-        with open(old_team_path, 'r') as f:
-            content = f.read()
-            created_pattern = r'CREATED_AT\s*=\s*"([^"]*)"'
-            created_date = re.search(created_pattern, content, re.DOTALL).group(1)
-            
-            agents_pattern = r'AGENT_FILE_NAMES\s*=\s*\[(.*?)\]'
-            if match := re.search(agents_pattern, content):
-                old_agents = [a.strip().strip("'") for a in match.group(1).split(',') if a.strip()]
-            else:
-                old_agents = []
-
-        # Load the team template
-        with open(TEMPLATES_PATH / "team_template.py", "r") as f:
-            template = f.read()
-        
-
-        # Create a list of 8 agents, filling empty slots with "null_X"
-        agents = [agent.replace('_expert', '') for agent in team_data.agents[:8]]  # Remove _expert suffix
-        while len(agents) < 8:
-            agents.append(f"null_{len(agents)}")
-
-        agent_instructions_list = []
-        for agent in team_data.agents:
-            agent_name = agent.replace('_expert', '')
-            agent_file_path = INDIVIDUAL_AGENTS_PATH / f"{agent_name}_expert.py"
-            #shared_agent_file_path = SHARED_TEAMS_PATH / "multiagent" / "agent_experts" / f"{new_formatted_name}_expert.py"
-            shutil.copyfile(agent_file_path, SHARED_TEAMS_PATH / new_formatted_name / "multiagent" / "agent_experts" / f"{agent_name}_expert.py")
+        # Load agents into a dictionary with unique_id as key
+        agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
+        agents_dict = {}
+        if agents_file.exists():
             try:
-                with open(agent_file_path, 'r') as f:
-                    content = f.read()
-                    # Use regex to extract AGENT_INSTRUCTIONS
-                    instructions_pattern = r'AGENT_INSTRUCTIONS\s*=\s*"""((?:[^\\]|\\.)*?)"""'
-                    if match := re.search(instructions_pattern, content, re.DOTALL):
-                        instructions = (match.group(1)
-                            .replace('"', '\\"')     # Escape double quotes
-                            .replace('\n', '\\n')    # Escape newlines
-                            .replace("'", "\\'"))    # Escape single quotes
-                        agent_instructions_list.append(f'"{instructions}"')
-                    else:
-                        logger.warning(f"Could not find AGENT_INSTRUCTIONS in {agent_file_path}")
-                        agent_instructions_list.append('""')
-            except Exception as e:
-                logger.error(f"Error reading agent file {agent_file_path}: {str(e)}")
-                agent_instructions_list.append('""')
+                with open(agents_file, "r") as f:
+                    agents_data = json.load(f)
+                    agents_dict = {
+                        agent["unique_id"]: {
+                            k: v for k, v in agent.items() 
+                            if k != "unique_id"
+                        }
+                        for agent in agents_data
+                    }
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding agents.json: {str(e)}")
+
+        teams_file = TEAMS_PATH / "teams.json"
+        if not teams_file.exists():
+            logger.info("No teams.json file found; no teams exist")
+            return {"teams": []}
+        try:
+            with open(teams_file, "r") as f:
+                teams = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding teams.json: {str(e)}")
+            return {"teams": []}
         
-        # Replace placeholders in the template
-        team_code = template.replace("{{TEAM_NAME}}", team_data.name)
-        team_code = team_code.replace("{{TEAM_FILE_NAME}}", new_formatted_name)
-        team_code = team_code.replace("{{TEAM_DESCRIPTION}}", team_data.description)
-        team_code = team_code.replace("{{TEAM_COLOR}}", team_data.color)
-        team_code = team_code.replace("{{TEAM_INSTRUCTIONS}}", team_data.team_instructions)
-        team_code = team_code.replace("{{MEMORY_TYPE}}", team_data.memory_type)
-        team_code = team_code.replace("{{MEMORY_KWARGS}}", json.dumps(team_data.memory_kwargs))
-        team_code = team_code.replace("{{AGENT_ZERO}}", agents[0])
-        team_code = team_code.replace("{{AGENT_ONE}}", agents[1])
-        team_code = team_code.replace("{{AGENT_TWO}}", agents[2])
-        team_code = team_code.replace("{{AGENT_THREE}}", agents[3])
-        team_code = team_code.replace("{{AGENT_FOUR}}", agents[4])
-        team_code = team_code.replace("{{AGENT_FIVE}}", agents[5])
-        team_code = team_code.replace("{{AGENT_SIX}}", agents[6])
-        team_code = team_code.replace("{{AGENT_SEVEN}}", agents[7])
-        agent_file_names = ", ".join([f"'{format_agent_name(agent.replace('_expert', ''))}'" for agent in team_data.agents])
-        agent_file_instructions = ", ".join([instr for instr in agent_instructions_list])
-        team_code = team_code.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
-        team_code = team_code.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
+        # Find the team to update
+        team_index = None
+        for i, team in enumerate(teams):
+            if str(team["unique_id"]) == unique_id:
+                team_index = i
+                break
+        if team_index is None:
+            raise HTTPException(status_code=404, detail=f"Team with ID {unique_id} not found")
+        selected_team = Team(**teams[team_index])
+        selected_team.name = team_data.name
+        selected_team.description = team_data.description
+        selected_team.color = team_data.color
+        selected_team.agents = team_data.agents
 
-        # Set the created date and update modification date
-        team_code = team_code.replace("{{CREATED_AT}}", created_date)
-        current_time = datetime.now().isoformat()
-        team_code = team_code.replace("{{MODIFIED_AT}}", current_time)
+        teams[team_index] = json.loads(selected_team.model_dump_json())
+
+        # Save the updated agents
+        with open(teams_file, "w") as f:
+            json.dump(teams, f, indent=4)
         
-        # Save the updated team file
-        with open(new_team_path, "w") as f:
-            f.write(team_code)
-        
-        # If the name has changed, remove the old file
-        if old_formatted_name != new_formatted_name:
-            os.remove(old_team_path)
-
-        # Update shared directory if name changed
-        old_shared_path = SHARED_TEAMS_PATH / old_formatted_name
-        new_shared_path = SHARED_TEAMS_PATH / new_formatted_name
-        if old_formatted_name != new_formatted_name and old_shared_path.exists():
-            shutil.move(str(old_shared_path), str(new_shared_path))
-
-        # Update the team file in shared directory
-        team_folder_path = new_shared_path / "multiagent" / "team"
-        # Clear the team folder first
-        if team_folder_path.exists():
-            # Remove old team file if name changed
-            if old_formatted_name != new_formatted_name:
-                old_team_file = team_folder_path / f"{old_formatted_name}.py"
-                if old_team_file.exists():
-                    old_team_file.unlink()
-        else:
-            team_folder_path.mkdir(parents=True, exist_ok=True)
-        
-        # Now copy the team file
-        shared_team_file_path = team_folder_path / f"{new_formatted_name}.py"
-        shutil.copyfile(new_team_path, shared_team_file_path)
-
-        # Replace the team_config.py with the template copy
-        team_shared_path = SHARED_TEAMS_PATH / new_formatted_name
-        team_config_path = team_shared_path / "team_config.yaml"
-        config_template_path = SHARED_STRUCTURE_PATH / "team_config.yaml"
-        with open(config_template_path, "r") as f:
-            config = f.read()
-        replaced_config = config.replace("{{AGENT_FILE_NAMES}}", agent_file_names)
-        replaced_config = replaced_config.replace("{{TEAM_NAME}}", team_data.name)
-        replaced_config = replaced_config.replace("{{AGENT_FILE_INSTRUCTIONS}}", agent_file_instructions)
-        with open(team_config_path, "w") as f:
-            f.write(replaced_config)
-
-        # Update processQuestion.py
-        process_question_template = SHARED_STRUCTURE_PATH / "multiagent" / "processQuestion.py"
-        process_question_path = new_shared_path / "multiagent" / "processQuestion.py"
-        with open(process_question_template, "r") as f:
-            process_question = f.read()
-        replaced_process = process_question.replace("{{TEAM_FILE_NAME}}", new_formatted_name)
-        with open(process_question_path, "w") as f:
-            f.write(replaced_process)
-        
-        # If name changed, remove old team file from shared directory
-        if old_formatted_name != new_formatted_name:
-            old_shared_team_file = old_shared_path / "teams" / f"{old_formatted_name}.py"
-            if old_shared_team_file.exists():
-                old_shared_team_file.unlink()
-        
-        # Get the new list of agents (without _expert suffix)
-        new_agents = [agent.replace('_expert', '') for agent in team_data.agents]
-
-        # Clean up removed agent files from the shared directory
-        experts_dir = new_shared_path / "multiagent" / "agent_experts"
-        if experts_dir.exists():
-            for old_agent in old_agents:
-                if old_agent not in new_agents:
-                    old_agent_file = experts_dir / f"{old_agent}_expert.py"
-                    if old_agent_file.exists():
-                        old_agent_file.unlink()
-
-        return {"message": f"Team {team_data.name} updated successfully", "file_name": new_formatted_name}
+        return {"message": f"Team {team_data.name} updated successfully", "file_name": unique_id}
     except Exception as e:
         logger.error(f"Error updating team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating team: {str(e)}")
@@ -700,22 +458,23 @@ async def get_available_teams():
     logger.info(f"Listing teams from directory: {teams_dir}")
     
     try:
-        if not os.path.exists(teams_dir):
-            logger.error(f"Teams directory not found: {teams_dir}")
+        teams_file = TEAMS_PATH / "teams.json"
+        if not teams_file.exists():
+            logger.info("No teams.json file found; no teams exist")
             return {"teams": []}
             
-        for filename in os.listdir(teams_dir):
-            if filename.endswith('.py'):
-                team_name = filename[:-3]  # Remove .py extension
-                # Skip if it starts with _ or .
-                if team_name.startswith('_') or team_name.startswith('.'):
-                    continue
-                    
-                teams.append({
-                    "id": team_name,
-                    "name": team_name.replace('_', ' '),
-                    "file_name": team_name
-                })
+        try:
+            with open(teams_file, "r") as f:
+                teams_data = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding teams.json: {str(e)}")
+            return {"teams": []}
+                
+        for team in teams_data:
+            teams.append({
+                "id": team["unique_id"],
+                "name": team["name"]
+            })
                 
         logger.info(f"Total teams found: {len(teams)}")
         return {"teams": teams}

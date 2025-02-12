@@ -1387,7 +1387,7 @@ function MultiAgentChat() {
                   </MenuItem>
                 ) : (
                   availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.file_name}>
+                    <MenuItem key={team.id} value={team.name}>
                       {team.name}
                     </MenuItem>
                   ))

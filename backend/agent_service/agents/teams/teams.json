@@ -1,0 +1,30 @@
+[
+    {
+        "name": "qwerty",
+        "unique_id": "05657d71-7186-4733-a2a8-6b65b2a4fe9c",
+        "description": "qwertyuiop",
+        "agents": [
+            "e1113c05-0ef4-4b07-8382-40c44a435d0d",
+            "b5b4b6a8-ab83-407e-b7fc-a87dec1e21c9",
+            "a5198e9c-42be-4671-a7e3-14a22f59750a",
+            "4486704e-96a1-4153-9cc6-ec9cdf31e91c",
+            "b4c36209-4d6d-4ab7-b24d-66fca9799c0d"
+        ],
+        "color": "#FF7F50",
+        "created_at": "2025-02-12T18:44:27.754708Z",
+        "last_modified": "2025-02-12T21:31:37.824924Z"
+    },
+    {
+        "name": "blue",
+        "unique_id": "ff1b50d0-9d90-4836-9f77-febd1c5f932b",
+        "description": "hfdkjsaljowieu",
+        "agents": [
+            "a5198e9c-42be-4671-a7e3-14a22f59750a",
+            "b5b4b6a8-ab83-407e-b7fc-a87dec1e21c9",
+            "b4c36209-4d6d-4ab7-b24d-66fca9799c0d"
+        ],
+        "color": "#0000FF",
+        "created_at": "2025-02-12T19:45:48.126153Z",
+        "last_modified": "2025-02-12T21:31:55.825118Z"
+    }
+]
