@@ -143,77 +143,54 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         except Exception as e:
             raise Exception(f"Error loading team: {str(e)}")
 
-        # Session management with thread-safe locks
+        # Session handling with new format
         if session_id:
-            session_data = session_manager.get_session(session_id)
-            if session_data:
-                conversation_history = [Chat.from_dict(chat_dict) for chat_dict in session_data["conversation_history"]]
-                iteration = session_data["iteration"]
-                logger.info(f"Loaded existing session {session_id}")
-            else:
-                logger.warning(f"Session {session_id} not found, creating new session")
-                session_id = session_manager.create_session(user_id) if user_id else None
-        elif user_id:
-            session_id = session_manager.create_session(user_id)
-            logger.info(f"Created new session {session_id}")
-        
+            session = session_manager.get_session(session_id)
+            if not session:
+                session_id = session_manager.create_session(team_id)
+                logger.info(f"Created new session: {session_id}")
+        else:
+            session_id = session_manager.create_session(team_id)
+            logger.info(f"Created new session: {session_id}")
+
         # Process the question
         logger.info(f"Processing question: {question}")
         graph = get_or_create_graph()
-        iteration += 1
         
         # Process graph stream asynchronously
         final_output = await process_graph_stream(graph, inputs)
         
-        if not final_output:
+        if not final_output or 'synthesis' not in final_output:
             raise Exception("No output generated from graph processing")
 
-        # Create and append new Chat object
-        if 'synthesis' in final_output:
-            new_chat = Chat(
-                question=question,
-                expert_analyses=final_output['synthesis'].get('expert_final_analysis', {}),
-                synthesized_report=final_output['synthesis'].get('synthesized_report', '')
-            )
-            conversation_history.append(new_chat)
+        # Generate expert HTML from the GraphState
+        expert_html = "\n\n<details><summary>Expert Analyses</summary>\n"
+        if 'expert_final_analysis' in final_output['synthesis']:
+            for expert_name, expert_output in final_output['synthesis']['expert_final_analysis'].items():
+                expert_html += f"""<details><summary>{expert_name}</summary>{expert_output}</details>"""
+        expert_html += "</details>"
 
-        # Thread-safe session update
-        if session_id:
-            chat_dicts = [chat.to_dict() for chat in conversation_history]
-            session_manager.update_session(
-                session_id,
-                chat_dicts,
-                iteration
-            )
-            logger.info(f"Updated session {session_id}")
+        # Combine synthesized report with expert HTML
+        full_response = final_output['synthesis']['synthesized_report'] + expert_html
 
-        end_time = time.time()
-        processing_time = end_time - start_time
-        logger.info(f"Processing completed in {processing_time} seconds")
+        # Update session with new interaction
+        session_manager.add_interaction(
+            session_id,
+            question=question,
+            response=full_response
+        )
 
-        if 'synthesis' in final_output and 'synthesized_report' in final_output['synthesis']:
-            expert_html = "\n\n<details><summary>Expert Analyses</summary>\n"
-            for expert, analysis in final_output['synthesis'].get('expert_final_analysis', {}).items():
-                expert_html += f"<details><summary>{expert}</summary>\n{analysis}\n</details>\n"
-            expert_html += "</details>"
-
-            return {
-                'response': final_output['synthesis']['synthesized_report'] + expert_html,
-                'session_id': session_id,
-                'conversation_history': [chat.to_dict() for chat in conversation_history],
-                'iteration': iteration,
-                'expert_outputs': final_output.get('expert_outputs', {}),
-                'processing_time': processing_time
-            }
-        else:
-            logger.error("No synthesized report generated")
-            return {
-                'response': "Error: No synthesized report generated.",
-                'session_id': session_id,
-                'conversation_history': [chat.to_dict() for chat in conversation_history],
-                'iteration': iteration,
-                'processing_time': processing_time
-            }
+        # Return response with updated session info
+        return {
+            'response': full_response,
+            'session_id': session_id,
+            'created_at': session_manager.get_session(session_id)['created_at'],
+            'updated_at': session_manager.get_session(session_id)['updated_at'],
+            'conversation_history': session_manager.get_session(session_id)['conversation_history'],
+            'processing_time': time.time() - start_time,
+            'expert_final_analysis': final_output['synthesis'].get('expert_final_analysis', {}),
+            'synthesized_report': final_output['synthesis'].get('synthesized_report', '')
+        }
 
     except Exception as e:
         logger.error(f"Error processing question: {str(e)}")
@@ -221,8 +198,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         return {
             'response': f"Error processing question: {str(e)}",
             'session_id': session_id,
-            'conversation_history': [chat.to_dict() for chat in conversation_history],
-            'iteration': iteration
+            'error': str(e)
         }
 
     finally:

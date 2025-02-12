@@ -9,6 +9,8 @@ import asyncio
 import shutil
 from config_ import load_config
 from multiagent.processQuestion import process_question
+from typing import Optional
+from multiagent.session_manager import SessionManager
 
 config = load_config()
 
@@ -27,6 +29,8 @@ logger = logging.getLogger(__name__)
 class ChatMessage(BaseModel):
     message: str
     team_name: str
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 app = FastAPI()
 
@@ -94,6 +98,38 @@ async def delete_team(team_name: str):
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Chat Service API"}
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    try:
+        session_manager = SessionManager()
+        session = session_manager.get_session(session_id)
+        if session:
+            return session
+        raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error retrieving session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sessions")
+async def list_sessions():
+    try:
+        session_manager = SessionManager()
+        return session_manager.list_sessions()
+    except Exception as e:
+        logger.error(f"Error listing sessions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    try:
+        session_manager = SessionManager()
+        if session_manager.delete_session(session_id):
+            return {"message": f"Session {session_id} deleted successfully"}
+        raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
