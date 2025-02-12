@@ -3,15 +3,17 @@ from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState
 from multiagent.llm_manager import LLMManager
-#from webProject.utils.setup_logging import setup_logging
+from multiagent.agents.helpers import create_banner
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 def conversation_history_manager(state: GraphState) -> GraphState:
     """
     Is the true first step in the conversation. This agent looks at the users question and the conversation history, and then decides if the user is asking about something that has been previously discussed.
     """
-    print("\n\n\t---------------------------\n\n\t---CONVERSATION HISTORY MANAGER---\n\n\t---------------------------\n\n\t")
-
+    print(create_banner(f"CONVERSATION HISTORY MANAGER").upper())
     # Validate state and get question
 
     question = state.get('question')
@@ -31,7 +33,7 @@ def conversation_history_manager(state: GraphState) -> GraphState:
             "conversation_history": "\n\n".join([f"Question: {chat.question}\n" + "\n".join([f"{expert} Analysis: {analysis}" for expert, analysis in chat.expert_analyses.items()]) + "\n" + "-"*40 for chat in state.get('conversation_history', [])])
         })
 
-        print(f"\n\t+++++++++++++++{new_question}")
+        logger.info(new_question)
 
         #print(state)# Ensure we're returning a valid state format
         return {

@@ -81,8 +81,6 @@ def create_graph() -> StateGraph:
     
     workflow.set_entry_point("conversation_history_manager")
     workflow.add_edge("conversation_history_manager", "identify_experts")
-    #workflow.add_conditional_edges("identify_experts",router_get_Moderator_Guidance, ["get_Moderator_Guidance"])
-    #workflow.add_conditional_edges("get_Moderator_Guidance", router_expert_subgraphs, ["expert_subgraph_entry"])
     workflow.add_edge("identify_experts", "modguidance_subgraph")
     workflow.add_edge("modguidance_subgraph","expert_subgraph")
 
@@ -90,11 +88,6 @@ def create_graph() -> StateGraph:
     workflow.add_edge("collab_subgraph", "expert_subgraph_report")
     workflow.add_edge("expert_subgraph_report", "synthesis")
     workflow.add_edge("synthesis", END)
-    #workflow.add_conditional_edges("expert_subgraph_entry", router_collaboration_requested,["collab_subgraph_entry"])
-    #workflow.add_conditional_edges("print_Graph", router_collaboration_requested,["collab_subgraph_entry"])
-    #workflow.add_conditional_edges("collab_subgraph_entry", router_expert_report, ["expert_subgraph_report"])
-    #workflow.add_edge("expert_subgraph_report", "synthesis")
-    #workflow.add_edge("synthesis", END)
     
     logger.info("Agent graph creation complete")
     return workflow.compile()

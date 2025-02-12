@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Agent(BaseModel):
     name: str
-    _unique_id: UUID
+    unique_id: UUID = Field(default_factory=uuid4)
     description: str
     instructions: str
     llm_model: str
@@ -26,7 +26,7 @@ class Agent(BaseModel):
         Load all agents from the configured JSON file.
         
         Returns:
-            Dict[str, Agent]: Dictionary mapping agent names to Agent instances
+            Dict[str, Agent]: Dictionary mapping agent UUIDs to Agent instances
         
         Raises:
             FileNotFoundError: If the agents file doesn't exist
@@ -61,11 +61,13 @@ class Agent(BaseModel):
                             agent_data[field] = datetime.fromisoformat(agent_data[field].replace('Z', '+00:00'))
                     
                     # Convert string UUID to UUID object
-                    if '_unique_id' in agent_data:
-                        agent_data['_unique_id'] = UUID(agent_data['_unique_id'])
+                    if 'unique_id' in agent_data:
+                        agent_data['unique_id'] = UUID(agent_data['unique_id'])
+                    else:
+                        agent_data['unique_id'] = uuid4()
                     
                     agent = cls(**agent_data)
-                    agents[agent.name] = agent
+                    agents[str(agent.unique_id)] = agent
                 except Exception as e:
                     logger.error(f"Error loading agent {agent_data.get('name', 'unknown')}: {str(e)}")
                     continue
