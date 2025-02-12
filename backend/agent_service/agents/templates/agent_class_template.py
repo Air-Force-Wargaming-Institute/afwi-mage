@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from uuid import UUID, uuid4
@@ -10,14 +10,14 @@ class Agent(BaseModel):
     instructions: str
     llm_model: str
     color: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     vectorstores: List[str]
-    last_modified: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    last_modified: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     @model_validator(mode='before')
     def update_last_modified(cls, values):
         """Update last_modified timestamp whenever any field is changed"""
-        values['last_modified'] = datetime.now(datetime.UTC)
+        values['last_modified'] = datetime.now(timezone.utc)
         return values
 
     @classmethod
@@ -49,6 +49,6 @@ class Agent(BaseModel):
             llm_model=llm_model,
             color=color,
             vectorstores=vectorstores or [],
-            created_at=datetime.now(datetime.UTC),
-            last_modified=datetime.now(datetime.UTC)
+            created_at=datetime.now(timezone.utc),
+            last_modified=datetime.now(timezone.utc)
         )

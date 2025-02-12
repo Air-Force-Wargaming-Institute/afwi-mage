@@ -1,1 +1,35 @@
-[]
+[
+    {
+        "name": "Orange",
+        "unique_id": "e1113c05-0ef4-4b07-8382-40c44a435d0d",
+        "description": "This is ad2342===sdfasd",
+        "instructions": "Theisins \"sdfsd\" /n\n\ntheiw&&__> sdfsd\nsfdf'''sdfsd'''",
+        "llm_model": "gpt-3.5-turbo",
+        "color": "#FF8C00",
+        "created_at": "2025-02-12T14:51:17.948646Z",
+        "vectorstores": [],
+        "last_modified": "2025-02-12T14:51:17.948658Z"
+    },
+    {
+        "name": "Gold",
+        "unique_id": "a5198e9c-42be-4671-a7e3-14a22f59750a",
+        "description": "This is ad2342===sdfasd",
+        "instructions": "Theisins \"sdfsd\" \\n\n\n\nsfdf'''sdfsd'''",
+        "llm_model": "gpt-3.5-turbo",
+        "color": "#F0E68C",
+        "created_at": "2025-02-12T14:55:22.221029Z",
+        "vectorstores": [],
+        "last_modified": "2025-02-12T14:55:22.221042Z"
+    },
+    {
+        "name": "lskdjflskdjfs",
+        "unique_id": "b5b4b6a8-ab83-407e-b7fc-a87dec1e21c9",
+        "description": "wuosdjlskdjflskaj",
+        "instructions": "klsjdlfk\n\nsdfa\n\n:sdfs::",
+        "llm_model": "gpt-3.5-turbo",
+        "color": "#1E90FF",
+        "created_at": "2025-02-12T15:24:09.800227Z",
+        "vectorstores": [],
+        "last_modified": "2025-02-12T15:24:09.800240Z"
+    }
+]

@@ -1,27 +1,23 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Dict, Optional
 from uuid import UUID, uuid4
 
-from agent_class_template import Agent
+from .agent_class_template import Agent
 
 class Team(BaseModel):
     name: str
-    _unique_id: UUID = Field(default_factory=uuid4, alias='unique_id')
+    unique_id: UUID = Field(default_factory=uuid4, alias='unique_id')
     description: str
     agents: Dict[str, Agent]
     color: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
-    last_modified: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
-
-    @property
-    def unique_id(self) -> UUID:
-        return self._unique_id
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_modified: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @model_validator(mode='before')
     def update_last_modified(cls, values):
         """Update last_modified timestamp whenever any field is changed"""
-        values['last_modified'] = datetime.now(datetime.UTC)
+        values['last_modified'] = datetime.now(timezone.utc)
         return values
 
     @classmethod
@@ -47,7 +43,7 @@ class Team(BaseModel):
             description=description,
             color=color,
             agents=agents or {},
-            created_at=datetime.now(datetime.UTC),
-            last_modified=datetime.now(datetime.UTC)
+            created_at=datetime.now(timezone.utc),
+            last_modified=datetime.now(timezone.utc)
         )
     

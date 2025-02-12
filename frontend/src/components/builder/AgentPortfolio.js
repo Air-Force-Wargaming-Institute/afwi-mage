@@ -217,9 +217,10 @@ const formatDate = (dateString) => {
 const sanitizeInput = (input) => {
   // Remove any HTML tags and limit special characters
   return input.replace(/<[^>]*>/gm, '')
-              .replace(/'/gm, "\\'")     // Escape single quotes
-              .replace(/"/gm, '\\"')     // Escape double quotes
-              .replace(/[^\w\s.,!?()\-'"\\]/gm, ''); // Remove special chars except quotes and backslashes
+              .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '');
+              //.replace(/'/gm, "\\'")     // Escape single quotes
+              //.replace(/"/gm, '\\"')     // Escape double quotes
+              //.replace(/[^\w\s.,!?()\-'"\\]/gm, ''); // Remove special chars except quotes and backslashes
 };
 
 const validateInput = (input, field) => {
@@ -266,7 +267,6 @@ function AgentPortfolio() {
     description: '',
     llm_model: 'gpt-3.5-turbo',
     agent_instructions: '',
-    memory_kwargs: { 'max_token_limit': 2000 },
     color: colorOptions[0]  // Default to the first color
   });
   const [snackbar, setSnackbar] = useState({
@@ -541,10 +541,8 @@ function AgentPortfolio() {
 
   const handleDuplicateSubmit = async () => {
     try {
-      // Add default memory_type
       const agentData = {
-        ...duplicatedAgent,
-        memory_type: "ConversationBufferMemory"
+        ...duplicatedAgent
       };
       await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), agentData);
       setSnackbar({
