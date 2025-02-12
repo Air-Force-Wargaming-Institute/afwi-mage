@@ -7,7 +7,7 @@ from agent_class_template import Agent
 
 class Team(BaseModel):
     name: str
-    _unique_id: UUID = Field(default_factory=uuid4, alias='unique_id')
+    unique_id: UUID = Field(default_factory=uuid4, alias='unique_id')
     description: str
     agents: Dict[str, Agent]
     color: str
@@ -16,7 +16,7 @@ class Team(BaseModel):
 
     @property
     def unique_id(self) -> UUID:
-        return self._unique_id
+        return self.unique_id
 
     @model_validator(mode='before')
     def update_last_modified(cls, values):

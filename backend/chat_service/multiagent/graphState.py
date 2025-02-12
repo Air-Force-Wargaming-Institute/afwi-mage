@@ -23,6 +23,8 @@ class GraphState(TypedDict):
 class ExpertState(TypedDict):
     question: str
     selected_experts: list[str]
+    expert_instructions: Dict[str, str]
+    expert_list: list[str]
     expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
     expert_analysis: Annotated[Dict[str, str], operator.__ior__]
     expert_reflection: Annotated[Dict[str, str], operator.__ior__]      
@@ -39,6 +41,7 @@ class ModGuidanceState(TypedDict):
 class CollabState(TypedDict):
     question: str
     selected_experts: list[str]
+    expert_instructions: Dict[str, str]
     expert_collaborators_list: Annotated[Dict[str, list[str]], operator.__ior__]
     expert_analysis: Annotated[Dict[str, str], operator.__ior__]
     expert_collab_areas: Annotated[Dict[str, list[str]], operator.__ior__]

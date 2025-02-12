@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import logging
 from pathlib import Path
 import os
@@ -47,34 +47,31 @@ MAX_CONCURRENT_REQUESTS = 10
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
 @app.post("/chat")
-async def chat_endpoint(request_data: dict):
-    message = request_data.get("message")
-    user_id = request_data.get("user_id")
-    session_id = request_data.get("session_id")
-    team_id = request_data.get("team_id")
-    
-    logger.info(f"Received chat message: {message}")
-    
-    async with semaphore:  # Limit concurrent requests
-        try:
-            # Process the question in a thread pool
+async def chat_endpoint(request_data: ChatMessage):
+    try:
+        # Use Pydantic model for request validation
+        logger.info(f"Received chat message: {request_data.message}")
+        
+        async with semaphore:
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
                 executor,
                 lambda: asyncio.run(process_question(
-                    question=message,
-                    user_id=user_id,
-                    session_id=session_id,
-                    team_id=team_id
+                    question=request_data.message,
+                    user_id=request_data.user_id,
+                    session_id=request_data.session_id,
+                    #team_id=request_data.team_id
+                    team_id="f47ac10b-58cc-4372-a567-0e02b2c3d490"
                 ))
             )
-            
-            logger.info(f"Generated response with session {response.get('session_id')}")
             return response
             
-        except Exception as e:
-            logger.error(f"Error processing message: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+    except ValidationError as e:
+        logger.error(f"Invalid request data: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error processing chat request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/delete_team/{team_name}")
 async def delete_team(team_name: str):

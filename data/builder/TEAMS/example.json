@@ -1,7 +1,7 @@
 [
     {
         "name": "PRC_Expert_Panel",
-        "_unique_id": "f47ac10b-58cc-4372-a567-0e02b2c3d490",
+        "unique_id": "f47ac10b-58cc-4372-a567-0e02b2c3d490",
         "description": "Comprehensive analysis team focusing on PRC government, military, economic, regional, global, domestic, and technological developments",
         "color": "#3498DB",
         "agents": [

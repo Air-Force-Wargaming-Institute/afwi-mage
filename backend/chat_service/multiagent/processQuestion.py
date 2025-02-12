@@ -105,7 +105,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
             # Then load teams (which will use the loaded agents)
             teams = Team.load_teams()
             team_uuid = UUID(team_id)
-            team = next((t for t in teams.values() if t._unique_id == team_uuid), None)
+            team = next((t for t in teams.values() if t.unique_id == team_uuid), None)
             if not team:
                 raise Exception(f"Team with UUID {team_id} not found")
             logger.info(f"Loaded team: {team.name}")
