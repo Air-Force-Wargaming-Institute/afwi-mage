@@ -1,0 +1,265 @@
+# .gitlab-ci.yml
+
+# ---------------------------------------------------------------------
+# 1) Define stages
+# ---------------------------------------------------------------------
+stages:
+  - build
+  - test
+  - security
+  - aggregate
+  - deploy
+
+# ---------------------------------------------------------------------
+# 2) Global defaults (optional)
+#    - Use a Python or Node image by default for all jobs
+#    - You can override the image in specific jobs if needed
+# ---------------------------------------------------------------------
+default:
+  image: python:3.9          # Example default image for Python
+  before_script:
+    - python --version
+    # If you also need Node, you could do:
+    # - apt-get update && apt-get install -y curl
+    # - curl -sL https://deb.nodesource.com/setup_16.x | bash -
+    # - apt-get install -y nodejs
+    # - node --version
+  # The "cache" or other defaults can go here if needed
+  tags: 
+    - docker  # or any other tag your shared runner requires
+
+# ---------------------------------------------------------------------
+# 3) Build Stage
+#    - Typically to install or compile dependencies for Python/Node
+# ---------------------------------------------------------------------
+build-job:
+  stage: build
+  script:
+    - echo "Installing dependencies for Python..."
+    - pip install --upgrade pip setuptools wheel
+    - pip install -r requirements.txt  # Adjust as needed
+    - echo "Installing dependencies for Node..."
+    - npm install
+    - echo "Build step complete."
+  artifacts:
+    paths:
+      - node_modules/
+      - .venv/
+      # Or wherever your installed packages or build artifacts reside
+    expire_in: 1 week
+
+# ---------------------------------------------------------------------
+# 4) Test Stage
+#    - Linting and unit tests for Python and Node
+# ---------------------------------------------------------------------
+lint-job-python:
+  stage: test
+  script:
+    - echo "Linting Python code with flake8..."
+    - pip install flake8
+    - flake8 mage/  # or wherever your python files are
+    - echo "Python lint complete."
+
+lint-job-node:
+  stage: test
+  script:
+    - echo "Linting Node.js code with ESLint..."
+    - npm install --save-dev eslint
+    - npx eslint .  # Adjust path to your Node files
+    - echo "Node lint complete."
+
+unit-test-python:
+  stage: test
+  script:
+    - echo "Running Python unit tests..."
+    - pip install pytest pytest-cov
+    - pytest --cov=mage --cov-report=term-missing
+    # Optionally store coverage data
+  artifacts:
+    paths:
+      - htmlcov/
+    expire_in: 1 week
+
+unit-test-node:
+  stage: test
+  script:
+    - echo "Running Node.js unit tests..."
+    - npm test
+    # Optionally store coverage data
+  artifacts:
+    paths:
+      - coverage/
+    expire_in: 1 week
+
+# ---------------------------------------------------------------------
+# 5) Security Stage
+#    - SAST, Dependency scanning, Secret detection, etc.
+#    - Each job outputs both JSON and CSV as artifacts
+# ---------------------------------------------------------------------
+
+# --- 5a) SAST for Python using bandit ---
+sast-python:
+  stage: security
+  script:
+    - echo "Running Bandit for Python SAST..."
+    - pip install bandit
+    - bandit -r mage/ -f json -o bandit-report.json || true
+      # We use `|| true` so the job doesn't fail just because vulnerabilities were found.
+      # If you want the pipeline to fail on findings, remove `|| true`.
+    # Convert JSON to CSV (example using `jq`):
+    - pip install jq
+    - echo "Converting bandit-report.json to CSV..."
+    - cat bandit-report.json | jq -r '
+        ( "test_name,severity,file,line,issue_text" ),
+        ( .results[] | [
+            .test_name,
+            .issue_severity,
+            .filename,
+            .line_number,
+            ( .issue_text | gsub(",";"") )
+          ] | join(",") )
+      ' > bandit-report.csv
+  artifacts:
+    paths:
+      - bandit-report.json
+      - bandit-report.csv
+    when: always
+    expire_in: 1 week
+
+# --- 5b) SAST for Node using eslint security plugin or NodeJsScan (example) ---
+sast-node:
+  stage: security
+  script:
+    - echo "Running Node.js SAST..."
+    # For a quick example, let's say we use NodeJsScan or a specialized plugin:
+    - pip install nodejsscan
+    - nodejsscan -d . -o nodejs-sast.json || true
+    # Convert JSON to CSV:
+    - cat nodejs-sast.json | jq -r '
+        ( "title,severity,file,line" ),
+        ( .vulnerabilities[]? | [
+            .title,
+            .severity,
+            .file,
+            .line
+          ] | join(",") )
+      ' > nodejs-sast.csv
+  artifacts:
+    paths:
+      - nodejs-sast.json
+      - nodejs-sast.csv
+    when: always
+    expire_in: 1 week
+
+# --- 5c) Dependency Scanning for Python (pip-audit) and Node (npm audit) ---
+dependency-scan:
+  stage: security
+  script:
+    - echo "Running pip-audit for Python..."
+    - pip install pip-audit
+    - pip-audit --output pip-audit.json --format json || true
+    # Convert to CSV
+    - cat pip-audit.json | jq -r '
+        ( "package,current_version,installed_version,description,fix_versions" ),
+        ( .[]? | [
+            .dependency.package,
+            .dependency.version,
+            .installed_version,
+            ( .description | gsub(",";"") ),
+            ( .fix_versions | join("|") )
+          ] | join(",") )
+      ' > pip-audit.csv
+
+    - echo "Running npm audit..."
+    - npm audit --json > npm-audit.json || true
+    # Convert to CSV (example, you might refine the .advisories path)
+    - cat npm-audit.json | jq -r '
+        ( "module_name,severity,recommendation" ),
+        ( .advisories[]? | [
+            .module_name,
+            .severity,
+            ( .recommendation | gsub(",";"") )
+          ] | join(",") )
+      ' > npm-audit.csv
+  artifacts:
+    paths:
+      - pip-audit.json
+      - pip-audit.csv
+      - npm-audit.json
+      - npm-audit.csv
+    when: always
+    expire_in: 1 week
+
+# --- 5d) Secret Detection using Gitleaks (example) ---
+secret-detection:
+  stage: security
+  script:
+    - echo "Running Gitleaks..."
+    - curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64 \
+       -o gitleaks && chmod +x gitleaks
+    - ./gitleaks detect --source . --report-format json --report-path gitleaks.json || true
+    # Convert to CSV
+    - cat gitleaks.json | jq -r '
+        ( "description,file,line,secret" ),
+        ( .findings[]? | [
+            ( .description | gsub(",";"") ),
+            .file,
+            (.line|tostring),
+            ( .secret | gsub(",";"") )
+          ] | join(",") )
+      ' > gitleaks.csv
+  artifacts:
+    paths:
+      - gitleaks.json
+      - gitleaks.csv
+    when: always
+    expire_in: 1 week
+
+# ---------------------------------------------------------------------
+# 6) Aggregation Stage
+#    - Collect all JSON/CSV from security scans, produce a final CSV/JSON
+#    - Summarize total vulnerabilities, recommended mitigations, etc.
+# ---------------------------------------------------------------------
+aggregate-reports:
+  stage: aggregate
+  script:
+    - echo "Aggregating security scan results..."
+    - mkdir final_reports
+
+    # Example aggregator logic:
+    # Combine relevant JSON or CSV data into final JSON/CSV
+    # For demonstration, we'll just create placeholders:
+    - echo '{"summary": {"totalVulnerabilities": 0, "highSeverity": 0, "mediumSeverity": 0, "lowSeverity": 0}, "details": []}' > final_reports/final-security-report.json
+    - echo "id,severity,file,description,mitigation" > final_reports/final-security-report.csv
+    # If you want to parse all the artifacts in detail, you can do so with jq or python scripts.
+
+    - echo "SAST-PY-1,High,mage/foo.py,Example vulnerability,Upgrade library X" >> final_reports/final-security-report.csv
+    - echo "SAST-NODE-1,Medium,src/index.js,Example vulnerability,Use safer function" >> final_reports/final-security-report.csv
+    - echo "Added sample lines to CSV. You would parse all your JSON files here."
+
+  dependencies:
+    # This ensures we can download the artifacts from these security jobs
+    - sast-python
+    - sast-node
+    - dependency-scan
+    - secret-detection
+  artifacts:
+    paths:
+      - final_reports/
+    when: always
+    expire_in: 1 week
+
+# ---------------------------------------------------------------------
+# 7) Deploy Stage
+#    - Only deploy if the pipeline is successful (or add manual approval)
+# ---------------------------------------------------------------------
+deploy-job:
+  stage: deploy
+  script:
+    - echo "Deploying MAGE to production server..."
+    # Insert your actual deploy script here
+    - echo "Deployment complete."
+  environment:
+    name: production
+  only:
+    - main  # or your primary branch
