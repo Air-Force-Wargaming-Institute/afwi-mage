@@ -18,7 +18,7 @@ def identify_experts(state: GraphState):
     """
     expert_list = state['expert_list']
     expert_instructions = state['expert_instructions']
-    llm = LLMManager().llm
+    llm = LLMManager().get_llm(model="hermes3:8b")
     user_question = state['question']
     
     prompt_template = PromptTemplate(

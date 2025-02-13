@@ -12,6 +12,7 @@ class LLMManager:
     _streaming_llm = None
     _non_streaming_llm = None
     _initialized = False
+    _base_kwargs = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -28,37 +29,50 @@ class LLMManager:
         config = load_config()
         callbacks = CallbackManager([StreamingStdOutCallbackHandler()])
 
+        # Store base kwargs for reuse
+        self._base_kwargs = {
+            'temperature': config['TEMPERATURE'],
+            'base_url': config['BASE_URL'],
+            'api_key': config['API_KEY'],
+            'max_tokens': config['MAX_TOKENS'],
+            'model': config['LOCAL_LLM']
+        }
+
         self._streaming_llm = ChatOpenAI(
-            temperature=config['TEMPERATURE'],
-            base_url=config['BASE_URL'],
-            api_key=config['API_KEY'],
-            max_tokens=config['MAX_TOKENS'],
+            **self._base_kwargs,
             streaming=True,
-            callbacks=callbacks,
-            model=config['LOCAL_LLM']
+            callbacks=callbacks
         )
 
-        self._non_streaming_llm = ChatOpenAI(
-            temperature=config['TEMPERATURE'],
-            base_url=config['BASE_URL'],
-            api_key=config['API_KEY'],
-            max_tokens=config['MAX_TOKENS'],
-            model=config['LOCAL_LLM']
-        )
+        self._non_streaming_llm = ChatOpenAI(**self._base_kwargs)
 
-    @property
-    def streaming(self):
-        return self._streaming_llm
+    def get_llm(self, model: str = None) -> ChatOpenAI:
+        """
+        Returns an LLM instance with the specified model, or default if none provided.
+        
+        Args:
+            model (str, optional): The model to use. Defaults to config value.
+        """
+        config = load_config()
+        base_llm = self._streaming_llm if config.get('STREAMING_LLM', 1) else self._non_streaming_llm
+        
+        if not model:
+            return base_llm
+            
+        # Create new instance with specified model using stored base kwargs
+        kwargs = self._base_kwargs.copy()
+        kwargs['model'] = model
+        
+        if isinstance(base_llm, self._streaming_llm.__class__):
+            kwargs['streaming'] = True
+            kwargs['callbacks'] = base_llm.callbacks if hasattr(base_llm, 'callbacks') else None
 
-    @property
-    def non_streaming(self):
-        return self._non_streaming_llm
+        return ChatOpenAI(**kwargs)
 
     @property
     def llm(self):
         """Returns the appropriate LLM instance based on the configuration"""
-        config = load_config()
-        return self._streaming_llm if config.get('STREAMING_LLM', 1) else self._non_streaming_llm
+        return self.get_llm()
 
     async def process_streaming_response(self, response: Union[AsyncGenerator, str, Coroutine[Any, Any, Any]]) -> str:
         if isinstance(response, str):
@@ -80,8 +94,14 @@ class LLMManager:
             raise
         return full_response
 
-    async def __call__(self, prompt):
-        """Handle both streaming and non-streaming responses."""
+    async def __call__(self, prompt, model: str = None):
+        """
+        Handle both streaming and non-streaming responses.
+        
+        Args:
+            prompt: The prompt to process
+            model (str, optional): The model to use. Defaults to config value.
+        """
         if isinstance(prompt, AsyncGenerator):
             return await self.process_streaming_response(prompt)
-        return prompt 
+        return self.get_llm(model)(prompt) 

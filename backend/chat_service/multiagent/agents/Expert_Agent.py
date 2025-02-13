@@ -17,9 +17,9 @@ def get_librarian_request(whoami: str, question: str, agent_instructions: str, c
     
     return base_request + "\n\nPlease retrieve documents that are most related to the question and provide a summary without embellishment or personal interpretation. Also provide sources or references when possible."
 
-def create_chain(prompt: PromptTemplate, **kwargs) -> str:
+def create_chain(prompt: PromptTemplate, model: str = None, **kwargs) -> str:
     """Create and execute a language model chain."""
-    llm = LLMManager().llm
+    llm = LLMManager().get_llm(model)
     chain = prompt | llm | StrOutputParser()
     return chain.invoke(kwargs)
 
@@ -96,7 +96,7 @@ def expert_subgraph_report(state: ExpertState):
     if collab_report:
         analysis_inputs["collab_report"] = collab_report
     
-    analysis = create_chain(prompt, **analysis_inputs)
+    analysis = create_chain(prompt,model=state['expert_models'][whoami], **analysis_inputs)
     
     return {'expert_final_analysis': {whoami: analysis}}
 
@@ -145,6 +145,7 @@ def expert_subgraph_entry(state: ExpertState):
     
     analysis = create_chain(
         initial_prompt,
+        model=state['expert_models'][whoami],
         question=state['question'],
         document_summary=document_summary,
         relevant_docs=documents_text,
@@ -156,6 +157,7 @@ def expert_subgraph_entry(state: ExpertState):
     # Generate reflection
     reflection = create_chain(
         create_reflection_prompt(),
+        model=state['expert_models'][whoami],
         question=state['question'],
         analysis=analysis,
         documents_text=documents_text,
@@ -176,6 +178,7 @@ def expert_subgraph_entry(state: ExpertState):
     if collaborators:
         collab_areas = create_chain(
             create_collaboration_prompt(),
+            model=state['expert_models'][whoami],
             question=state['question'],
             analysis=analysis,
             reflection=reflection,

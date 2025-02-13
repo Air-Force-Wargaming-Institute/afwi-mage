@@ -10,7 +10,7 @@ from multiagent.agents.helpers import create_banner
 def get_Moderator_Guidance(state: ModGuidanceState):
     print(create_banner(f"{state['expert']} get_Moderator_Guidance"))  
     whoami = state['expert']
-    llm = LLMManager().llm
+    llm = LLMManager().get_llm()  # Uses default model from config
     question = state['question']
     prompt = PromptTemplate(
                 input_variables=["question", "expert"],
