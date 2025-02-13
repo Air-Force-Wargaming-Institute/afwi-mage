@@ -56,6 +56,7 @@ async def chat_endpoint(request_data: ChatMessage):
         # Use Pydantic model for request validation
         logger.info(f"Received chat message: {request_data.message}")
         
+        logger.info(f"session_id: {request_data.session_id}")
         async with semaphore:
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(

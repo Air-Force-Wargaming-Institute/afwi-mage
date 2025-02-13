@@ -54,22 +54,28 @@ async def process_graph_stream(graph, inputs):
 
     return await loop.run_in_executor(graph_executor, run_stream)
 
-def format_conversation_entry(question: str, state: GraphState) -> str:
-    """Format a conversation entry with question, expert analyses, and final report"""
-    conversation_entry = f"\nUser Question: {question}\n\n"
+# def format_conversation_entry(question: str, state: GraphState) -> str:
+#     """Format a conversation entry with question, expert analyses, and final report"""
+#     conversation_entry = f"\nUser Question: {question}\n\n"
     
-    # Add expert final analyses if they exist
-    if state.get('expert_final_analysis'):
-        conversation_entry += "Expert Analyses:\n"
-        for expert, analysis in state['expert_final_analysis'].items():
-            conversation_entry += f"\n{expert}:\n{analysis}\n"
+#     # Add expert final analyses if they exist
+#     if state.get('expert_final_analysis'):
+#         conversation_entry += "Expert Analyses:\n"
+#         for expert, analysis in state['expert_final_analysis'].items():
+#             conversation_entry += f"\n{expert}:\n{analysis}\n"
     
-    # Add synthesized report if it exists
-    if state.get('synthesized_report'):
-        conversation_entry += f"\nFinal Synthesized Report:\n{state['synthesized_report']}\n"
+#     # Add synthesized report if it exists
+#     if state.get('synthesized_report'):
+#         conversation_entry += f"\nFinal Synthesized Report:\n{state['synthesized_report']}\n"
     
-    conversation_entry += "\n" + "-"*80 + "\n"  # Add separator between conversations
-    return conversation_entry
+#     conversation_entry += "\n" + "-"*80 + "\n"  # Add separator between conversations
+#     return conversation_entry
+
+def restructure_and_human_validation(question: str, session_id: str, team_id: str, user_response: str):
+    """
+    This function is used to restructure and/or rewrite the user's question, potentially using the conversation history, and then having the user validate the new question.
+    """
+    pass
 
 async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None):
     """
@@ -143,15 +149,18 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         except Exception as e:
             raise Exception(f"Error loading team: {str(e)}")
 
-        # Session handling with new format
+        # Modified session handling logic
         if session_id:
             session = session_manager.get_session(session_id)
             if not session:
-                session_id = session_manager.create_session(team_id)
-                logger.info(f"Created new session: {session_id}")
+                # Use the provided session_id when creating new session
+                session_manager.create_session(team_id, session_id=session_id)
+                logger.info(f"Created new session with provided ID: {session_id}")
+            else:
+                logger.info(f"Using existing session: {session_id}")
         else:
             session_id = session_manager.create_session(team_id)
-            logger.info(f"Created new session: {session_id}")
+            logger.info(f"Created new session with generated ID: {session_id}")
 
         # Process the question
         logger.info(f"Processing question: {question}")
