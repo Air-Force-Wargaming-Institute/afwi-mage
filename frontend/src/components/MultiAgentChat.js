@@ -1098,10 +1098,12 @@ function MultiAgentChat() {
     try {
       const currentSession = chatSessions.find(session => session.id === state.currentSessionId);
       const teamName = currentSession?.team || 'PRC_Team'; // Fallback to PRC_Team if no team selected
+      const teamId = currentSession?.teamId; // Get the team's unique_id
 
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
-        team_name: teamName
+        team_name: teamName,
+        team_id: teamId // Add the team's unique_id to the request
       });
 
       const aiResponse = Array.isArray(response.data.response) 
@@ -1158,10 +1160,14 @@ function MultiAgentChat() {
       return;
     }
     
+    // Find the selected team object from availableTeams to get its ID
+    const selectedTeamObj = availableTeams.find(team => team.name === selectedTeam);
+    
     const newSession = { 
       id: chatSessions.length + 1, 
       name: newSessionName.trim(),
-      team: selectedTeam 
+      team: selectedTeam,
+      teamId: selectedTeamObj?.id // Store the team's unique_id
     };
     
     dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
@@ -1387,7 +1393,7 @@ function MultiAgentChat() {
                   </MenuItem>
                 ) : (
                   availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.file_name}>
+                    <MenuItem key={team.id} value={team.name}>
                       {team.name}
                     </MenuItem>
                   ))

@@ -9,7 +9,7 @@ class Team(BaseModel):
     name: str
     unique_id: UUID = Field(default_factory=uuid4, alias='unique_id')
     description: str
-    agents: Dict[str, Agent]
+    agents: List[str]
     color: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_modified: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

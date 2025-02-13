@@ -480,10 +480,11 @@ function AgentPortfolio() {
         ...selectedAgent,
         name: sanitizeInput(selectedAgent.name),
         description: sanitizeInput(selectedAgent.description),
-        agent_instructions: sanitizeInput(selectedAgent.agent_instructions)
+        agent_instructions: sanitizeInput(selectedAgent.agent_instructions),
+        llm_model: selectedAgent.llm_model
       };
 
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.file_name}`), sanitizedAgent);
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.unique_id}`), sanitizedAgent);
       setSnackbar({
         open: true,
         message: 'Agent updated successfully!',
@@ -508,7 +509,7 @@ function AgentPortfolio() {
 
   const handleDeleteConfirm = async () => {
     try {
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_agent/${agentToDelete.file_name}`));
+      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_agent/${agentToDelete.unique_id}`));
       setSnackbar({
         open: true,
         message: 'Agent deleted successfully!',
