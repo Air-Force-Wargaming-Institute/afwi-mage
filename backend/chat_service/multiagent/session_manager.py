@@ -141,4 +141,29 @@ class SessionManager:
                 return False
             except Exception as e:
                 logger.error(f"Error deleting session {session_id}: {str(e)}")
-                return False 
+                return False
+
+    def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get conversation history for a specific session only"""
+        session = self._sessions_cache.get(session_id)
+        if not session:
+            logger.warning(f"No session found for ID: {session_id}")
+            return []
+        
+        return session.get('conversation_history', [])
+
+    def get_formatted_history(self, session_id: str) -> List[Dict[str, str]]:
+        """Get formatted conversation history for a specific session"""
+        history = self.get_session_history(session_id)
+        
+        formatted_history = []
+        for interaction in history:
+            formatted_history.append({
+                'role': 'user',
+                'content': interaction['question']
+            })
+            formatted_history.append({
+                'role': 'assistant',
+                'content': interaction['response']
+            })
+        return formatted_history 

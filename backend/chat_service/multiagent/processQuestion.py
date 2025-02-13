@@ -78,30 +78,37 @@ def restructure_and_human_validation(question: str, session_id: str, team_id: st
     pass
 
 async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None):
-    """
-    Process a question through the multiagent system, maintaining session state
-    Thread-safe and async-ready version
-    
-    Args:
-        question: The question to process
-        user_id: Optional user ID
-        session_id: Optional session ID
-        team_id: Required UUID of the team to use (as string)
-        
-    Raises:
-        ValueError: If team_id is not provided or invalid
-        Exception: If team is not found or other processing errors occur
-    """
+    """Process a question through the multiagent system, maintaining session state"""
     if not team_id:
         raise ValueError("team_id is required")
         
-    conversation_history = []
     iteration = 0
     
     try:
         start_time = time.time()
         session_manager = SessionManager()
         
+        # Modified session handling logic with explicit session history loading
+        if session_id:
+            session = session_manager.get_session(session_id)
+            if not session:
+                # Create new session with provided ID
+                session_manager.create_session(team_id, session_id=session_id)
+                conversation_history = []
+                logger.info(f"Created new session with provided ID: {session_id}")
+            else:
+                # Verify session belongs to correct team
+                if session['team_id'] != team_id:
+                    raise ValueError(f"Session {session_id} belongs to different team")
+                    
+                # Load conversation history for this specific session only
+                conversation_history = session_manager.get_session_history(session_id)
+                logger.info(f"Loaded {len(conversation_history)} messages for session: {session_id}")
+        else:
+            session_id = session_manager.create_session(team_id)
+            conversation_history = []
+            logger.info(f"Created new session with generated ID: {session_id}")
+
         # Load required team
         try:
             # First load all available agents
@@ -148,19 +155,6 @@ async def process_question(question: str, user_id: str = None, session_id: str =
             raise ValueError(f"Invalid UUID format for team_id: {team_id}")
         except Exception as e:
             raise Exception(f"Error loading team: {str(e)}")
-
-        # Modified session handling logic
-        if session_id:
-            session = session_manager.get_session(session_id)
-            if not session:
-                # Use the provided session_id when creating new session
-                session_manager.create_session(team_id, session_id=session_id)
-                logger.info(f"Created new session with provided ID: {session_id}")
-            else:
-                logger.info(f"Using existing session: {session_id}")
-        else:
-            session_id = session_manager.create_session(team_id)
-            logger.info(f"Created new session with generated ID: {session_id}")
 
         # Process the question
         logger.info(f"Processing question: {question}")
