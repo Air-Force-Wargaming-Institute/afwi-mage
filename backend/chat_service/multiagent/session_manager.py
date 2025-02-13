@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from pathlib import Path
 from typing import Dict, Optional, Any, List
@@ -70,12 +70,13 @@ class SessionManager:
             logger.error(f"Error saving sessions: {str(e)}")
             return False
 
-    def create_session(self, team_id: str) -> str:
+    def create_session(self, team_id: str, session_id: str = None) -> str:
         """Create a new chat session"""
         with self._lock:
             try:
-                session_id = str(uuid.uuid4())
-                current_time = datetime.utcnow().isoformat()
+                # Use provided session_id or generate new one
+                session_id = session_id or str(uuid.uuid4())
+                current_time = datetime.now(timezone.utc).isoformat()
                 
                 session_data = {
                     "session_id": session_id,

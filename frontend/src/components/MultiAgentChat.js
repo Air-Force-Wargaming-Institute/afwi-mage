@@ -52,6 +52,7 @@ import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
 import rehypeRaw from 'rehype-raw';
+import { v4 as uuidv4 } from 'uuid';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -1049,13 +1050,29 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
+    // Get the current session - if none exists, create one
+    let currentSession = chatSessions.find(session => session.id === state.currentSessionId);
+    
+    // If no current session exists, create one with default team
+    if (!currentSession) {
+      const defaultTeam = availableTeams[0];
+      currentSession = {
+        id: uuidv4(),
+        name: 'New Chat',
+        team: defaultTeam?.name || 'PRC_Team',
+        teamId: defaultTeam?.id
+      };
+      dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: currentSession });
+      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: currentSession.id });
+    }
+
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
-        id: Date.now(),
         text: input.trim(), 
         sender: 'user', 
-        timestamp: new Date() 
+        timestamp: new Date(),
+        sessionId: currentSession.id  // Use existing session ID
       }
     });
     
@@ -1063,14 +1080,11 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
-      const currentSession = chatSessions.find(session => session.id === state.currentSessionId);
-      const teamName = currentSession?.team || 'PRC_Team';
-      const teamId = currentSession?.teamId;
-
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
-        team_name: teamName,
-        team_id: teamId
+        team_name: currentSession.team,
+        session_id: currentSession.id,  // Use same session ID for all messages
+        team_id: currentSession.teamId
       });
 
       // Handle the response properly
@@ -1100,11 +1114,10 @@ function MultiAgentChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
           text: aiResponse, 
           sender: 'ai', 
           timestamp: new Date(),
-          sessionId: responseData.session_id
+          sessionId: currentSession.id  // Use same session ID
         }
       });
     } catch (error) {
@@ -1112,7 +1125,6 @@ function MultiAgentChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
           text: `Error: Failed to get response from AI - ${error.message}`, 
           sender: 'system', 
           timestamp: new Date() 
@@ -1144,18 +1156,19 @@ function MultiAgentChat() {
       return;
     }
     
-    // Find the selected team object from availableTeams to get its ID
     const selectedTeamObj = availableTeams.find(team => team.name === selectedTeam);
     
     const newSession = { 
-      id: chatSessions.length + 1, 
+      id: uuidv4(), // Generate UUID for session
       name: newSessionName.trim(),
       team: selectedTeam,
-      teamId: selectedTeamObj?.id // Store the team's unique_id
+      teamId: selectedTeamObj?.id
     };
     
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    // Clear messages when creating new chat session
     dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
     
     setDialogOpen(false);
     setNewSessionName('');
@@ -1247,7 +1260,6 @@ function MultiAgentChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
           text: aiResponse, 
           sender: 'ai', 
           timestamp: new Date() 
