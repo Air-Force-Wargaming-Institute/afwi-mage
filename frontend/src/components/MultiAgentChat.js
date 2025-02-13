@@ -867,15 +867,27 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
     }
 
     try {
-      const parts = safeContent.split('<details><summary>Expert Analyses</summary>');
+      // First check if it's a JSON string that needs parsing
+      let processedContent = safeContent;
+      if (typeof safeContent === 'string' && safeContent.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(safeContent);
+          processedContent = parsed.response || parsed.message || safeContent;
+        } catch (e) {
+          console.log('Not JSON content');
+        }
+      }
+
+      // Extract expert analyses if present
+      const parts = processedContent.split('<details><summary>Expert Analyses</summary>');
       if (parts.length !== 2) {
-        return { mainContent: safeContent, experts: [] };
+        return { mainContent: processedContent, experts: [] };
       }
 
       const mainContent = parts[0].trim();
       const expertsSection = parts[1];
 
-      // Extract individual expert analyses more robustly
+      // Extract individual expert analyses
       const experts = [];
       const expertMatches = expertsSection.matchAll(/<details><summary>(.*?)<\/summary>([\s\S]*?)<\/details>/g);
       
@@ -902,28 +914,26 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
       <ReactMarkdown 
         rehypePlugins={[rehypeRaw]}
         components={{
-          code: ({node, inline, className, children, ...props}) => {
-            // ... existing code component logic ...
-          }
+          code: CodeBlock
         }}
+        className={classes.markdown}
       >
         {mainContent}
       </ReactMarkdown>
 
       {experts.length > 0 && (
-        <div className={classes.expertsSection}>
+        <div className={classes.expertAnalyses}>
           <details>
             <summary>Expert Analyses</summary>
             {experts.map((expert, index) => (
-              <details key={index}>
+              <details key={index} className={classes.expertAnalysis}>
                 <summary>{expert.title}</summary>
                 <ReactMarkdown 
                   rehypePlugins={[rehypeRaw]}
                   components={{
-                    code: ({node, inline, className, children, ...props}) => {
-                      // ... existing code component logic ...
-                    }
+                    code: CodeBlock
                   }}
+                  className={classes.markdown}
                 >
                   {expert.content}
                 </ReactMarkdown>
@@ -1054,30 +1064,47 @@ function MultiAgentChat() {
 
     try {
       const currentSession = chatSessions.find(session => session.id === state.currentSessionId);
-      const teamName = currentSession?.team || 'PRC_Team'; // Fallback to PRC_Team if no team selected
-      const teamId = currentSession?.teamId; // Get the team's unique_id
+      const teamName = currentSession?.team || 'PRC_Team';
+      const teamId = currentSession?.teamId;
 
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
         team_name: teamName,
-        team_id: teamId // Add the team's unique_id to the request
+        team_id: teamId
       });
 
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
+      // Handle the response properly
+      let aiResponse = '';
+      const responseData = response.data;
+
+      if (responseData.error) {
+        throw new Error(responseData.error);
+      }
+
+      // Check if we have a synthesized report with expert analyses
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.synthesized_report) {
+        // Build the response with expert analyses if available
+        aiResponse = responseData.synthesized_report;
+        if (responseData.expert_final_analysis) {
+          aiResponse += '\n\n<details><summary>Expert Analyses</summary>\n';
+          Object.entries(responseData.expert_final_analysis).forEach(([expert, analysis]) => {
+            aiResponse += `<details><summary>${expert}</summary>${analysis}</details>\n`;
+          });
+          aiResponse += '</details>';
+        }
+      }
 
       dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
-
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: Date.now(),
           text: aiResponse, 
           sender: 'ai', 
-          timestamp: new Date() 
+          timestamp: new Date(),
+          sessionId: responseData.session_id
         }
       });
     } catch (error) {
@@ -1086,7 +1113,7 @@ function MultiAgentChat() {
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: Date.now(),
-          text: 'Error: Failed to get response from AI', 
+          text: `Error: Failed to get response from AI - ${error.message}`, 
           sender: 'system', 
           timestamp: new Date() 
         }

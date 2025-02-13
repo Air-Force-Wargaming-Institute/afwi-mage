@@ -68,7 +68,7 @@ async def chat_endpoint(request_data: ChatMessage):
                 ))
             )
             logger.info(f"Response: {response}")
-            return response['response']
+            return response
             
     except ValidationError as e:
         logger.error(f"Invalid request data: {e}")
