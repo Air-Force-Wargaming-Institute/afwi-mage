@@ -222,23 +222,15 @@ secret-detection:
 # ---------------------------------------------------------------------
 aggregate-reports:
   stage: aggregate
-  script:
-    - echo "Aggregating security scan results..."
-    - mkdir final_reports
-
-    # Example aggregator logic:
-    # Combine relevant JSON or CSV data into final JSON/CSV
-    # For demonstration, we'll just create placeholders:
-    - echo '{"summary": {"totalVulnerabilities": 0, "highSeverity": 0, "mediumSeverity": 0, "lowSeverity": 0}, "details": []}' > final_reports/final-security-report.json
-    - echo "id,severity,file,description,mitigation" > final_reports/final-security-report.csv
-    # If you want to parse all the artifacts in detail, you can do so with jq or python scripts.
-
-    - echo "SAST-PY-1,High,mage/foo.py,Example vulnerability,Upgrade library X" >> final_reports/final-security-report.csv
-    - echo "SAST-NODE-1,Medium,src/index.js,Example vulnerability,Use safer function" >> final_reports/final-security-report.csv
-    - echo "Added sample lines to CSV. You would parse all your JSON files here."
-
+  script: |
+    echo "Aggregating security scan results..."
+    mkdir final_reports
+    echo "{\"summary\": {\"totalVulnerabilities\": 0, \"highSeverity\": 0, \"mediumSeverity\": 0, \"lowSeverity\": 0}, \"details\": []}" > final_reports/final-security-report.json
+    echo "id,severity,file,description,mitigation" > final_reports/final-security-report.csv
+    echo "SAST-PY-1,High,mage/foo.py,Example vulnerability,Upgrade library X" >> final_reports/final-security-report.csv
+    echo "SAST-NODE-1,Medium,src/index.js,Example vulnerability,Use safer function" >> final_reports/final-security-report.csv
+    echo "Added sample lines to CSV. You would parse all your JSON files here."
   dependencies:
-    # This ensures we can download the artifacts from these security jobs
     - sast-python
     - sast-node
     - dependency-scan
@@ -247,7 +239,10 @@ aggregate-reports:
     paths:
       - final_reports/
     when: always
-    expire_in: 1 week
+    expire_in: "1 week"
+
+
+
 
 # ---------------------------------------------------------------------
 # 7) Deploy Stage
