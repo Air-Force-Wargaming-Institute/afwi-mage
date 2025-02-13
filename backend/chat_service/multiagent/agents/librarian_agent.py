@@ -17,8 +17,7 @@ def librarian(requester:str, agent_request:str):
     TOP_N_DOCUMENTS = config['TOP_N_DOCUMENTS']
 
     retriever = RetrieverManager().retriever
-    
-    llm = LLMManager().non_streaming
+    llm = LLMManager().get_llm()  # Uses default model from config
 
     # Begin by retrieving documents relevant to the agent request
     relevant_docs = retriever.invoke(agent_request.strip())

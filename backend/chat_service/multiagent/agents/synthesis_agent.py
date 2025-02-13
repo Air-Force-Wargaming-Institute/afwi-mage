@@ -14,7 +14,7 @@ def synthesis_agent(state: GraphState) -> GraphState:
     The Synthesis Agent
     Consolidates insights from all other agents into a comprehensive report.
     """
-    llm = LLMManager().llm 
+    llm = LLMManager().get_llm()  # Uses default model from config
     
     question = state['question']
 

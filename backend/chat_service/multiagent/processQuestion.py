@@ -127,12 +127,14 @@ async def process_question(question: str, user_id: str = None, session_id: str =
             agent_names = []
             agent_instructions = {}
             agent_descriptions = {}
+            agent_models = {}
             for agent_uuid in team.agents:
                 agent = available_agents.get(agent_uuid)
                 if agent:
                     agent_names.append(agent.name)
                     agent_instructions[agent.name] = agent.instructions
                     agent_descriptions[agent.name] = agent.description
+                    agent_models[agent.name] = agent.llm_model
                 else:
                     logger.warning(f"Agent {agent_uuid} not found in available agents")
             
@@ -148,7 +150,8 @@ async def process_question(question: str, user_id: str = None, session_id: str =
                 "iteration": iteration,
                 "expert_list": agent_names,
                 "expert_descriptions": agent_descriptions,
-                "expert_instructions": agent_instructions
+                "expert_instructions": agent_instructions,
+                "expert_models": agent_models
             }
             
         except ValueError:

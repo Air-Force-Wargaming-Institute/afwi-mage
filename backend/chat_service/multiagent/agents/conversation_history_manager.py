@@ -18,7 +18,7 @@ def conversation_history_manager(state: GraphState) -> GraphState:
 
     question = state.get('question')
 
-    llm = LLMManager().non_streaming
+    llm = LLMManager().get_llm()  # Uses default model from config
 
     # Process the question with conversation history
     try:
