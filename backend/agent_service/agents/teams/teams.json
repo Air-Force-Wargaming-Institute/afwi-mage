@@ -5,26 +5,79 @@
         "description": "qwertyuiop",
         "agents": [
             "e1113c05-0ef4-4b07-8382-40c44a435d0d",
-            "b5b4b6a8-ab83-407e-b7fc-a87dec1e21c9",
-            "a5198e9c-42be-4671-a7e3-14a22f59750a",
-            "4486704e-96a1-4153-9cc6-ec9cdf31e91c",
-            "b4c36209-4d6d-4ab7-b24d-66fca9799c0d"
+            "a7de29f5-bbcc-41c5-91dc-da82b2f0fd44",
+            "efba2778-e2bf-4890-969c-36c24722de62"
         ],
         "color": "#FF7F50",
         "created_at": "2025-02-12T18:44:27.754708Z",
-        "last_modified": "2025-02-12T21:31:37.824924Z"
+        "last_modified": "2025-02-13T16:11:51.894196Z"
     },
     {
         "name": "blue",
         "unique_id": "ff1b50d0-9d90-4836-9f77-febd1c5f932b",
         "description": "hfdkjsaljowieu",
         "agents": [
-            "a5198e9c-42be-4671-a7e3-14a22f59750a",
-            "b5b4b6a8-ab83-407e-b7fc-a87dec1e21c9",
-            "b4c36209-4d6d-4ab7-b24d-66fca9799c0d"
+            "fe9cd08b-a0e9-4dbc-9099-d41d11506ea0",
+            "efba2778-e2bf-4890-969c-36c24722de62",
+            "a7de29f5-bbcc-41c5-91dc-da82b2f0fd44"
         ],
         "color": "#0000FF",
         "created_at": "2025-02-12T19:45:48.126153Z",
-        "last_modified": "2025-02-12T21:31:55.825118Z"
+        "last_modified": "2025-02-13T16:14:06.090316Z"
+    },
+    {
+        "name": "agent delete modify team",
+        "unique_id": "5c7fddea-7475-4138-8698-2041632c8050",
+        "description": "team to be modified when an agent is deleted",
+        "agents": [
+            "e1113c05-0ef4-4b07-8382-40c44a435d0d"
+        ],
+        "color": "#808080",
+        "created_at": "2025-02-13T15:20:36.804400Z",
+        "last_modified": "2025-02-13T15:20:36.804412Z"
+    },
+    {
+        "name": "color team",
+        "unique_id": "61cee774-2437-42c7-bed8-7b9a6c75c8dd",
+        "description": "colorful colors",
+        "agents": [
+            "e1113c05-0ef4-4b07-8382-40c44a435d0d",
+            "f8cc35f4-1bc3-4416-84fd-509c08d9ad84",
+            "a7de29f5-bbcc-41c5-91dc-da82b2f0fd44",
+            "fe9cd08b-a0e9-4dbc-9099-d41d11506ea0",
+            "efba2778-e2bf-4890-969c-36c24722de62"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-02-13T15:42:56.697984Z",
+        "last_modified": "2025-02-13T15:42:56.697996Z"
+    },
+    {
+        "name": "buweusd",
+        "unique_id": "8a93aa81-8003-49e3-80ca-ca5a894f9f36",
+        "description": "wesxhrufgf",
+        "agents": [
+            "fe9cd08b-a0e9-4dbc-9099-d41d11506ea0",
+            "a7de29f5-bbcc-41c5-91dc-da82b2f0fd44",
+            "e1113c05-0ef4-4b07-8382-40c44a435d0d",
+            "f8cc35f4-1bc3-4416-84fd-509c08d9ad84"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-02-13T16:15:13.737564Z",
+        "last_modified": "2025-02-13T16:15:13.737579Z"
+    },
+    {
+        "name": "Copy of color team",
+        "unique_id": "b37f9bc6-3219-43f0-8e35-330787c07b9f",
+        "description": "colorful colors",
+        "agents": [
+            "e1113c05-0ef4-4b07-8382-40c44a435d0d",
+            "f8cc35f4-1bc3-4416-84fd-509c08d9ad84",
+            "a7de29f5-bbcc-41c5-91dc-da82b2f0fd44",
+            "fe9cd08b-a0e9-4dbc-9099-d41d11506ea0",
+            "efba2778-e2bf-4890-969c-36c24722de62"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-02-13T16:17:51.659941Z",
+        "last_modified": "2025-02-13T16:17:51.659953Z"
     }
 ]

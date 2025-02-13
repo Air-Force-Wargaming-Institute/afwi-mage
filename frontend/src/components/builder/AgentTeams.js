@@ -451,9 +451,9 @@ function AgentTeams() {
 
   const handleDeleteConfirm = async () => {
     try {
-      // Delete from agent and chat service
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.file_name}`));
-      await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
+      // Delete from agent and chat service TODO: do we need to delete from chat service?
+      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.unique_id}`));
+      //await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
       
       setDeleteConfirmOpen(false);
       setSnackbar({
@@ -495,11 +495,17 @@ function AgentTeams() {
   const handleDuplicateClick = async (team) => {
     try {
       // Create a new team object based on the existing team
+      // Map agent names to their unique IDs before sending
+      const agentIds = team.agents
+        .filter(agentName => agentName !== '')
+        .map(agentName => agentMapping[agentName])
+        .filter(id => id !== undefined);
+
       const duplicateTeam = {
         name: `Copy of ${team.name}`,
         description: team.description,
         color: team.color,
-        agents: team.agents,
+        agents: agentIds  // Now sending IDs instead of names
       };
 
       const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
