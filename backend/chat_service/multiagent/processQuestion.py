@@ -173,7 +173,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
 
         # Combine synthesized report with expert HTML
         full_response = final_output['synthesis']['synthesized_report'] + expert_html
-
+        logger.info(f"Full response: {full_response}")
         # Update session with new interaction
         session_manager.add_interaction(
             session_id,

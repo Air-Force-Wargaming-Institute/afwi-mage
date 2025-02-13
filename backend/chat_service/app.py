@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class ChatMessage(BaseModel):
     message: str
-    team_name: str
+    team_id: str
     session_id: Optional[str] = None
     user_id: Optional[str] = None
 
@@ -64,12 +64,11 @@ async def chat_endpoint(request_data: ChatMessage):
                     question=request_data.message,
                     user_id=request_data.user_id,
                     session_id=request_data.session_id,
-                    #team_id=request_data.team_id
-                    team_id="f47ac10b-58cc-4372-a567-0e02b2c3d490"
+                    team_id=request_data.team_id
                 ))
             )
             logger.info(f"Response: {response}")
-            return response
+            return response['response']
             
     except ValidationError as e:
         logger.error(f"Invalid request data: {e}")

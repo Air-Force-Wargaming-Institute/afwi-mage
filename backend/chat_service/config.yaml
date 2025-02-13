@@ -58,5 +58,5 @@ MAX_TOKENS: 8000
 TEMPERATURE: 0.2
 
 # Paths to agent and team configuration files
-AGENTS_FILE_PATH: 'data/builder/AGENTS/example.json'
-TEAMS_FILE_PATH: 'data/builder/TEAMS/example.json'
+AGENTS_FILE_PATH: 'data/builder/AGENTS/agents.json'
+TEAMS_FILE_PATH: 'data/builder/TEAMS/teams.json'
