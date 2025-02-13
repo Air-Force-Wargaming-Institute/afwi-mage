@@ -19,21 +19,16 @@ def synthesis_agent(state: GraphState) -> GraphState:
     question = state['question']
 
     # Define expert name mappings
-    EXPERT_NAMES = {
-        "Government": "prc_government",
-        "Military": "prc_military",
-        "Economic": "prc_economic",
-        "Regional Dynamics": "regional_dynamics",
-        "Global Influence": "global_influence",
-        "Technology": "technology_innovation",
-        "Domestic Stability": "domestic_stability"
-    }
     analyses = {
-        display_name: state['expert_final_analysis'].get(expert_id, "")
-        for display_name, expert_id in EXPERT_NAMES.items()
+        expert: state['expert_final_analysis'].get(expert, "")
+        for expert in state['expert_list']
     }
 
-    analyses_text = "\n\n".join([f"{key} Analysis:\n{value}" for key, value in analyses.items()])
+    # Safely handle empty analyses
+    if not analyses:
+        analyses_text = "No expert analyses available."
+    else:
+        analyses_text = "\n\n".join([f"{key} Analysis:\n{value}" for key, value in analyses.items() if value])
 
     prompt = PromptTemplate(
         input_variables=["question", "analyses"],

@@ -16,11 +16,10 @@ def identify_experts(state: GraphState):
     This function identifies the experts that are most relevant to the user's question.
     It uses the LLM to determine the experts that are most relevant to the user's question.
     """
-    config = load_config()
-    expert_list = config['EXPERT_AGENTS']
+    expert_list = state['expert_list']
+    expert_descriptions = state['expert_descriptions']
     llm = LLMManager().llm
     user_question = state['question']
-    expert_descriptions = config['EXPERT_DESCRIPTIONS']
     
     prompt_template = PromptTemplate(
         input_variables=["question", "experts_with_descriptions"],
@@ -36,7 +35,10 @@ def identify_experts(state: GraphState):
         """
     )
 
-    experts_with_descriptions = "\n".join(f"- {expert}: {description}" for expert, description in zip(expert_list, expert_descriptions))
+    experts_with_descriptions = "\n".join(
+        f"- {expert}: {expert_descriptions[expert]}" 
+        for expert in expert_list
+    )
     print("\tINFO: In identify_experts\n\tAvailable Experts:\n\t"+experts_with_descriptions)
 
     prompt = prompt_template.format(

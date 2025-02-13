@@ -164,10 +164,9 @@ def expert_subgraph_entry(state: ExpertState):
     )
     
     # Determine collaborators
-    expert_agents = state['expert_list']
-    expert_agents.remove(whoami)
-    expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents)
-    collaborators = determine_collaboration(reflection, analysis, expert_agents_str)
+    expert_agents_withoutme = state['expert_list']
+    expert_agents_withoutme.remove(whoami)
+    collaborators = determine_collaboration(reflection, analysis, expert_agents_withoutme)
     
     result = {
         'expert_analysis': {whoami: analysis},
@@ -187,6 +186,11 @@ def expert_subgraph_entry(state: ExpertState):
         result.update({
             'expert_collab_areas': {whoami: collab_areas},
             'expert_collaborators_list': {whoami: collaborators}
+        })
+    else:
+        result.update({
+            'expert_collab_areas': {whoami: ""},
+            'expert_collaborators_list': {whoami: []}
         })
     
     return result

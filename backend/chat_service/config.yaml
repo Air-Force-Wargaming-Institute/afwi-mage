@@ -60,15 +60,3 @@ TEMPERATURE: 0.2
 # Paths to agent and team configuration files
 AGENTS_FILE_PATH: 'data/builder/AGENTS/example.json'
 TEAMS_FILE_PATH: 'data/builder/TEAMS/example.json'
-
-# Expert agents to use in the multi agent system
-EXPERT_AGENTS: ["prc_economic", "prc_military", "prc_government", "regional_dynamics", "global_influence", "technology_innovation", "domestic_stability"]
-EXPERT_DESCRIPTIONS: [
-        "Expert on the structure, decision-making processes, and key figures within the PRC government.",
-        "Expert on the capabilities, doctrine, and strategic objectives of the People's Liberation Army (PLA).",
-        "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
-        "Expert on the PRC's relationships with neighboring countries and regional powers.",
-        "Expert on the PRC's efforts to expand its global influence.",
-        "Expert on internal social, demographic, and political factors in the PRC.",
-        "Expert on the PRC's recent advancements in key technologies."
-    ]

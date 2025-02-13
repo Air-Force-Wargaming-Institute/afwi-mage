@@ -8,7 +8,7 @@ from multiagent.llm_manager import LLMManager
 class CollabList(BaseModel):
     collaborators:list[str]
 
-def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
+def determine_collaboration(reflection: str, analysis: str, expert_agents_withoutme: list[str]):
     print(create_banner("determine_collaboration"))
     '''
     This function is used to determine if collaboration is needed and which expert to collaborate with. Arguments are:
@@ -16,8 +16,7 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     analysis: The analysis of the report as a string
     expert_agents: The list of expert agents as a string (do some sort of `"".join(expert_agents)` to get it in the correct format)
     '''
-    config = load_config()
-    EXPERT_LIST = config['EXPERT_AGENTS']
+    expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents_withoutme)
 
     llm = LLMManager().llm
     collab_template = PromptTemplate(
@@ -28,7 +27,7 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
     prompt = collab_template.format(
         reflection=reflection,
         analysis=analysis,
-        expert_agents=expert_agents
+        expert_agents=expert_agents_str
     )
 
     response = llm.with_structured_output(CollabList).invoke([HumanMessage(content=prompt)])
@@ -40,7 +39,7 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents: str):
         collaborators = response.collaborators
 
         # We don't want the LLM to have made up experts, so validate the list.
-    collaborators_list = [expert for expert in collaborators if expert in EXPERT_LIST]
+    collaborators_list = [expert for expert in collaborators if expert in expert_agents_withoutme]
 
 
     print("\tINFO: In determine_collaboration\n\tSelected Collaborators:\n\t"+str(collaborators_list))

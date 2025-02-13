@@ -162,6 +162,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
         
         if not final_output or 'synthesis' not in final_output:
             raise Exception("No output generated from graph processing")
+            
 
         # Generate expert HTML from the GraphState
         expert_html = "\n\n<details><summary>Expert Analyses</summary>\n"

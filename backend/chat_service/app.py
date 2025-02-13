@@ -68,6 +68,7 @@ async def chat_endpoint(request_data: ChatMessage):
                     team_id="f47ac10b-58cc-4372-a567-0e02b2c3d490"
                 ))
             )
+            logger.info(f"Response: {response}")
             return response
             
     except ValidationError as e:

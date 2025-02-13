@@ -26,7 +26,7 @@
         "unique_id": "f47ac10b-58cc-4372-a567-0e02b2c3d481",
         "description": "Expert on the PRC's economic policies, trade relationships, and industrial strategies.",
         "instructions": "You are the PRC Economic Expert in a multi-agent system. Focus on the PRC's economic policies, trade relationships, and industrial strategies. \n\nYour analysis should \n1. Predict economic actions and their geopolitical implications relevant to the query. \n2. Explain how economic factors influence PRC's approach to the issue at hand.\n3. Provide data on relevant economic indicators, trade patterns, or industrial policies.\n4. Discuss any recent economic initiatives or shifts that relate to the user's question. Use specific economic data and examples from the documents to support your points. Your task is to use the moderator guidance and provided documents to answer the question.",
-        "llm_model": "hermes3:8b",
+        "llm_model": "llama3.1",
         "color": "#2ECC71",
         "vectorstores": ["prc_economic_docs"],
         "created_at": "2024-03-20T00:00:00Z",
