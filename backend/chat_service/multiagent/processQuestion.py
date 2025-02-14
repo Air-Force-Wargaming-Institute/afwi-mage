@@ -1,4 +1,6 @@
 import logging
+
+from pydantic import BaseModel
 from multiagent.graphState import GraphState
 from multiagent.graph.createGraph import create_graph
 from multiagent.session_manager import SessionManager
@@ -13,7 +15,10 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 from multiagent.support_models.agent_class import Agent
 from langchain_core.prompts import PromptTemplate
-from .llm_manager import LLMManager
+from langchain_core.messages import HumanMessage
+from utils.llm_manager import LLMManager
+from datetime import datetime
+from config_ import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -56,38 +61,110 @@ async def process_graph_stream(graph, inputs):
 
     return await loop.run_in_executor(graph_executor, run_stream)
 
-def restructure_and_human_validation(question: str, chat_history: List[Dict[str, Any]], team_id: str, user_response: str):
+def restructure_and_human_validation(question: str, chat_history: List[Dict[str, Any]], team_id: str):
     """
     This function is used to restructure and/or rewrite the user's question, potentially using the conversation history, and then having the user validate the new question.
     """
+    class UserPlan(BaseModel):
+        """
+        Structured output for the planning phase of multi-agent interactions.
+        selected_agents: a list of agent names that will be tasked with answering the question
+        plan: reasoning for selecting particular agents, and the approach they will take to answering the question
+        modified_question: the new question that the user has approved
+        """
+        selected_agents: List[str] # a list of agent names that will be tasked with answering the question
+        plan: str # reasoning for selecting particular agents, and the approach they will take to answering the question
+        modified_question: str # the new question that the user has approved
+
+    
+    config = load_config()
+    high_level_prompt = config["HIGH_LEVEL_PROMPT"]
     agents = Agent.load_agents()
     teams = Team.load_teams()
     team = teams.get(team_id)
     if not team:
-        raise ValueError(f"Team with ID {team_id} not found")
-    agent_names = [agent.name for agent in team.agents]
-    agent_instructions = {agent.name: agent.instructions for agent in team.agents}
+        raise ValueError(f"Team {team_id} not found")
+    
+    # Get agent details directly from team.agents dictionary
+    agent_names = []
+    agent_instructions = {}
+    
+    logger.info(f"Before creating agent instructions: Team agents: {team.agents}")
+    for agent_id, agent in team.agents.items():
+        agent_names.append(agent.name)
+        agent_instructions[agent.name] = agent.instructions
+    
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
         for agent in agent_names
     )
 
-    plan_template = """You are a planning coordinator for a multi-agent AI team. Your job is to: 1. Analyze the user's question 2. Review the available AI agents and their instructions 3. Create a clear plan for how these agents will work together to answer the question 4. Present this plan to the user for approval
+    # Format chat history
+    formatted_history = []
+    for chat in chat_history:
+        chat_entry = f"Question: {chat.get('question', '')}\nResponse: {chat.get('response', '')}\n{'-'*40}"
+        formatted_history.append(chat_entry)
+    conversation_history = "\n\n".join(formatted_history)
+
+    plan_template = high_level_prompt + """
+You are a planning coordinator for a multi-agent AI team. Your job is to: 1. Analyze the user's question 2. Review the available AI agents and their instructions 3. Create a clear plan for how these agents will work together to answer the question 4. Present this plan to the user for approval
     User's Question: {question}
     
     Available Agents: {agents_with_instructions}
 
     Previous Conversation Context: {conversation_history}
 
-    Please create a plan that: 1. Explains which agents will be involved and why 2. Outlines how their expertise and instructions will be applied 3. Describes how their responses will be synthesized 4. Asks the user if this approach meets their needs
+    Please create a plan that: 1. Explains which agents will be involved and why 2. Outlines how their expertise and instructions will be applied 3. Asks the user if this approach meets their needs
     Your response should be clear and user-friendly, avoiding technical jargon where possible.
     """
     prompt = PromptTemplate(
-        input_variables=["question", "agents_with_instructions", "conversation_history"],
+        input_variables=["current_datetime", "question", "agents_with_instructions", "conversation_history"],
         template=plan_template
     )
-
     llm = LLMManager().get_llm()
+
+    logger.info(f"Before creating prompt and entering HIL")
+    while True:
+        prompt = prompt.format(
+            current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            question=question,
+            agents_with_instructions=agents_with_instructions,
+            conversation_history=conversation_history
+        )
+        response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
+
+        logger.info(f"After creating prompt and entering HIL")
+        # Format the plan for user review
+        plan_display = f"""
+Proposed Plan:
+-------------
+Selected Agents:
+{', '.join(response.selected_agents)}
+
+Reasoning:
+{response.plan}
+
+Modified Question:
+{response.modified_question}
+        """
+        print(plan_display)
+        
+        user_response = input("\n\nDo you approve of this plan?\n(Type 'approve' or 'reject'\nTyping anything else will be considered a reject. You will be able to provide feedback and plan again if you reject.)")
+
+        if user_response and user_response.lower().strip() == "approve":
+            # User approved the plan, return the structured response
+            return {
+                "new_question": response.modified_question,
+                "plan": response.plan,
+                "team_agents": response.selected_agents
+            }
+        else:
+            feedback = input("Please provide feedback on what you'd like to change: ")
+            question = high_level_prompt + f"""Original Question: {question}
+                            User Feedback: {feedback}
+                            Please revise the approach based on this feedback."""
+            user_response = None  # Reset for next iteration
+            continue
 
 async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None):
     """Process a question through the multiagent system, maintaining session state"""
@@ -123,8 +200,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
             logger.info(f"Created new session with generated ID: {session_id}")
 
         # Begin Human in the Loop validation to create a plan
-        # TODO
-        print(f"Conversation history: {conversation_history}")
+        plan = restructure_and_human_validation(question, conversation_history, team_id)
 
         # Load required team
         try:
