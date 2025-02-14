@@ -116,6 +116,7 @@ async def process_question(question: str, user_id: str = None, session_id: str =
                 # Load conversation history for this specific session only
                 conversation_history = session_manager.get_session_history(session_id)
                 logger.info(f"Loaded {len(conversation_history)} messages for session: {session_id}")
+                logger.info(f"Conversation history: {conversation_history}")
         else:
             session_id = session_manager.create_session(team_id)
             conversation_history = []

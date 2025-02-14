@@ -1,7 +1,7 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 from config_ import load_config
 from multiagent.retriever_manager import RetrieverManager
 from multiagent.agents.helpers import create_banner

@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 from multiagent.graphState import GraphState
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 from multiagent.agents.helpers import create_banner
 
 def synthesis_agent(state: GraphState) -> GraphState:

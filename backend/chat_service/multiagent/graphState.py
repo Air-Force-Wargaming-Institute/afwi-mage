@@ -5,7 +5,7 @@ from langgraph.graph.message import add_messages
 
 class GraphState(TypedDict):
     question: str
-    conversation_history: str
+    conversation_history: list[Dict[str, str]]
     iteration: int
     expert_list: list[str]
     expert_descriptions: Dict[str, str]
@@ -23,6 +23,7 @@ class GraphState(TypedDict):
 
 class ExpertState(TypedDict):
     question: str
+    conversation_history: list[Dict[str, str]]
     selected_experts: list[str]
     expert_instructions: Dict[str, str]
     expert_list: list[str]
@@ -42,6 +43,7 @@ class ModGuidanceState(TypedDict):
 
 class CollabState(TypedDict):
     question: str
+    conversation_history: list[Dict[str, str]]
     selected_experts: list[str]
     expert_models: Dict[str, str]
     expert_instructions: Dict[str, str]
