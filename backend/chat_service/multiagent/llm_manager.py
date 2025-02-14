@@ -3,6 +3,11 @@ from langchain_core.callbacks.manager import CallbackManager
 from langchain_openai import ChatOpenAI
 from config_ import load_config
 from typing import AsyncGenerator, Union, Any, Coroutine
+import logging 
+
+from utils.model_list import OllamaModelManager
+
+logger = logging.getLogger(__name__)
 
 class LLMManager:
     """
@@ -48,7 +53,7 @@ class LLMManager:
 
     def get_llm(self, model: str = None) -> ChatOpenAI:
         """
-        Returns an LLM instance with the specified model, or default if none provided.
+        Returns an LLM instance with the specified model, or default if none provided/invalid.
         
         Args:
             model (str, optional): The model to use. Defaults to config value.
@@ -56,18 +61,34 @@ class LLMManager:
         config = load_config()
         base_llm = self._streaming_llm if config.get('STREAMING_LLM', 1) else self._non_streaming_llm
         
-        if not model:
-            return base_llm
+        if model:
+            logger.info(f"Requesting LLM with model: {model}")
+            logger.debug(f"Current base LLM configuration: {self._base_kwargs}")
             
-        # Create new instance with specified model using stored base kwargs
-        kwargs = self._base_kwargs.copy()
-        kwargs['model'] = model
-        
-        if isinstance(base_llm, self._streaming_llm.__class__):
-            kwargs['streaming'] = True
-            kwargs['callbacks'] = base_llm.callbacks if hasattr(base_llm, 'callbacks') else None
+            # Check if requested model exists in Ollama using OLLAMA_API_URL
+            ollama = OllamaModelManager(base_url=config.get('OLLAMA_API_URL'))
+            
+            logger.debug(f"Checking Ollama at: {ollama.base_url}")
+            
+            if not ollama.model_exists(model):
+                logger.warning(f"Model {model} not found in Ollama. Using default model: {self._base_kwargs['model']}")
+                return base_llm
+            
+            # Create new instance with specified model using stored base kwargs
+            logger.info(f"Creating new LLM instance with model: {model}")
+            kwargs = self._base_kwargs.copy()
+            kwargs['model'] = model
+            
+            if isinstance(base_llm, self._streaming_llm.__class__):
+                kwargs['streaming'] = True
+                kwargs['callbacks'] = base_llm.callbacks if hasattr(base_llm, 'callbacks') else None
+                logger.debug("Using streaming configuration")
 
-        return ChatOpenAI(**kwargs)
+            logger.debug(f"Final LLM configuration: {kwargs}")
+            return ChatOpenAI(**kwargs)
+        
+        logger.debug("No specific model requested, using base LLM")
+        return base_llm
 
     @property
     def llm(self):
