@@ -41,7 +41,7 @@
         "color": "#FF0000",
         "created_at": "2025-02-03T21:50:09.886812Z",
         "vectorstores": [],
-        "last_modified": "2025-02-13T17:22:05.678029Z"
+        "last_modified": "2025-02-14T21:03:29.004330Z"
     },
     {
         "name": "PRC Global Influence",
@@ -111,7 +111,7 @@
     },
     {
         "name": "US Economics",
-        "unique_id": "6f7890ab-cdef-1234-5678-90123456789a",
+        "unique_id": "6f7890ab-cdef-1234-5678-901234567444",
         "description": "US Economics Expert",
         "instructions": "You are the US Economic Expert in a multi-agent system. Focus on the United States' economic policies, trade relationships, and industrial strategies. \n\nYour analysis should \n1. Predict economic actions and their geopolitical implications relevant to the query. \n2. Explain how economic factors influence the US's approach to the issue at hand.\n3. Provide data on relevant economic indicators, trade patterns, or industrial policies.\n4. Discuss any recent economic initiatives or shifts that relate to the user's question. Use specific economic data and examples from the documents to support your points. Your task is to use the moderator guidance and provided documents to answer the question.",
         "llm_model": "gpt-3.5-turbo",

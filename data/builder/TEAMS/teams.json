@@ -14,7 +14,7 @@
         ],
         "color": "#FF0000",
         "created_at": "2025-02-13T17:25:26.750788Z",
-        "last_modified": "2025-02-13T17:25:26.750802Z"
+        "last_modified": "2025-02-14T21:00:42.076011Z"
     },
     {
         "name": "US Expert Panel",
@@ -22,7 +22,7 @@
         "description": "Panel of United States Experts",
         "agents": [
             "7890abcd-ef12-3456-7890-123456789abc",
-            "6f7890ab-cdef-1234-5678-90123456789a",
+            "6f7890ab-cdef-1234-5678-901234567444",
             "5e6f7890-abcd-ef12-3456-789012345678",
             "4d5e6f78-90ab-cdef-1234-567890123456",
             "1a2b3c4d-5e6f-7890-abcd-ef1234567890",
