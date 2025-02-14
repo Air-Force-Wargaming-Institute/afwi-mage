@@ -4,7 +4,7 @@ from multiagent.graph.createGraph import create_graph
 from multiagent.session_manager import SessionManager
 from multiagent.support_models.team_class import Team
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 from multiagent.support_models.chat import Chat
 from threading import Lock
 import threading
@@ -12,6 +12,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 from multiagent.support_models.agent_class import Agent
+from langchain_core.prompts import PromptTemplate
+from .llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
@@ -54,28 +56,38 @@ async def process_graph_stream(graph, inputs):
 
     return await loop.run_in_executor(graph_executor, run_stream)
 
-# def format_conversation_entry(question: str, state: GraphState) -> str:
-#     """Format a conversation entry with question, expert analyses, and final report"""
-#     conversation_entry = f"\nUser Question: {question}\n\n"
-    
-#     # Add expert final analyses if they exist
-#     if state.get('expert_final_analysis'):
-#         conversation_entry += "Expert Analyses:\n"
-#         for expert, analysis in state['expert_final_analysis'].items():
-#             conversation_entry += f"\n{expert}:\n{analysis}\n"
-    
-#     # Add synthesized report if it exists
-#     if state.get('synthesized_report'):
-#         conversation_entry += f"\nFinal Synthesized Report:\n{state['synthesized_report']}\n"
-    
-#     conversation_entry += "\n" + "-"*80 + "\n"  # Add separator between conversations
-#     return conversation_entry
-
-def restructure_and_human_validation(question: str, session_id: str, team_id: str, user_response: str):
+def restructure_and_human_validation(question: str, chat_history: List[Dict[str, Any]], team_id: str, user_response: str):
     """
     This function is used to restructure and/or rewrite the user's question, potentially using the conversation history, and then having the user validate the new question.
     """
-    pass
+    agents = Agent.load_agents()
+    teams = Team.load_teams()
+    team = teams.get(team_id)
+    if not team:
+        raise ValueError(f"Team with ID {team_id} not found")
+    agent_names = [agent.name for agent in team.agents]
+    agent_instructions = {agent.name: agent.instructions for agent in team.agents}
+    agents_with_instructions = "\n".join(
+        f"- {agent}: {agent_instructions[agent]}" 
+        for agent in agent_names
+    )
+
+    plan_template = """You are a planning coordinator for a multi-agent AI team. Your job is to: 1. Analyze the user's question 2. Review the available AI agents and their instructions 3. Create a clear plan for how these agents will work together to answer the question 4. Present this plan to the user for approval
+    User's Question: {question}
+    
+    Available Agents: {agents_with_instructions}
+
+    Previous Conversation Context: {conversation_history}
+
+    Please create a plan that: 1. Explains which agents will be involved and why 2. Outlines how their expertise and instructions will be applied 3. Describes how their responses will be synthesized 4. Asks the user if this approach meets their needs
+    Your response should be clear and user-friendly, avoiding technical jargon where possible.
+    """
+    prompt = PromptTemplate(
+        input_variables=["question", "agents_with_instructions", "conversation_history"],
+        template=plan_template
+    )
+
+    llm = LLMManager().get_llm()
 
 async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None):
     """Process a question through the multiagent system, maintaining session state"""
@@ -108,6 +120,10 @@ async def process_question(question: str, user_id: str = None, session_id: str =
             session_id = session_manager.create_session(team_id)
             conversation_history = []
             logger.info(f"Created new session with generated ID: {session_id}")
+
+        # Begin Human in the Loop validation to create a plan
+        # TODO
+        print(f"Conversation history: {conversation_history}")
 
         # Load required team
         try:
