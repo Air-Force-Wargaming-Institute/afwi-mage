@@ -3,7 +3,7 @@ from config_ import load_config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from multiagent.graphState import GraphState
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 from multiagent.agents.helpers import create_banner
 import ast
 

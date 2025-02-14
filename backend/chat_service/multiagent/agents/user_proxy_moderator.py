@@ -2,7 +2,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from multiagent.graphState import GraphState, ModGuidanceState
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 from langchain_core.messages import AIMessage
 from typing import Set
 from multiagent.agents.helpers import create_banner

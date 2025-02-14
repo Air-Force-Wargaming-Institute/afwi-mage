@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from config_ import load_config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 
 
 class CollabList(BaseModel):

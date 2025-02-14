@@ -2,7 +2,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from multiagent.graphState import ExpertState, CollabState
 from multiagent.agents.helpers import determine_collaboration, create_banner
-from multiagent.llm_manager import LLMManager
+from utils.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
 
 def get_librarian_request(whoami: str, question: str, agent_instructions: str, context: str = "") -> str:
