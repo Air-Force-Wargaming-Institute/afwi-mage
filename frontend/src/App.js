@@ -11,6 +11,7 @@ import FineTune from './components/FineTune';
 import Test from './components/Test';
 import MultiAgentBuilder from './components/MultiAgentBuilder';
 import MultiAgentChat from './components/MultiAgentChat';
+import MultiAgentHILChat from './components/MultiAgentHILChat';
 import RetrievalGuide from './components/RetrievalGuide';
 import BuildRetrievalDatabases from './components/BuildRetrievalDatabases';
 import LibrarianAgents from './components/LibrarianAgents';
@@ -21,6 +22,7 @@ import { ExtractionProvider } from './contexts/ExtractionContext';
 import { GenerationProvider } from './contexts/GenerationContext';
 import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
+import { HILChatProvider } from './contexts/HILChatContext';
 import DirectChat from './components/DirectChat';
 import { DirectChatProvider } from './contexts/DirectChatContext';
 
@@ -46,7 +48,8 @@ const AuthenticatedRoutes = () => {
           <Route path="/multi-agent/guide" component={UserGuide} />
           <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
           <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
-          <Route path="/multi-agent/chat" component={MultiAgentChat} />
+          {/*<Route path="/multi-agent/chat" component={MultiAgentChat} />*/}
+          <Route path="/multi-agent/chat" component={MultiAgentHILChat} />
           <Route path="/multi-agent/direct-chat" component={DirectChat} />
           <Route exact path="/fine-tuning" component={FineTuneGuide} />
           <Route path="/fine-tuning/extract" component={ExtractComponent} />
@@ -78,11 +81,13 @@ function App() {
         <DocumentLibraryProvider>
           <DirectChatProvider>
             <ChatProvider>
-              <AuthProvider>
-                <Router>
-                  <AuthenticatedRoutes />
-                </Router>
-              </AuthProvider>
+              <HILChatProvider>
+                <AuthProvider>
+                  <Router>
+                    <AuthenticatedRoutes />
+                  </Router>
+                </AuthProvider>
+              </HILChatProvider>
             </ChatProvider>
           </DirectChatProvider>
         </DocumentLibraryProvider>

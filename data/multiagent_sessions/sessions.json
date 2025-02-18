@@ -241,5 +241,68 @@
         "timestamp": "2025-02-14T15:34:50.315303"
       }
     ]
+  },
+  {
+    "session_id": "d4d9ca24-0007-4a9e-b987-8c0a9dab7e2e",
+    "team_id": "1c0a2280-a996-4a65-b7f5-33343480330f",
+    "created_at": "2025-02-18T17:08:28.339809+00:00",
+    "updated_at": "2025-02-18T17:08:28.339809+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "2e61b545-af1a-4ff6-bd0e-7ae4c2bfcf65",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:18:57.811746+00:00",
+    "updated_at": "2025-02-18T21:18:57.811746+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "5e17db75-0e85-493c-9078-cbf47ff9570b",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:33:26.325478+00:00",
+    "updated_at": "2025-02-18T21:33:26.325478+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "445d4c03-8730-40fa-9464-7e97f16cc803",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:40:59.099724+00:00",
+    "updated_at": "2025-02-18T21:40:59.099724+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "ef92e365-a4ce-4ecf-820d-f01324e73c27",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:41:42.961527+00:00",
+    "updated_at": "2025-02-18T21:41:42.961527+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "fb9ac1f8-2aa3-4ba9-8b0d-b928ac5e9dd5",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:48:34.530332+00:00",
+    "updated_at": "2025-02-18T21:48:34.530332+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "6cc642fd-4f65-4a21-a9a3-a0582342045a",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:52:27.067699+00:00",
+    "updated_at": "2025-02-18T21:52:27.067699+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "12b02ee7-a619-492a-ae6e-4e7008cd19b2",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:56:37.402663+00:00",
+    "updated_at": "2025-02-18T21:56:37.402663+00:00",
+    "conversation_history": []
+  },
+  {
+    "session_id": "e83c083e-72b6-4afb-abfb-306b7ecc25f1",
+    "team_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+    "created_at": "2025-02-18T21:59:24.899976+00:00",
+    "updated_at": "2025-02-18T21:59:24.899976+00:00",
+    "conversation_history": []
   }
 ]

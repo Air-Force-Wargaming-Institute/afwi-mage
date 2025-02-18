@@ -1,0 +1,1009 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { makeStyles } from '@material-ui/core/styles';
+import {
+  Container,
+  Paper,
+  TextField,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Typography,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  CircularProgress,
+  Box,
+  IconButton,
+  Fade,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  Tooltip,
+  ListItemIcon
+} from '@material-ui/core';
+import SendIcon from '@material-ui/icons/Send';
+import FullscreenIcon from '@material-ui/icons/Fullscreen';
+import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
+import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import { v4 as uuidv4 } from 'uuid';
+import { debounce } from 'lodash';
+import { useHILChat, ACTIONS } from '../contexts/HILChatContext';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import Snackbar from '@material-ui/core/Snackbar';
+import Alert from '@material-ui/lab/Alert';
+import axios from 'axios';
+import { getApiUrl } from '../config';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import SchoolIcon from '@mui/icons-material/School';
+import TuneIcon from '@mui/icons-material/Tune';
+import PersonIcon from '@mui/icons-material/Person';
+
+const useStyles = makeStyles((theme) => ({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    padding: theme.spacing(2),
+    height: 'calc(80vh - 64px)',
+    marginTop: '10px',
+  },
+  chatContainer: {
+    display: 'flex',
+    flexGrow: 1,
+    overflow: 'hidden',
+    borderRadius: '10px',
+    height: '100%',
+  },
+  chatArea: {
+    flexGrow: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    position: 'relative',
+  },
+  messageArea: {
+    flexGrow: 1,
+    overflowY: 'auto',
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(1),
+    textAlign: 'left',
+    fontSize: '0.7rem',
+    scrollBehavior: 'smooth',
+    '&::-webkit-scrollbar': {
+      width: '8px',
+      zIndex: 2,
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+      zIndex: 2,
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[300],
+      borderRadius: '4px',
+      zIndex: 2,
+      '&:hover': {
+        background: theme.palette.grey[400],
+      },
+    },
+  },
+  message: {
+    marginBottom: theme.spacing(1),
+    padding: theme.spacing(2),
+    paddingBottom: theme.spacing(2),
+    borderRadius: '30px',
+    border: '1px solid #e0e0e0',
+    maxWidth: '80%',
+    wordBreak: 'break-word',
+    display: 'inline-block',
+    whiteSpace: 'pre-wrap',
+    position: 'relative',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+      transform: 'translateY(-1px)',
+    },
+  },
+  userMessage: {
+    backgroundColor: theme.palette.primary.main,
+    color: '#ffffff',
+    marginLeft: 'auto',
+    borderRadius: '20px 20px 0 20px',
+    '& $messageContent': {
+      color: '#ffffff',
+    },
+    '& p, & div': {
+      color: '#ffffff !important',
+    },
+  },
+  aiMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.palette.grey[100],
+    color: theme.palette.text.primary,
+    borderBottomLeftRadius: '4px',
+    '& pre': {
+      margin: '8px 0',
+      borderRadius: '4px',
+      overflow: 'auto',
+    },
+    '& code': {
+      fontFamily: 'monospace',
+    },
+  },
+  inputArea: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper,
+    borderTop: `1px solid ${theme.palette.divider}`,
+  },
+  input: {
+    flexGrow: 1,
+    marginRight: theme.spacing(2),
+    '& .MuiInputBase-root': {
+      maxHeight: '150px',
+      overflowY: 'auto',
+    },
+  },
+  inputHelpIcon: {
+    marginRight: theme.spacing(1),
+    color: theme.palette.text.secondary,
+  },
+  typingIndicator: {
+    padding: theme.spacing(2),
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    '& .loading-header': {
+      fontWeight: 600,
+    },
+    '& .loading-text': {
+      color: theme.palette.text.secondary,
+      fontSize: '0.9rem',
+      textAlign: 'center',
+    },
+    '& .dots': {
+      display: 'flex',
+      gap: '8px',
+      marginTop: theme.spacing(1),
+      '& .dot': {
+        width: '8px',
+        height: '8px',
+        backgroundColor: theme.palette.primary.main,
+        borderRadius: '50%',
+        animation: '$bounce 1.4s infinite ease-in-out both',
+        '&:nth-child(1)': {
+          animationDelay: '-0.32s',
+        },
+        '&:nth-child(2)': {
+          animationDelay: '-0.16s',
+        },
+      },
+    },
+  },
+  '@keyframes bounce': {
+    '0%, 80%, 100%': {
+      transform: 'scale(0)',
+    },
+    '40%': {
+      transform: 'scale(1)',
+    },
+  },
+  improvementDialog: {
+    '& .MuiDialog-paper': {
+      width: '600px',
+      maxWidth: '90vw',
+    },
+  },
+  feedbackField: {
+    marginTop: theme.spacing(2),
+  },
+  sessionButton: {
+    marginBottom: theme.spacing(2),
+  },
+  closeButton: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    top: theme.spacing(1),
+  },
+  improvementBox: {
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(2),
+    backgroundColor: theme.palette.background.default,
+  },
+  chatLog: {
+    width: '30%',
+    height: '100%',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    marginRight: theme.spacing(2),
+  },
+  newChatButton: {
+    margin: theme.spacing(2),
+  },
+  chatSessionItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing(1, 2),
+  },
+  sessionActions: {
+    display: 'flex',
+    gap: theme.spacing(1),
+    opacity: 0.7,
+    transition: 'opacity 0.2s',
+    '&:hover': {
+      opacity: 1,
+    },
+  },
+  promptHelpDialog: {
+    '& .MuiDialog-paper': {
+      width: '600px',
+      maxWidth: '90vw',
+    },
+  },
+  dialogTitle: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dialogContent: {
+    padding: theme.spacing(2),
+  },
+  promptTip: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(2),
+    marginBottom: theme.spacing(3),
+  },
+  tipIcon: {
+    color: theme.palette.primary.main,
+    marginTop: theme.spacing(0.5),
+  },
+  planBox: {
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+    maxHeight: '400px',
+    overflowY: 'auto',
+  },
+  modifiedQuestionBox: {
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+  },
+  agentsBox: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.default,
+  },
+  agentIcon: {
+    marginRight: theme.spacing(2),
+  },
+}));
+
+// Custom markdown renderer for code blocks
+const CodeBlock = ({ node, inline, className, children, ...props }) => {
+  const match = /language-(\w+)/.exec(className || '');
+  return !inline && match ? (
+    <SyntaxHighlighter
+      style={materialDark}
+      language={match[1]}
+      PreTag="div"
+      {...props}
+    >
+      {String(children).replace(/\n$/, '')}
+    </SyntaxHighlighter>
+  ) : (
+    <code className={className} {...props}>
+      {children}
+    </code>
+  );
+};
+
+// Add API endpoint constants
+const API_ENDPOINTS = {
+  INIT: '/chat/init',    // Initialize chat session
+  REFINE: '/chat/refine', // Get message refinement suggestions
+  PROCESS: '/chat/process' // Process final message
+};
+
+function MultiAgentHILChat() {
+  const classes = useStyles();
+  const { state, dispatch } = useHILChat();
+  const messageEndRef = useRef(null);
+  const messageAreaRef = useRef(null);
+  const shouldUpdatePositions = useRef(false);
+
+  // Scroll handling
+  const handleScroll = debounce(() => {
+    if (!messageAreaRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = messageAreaRef.current;
+    const isNearTop = scrollTop < 100;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    dispatch({ type: ACTIONS.SET_SCROLL_TOP, payload: isNearTop });
+    dispatch({ type: ACTIONS.SET_SCROLL_BOTTOM, payload: !isNearBottom });
+  }, 100);
+
+  const scrollToBottom = () => {
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (state.messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [state.messages]);
+
+  // Loading indicator component
+  const TypingIndicator = () => (
+    <div className={classes.typingIndicator}>
+      <Typography className="loading-header">Processing your message</Typography>
+      <Typography className="loading-text">Please wait</Typography>
+      <div className="dots">
+        <div className="dot" />
+        <div className="dot" />
+        <div className="dot" />
+      </div>
+    </div>
+  );
+
+  // Message component with markdown support
+  const Message = ({ message }) => (
+    <div
+      className={`${classes.message} ${
+        message.sender === 'user' ? classes.userMessage : classes.aiMessage
+      }`}
+    >
+      <ReactMarkdown
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          code: CodeBlock
+        }}
+      >
+        {message.text}
+      </ReactMarkdown>
+      <Typography variant="caption" className={classes.messageTimestamp}>
+        {new Date(message.timestamp).toLocaleTimeString()}
+      </Typography>
+    </div>
+  );
+
+  // Add these state variables at the start of the component
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [newSessionName, setNewSessionName] = useState('');
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
+  const [teamError, setTeamError] = useState('');
+  const [promptHelpOpen, setPromptHelpOpen] = useState(false);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planChoice, setPlanChoice] = useState('');
+  const [rejectionText, setRejectionText] = useState('');
+  const [planContent, setPlanContent] = useState('');
+  const [modifiedQuestion, setModifiedQuestion] = useState('');
+  const [selectedAgents, setSelectedAgents] = useState([]);
+
+  // Replace the existing handleNewChat with this version
+  const handleNewChat = async () => {
+    setIsLoadingTeams(true);
+    setTeamError('');
+    try {
+      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+      setAvailableTeams(response.data.teams);
+      setDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      setTeamError('Failed to load available teams. Please try again.');
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  };
+
+  // Add this new function
+  const handleCreateNewChat = () => {
+    if (!selectedTeam || !newSessionName.trim()) {
+      setTeamError('Please select a team and enter a session name');
+      return;
+    }
+    
+    const selectedTeamObj = availableTeams.find(team => team.name === selectedTeam);
+    
+    const newSession = { 
+      id: uuidv4(),
+      name: newSessionName.trim(),
+      team: selectedTeam,
+      teamId: selectedTeamObj?.id
+    };
+    
+    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
+    
+    setDialogOpen(false);
+    setNewSessionName('');
+    setSelectedTeam('');
+    setTeamError('');
+  };
+
+  const handleEditSession = (sessionId) => {
+    // TODO: Implement edit functionality
+    console.log(`Edit session ${sessionId}`);
+  };
+
+  const handleDeleteSession = (sessionId) => {
+    // TODO: Implement delete functionality
+    console.log(`Delete session ${sessionId}`);
+  };
+
+  const handleDownloadSession = (sessionId) => {
+    // TODO: Implement download functionality
+    console.log(`Download session ${sessionId}`);
+  };
+
+  const handleInputChange = (event) => {
+    dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
+  };
+
+  const handleKeyPress = (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      handleSubmit(event);
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!state.input.trim()) return;
+
+    // Get the current session - if none exists, create one
+    let currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
+    
+    // If no current session exists, create one with default team
+    if (!currentSession) {
+      const defaultTeam = availableTeams[0];
+      currentSession = {
+        id: uuidv4(),
+        name: 'New Chat',
+        team: defaultTeam?.name || 'PRC_Team',
+        teamId: defaultTeam?.id
+      };
+      dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: currentSession });
+      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: currentSession.id });
+    }
+
+    const messageData = { 
+      message: state.input.trim(), 
+      team_name: currentSession.team,
+      session_id: currentSession.id,
+      team_id: currentSession.teamId
+    };
+
+    // Add user message to chat first
+    dispatch({ 
+      type: ACTIONS.ADD_MESSAGE, 
+      payload: { 
+        text: state.input.trim(), 
+        sender: 'user', 
+        timestamp: new Date(),
+        sessionId: currentSession.id
+      }
+    });
+    
+    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
+    
+    try {
+      // Start loading only when making the API call
+      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+      
+      // First, send to init endpoint
+      let response = await axios.post(getApiUrl('CHAT', '/chat/init'), messageData);
+
+      // Handle any errors
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      // Check if we need to continue to refinement
+      if (response.data.continue === true) {
+        // Send to refine endpoint with the same data
+        response = await axios.post(getApiUrl('CHAT', '/chat/refine'), messageData);
+        
+        if (response.data.error) {
+          throw new Error(response.data.error);
+        }
+
+        // Clear loading before showing dialog
+        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+        
+        // Store plan, modified question, and selected agents
+        setPlanContent(response.data.plan || response.data.response || response.data.message);
+        setModifiedQuestion(response.data.modified_message || '');
+        setSelectedAgents(response.data.selected_agents || []);
+        setPlanDialogOpen(true);
+        return;
+      }
+
+      // If continue was false, display the init response
+      dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          text: response.data.response || response.data.message, 
+          sender: 'ai', 
+          timestamp: new Date(),
+          sessionId: currentSession.id
+        }
+      });
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          text: `Error: Failed to get response from AI - ${error.message}`, 
+          sender: 'system', 
+          timestamp: new Date() 
+        }
+      });
+    } finally {
+      // Clear loading state if we're not showing the dialog
+      if (!planDialogOpen) {
+        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+      }
+    }
+  };
+
+  // Add handler for plan dialog submission
+  const handlePlanSubmit = async () => {
+    if (planChoice === 'reject' && !rejectionText.trim()) {
+      return;
+    }
+
+    const currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
+    const messageData = {
+      message: planChoice === 'accept' ? 'accept' : rejectionText.trim(),
+      plan: planContent,
+      team_name: currentSession.team,
+      session_id: currentSession.id,
+      team_id: currentSession.teamId
+    };
+
+    // Close dialog and show loading first
+    setPlanDialogOpen(false);
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+    try {
+      const endpoint = planChoice === 'accept' ? '/chat/process' : '/chat/refine';
+      const response = await axios.post(getApiUrl('CHAT', endpoint), messageData);
+
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      // If this is a refine response, show the plan dialog
+      if (endpoint === '/chat/refine') {
+        // Clear loading before showing dialog
+        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+        
+        setPlanContent(response.data.plan || response.data.response || response.data.message);
+        setModifiedQuestion(response.data.modified_message || '');
+        setSelectedAgents(response.data.selected_agents || []);
+        setPlanDialogOpen(true);
+        return;
+      }
+
+      // Otherwise, display the response in chat
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          text: response.data.response || response.data.message, 
+          sender: 'ai', 
+          timestamp: new Date(),
+          sessionId: currentSession.id
+        }
+      });
+
+    } catch (error) {
+      console.error('Error submitting plan choice:', error);
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          text: `Error: Failed to process plan - ${error.message}`, 
+          sender: 'system', 
+          timestamp: new Date() 
+        }
+      });
+    } finally {
+      if (!planDialogOpen) { // Only clean up if we're not showing the plan dialog
+        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+        setPlanChoice('');
+        setRejectionText('');
+      }
+    }
+  };
+
+  const handlePromptHelpOpen = () => {
+    setPromptHelpOpen(true);
+  };
+
+  const handlePromptHelpClose = () => {
+    setPromptHelpOpen(false);
+  };
+
+  return (
+    <Container className={`${classes.root} ${state.isFullscreen ? classes.fullscreen : ''}`}>
+      <div className={classes.chatContainer}>
+        {!state.isFullscreen && (
+          <Paper className={classes.chatLog} elevation={3}>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              className={classes.newChatButton}
+              onClick={handleNewChat}
+            >
+              Start New Chat Session
+            </Button>
+            <List>
+              {state.chatSessions.map((session) => (
+                <React.Fragment key={session.id}>
+                  <ListItem 
+                    button 
+                    className={classes.chatSessionItem}
+                    selected={session.id === state.currentSessionId}
+                    onClick={() => dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: session.id })}
+                  >
+                    <ListItemText primary={session.name} />
+                    <div className={classes.sessionActions}>
+                      <Tooltip title="Edit">
+                        <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteSession(session.id)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Download">
+                        <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
+                          <GetAppIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </div>
+                  </ListItem>
+                  <Divider />
+                </React.Fragment>
+              ))}
+            </List>
+          </Paper>
+        )}
+        
+        <Paper className={classes.chatArea} elevation={3}>
+          <div 
+            className={classes.messageArea} 
+            ref={messageAreaRef}
+            onScroll={handleScroll}
+          >
+            {state.messages.map((message) => (
+              <Message key={message.id} message={message} />
+            ))}
+            {state.isLoading && <TypingIndicator />}
+            <div ref={messageEndRef} />
+          </div>
+
+          <form onSubmit={handleSubmit} className={classes.inputArea}>
+            <IconButton 
+              onClick={handlePromptHelpOpen}
+              size="small"
+              className={classes.inputHelpIcon}
+              title="Prompt Engineering Tips"
+            >
+              <HelpOutlineIcon />
+            </IconButton>
+            <TextField
+              className={classes.input}
+              variant="outlined"
+              placeholder="Type your message here... (Ctrl+Enter to send)"
+              value={state.input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyPress}
+              multiline
+              minRows={1}
+              maxRows={5}
+              fullWidth
+            />
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary" 
+              endIcon={<SendIcon />}
+            >
+              Send
+            </Button>
+          </form>
+        </Paper>
+      </div>
+
+      {/* Session Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      >
+        <DialogTitle>Create New Chat Session</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Session Name"
+              fullWidth
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              error={teamError && !newSessionName.trim()}
+              helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Select Team</InputLabel>
+              <Select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                error={teamError && !selectedTeam}
+              >
+                {isLoadingTeams ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> Loading teams...
+                  </MenuItem>
+                ) : (
+                  availableTeams.map(team => (
+                    <MenuItem key={team.id} value={team.name}>
+                      {team.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {teamError && !selectedTeam && (
+                <Typography color="error" variant="caption">
+                  Please select a team
+                </Typography>
+              )}
+            </FormControl>
+            {teamError && (
+              <Typography color="error" variant="body2">
+                {teamError}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDialogOpen(false);
+            setTeamError('');
+            setNewSessionName('');
+            setSelectedTeam('');
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateNewChat}
+            color="primary"
+            variant="contained"
+            disabled={isLoadingTeams}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Plan Dialog */}
+      <Dialog
+        open={planDialogOpen}
+        onClose={() => {}}
+        maxWidth="md"
+        fullWidth
+        disableEscapeKeyDown
+      >
+        <DialogTitle>Review Plan</DialogTitle>
+        <DialogContent>
+          {selectedAgents.length > 0 && (
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>Selected Agents</Typography>
+              <Paper elevation={1} className={classes.agentsBox}>
+                <List dense>
+                  {selectedAgents.map((agent, index) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        <PersonIcon className={classes.agentIcon} />
+                      </ListItemIcon>
+                      <ListItemText primary={agent} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            </Box>
+          )}
+
+          <Box mb={3}>
+            <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
+            <Paper elevation={1} className={classes.planBox}>
+              <ReactMarkdown
+                rehypePlugins={[rehypeRaw]}
+                components={{
+                  code: CodeBlock
+                }}
+              >
+                {planContent}
+              </ReactMarkdown>
+            </Paper>
+          </Box>
+          
+          {modifiedQuestion && (
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>Modified Question</Typography>
+              <Paper elevation={1} className={classes.modifiedQuestionBox}>
+                <Typography variant="body1">
+                  {modifiedQuestion}
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          <RadioGroup
+            value={planChoice}
+            onChange={(e) => setPlanChoice(e.target.value)}
+          >
+            <FormControlLabel 
+              value="accept" 
+              control={<Radio color="primary" />} 
+              label="Accept this plan" 
+            />
+            <FormControlLabel 
+              value="reject" 
+              control={<Radio color="primary" />} 
+              label="Reject and provide feedback" 
+            />
+          </RadioGroup>
+          <Fade in={planChoice === 'reject'}>
+            <div>
+              {planChoice === 'reject' && (
+                <TextField
+                  className={classes.feedbackField}
+                  multiline
+                  minRows={3}
+                  variant="outlined"
+                  fullWidth
+                  label="Please explain what you would like to improve"
+                  value={rejectionText}
+                  onChange={(e) => setRejectionText(e.target.value)}
+                  error={planChoice === 'reject' && !rejectionText.trim()}
+                  helperText={planChoice === 'reject' && !rejectionText.trim() ? 'Feedback is required when rejecting' : ''}
+                />
+              )}
+            </div>
+          </Fade>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPlanDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handlePlanSubmit}
+            color="primary"
+            variant="contained"
+            disabled={!planChoice || (planChoice === 'reject' && !rejectionText.trim())}
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Prompt Help Dialog */}
+      <Dialog
+        open={promptHelpOpen}
+        onClose={handlePromptHelpClose}
+        className={classes.promptHelpDialog}
+        aria-labelledby="prompt-help-dialog-title"
+      >
+        <DialogTitle id="prompt-help-dialog-title" className={classes.dialogTitle}>
+          <Typography variant="h6">Effective Prompt Engineering Tips</Typography>
+          <IconButton
+            aria-label="close"
+            className={classes.closeButton}
+            onClick={handlePromptHelpClose}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className={classes.dialogContent}>
+          <div className={classes.promptTip}>
+            <LightbulbIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Be Specific and Clear</strong></Typography>
+              <Typography>
+                Instead of "How to make a website?", try "What are the key steps to create a responsive website using React and Material-UI for a small business?"
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <FormatListBulletedIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Break Down Complex Questions</strong></Typography>
+              <Typography>
+                For complex topics, break your query into smaller, focused questions. This helps get more detailed and accurate responses.
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <SchoolIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Provide Context</strong></Typography>
+              <Typography>
+                Include relevant background information and your level of expertise in the topic for more tailored responses.
+              </Typography>
+            </div>
+          </div>
+          <div className={classes.promptTip}>
+            <TuneIcon className={classes.tipIcon} />
+            <div>
+              <Typography><strong>Iterate and Refine</strong></Typography>
+              <Typography>
+                If the response isn't quite what you need, refine your question or ask for clarification on specific points.
+              </Typography>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handlePromptHelpClose} 
+            color="primary"
+            variant="contained"
+            style={{ borderRadius: '20px', textTransform: 'none' }}
+          >
+            Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={Boolean(state.error)}
+        autoHideDuration={6000}
+        onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
+      >
+        <Alert
+          onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
+          severity="error"
+          elevation={6}
+          variant="filled"
+        >
+          {state.error}
+        </Alert>
+      </Snackbar>
+
+    </Container>
+  );
+}
+
+export default MultiAgentHILChat; 
