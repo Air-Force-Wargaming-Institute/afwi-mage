@@ -35,9 +35,11 @@ logger = logging.getLogger(__name__)
 class ChatMessage(BaseModel):
     message: str
     team_id: str
+    team_name: Optional[str] = None
     session_id: Optional[str] = None
     user_id: Optional[str] = None
     plan: Optional[str] = None
+    selected_agents: Optional[List[str]] = None
 
 app = FastAPI()
 
@@ -268,6 +270,12 @@ async def chat_endpoint(request_data: ChatMessage):
     except Exception as e:
         logger.error(f"Error processing chat request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/chat/generate_session_id/")
+async def generate_session_id(session_name: str, team_id: str):
+    session_manager = SessionManager()
+    session_id = session_manager.create_session(team_id)
+    return {"session_id": session_id}
 
 @app.delete("/delete_team/{team_name}")
 async def delete_team(team_name: str):
