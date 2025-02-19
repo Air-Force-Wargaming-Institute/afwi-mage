@@ -35,9 +35,11 @@ logger = logging.getLogger(__name__)
 class ChatMessage(BaseModel):
     message: str
     team_id: str
+    team_name: Optional[str] = None
     session_id: Optional[str] = None
     user_id: Optional[str] = None
     plan: Optional[str] = None
+    selected_agents: Optional[List[str]] = None
 
 app = FastAPI()
 
@@ -113,9 +115,9 @@ async def init_chat(request_data: ChatMessage):
 @app.post("/chat/refine")
 async def refine_chat(request_data: ChatMessage):
     try:
-        
-        # Initialize LLM
+        logger.info(f"Received refine chat request: {request_data}")
         llm = LLMManager().get_llm()
+
         class UserPlan(BaseModel):
             """
             Structured output for the planning phase of multi-agent interactions.
@@ -126,23 +128,18 @@ async def refine_chat(request_data: ChatMessage):
             selected_agents: List[str]  # a list of agent names that will be tasked with answering the message
             plan: str                   # reasoning for selecting particular agents, and the approach they will take to answering the message
             modified_message: str      # the new message that the user has approved
-        # Initialize SessionManager
-        session_manager = SessionManager()
 
-        # Load teams
         teams = Team.load_teams()
         team = teams.get(request_data.team_id)
         if not team:
-            logger.error(f"[REFINE_TEAM] Team {request_data.team_id} not found")
             raise ValueError(f"Team {request_data.team_id} not found")
     
-        # Get agent details
+        # Get agent details directly from team.agents dictionary
         agent_names = []
         agent_instructions = {}
     
-        logger.info(f"[REFINE_AGENTS] Processing team agents: {len(team.agents)} agents found")
+        logger.info(f"Before creating agent instructions: Team agents: {team.agents}")
         for agent_id, agent in team.agents.items():
-            logger.debug(f"[REFINE_AGENTS] Processing agent: {agent.name}")
             agent_names.append(agent.name)
             agent_instructions[agent.name] = agent.instructions
     
@@ -151,33 +148,28 @@ async def refine_chat(request_data: ChatMessage):
             for agent in agent_names
         )
 
-        # Session handling
+        # Grab conversation history from session
+        session_manager = SessionManager()
         if request_data.session_id:
-            logger.info(f"[REFINE_SESSION] Attempting to get session: {request_data.session_id}")
-            try:
-                session = session_manager.get_session(request_data.session_id)
-                logger.info(f"[REFINE_SESSION] Session retrieved: {bool(session)}")
-                
-                if not session:
-                    session_manager.create_session(request_data.team_id, session_id=request_data.session_id)
-                    conversation_history = []
-                    logger.info(f"[REFINE_SESSION] Created new session with provided ID: {request_data.session_id}")
-                else:
-                    # Verify session belongs to correct team
-                    if session['team_id'] != request_data.team_id:
-                        logger.error(f"[REFINE_SESSION] Session {request_data.session_id} belongs to team {session['team_id']}, not {request_data.team_id}")
-                        raise ValueError(f"Session {request_data.session_id} belongs to different team")
+            session = session_manager.get_session(request_data.session_id)
+            if not session:
+                # Create new session with provided ID
+                session_manager.create_session(request_data.team_id, session_id=request_data.session_id)
+                conversation_history = []
+                logger.info(f"Created new session with provided ID: {request_data.session_id}")
+            else:
+                # Verify session belongs to correct team
+                if session['team_id'] != request_data.team_id:
+                    raise ValueError(f"Session {request_data.session_id} belongs to different team")
                     
-                    conversation_history = session_manager.get_session_history(request_data.session_id)
-                    logger.info(f"[REFINE_SESSION] Loaded {len(conversation_history)} messages")
-            except Exception as e:
-                logger.error(f"[REFINE_SESSION] Error handling existing session: {str(e)}")
-                raise
+                # Load conversation history for this specific session only
+                conversation_history = session_manager.get_session_history(request_data.session_id)
+                logger.info(f"Loaded {len(conversation_history)} messages for session: {request_data.session_id}")
+                logger.info(f"Conversation history: {conversation_history}")
         else:
-            logger.info("[REFINE_SESSION] No session ID provided, creating new session")
             request_data.session_id = session_manager.create_session(request_data.team_id)
             conversation_history = []
-            logger.info(f"[REFINE_SESSION] Created new session with generated ID: {request_data.session_id}")
+            logger.info(f"Created new session with generated ID: {request_data.session_id}")
 
         # Format conversation history
         formatted_history = []
@@ -186,9 +178,9 @@ async def refine_chat(request_data: ChatMessage):
             formatted_history.append(chat_entry)
         conversation_history = "\n\n".join(formatted_history)
 
-        # Handle plan creation
         if request_data.plan:
-            logger.info("[REFINE_PLAN] Using subsequent refinement template")
+            # Subsequent refinement
+            # Build template for llm and ask it create the plan
             plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
             1. Use the previous plan as the foundation for your new plan
             2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
@@ -237,16 +229,10 @@ async def refine_chat(request_data: ChatMessage):
                 agents_with_instructions=agents_with_instructions
             )
 
-        # Get LLM response
-        try:
-            response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
-            logger.debug(f"[REFINE_LLM] Response: {response}")
-        except Exception as e:
-            logger.error(f"[REFINE_LLM] Error getting LLM response: {str(e)}")
-            raise
-        
-        # Prepare response
-        result = {
+        response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
+        print(f"Selected agents: {response.selected_agents}")
+        # Send the plan to the user for approval
+        return {
             "message": response.plan,
             "modified_message": response.modified_message,
             "selected_agents": response.selected_agents,
@@ -255,8 +241,7 @@ async def refine_chat(request_data: ChatMessage):
         return result
         
     except Exception as e:
-        logger.error(f"[REFINE_ERROR] Error in refine_chat: {str(e)}")
-        logger.exception("[REFINE_ERROR] Full traceback:")
+        logger.error(f"Error initializing chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/process")
@@ -287,7 +272,9 @@ async def chat_endpoint(request_data: ChatMessage):
                     question=request_data.message,
                     user_id=request_data.user_id,
                     session_id=request_data.session_id,
-                    team_id=request_data.team_id
+                    team_id=request_data.team_id,
+                    plan=request_data.plan,
+                    selected_agents=request_data.selected_agents
                 ))
             )
             logger.info(f"Response: {response}")
@@ -299,6 +286,12 @@ async def chat_endpoint(request_data: ChatMessage):
     except Exception as e:
         logger.error(f"Error processing chat request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/chat/generate_session_id/")
+async def generate_session_id(session_name: str, team_id: str):
+    session_manager = SessionManager()
+    session_id = session_manager.create_session(team_id)
+    return {"session_id": session_id}
 
 @app.delete("/delete_team/{team_name}")
 async def delete_team(team_name: str):

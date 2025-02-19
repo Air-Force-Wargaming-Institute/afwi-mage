@@ -265,7 +265,7 @@ function AgentPortfolio() {
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
-    llm_model: 'gpt-3.5-turbo',
+    llm_model: 'hermes3:8b',
     agent_instructions: '',
     color: colorOptions[0]  // Default to the first color
   });
@@ -797,8 +797,9 @@ function AgentPortfolio() {
                 onChange={handleChange}
                 required
               >
-                <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                <MenuItem value="gpt-4">GPT-4</MenuItem>
+                <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
+                <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
+                <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
               </Select>
             </FormControl>
             {renderTooltip(
@@ -912,8 +913,9 @@ function AgentPortfolio() {
                     onChange={handleAgentChange}
                     disabled={!isEditing}
                   >
-                    <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                    <MenuItem value="gpt-4">GPT-4</MenuItem>
+                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
+                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
+                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
                   </Select>
                 </FormControl>
                 {renderTooltip(
@@ -1067,8 +1069,9 @@ function AgentPortfolio() {
                     value={duplicatedAgent.llm_model}
                     onChange={handleDuplicateChange}
                   >
-                    <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                    <MenuItem value="gpt-4">GPT-4</MenuItem>
+                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
+                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
+                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
                   </Select>
                 </FormControl>
                 {renderTooltip(

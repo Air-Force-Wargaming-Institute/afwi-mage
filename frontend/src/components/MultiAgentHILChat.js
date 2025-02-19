@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import {
   Container,
@@ -301,6 +301,54 @@ const useStyles = makeStyles((theme) => ({
   agentIcon: {
     marginRight: theme.spacing(2),
   },
+  markdown: {
+    '& details': {
+      margin: '1em 0',
+      padding: '0.5em',
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius,
+      boxShadow: theme.shadows[1],
+      
+      '& summary': {
+        cursor: 'pointer',
+        fontWeight: 500,
+        marginBottom: '0.5em',
+        padding: '0.5em',
+        
+        '&:hover': {
+          color: theme.palette.primary.main,
+        },
+      },
+      
+      '& details': {
+        margin: '0.5em 0',
+        padding: '0.5em',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      },
+    },
+  },
+  markdownDetails: {
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    '& summary': {
+      fontWeight: 600,
+      cursor: 'pointer',
+      padding: '0.5em 0',
+      outline: 'none',
+      '&:hover': {
+        color: theme.palette.primary.main,
+      },
+    },
+    '& details[open] summary': {
+      color: theme.palette.primary.main,
+    },
+  },
+  messageTimestamp: {
+    fontSize: '0.75rem',
+    color: theme.palette.text.secondary,
+    opacity: 0.8,
+    marginTop: theme.spacing(1),
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -329,6 +377,62 @@ const API_ENDPOINTS = {
   PROCESS: '/chat/process' // Process final message
 };
 
+// Memoized Message Component
+const Message = memo(({ message }) => {
+  const classes = useStyles();
+  const [expandedSections, setExpandedSections] = useState({});
+
+  const handleToggle = (id) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  return (
+    <div
+      className={`${classes.message} ${
+        message.sender === 'user' ? classes.userMessage : classes.aiMessage
+      }`}
+    >
+      <ReactMarkdown
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          code: CodeBlock,
+          details: ({ node, children, ...props }) => {
+            // Generate a stable ID using message ID and detail index
+            const detailsIndex = node.position ? node.position.start.line : Math.random();
+            const id = `message-${message.id}-details-${detailsIndex}`;
+
+            return (
+              <details
+                {...props}
+                open={expandedSections[id] || false}
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event bubbling
+                  handleToggle(id);
+                }}
+                className={classes.markdownDetails}
+              >
+                {children}
+              </details>
+            );
+          },
+        }}
+        className={classes.markdown}
+      >
+        {message.text}
+      </ReactMarkdown>
+      <Typography variant="caption" className={classes.messageTimestamp}>
+        {new Date(message.timestamp).toLocaleTimeString()}
+      </Typography>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Prevent re-render if message hasn't changed
+  return prevProps.message === nextProps.message;
+});
+
 function MultiAgentHILChat() {
   const classes = useStyles();
   const { state, dispatch } = useHILChat();
@@ -336,17 +440,33 @@ function MultiAgentHILChat() {
   const messageAreaRef = useRef(null);
   const shouldUpdatePositions = useRef(false);
 
-  // Scroll handling
-  const handleScroll = debounce(() => {
-    if (!messageAreaRef.current) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = messageAreaRef.current;
-    const isNearTop = scrollTop < 100;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    
-    dispatch({ type: ACTIONS.SET_SCROLL_TOP, payload: isNearTop });
-    dispatch({ type: ACTIONS.SET_SCROLL_BOTTOM, payload: !isNearBottom });
-  }, 100);
+  // Update scroll handling to use useCallback with debounce
+  const handleScroll = useCallback(
+    debounce(({ target }) => {
+      const { scrollTop, scrollHeight, clientHeight } = target;
+      dispatch({ 
+        type: ACTIONS.SET_SCROLL_TOP, 
+        payload: scrollTop > 200 
+      });
+      dispatch({ 
+        type: ACTIONS.SET_SCROLL_BOTTOM, 
+        payload: scrollHeight - scrollTop - clientHeight > 200 
+      });
+    }, 100),
+    [dispatch]
+  );
+
+  // Add scroll position effect
+  useEffect(() => {
+    const messageArea = messageAreaRef.current;
+    if (messageArea) {
+      messageArea.addEventListener('scroll', handleScroll);
+      return () => {
+        messageArea.removeEventListener('scroll', handleScroll);
+        handleScroll.cancel();
+      };
+    }
+  }, [handleScroll]);
 
   const scrollToBottom = () => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -368,27 +488,6 @@ function MultiAgentHILChat() {
         <div className="dot" />
         <div className="dot" />
       </div>
-    </div>
-  );
-
-  // Message component with markdown support
-  const Message = ({ message }) => (
-    <div
-      className={`${classes.message} ${
-        message.sender === 'user' ? classes.userMessage : classes.aiMessage
-      }`}
-    >
-      <ReactMarkdown
-        rehypePlugins={[rehypeRaw]}
-        components={{
-          code: CodeBlock
-        }}
-      >
-        {message.text}
-      </ReactMarkdown>
-      <Typography variant="caption" className={classes.messageTimestamp}>
-        {new Date(message.timestamp).toLocaleTimeString()}
-      </Typography>
     </div>
   );
 
@@ -424,29 +523,43 @@ function MultiAgentHILChat() {
   };
 
   // Add this new function
-  const handleCreateNewChat = () => {
+  const handleCreateNewChat = async () => {
     if (!selectedTeam || !newSessionName.trim()) {
       setTeamError('Please select a team and enter a session name');
       return;
     }
     
     const selectedTeamObj = availableTeams.find(team => team.name === selectedTeam);
+
+    try {
+        // Get session ID from backend
+        const response = await axios.post(
+          getApiUrl('CHAT', `/chat/generate_session_id/?session_name=${encodeURIComponent(newSessionName.trim())}&team_id=${encodeURIComponent(selectedTeamObj?.id)}`)
+        );
     
-    const newSession = { 
-      id: uuidv4(),
-      name: newSessionName.trim(),
-      team: selectedTeam,
-      teamId: selectedTeamObj?.id
-    };
+        if (!response.data.session_id) {
+          throw new Error('No session ID received from server');
+        }
     
-    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
-    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
+        const newSession = { 
+            id: response.data.session_id,
+            name: newSessionName.trim(),
+            team: selectedTeam,
+            teamId: selectedTeamObj?.id
+        };
     
-    setDialogOpen(false);
-    setNewSessionName('');
-    setSelectedTeam('');
-    setTeamError('');
+        dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+        dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+        dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
+    
+        setDialogOpen(false);
+        setNewSessionName('');
+        setSelectedTeam('');
+        setTeamError('');
+    } catch (error) {
+        console.error('Error creating new chat:', error);
+        setTeamError('Failed to create new chat session. Please try again.');
+    }
   };
 
   const handleEditSession = (sessionId) => {
@@ -505,6 +618,7 @@ function MultiAgentHILChat() {
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
+        id: uuidv4(),
         text: state.input.trim(), 
         sender: 'user', 
         timestamp: new Date(),
@@ -551,6 +665,7 @@ function MultiAgentHILChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
+          id: uuidv4(),
           text: response.data.response || response.data.message, 
           sender: 'ai', 
           timestamp: new Date(),
@@ -563,6 +678,7 @@ function MultiAgentHILChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
+          id: uuidv4(),
           text: `Error: Failed to get response from AI - ${error.message}`, 
           sender: 'system', 
           timestamp: new Date() 
@@ -584,11 +700,12 @@ function MultiAgentHILChat() {
 
     const currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
     const messageData = {
-      message: planChoice === 'accept' ? 'accept' : rejectionText.trim(),
+      message: planChoice === 'accept' ? modifiedQuestion : rejectionText.trim(),
       plan: planContent,
       team_name: currentSession.team,
       session_id: currentSession.id,
-      team_id: currentSession.teamId
+      team_id: currentSession.teamId,
+      selected_agents: selectedAgents
     };
 
     // Close dialog and show loading first
@@ -619,6 +736,7 @@ function MultiAgentHILChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
+          id: uuidv4(),
           text: response.data.response || response.data.message, 
           sender: 'ai', 
           timestamp: new Date(),
@@ -631,6 +749,7 @@ function MultiAgentHILChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
+          id: uuidv4(),
           text: `Error: Failed to process plan - ${error.message}`, 
           sender: 'system', 
           timestamp: new Date() 
@@ -702,17 +821,16 @@ function MultiAgentHILChat() {
         )}
         
         <Paper className={classes.chatArea} elevation={3}>
-          <div 
-            className={classes.messageArea} 
-            ref={messageAreaRef}
-            onScroll={handleScroll}
-          >
+          {/* Move TypingIndicator outside the messageArea */}
+          <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
             {state.messages.map((message) => (
               <Message key={message.id} message={message} />
             ))}
-            {state.isLoading && <TypingIndicator />}
             <div ref={messageEndRef} />
           </div>
+
+          {/* Conditionally render TypingIndicator outside messageArea */}
+          {state.isLoading && <TypingIndicator />}
 
           <form onSubmit={handleSubmit} className={classes.inputArea}>
             <IconButton 
@@ -1006,4 +1124,4 @@ function MultiAgentHILChat() {
   );
 }
 
-export default MultiAgentHILChat; 
+export default memo(MultiAgentHILChat); 

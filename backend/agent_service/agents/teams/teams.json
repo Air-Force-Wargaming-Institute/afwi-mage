@@ -1,7 +1,7 @@
 [
     {
         "name": "PRC Expert Panel",
-        "unique_id": "f1dae519-74ed-4e13-84b4-ad818a661a5e",
+        "unique_id": "4b3dc175-3eda-45ac-9f1f-5d4dd38def3f",
         "description": "Panel of PRC domain experts",
         "agents": [
             "def12345-6789-0123-4567-89abcdef0123",
@@ -13,12 +13,12 @@
             "890abcde-f123-4567-8901-23456789abcd"
         ],
         "color": "#FF0000",
-        "created_at": "2025-02-13T17:25:26.750788Z",
-        "last_modified": "2025-02-14T21:00:42.076011Z"
+        "created_at": "2025-02-19T17:39:18.533700Z",
+        "last_modified": "2025-02-19T17:39:35.422524Z"
     },
     {
         "name": "US Expert Panel",
-        "unique_id": "1c0a2280-a996-4a65-b7f5-33343480330f",
+        "unique_id": "0ad82c60-0584-4a32-acd4-fc658d3c23d9",
         "description": "Panel of United States Experts",
         "agents": [
             "7890abcd-ef12-3456-7890-123456789abc",
@@ -30,12 +30,12 @@
             "3c4d5e6f-7890-abcd-ef12-345678901234"
         ],
         "color": "#0000FF",
-        "created_at": "2025-02-13T17:26:08.742146Z",
-        "last_modified": "2025-02-13T17:26:08.742156Z"
+        "created_at": "2025-02-19T17:39:19.473662Z",
+        "last_modified": "2025-02-19T17:39:40.108647Z"
     },
     {
         "name": "US-NATO Coalition",
-        "unique_id": "ee60da95-2f3a-4a58-8efb-f3de0764ef17",
+        "unique_id": "a9e3d548-d5f8-492a-a1b4-8747df4b4dff",
         "description": "Coalition of US and NATO Experts",
         "agents": [
             "ef123456-7890-1234-5678-9abcdef01234",
@@ -44,7 +44,7 @@
             "2b3c4d5e-6f78-90ab-cdef-123456789012"
         ],
         "color": "#800080",
-        "created_at": "2025-02-13T17:27:01.834423Z",
-        "last_modified": "2025-02-13T17:27:01.834437Z"
+        "created_at": "2025-02-19T17:39:20.271028Z",
+        "last_modified": "2025-02-19T17:39:44.792833Z"
     }
 ]
