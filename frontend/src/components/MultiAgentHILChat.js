@@ -515,7 +515,7 @@ function MultiAgentHILChat() {
           // Transform the sessions data to include only necessary fields
           const formattedSessions = response.data.map(session => ({
             id: session.session_id,
-            name: `Chat Session ${new Date(session.created_at).toLocaleDateString()}`, //TODO
+            name: session.session_name,
             team: session.team_id,
             teamId: session.team_id
           }));
