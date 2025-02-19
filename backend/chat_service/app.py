@@ -231,7 +231,7 @@ async def refine_chat(request_data: ChatMessage):
             )
 
         response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
-        
+        print(f"Selected agents: {response.selected_agents}")
         # Send the plan to the user for approval
         return {
             "message": response.plan,
@@ -258,7 +258,9 @@ async def chat_endpoint(request_data: ChatMessage):
                     question=request_data.message,
                     user_id=request_data.user_id,
                     session_id=request_data.session_id,
-                    team_id=request_data.team_id
+                    team_id=request_data.team_id,
+                    plan=request_data.plan,
+                    selected_agents=request_data.selected_agents
                 ))
             )
             logger.info(f"Response: {response}")
