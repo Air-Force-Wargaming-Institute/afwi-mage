@@ -105,7 +105,7 @@ class SessionManager:
             logger.exception("[SESSION_SAVE] Full traceback:")
             return False
 
-    def create_session(self, team_id: str, session_id: str = None) -> str:
+    def create_session(self, team_id: str, session_id: str = None, session_name: str = None) -> str:
         """Create a new chat session"""
         try:
             logger.info("[SESSION_CREATE] Creating new session")
@@ -115,6 +115,7 @@ class SessionManager:
             new_session = {
                 "session_id": session_id,
                 "team_id": team_id,
+                "session_name": session_name or f"Session {session_id[:8]}",  # Default name if none provided
                 "created_at": current_time,
                 "updated_at": current_time,
                 "conversation_history": []
@@ -126,7 +127,7 @@ class SessionManager:
                 self._sessions_cache[session_id] = new_session
                 self._save_all_sessions(self._sessions_cache)
                 
-            logger.info(f"[SESSION_CREATE] Created session: {session_id}")
+            logger.info(f"[SESSION_CREATE] Created session: {session_id} with name: {new_session['session_name']}")
             return session_id
             
         except Exception as e:

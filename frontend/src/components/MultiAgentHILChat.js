@@ -533,16 +533,14 @@ function MultiAgentHILChat() {
 
     try {
         // Get session ID from backend
-        const response = await axios.post(
-          getApiUrl('CHAT', `/chat/generate_session_id/?session_name=${encodeURIComponent(newSessionName.trim())}&team_id=${encodeURIComponent(selectedTeamObj?.id)}`)
-        );
+        const sessionId = await generateSessionId(selectedTeamObj?.id, newSessionName.trim());
     
-        if (!response.data.session_id) {
+        if (!sessionId) {
           throw new Error('No session ID received from server');
         }
     
         const newSession = { 
-            id: response.data.session_id,
+            id: sessionId,
             name: newSessionName.trim(),
             team: selectedTeam,
             teamId: selectedTeamObj?.id
@@ -770,6 +768,19 @@ function MultiAgentHILChat() {
 
   const handlePromptHelpClose = () => {
     setPromptHelpOpen(false);
+  };
+
+  const generateSessionId = async (teamId, sessionName) => {
+    try {
+      const response = await axios.post(getApiUrl('CHAT', '/chat/generate_session_id'), {
+        team_id: teamId,
+        session_name: sessionName
+      });
+      return response.data.session_id;
+    } catch (error) {
+      console.error('Error generating session ID:', error);
+      throw error;
+    }
   };
 
   return (
