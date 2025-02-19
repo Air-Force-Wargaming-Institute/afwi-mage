@@ -506,7 +506,50 @@ function MultiAgentHILChat() {
   const [modifiedQuestion, setModifiedQuestion] = useState('');
   const [selectedAgents, setSelectedAgents] = useState([]);
 
-  // Replace the existing handleNewChat with this version
+  // Add this useEffect at the top level of the component
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const response = await axios.get(getApiUrl('CHAT', '/sessions'));
+        if (response.data && Array.isArray(response.data)) {
+          // Transform the sessions data to include only necessary fields
+          const formattedSessions = response.data.map(session => ({
+            id: session.session_id,
+            name: `Chat Session ${new Date(session.created_at).toLocaleDateString()}`, //TODO
+            team: session.team_id,
+            teamId: session.team_id
+          }));
+          
+          dispatch({ 
+            type: ACTIONS.SET_CHAT_SESSIONS, 
+            payload: formattedSessions 
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching chat sessions:', error);
+        dispatch({ 
+          type: ACTIONS.SET_ERROR, 
+          payload: 'Failed to load chat sessions. Please try again later.' 
+        });
+      }
+    };
+
+    fetchSessions();
+  }, []); // Empty dependency array means this runs once when component mounts
+
+  // Add this handler for session clicks
+  const handleSessionClick = (sessionId) => {
+    dispatch({ 
+      type: ACTIONS.SET_CURRENT_SESSION, 
+      payload: sessionId 
+    });
+    dispatch({ 
+      type: ACTIONS.SET_MESSAGES, 
+      payload: [] 
+    }); // Clear messages when switching sessions
+  };
+
+  // Modify the handleNewChat function to handle the new session ID
   const handleNewChat = async () => {
     setIsLoadingTeams(true);
     setTeamError('');
@@ -522,7 +565,7 @@ function MultiAgentHILChat() {
     }
   };
 
-  // Add this new function
+  // Modify handleCreateNewChat to handle the session ID
   const handleCreateNewChat = async () => {
     if (!selectedTeam || !newSessionName.trim()) {
       setTeamError('Please select a team and enter a session name');
@@ -542,10 +585,10 @@ function MultiAgentHILChat() {
         }
     
         const newSession = { 
-            id: response.data.session_id,
-            name: newSessionName.trim(),
-            team: selectedTeam,
-            teamId: selectedTeamObj?.id
+          id: response.data.session_id,
+          name: newSessionName.trim(),
+          team: selectedTeam,
+          teamId: selectedTeamObj?.id
         };
     
         dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
@@ -792,7 +835,7 @@ function MultiAgentHILChat() {
                     button 
                     className={classes.chatSessionItem}
                     selected={session.id === state.currentSessionId}
-                    onClick={() => dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: session.id })}
+                    onClick={() => handleSessionClick(session.id)}
                   >
                     <ListItemText primary={session.name} />
                     <div className={classes.sessionActions}>
