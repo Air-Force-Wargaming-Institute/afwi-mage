@@ -13,3 +13,5 @@ flask
 flask-cors
 pathlib
 pytest-shutil
+filelock
+portalocker

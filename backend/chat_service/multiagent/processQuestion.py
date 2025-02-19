@@ -67,12 +67,12 @@ async def process_question(question: str, session_id: str = None, team_id: str =
         raise ValueError("team_id is required")
         
     iteration = 0
+    session_manager = SessionManager()
     
     try:
         start_time = time.time()
-        session_manager = SessionManager()
         
-        # Modified session handling logic with explicit session history loading
+        # Session handling
         if session_id:
             session = session_manager.get_session(session_id)
             if not session:
@@ -84,7 +84,7 @@ async def process_question(question: str, session_id: str = None, team_id: str =
                 # Verify session belongs to correct team
                 if session['team_id'] != team_id:
                     raise ValueError(f"Session {session_id} belongs to different team")
-                    
+                
                 # Load conversation history for this specific session only
                 conversation_history = session_manager.get_session_history(session_id)
                 logger.info(f"Loaded {len(conversation_history)} messages for session: {session_id}")
@@ -168,19 +168,25 @@ async def process_question(question: str, session_id: str = None, team_id: str =
         full_response = final_output['synthesis']['synthesized_report'] + expert_html
         logger.info(f"Full response: {full_response}")
         # Update session with new interaction
-        session_manager.add_interaction(
+        session_manager.add_to_session_history(
             session_id,
-            question=question,
-            response=full_response
+            {
+                "question": question,
+                "response": full_response,
+                "timestamp": datetime.now().isoformat()
+            }
         )
+        
+        # Get updated session data
+        updated_session = session_manager.get_session(session_id)
 
         # Return response with updated session info
         return {
             'response': full_response,
             'session_id': session_id,
-            'created_at': session_manager.get_session(session_id)['created_at'],
-            'updated_at': session_manager.get_session(session_id)['updated_at'],
-            'conversation_history': session_manager.get_session(session_id)['conversation_history'],
+            'created_at': updated_session['created_at'],
+            'updated_at': updated_session['updated_at'],
+            'conversation_history': updated_session['conversation_history'],
             'processing_time': time.time() - start_time,
             'expert_final_analysis': final_output['synthesis'].get('expert_final_analysis', {}),
             'synthesized_report': final_output['synthesis'].get('synthesized_report', '')

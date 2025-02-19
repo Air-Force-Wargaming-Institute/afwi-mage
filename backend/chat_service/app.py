@@ -171,6 +171,7 @@ async def refine_chat(request_data: ChatMessage):
             conversation_history = []
             logger.info(f"Created new session with generated ID: {request_data.session_id}")
 
+        # Format conversation history
         formatted_history = []
         for chat in conversation_history:
             chat_entry = f"Message: {chat.get('question', '')}\nResponse: {chat.get('response', '')}\n{'-'*40}"
@@ -204,8 +205,6 @@ async def refine_chat(request_data: ChatMessage):
                 agents_with_instructions=agents_with_instructions
             )
         else:
-            # Initial refinement
-            # Build template for llm and ask it create the plan
             plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
             1. Review the previous conversation to incorporate any relevant information regarding the user's message
             2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
@@ -239,6 +238,8 @@ async def refine_chat(request_data: ChatMessage):
             "selected_agents": response.selected_agents,
         }
         
+        return result
+        
     except Exception as e:
         logger.error(f"Error initializing chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -246,10 +247,23 @@ async def refine_chat(request_data: ChatMessage):
 @app.post("/chat/process")
 async def chat_endpoint(request_data: ChatMessage):
     try:
-        # Use Pydantic model for request validation
         logger.info(f"Received chat message: {request_data.message}")
         
-        logger.info(f"session_id: {request_data.session_id}")
+        # Verify session exists and belongs to correct team before processing
+        session_manager = SessionManager()
+        if request_data.session_id:
+            session = session_manager.get_session(request_data.session_id)
+            if not session:
+                raise HTTPException(
+                    status_code=404, 
+                    detail="Session not found"
+                )
+            if session['team_id'] != request_data.team_id:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Session belongs to different team"
+                )
+        
         async with semaphore:
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
