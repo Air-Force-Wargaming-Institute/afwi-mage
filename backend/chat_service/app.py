@@ -4,12 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 import logging
 from pathlib import Path
-import os
 from concurrent.futures import ThreadPoolExecutor
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 import asyncio
-import shutil
 from config_ import load_config
 from multiagent.processQuestion import process_question
 from typing import List, Optional
@@ -17,6 +15,7 @@ from multiagent.session_manager import SessionManager
 from utils.llm_manager import LLMManager
 from multiagent.support_models.team_class import Team
 from multiagent.support_models.agent_class import Agent
+from utils.model_list import OllamaModelManager
 
 config = load_config()
 
@@ -40,6 +39,13 @@ class ChatMessage(BaseModel):
     user_id: Optional[str] = None
     plan: Optional[str] = None
     selected_agents: Optional[List[str]] = None
+
+class SessionUpdate(BaseModel):
+    """
+    Model for session update requests
+    """
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
 
 app = FastAPI()
 
@@ -319,29 +325,6 @@ async def generate_session_id(session_name: str, team_id: str):
         )
         return {"session_id": session_id}
 
-@app.delete("/delete_team/{team_name}")
-async def delete_team(team_name: str):
-    try:
-        async with semaphore:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                executor,
-                lambda: _process_delete_team(team_name)
-            )
-    except Exception as e:
-        print(f"Error deleting team: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-def _process_delete_team(team_name: str):
-    chat_teams_dir = Path(__file__).parent / "chat_teams"
-    team_dir = chat_teams_dir / team_name
-
-    if team_dir.exists():
-        shutil.rmtree(team_dir)
-        return {"message": f"Team {team_name} deleted successfully from chat service"}
-    else:
-        return {"message": f"Team {team_name} not found in chat service"}
-
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Chat Service API"}
@@ -389,6 +372,61 @@ async def delete_session(session_id: str):
             raise HTTPException(status_code=404, detail="Session not found")
     except Exception as e:
         logger.error(f"Error deleting session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/sessions/{session_id}")
+async def update_session(session_id: str, update_data: SessionUpdate):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                executor,
+                lambda: _process_update_session(session_id, update_data)
+            )
+            if result:
+                return {
+                    "message": f"Session {session_id} updated successfully",
+                    "session": result
+                }
+            raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error updating session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _process_update_session(session_id: str, update_data: SessionUpdate):
+    session_manager = SessionManager()
+    session = session_manager.get_session(session_id)
+    
+    if not session:
+        return False
+    
+    # Only update fields that are provided in the request
+    if update_data.team_id is not None:
+        session['team_id'] = update_data.team_id
+    if update_data.team_name is not None:
+        session['team_name'] = update_data.team_name
+    
+    # Save updated session
+    session_manager.update_session(session_id, session)
+    return session
+
+@app.get("/models/ollama")
+async def list_ollama_models():
+    """
+    Get a list of available Ollama models
+    """
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            models = await loop.run_in_executor(
+                executor,
+                lambda: OllamaModelManager().list_models()
+            )
+            return {
+                "models": models
+            }
+    except Exception as e:
+        logger.error(f"Error listing Ollama models: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
