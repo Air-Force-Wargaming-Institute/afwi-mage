@@ -286,9 +286,22 @@ function AgentPortfolio() {
   const [descriptionError, setDescriptionError] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [editFormErrors, setEditFormErrors] = useState({});
+  const [availableModels, setAvailableModels] = useState([]);
 
   useEffect(() => {
     fetchAgents();
+    const fetchModels = async () => {
+      try {
+        const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+        const modelNames = response.data.models.map(model => model.name);
+        setAvailableModels(modelNames);
+      } catch (error) {
+        console.error('Error fetching Ollama models:', error);
+        setAvailableModels([]);
+      }
+    };
+
+    fetchModels();
   }, []);
 
   const fetchAgents = async () => {
@@ -797,9 +810,11 @@ function AgentPortfolio() {
                 onChange={handleChange}
                 required
               >
-                <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
-                <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
-                <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
+                {availableModels.map((modelName) => (
+                  <MenuItem key={modelName} value={modelName}>
+                    {modelName}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             {renderTooltip(
