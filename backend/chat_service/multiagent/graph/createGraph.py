@@ -26,6 +26,9 @@ def modguidance_subgraph_entry(state: ModGuidanceState):
 def expert_subgraph_report_start(state: GraphState):
     return
 
+def entry_point(state: GraphState):
+    return
+
 def create_graph() -> StateGraph:
     """
     Creates the agent graph for the multi-agent system.
@@ -69,9 +72,10 @@ def create_graph() -> StateGraph:
     
     workflow = StateGraph(GraphState)
     # Add base nodes
-    workflow.add_node("conversation_history_manager", conversation_history_manager)
-    workflow.add_node("identify_experts", identify_experts)
-    workflow.add_node("get_Moderator_Guidance", get_Moderator_Guidance)
+    # workflow.add_node("conversation_history_manager", conversation_history_manager)
+    # workflow.add_node("identify_experts", identify_experts)
+    # workflow.add_node("get_Moderator_Guidance", get_Moderator_Guidance)
+    workflow.add_node("entry_point", entry_point)
     workflow.add_node("modguidance_subgraph", subworkflow2.compile())
     workflow.add_node("expert_subgraph", subworkflow.compile())
     workflow.add_node("expert_subgraph_entry", expert_subgraph_entry)
@@ -79,9 +83,10 @@ def create_graph() -> StateGraph:
     workflow.add_node("expert_subgraph_report", subworkflow4.compile())
     workflow.add_node("synthesis", synthesis_agent)
     
-    workflow.set_entry_point("conversation_history_manager")
-    workflow.add_edge("conversation_history_manager", "identify_experts")
-    workflow.add_edge("identify_experts", "modguidance_subgraph")
+    # workflow.set_entry_point("conversation_history_manager")
+    # workflow.add_edge("conversation_history_manager", "identify_experts")
+    workflow.set_entry_point("entry_point")
+    workflow.add_edge("entry_point", "modguidance_subgraph")
     workflow.add_edge("modguidance_subgraph","expert_subgraph")
 
     workflow.add_edge("expert_subgraph", "collab_subgraph")

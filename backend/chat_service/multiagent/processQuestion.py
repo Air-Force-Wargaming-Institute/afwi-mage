@@ -61,7 +61,7 @@ async def process_graph_stream(graph, inputs):
 
     return await loop.run_in_executor(graph_executor, run_stream)
 
-async def process_question(question: str, user_id: str = None, session_id: str = None, team_id: str = None, plan: str = None, selected_agents: List[str] = None):
+async def process_question(question: str, session_id: str = None, team_id: str = None, plan: str = None, selected_agents: List[str] = None):
     """Process a question through the multiagent system, maintaining session state"""
     if not team_id:
         raise ValueError("team_id is required")

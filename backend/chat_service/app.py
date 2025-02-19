@@ -293,7 +293,6 @@ async def chat_endpoint(request_data: ChatMessage):
                 executor,
                 lambda: asyncio.run(process_question(
                     question=request_data.message,
-                    user_id=request_data.user_id,
                     session_id=request_data.session_id,
                     team_id=request_data.team_id,
                     plan=request_data.plan,
