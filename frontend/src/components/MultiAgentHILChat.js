@@ -608,9 +608,42 @@ function MultiAgentHILChat() {
     console.log(`Edit session ${sessionId}`);
   };
 
-  const handleDeleteSession = (sessionId) => {
-    // TODO: Implement delete functionality
-    console.log(`Delete session ${sessionId}`);
+  const handleDeleteSession = async (event, sessionId) => {
+    // Stop the click event from bubbling up to the ListItem
+    event.stopPropagation();
+    
+    try {
+      console.log(`Attempting to delete session: ${sessionId}`);
+      
+      // Send delete request to backend
+      await axios.delete(getApiUrl('CHAT', `/sessions/${sessionId}`));
+      
+      console.log(`Successfully deleted session: ${sessionId}`);
+      
+      // Remove from local state
+      dispatch({ 
+        type: ACTIONS.DELETE_CHAT_SESSION,
+        payload: sessionId 
+      });
+
+      // If the deleted session was the current session, clear it
+      if (state.currentSessionId === sessionId) {
+        dispatch({ 
+          type: ACTIONS.SET_CURRENT_SESSION, 
+          payload: null 
+        });
+        dispatch({ 
+          type: ACTIONS.SET_MESSAGES, 
+          payload: [] 
+        });
+      }
+    } catch (error) {
+      console.error(`Error deleting session ${sessionId}:`, error);
+      dispatch({ 
+        type: ACTIONS.SET_ERROR, 
+        payload: 'Failed to delete chat session. Please try again later.' 
+      });
+    }
   };
 
   const handleDownloadSession = (sessionId) => {
@@ -856,7 +889,11 @@ function MultiAgentHILChat() {
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteSession(session.id)}>
+                        <IconButton 
+                          edge="end" 
+                          aria-label="delete" 
+                          onClick={(e) => handleDeleteSession(e, session.id)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
