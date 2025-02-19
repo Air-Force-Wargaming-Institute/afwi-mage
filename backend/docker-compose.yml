@@ -1,3 +1,5 @@
+name: afwi-multi-agent-generative-engine
+
 networks:
   app-network:
     driver: bridge
@@ -201,6 +203,37 @@ services:
 #      timeout: 5s
 #      retries: 5
 #      start_period: 10s
+
+  direct_chat_service:
+    build: ./direct_chat_service
+    ports:
+      - "8011:8011"
+    volumes:
+      - ../data:/app/data
+      - ./direct_chat_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - PYTHONPATH=/app
+      - NVIDIA_VISIBLE_DEVICES=all
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:

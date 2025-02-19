@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
+import React, { useRef, useEffect, useState, useCallback, memo } from 'react';
+import { makeStyles, useTheme } from '@material-ui/core/styles';
 import { 
   Container, 
   Paper, 
@@ -17,11 +17,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
+  Checkbox,
   Select,
   MenuItem,
-  CircularProgress
+  FormControl,
+  FormControlLabel,
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
@@ -39,9 +39,11 @@ import TuneIcon from '@mui/icons-material/Tune';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Fade from '@material-ui/core/Fade';
-import axios from 'axios';
-import { getApiUrl } from '../config';
+import { FixedSizeList, VariableSizeList } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import memoize from 'memoize-one';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
@@ -49,50 +51,72 @@ import { useDirectChat, ACTIONS } from '../contexts/DirectChatContext';
 import ReplayIcon from '@mui/icons-material/Replay';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
-import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
+import { 
+  sendMessage, 
+  getChatHistory, 
+  createChatSession, 
+  deleteChatSession, 
+  getAllChatSessions,
+  uploadDocument,
+  getDocumentStatus,
+  getDocumentStates,
+  deleteDocument,
+  toggleDocumentState,
+  updateSessionName,
+  updateDocumentClassification,
+} from '../services/directChatService';
+import { useMarkdownComponents } from '../styles/markdownStyles';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { useDropzone } from 'react-dropzone';
+import Slider from '@material-ui/core/Slider';
 
 const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2),
-    height: 'calc(80vh - 64px)',
+    height: 'calc(100vh - 215px)',
+    maxHeight: 'calc(100vh - 128px)',
+    overflow: 'hidden',
     marginTop: '10px',
   },
   chatContainer: {
     display: 'flex',
-    flexGrow: 1,
-    overflow: 'hidden',
-    borderRadius: '10px',
+    width: '100%',
     height: '100%',
+    maxHeight: '100%',
+    overflow: 'hidden',
+    gap: theme.spacing(2),
   },
   chatLog: {
-    width: '30%',
+    width: '20%',
     height: '100%',
-    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    marginRight: theme.spacing(2),
+    flexShrink: 0,
+    overflow: 'hidden',
+    '& > *:not(:first-child)': {
+      overflow: 'auto',
+    },
   },
   chatArea: {
-    flexGrow: 1,
-    display: 'flex',
-    flexDirection: 'column',
+    width: '60%',
     height: '100%',
-    position: 'relative',
-  },
-  messageArea: {
-    flexGrow: 1,
-    overflowY: 'auto',
-    padding: theme.spacing(2),
-    marginBottom: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1),
-    textAlign: 'left',
-    fontSize: '0.7rem',
-    scrollBehavior: 'smooth',
+    flexShrink: 0,
+    overflow: 'hidden',
+    backgroundColor: theme.palette.background.default,
+    position: 'relative',
+    transition: 'opacity 0.3s ease',
+    '&.disabled': {
+      opacity: 0.5,
+      pointerEvents: 'none',
+      '& .MuiInputBase-root': {
+        backgroundColor: theme.palette.action.disabledBackground,
+      }
+    },
     '&::-webkit-scrollbar': {
       width: '8px',
       zIndex: 2,
@@ -110,12 +134,139 @@ const useStyles = makeStyles((theme) => ({
       },
     },
   },
-  inputArea: {
+  uploadPane: {
+    width: '20%',
+    height: '100%',
+    paddingTop: '10px',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: theme.palette.background.paper,
+    overflow: 'hidden',
+    transition: 'opacity 0.3s ease',
+    '&.disabled': {
+      opacity: 0.5,
+      pointerEvents: 'none',
+      filter: 'grayscale(50%)',
+    }
+  },
+  dropzone: {
+    flex: 1,
+    minHeight: '75px',
+    maxHeight: '100px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(2),
+    margin: theme.spacing(2),
+    border: `2px dashed ${theme.palette.primary.main}`,
+    borderRadius: '10px',
+    backgroundColor: theme.palette.background.default,
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    overflow: 'hidden',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      borderColor: theme.palette.primary.dark,
+    },
+  },
+  uploadIcon: {
+    fontSize: '48px',
+    color: theme.palette.primary.main,
+    marginBottom: theme.spacing(2),
+  },
+  uploadText: {
+    textAlign: 'center',
+    color: theme.palette.text.secondary,
+  },
+  fileList: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+  },
+  fileItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    padding: theme.spacing(1),
+    borderRadius: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  fileItemRow: {
     display: 'flex',
     alignItems: 'center',
+    width: '100%',
+  },
+  classificationSelect: {
+    marginTop: theme.spacing(1),
+    minWidth: '100%',
+    '& .MuiSelect-select': {
+      padding: theme.spacing(0.5, 1),
+    },
+  },
+  messageArea: {
+    flex: 1,
+    overflow: 'hidden',
+    height: '100%',
+    position: 'relative',
+    '& .ReactVirtualized__List': {
+      outline: 'none',
+    }
+  },
+  inputArea: {
+    display: 'flex',
+    flexDirection: 'column',
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
+    minHeight: '76px',
+  },
+  classificationSection: {
+    marginTop: theme.spacing(0.25),
+    padding: theme.spacing(0.25),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    '& .MuiTypography-subtitle2': {
+      fontSize: '0.7rem',
+      marginBottom: '2px',
+    },
+  },
+  classificationRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(0.25),
+    '& .MuiFormControlLabel-root': {
+      marginRight: theme.spacing(0.25),
+      marginLeft: 0,
+      marginY: 0,
+    },
+    '& .MuiCheckbox-root': {
+      padding: '2px',
+    },
+  },
+  classificationLabel: {
+    minWidth: '80px',
+    fontWeight: 500,
+    fontSize: '0.75rem',
+    color: theme.palette.text.secondary,
+    marginRight: theme.spacing(0.5),
+  },
+  checkboxGroup: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 0,
+    '& .MuiFormControlLabel-label': {
+      fontSize: '0.75rem',
+      lineHeight: 1,
+    },
+  },
+  checkboxLabel: {
+    fontSize: '0.75rem',
+    marginRight: 0,
+    lineHeight: 1,
   },
   input: {
     flexGrow: 1,
@@ -144,18 +295,14 @@ const useStyles = makeStyles((theme) => ({
     alignSelf: 'center',
   },
   message: {
-    marginBottom: theme.spacing(1),
     padding: theme.spacing(2),
-    paddingBottom: theme.spacing(2),
-    borderRadius: '30px',
+    borderRadius: '12px',
     border: '1px solid #e0e0e0',
-    maxWidth: '80%',
     wordBreak: 'break-word',
-    display: 'inline-block',
-    whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.2s ease',
+    backgroundColor: theme.palette.background.paper,
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
@@ -164,8 +311,9 @@ const useStyles = makeStyles((theme) => ({
   userMessage: {
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
-    marginLeft: 'auto',
-    borderRadius: '20px 20px 0 20px',
+    alignSelf: 'flex-end',
+    borderRadius: '12px 12px 0 12px',
+    border: 'none',
     '& $messageContent': {
       color: '#ffffff',
     },
@@ -177,10 +325,9 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   aiMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
-    borderBottomLeftRadius: '4px',
+    borderRadius: '12px 12px 12px 0',
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
@@ -202,10 +349,10 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
   },
   fullscreenButton: {
-    position: 'absolute',
-    top: theme.spacing(1),
-    right: theme.spacing(1),
-    zIndex: 1000,
+    color: theme.palette.text.secondary,
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
   },
   fullscreen: {
     position: 'fixed',
@@ -214,11 +361,12 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     bottom: 0,
     zIndex: 1300,
+    width: '100%',
     maxHeight: 'calc(100vh)',
   },
   buttonBar: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
@@ -229,95 +377,9 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1.1rem',
   },
-  markdown: {
-    '& h1, & h2, & h3, & h4, & h5, & h6': {
-      margin: '0.5em 0 0.3em',
-      lineHeight: 1,
-      color: theme.palette.text.primary,
-      fontSize: '1.1rem',
-    },
-    '& p': {
-      margin: '0.3em 0',
-      color: theme.palette.text.primary,
-      lineHeight: 1.3,
-      fontSize: '1rem',
-    },
-    '& ul, & ol': {
-      margin: '0.3em 0',
-      paddingLeft: theme.spacing(3),
-      color: theme.palette.text.primary,
-      '& li': {
-        marginTop: '0em',
-        marginBottom: '0.1em',
-        lineHeight: 1.3,
-      },
-      '& li:last-child': {
-        marginBottom: 0,
-      },
-    },
-    '& blockquote': {
-      margin: '0.8em 0',
-      padding: '0.4em 1em',
-      borderLeft: `4px solid ${theme.palette.grey[300]}`,
-      backgroundColor: theme.palette.grey[50],
-      color: theme.palette.text.secondary,
-    },
-    '& hr': {
-      margin: '.5em 0',
-    },
-    '& > *:first-child': {
-      marginTop: 0,
-    },
-    '& > *:last-child': {
-      marginBottom: 0,
-    },
-    '& code': {
-      backgroundColor: 'rgba(0, 0, 0, 0.06)',
-      padding: '0.2em 0.4em',
-      borderRadius: 3,
-      fontSize: '85%',
-      color: theme.palette.text.primary,
-    },
-    '& pre': {
-      margin: '0.5em 0',
-      padding: theme.spacing(1),
-      backgroundColor: '#f5f5f5',
-      borderRadius: '4px',
-      overflow: 'auto',
-    },
-    '& table': {
-      borderCollapse: 'collapse',
-      width: '100%',
-      margin: '0.5em 0',
-      color: theme.palette.text.primary,
-    },
-    '& th, & td': {
-      border: `1px solid ${theme.palette.grey[300]}`,
-      padding: '0.4em',
-    },
-    '& a': {
-      color: theme.palette.primary.main,
-      textDecoration: 'none',
-      '&:hover': {
-        textDecoration: 'underline',
-      },
-    },
-  },
-  messageContent: {
-    fontSize: '1rem',
-    lineHeight: 1.5,
-    color: theme.palette.text.primary,
-    marginBottom: theme.spacing(2),
-    '.userMessage & ': {
-      color: '#ffffff !important',
-    },
-  },
   messageWrapper: {
-    position: 'relative',
     width: '100%',
-    '&:hover $topActions': {
-      opacity: 1,
-    },
+    position: 'relative',
     '&:hover $messageActions': {
       opacity: 1,
     },
@@ -325,12 +387,25 @@ const useStyles = makeStyles((theme) => ({
   messageContainer: {
     position: 'relative',
     width: '100%',
-    padding: theme.spacing(1),
+    display: 'flex',
+    flexDirection: 'column',
     '&:hover .copyButton': {
       opacity: 1,
       transform: 'translateY(0)',
     },
-    overflow: 'visible',
+  },
+  messageContent: {
+    fontSize: '1rem',
+    lineHeight: 1.6,
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    '& p': {
+      margin: theme.spacing(1, 0),
+    },
   },
   messageFooter: {
     display: 'flex',
@@ -379,8 +454,7 @@ const useStyles = makeStyles((theme) => ({
   },
   helpIcon: {
     color: theme.palette.text.secondary,
-    fontSize: '1.1rem',
-    cursor: 'pointer',
+    marginRight: theme.spacing(1),
     '&:hover': {
       color: theme.palette.primary.main,
     },
@@ -798,30 +872,62 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: 'rgba(255, 255, 255, 1)',
     },
   },
+  noSessionsOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+  classificationSlider: {
+    width: '100%',
+    padding: '10px 0 0',
+    marginTop: theme.spacing(0.8),
+    '& .MuiSlider-rail': {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: '#e0e0e0',
+    },
+    '& .MuiSlider-track': {
+      height: 4,
+      borderRadius: 2,
+      transition: 'background-color 0.3s ease',
+    },
+    '& .MuiSlider-thumb': {
+      width: 16,
+      height: 16,
+      marginTop: -6,
+      marginLeft: -8,
+      backgroundColor: '#fff',
+      border: '2px solid',
+      transition: 'border-color 0.3s ease',
+      '&:hover, &.Mui-focusVisible': {
+        boxShadow: '0 0 0 8px rgba(0, 0, 0, 0.1)',
+      },
+    },
+    '& .MuiSlider-mark': {
+      width: 2,
+      height: 8,
+      marginTop: -2,
+      backgroundColor: '#bdbdbd',
+    },
+    '& .MuiSlider-markLabel': {
+      fontSize: '0.7rem',
+      fontWeight: 500,
+      top: -10,
+      transform: 'translate(-50%, 0)',
+      color: theme.palette.text.secondary,
+    },
+  },
 }));
-
-const CodeBlock = ({ inline, className, children }) => {
-  const match = /language-(\w+)/.exec(className || '');
-  const language = match ? match[1] : '';
-  
-  if (!inline && language) {
-    return (
-      <SyntaxHighlighter
-        style={materialDark}
-        language={language}
-        PreTag="div"
-      >
-        {String(children).replace(/\n$/, '')}
-      </SyntaxHighlighter>
-    );
-  }
-  return <code className={className}>{children}</code>;
-};
 
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
   const [copied, setCopied] = useState(false);
   const isErrorMessage = !isUser && content.includes('Error:');
+  const markdownComponents = useMarkdownComponents();
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -859,31 +965,44 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         </div>
       )}
 
-      <div className={classes.messageContent}>
+      <Box 
+        className={classes.messageContent}
+        sx={{
+          '& > *:first-child': { mt: 0 },
+          '& > *:last-child': { mb: 0 }
+        }}
+      >
         {isUser ? (
           <Typography 
             variant="body1" 
-            style={{ 
+            sx={{ 
               color: 'inherit',
-              whiteSpace: 'pre-wrap'
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.2,
+              my: 0,
+              textAlign: 'left',
+              width: '100%'
             }}
           >
             {content}
           </Typography>
         ) : (
           <ReactMarkdown
-            components={{
-              code: CodeBlock,
-              p: ({ children }) => <Typography variant="body1">{children}</Typography>,
-            }}
+            components={markdownComponents}
+            remarkPlugins={[remarkGfm]}
+            skipHtml={true}
+            unwrapDisallowed={true}
           >
-            {content}
+            {content.replace(/\n\s*\n/g, '\n\n').trim()}
           </ReactMarkdown>
         )}
-      </div>
+      </Box>
 
       <div className={classes.messageFooter}>
-        <Typography className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}>
+        <Typography 
+          className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}
+          sx={{ fontSize: '0.75rem', opacity: 0.8 }}
+        >
           {new Date(timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit',
@@ -915,16 +1034,14 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         )}
         
         {onRetry && isErrorMessage && (
-          <div className={classes.messageActions}>
-            <IconButton
-              className={classes.retryButton}
-              onClick={onRetry}
-              size="small"
-              title="Retry last message"
-            >
-              <ReplayIcon fontSize="small" />
-            </IconButton>
-          </div>
+          <IconButton
+            className={classes.copyButton}
+            onClick={onRetry}
+            size="small"
+            title="Retry"
+          >
+            <ReplayIcon fontSize="small" />
+          </IconButton>
         )}
       </div>
     </div>
@@ -948,38 +1065,577 @@ const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
   });
 };
 
-function DirectChat() {
+// Memoize the MessageContent component
+const MemoizedMessageContent = React.memo(MessageContent);
+
+// Create a memoized item renderer for the virtualized list
+const createItemData = memoize((messages, handleRetry, handleBookmark, bookmarkedMessages) => ({
+  messages,
+  handleRetry,
+  handleBookmark,
+  bookmarkedMessages
+}));
+
+// Row renderer for virtualized list
+const Row = React.memo(({ index, style, data }) => {
+  const message = data.messages[index];
   const classes = useStyles();
-  const { state, dispatch } = useDirectChat();
-  console.log('DirectChat - Current State:', state);
+  const isBookmarked = data.bookmarkedMessages.some(msg => msg.messageId === message.id);
 
-  const {
-    input,
-    messages = [],
-    chatSessions = [],
-    isLoading = false,
-    isFullscreen = false,
-    helpDialogOpen = false,
-    promptHelpOpen = false,
-    showScrollTop = false,
-    showScrollBottom = false,
-    selectedAgent = null,
-    availableAgents = [],
-    currentSessionId
-  } = state || {};
+  return (
+    <div style={{
+      ...style,
+      paddingTop: '8px',
+      paddingBottom: '8px',
+      paddingLeft: '16px',
+      paddingRight: '16px',
+    }}>
+      <Box 
+        id={`message-${message.id}`}
+        className={`${classes.message} ${
+          message.sender === 'user' ? classes.userMessage : classes.aiMessage
+        }`}
+        style={{ 
+          maxWidth: message.sender === 'user' ? '70%' : '85%',
+          margin: message.sender === 'user' ? '0 0 0 auto' : '0',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div className={classes.messageWrapper}>
+          <MemoizedMessageContent 
+            content={message.text} 
+            isUser={message.sender === 'user'} 
+            timestamp={message.timestamp}
+            sender={message.sender}
+            onRetry={
+              message.sender === 'system' && message.text.includes('Error:') 
+                ? () => data.handleRetry(data.messages[data.messages.length - 2]?.text) 
+                : undefined
+            }
+            messageId={message.id}
+            onBookmark={() => data.handleBookmark(message)}
+            isBookmarked={isBookmarked}
+          />
+        </div>
+      </Box>
+    </div>
+  );
+});
 
+// Update the message area in the DirectChat component
+const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMessages, isLoading, classes }) => {
   const messageEndRef = useRef(null);
-  const messageAreaRef = useRef(null);
-
-  // Add a ref to track if we need to update positions
-  const shouldUpdatePositions = useRef(false);
+  const listRef = useRef(null);
+  const [scrollToIndex, setScrollToIndex] = useState(undefined);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [availableTeams, setAvailableTeams] = useState([]);
-  const [selectedTeam, setSelectedTeam] = useState('');
-  const [newSessionName, setNewSessionName] = useState('');
-  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
-  const [teamError, setTeamError] = useState('');
+  const getItemSize = useCallback((index) => {
+    const message = messages[index];
+    let height = 80; // Base height
+    const lines = message.text.split('\n').length;
+    height += lines * 20; // Add height for each line
+    if (message.text.includes('```')) {
+      height += 100; // Extra height for code blocks
+    }
+    return height;
+  }, [messages]);
+
+  const scrollToBottom = useCallback(() => {
+    if (listRef.current && messages.length > 0) {
+      listRef.current.scrollToItem(messages.length - 1);
+    }
+  }, [messages.length]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, scrollToBottom]);
+
+  const renderMessage = useCallback(({ index, style }) => {
+    const message = messages[index];
+    const isBookmarked = bookmarkedMessages.some(msg => msg.messageId === message.id);
+
+    return (
+      <ListItem 
+        style={{
+          ...style,
+          display: 'flex',
+          padding: '8px 0',
+          width: '100%',
+          justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
+          alignItems: 'flex-start'
+        }}
+        disableGutters
+      >
+        <Box 
+          id={`message-${message.id}`}
+          className={`${classes.message} ${
+            message.sender === 'user' ? classes.userMessage : classes.aiMessage
+          }`}
+          style={{ 
+            width: 'auto',
+            maxWidth: '80%',
+            marginLeft: message.sender === 'user' ? 'auto' : '0',
+            marginRight: message.sender === 'user' ? '0' : 'auto'
+          }}
+        >
+          <MemoizedMessageContent 
+            content={message.text} 
+            isUser={message.sender === 'user'} 
+            timestamp={message.timestamp}
+            sender={message.sender}
+            onRetry={
+              message.sender === 'system' && message.text.includes('Error:') 
+                ? () => handleRetry(messages[messages.length - 2]?.text) 
+                : undefined
+            }
+            messageId={message.id}
+            onBookmark={() => handleBookmark(message)}
+            isBookmarked={isBookmarked}
+          />
+        </Box>
+      </ListItem>
+    );
+  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages]);
+
+  return (
+    <Box className={classes.messageArea}>
+      <AutoSizer>
+        {({ height, width }) => (
+          <VariableSizeList
+            ref={listRef}
+            height={height - (isLoading ? 100 : 0)}
+            width={width}
+            itemCount={messages.length}
+            itemSize={getItemSize}
+            overscanCount={5}
+            onItemsRendered={({ visibleStartIndex }) => {
+              const isAtTop = visibleStartIndex === 0;
+              const isAtBottom = visibleStartIndex + 10 >= messages.length;
+              setShowScrollTop(!isAtTop);
+              setShowScrollBottom(!isAtBottom);
+            }}
+          >
+            {renderMessage}
+          </VariableSizeList>
+        )}
+      </AutoSizer>
+
+      {isLoading && (
+        <div className={classes.typingIndicator}>
+          <Typography className="loading-header">
+            One moment...
+          </Typography>
+          <Typography className="loading-text">
+            Response is being generated...
+          </Typography>
+          <div className="dots">
+            <div className="dot" />
+            <div className="dot" />
+            <div className="dot" />
+          </div>
+        </div>
+      )}
+
+      {showScrollBottom && (
+        <Button
+          className={classes.scrollBottomButton}
+          onClick={scrollToBottom}
+          variant="contained"
+          size="small"
+        >
+          <KeyboardArrowDownIcon />
+        </Button>
+      )}
+
+      <div ref={messageEndRef} />
+    </Box>
+  );
+});
+
+const DocumentUploadPane = ({ currentSessionId }) => {
+  const classes = useStyles();
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [pollingIds, setPollingIds] = useState(new Set());
+  
+  const CLASSIFICATION_LEVELS = {
+    SELECT: "SELECT CLASSIFICATION",
+    UNCLASSIFIED: "Unclassified",
+    SECRET: "Secret",
+    TOP_SECRET: "Top Secret"
+  };
+
+  useEffect(() => {
+    const fetchDocumentStates = async () => {
+      if (!currentSessionId) {
+        setUploadedFiles([]);
+        return;
+      }
+      
+      try {
+        setUploadError(null);
+        const states = await getDocumentStates(currentSessionId);
+        const files = Object.entries(states).map(([docId, state]) => ({
+          id: docId,
+          name: state.originalName,
+          size: state.markdownSize,
+          status: state.status || 'pending',
+          isChecked: state.isChecked || false,
+          classification: state.classification || CLASSIFICATION_LEVELS.SELECT
+        }));
+        setUploadedFiles(files);
+        
+        const pendingFiles = files.filter(file => file.status === 'pending');
+        if (pendingFiles.length > 0) {
+          setPollingIds(new Set(pendingFiles.map(file => file.id)));
+        }
+      } catch (error) {
+        console.error('Error fetching document states:', error);
+        setUploadError('Failed to load documents');
+      }
+    };
+
+    fetchDocumentStates();
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    if (!currentSessionId || pollingIds.size === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      const updatedPollingIds = new Set(pollingIds);
+      
+      for (const docId of pollingIds) {
+        try {
+          const status = await getDocumentStatus(currentSessionId, docId);
+          if (status.status !== 'pending') {
+            updatedPollingIds.delete(docId);
+            setUploadedFiles(prev => prev.map(file => 
+              file.id === docId 
+                ? { ...file, status: status.status } 
+                : file
+            ));
+          }
+        } catch (error) {
+          console.error(`Error polling document ${docId}:`, error);
+        }
+      }
+      
+      if (updatedPollingIds.size !== pollingIds.size) {
+        setPollingIds(updatedPollingIds);
+      }
+      
+      if (updatedPollingIds.size === 0) {
+        clearInterval(pollInterval);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [currentSessionId, pollingIds]);
+  
+  const handleCheckboxChange = async (docId) => {
+    try {
+      // Use the service function instead of direct fetch
+      const result = await toggleDocumentState(currentSessionId, docId);
+
+      // Update local state
+      setUploadedFiles(prev => prev.map(file => 
+        file.id === docId 
+          ? { ...file, isChecked: result.isChecked }
+          : file
+      ));
+    } catch (error) {
+      console.error('Error updating document state:', error);
+      setUploadError('Failed to update document state');
+    }
+  };
+
+  const handleClassificationChange = async (docId, newClassification) => {
+    try {
+      await updateDocumentClassification(currentSessionId, docId, newClassification);
+      setUploadedFiles(prev => prev.map(file => 
+        file.id === docId 
+          ? { ...file, classification: newClassification }
+          : file
+      ));
+    } catch (error) {
+      console.error('Error updating classification:', error);
+      setUploadError('Failed to update document classification');
+    }
+  };
+
+  const handleUpload = useCallback(async (file) => {
+    if (!currentSessionId) {
+      setUploadError('No active session selected');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const response = await uploadDocument(currentSessionId, file);
+      setPollingIds(prev => new Set([...prev, response.docId]));
+      return response;
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(`Failed to upload ${file.name}: ${error.message}`);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [currentSessionId]);
+  
+  const onDrop = useCallback(async (acceptedFiles) => {
+    for (const file of acceptedFiles) {
+      try {
+        const response = await handleUpload(file);
+        setUploadedFiles(prev => [...prev, {
+          id: response.docId,
+          name: file.name,
+          size: file.size,
+          status: response.metadata.status || 'pending'
+        }]);
+      } catch (error) {
+        continue;
+      }
+    }
+  }, [handleUpload]);
+
+  const handleRemoveFile = useCallback(async (fileId) => {
+    try {
+      await deleteDocument(currentSessionId, fileId);
+      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+      setPollingIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(fileId);
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error removing file:', error);
+      setUploadError(`Failed to remove file: ${error.message}`);
+    }
+  }, [currentSessionId]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: '.pdf,.txt,.doc,.docx, .xlsx, .csv',
+    maxSize: 100 * 1024 * 1024,
+    disabled: !currentSessionId || isUploading
+  });
+
+  return (
+    <Paper className={`${classes.uploadPane} ${!currentSessionId ? 'disabled' : ''}`} elevation={3}>
+      <Typography variant="h6" gutterBottom>
+        Document Upload
+      </Typography>
+      {uploadError && (
+        <Typography color="error" variant="body2" style={{ margin: '8px' }}>
+          {uploadError}
+        </Typography>
+      )}
+      <div {...getRootProps()} className={classes.dropzone}>
+        <input {...getInputProps()} />
+        <CloudUploadIcon className={classes.uploadIcon} />
+        <Typography className={classes.uploadText}>
+          {!currentSessionId
+            ? 'Please select a chat session first'
+            : isDragActive
+              ? 'Drop the files here...'
+              : isUploading
+                ? 'Uploading...'
+                : 'Drag & drop files here, or click to select files'}
+        </Typography>
+        <Typography variant="caption" color="textSecondary">
+          Supported formats: PDF, TXT, DOC, DOCX, XLSX, CSV
+        </Typography>
+      </div>
+      <div className={classes.fileList}>
+        {uploadedFiles.map(file => (
+          <div key={file.id} className={classes.fileItem}>
+            <div className={classes.fileItemRow}>
+              <Checkbox
+                checked={file.isChecked}
+                onChange={() => handleCheckboxChange(file.id)}
+                color="primary"
+                size="small"
+                style={{ padding: '4px', marginRight: '8px' }}
+              />
+              <Typography variant="body2" style={{ flex: 1 }}>
+                {file.name}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => handleRemoveFile(file.id)}
+                disabled={isUploading}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </div>
+            <FormControl className={classes.classificationSelect} size="small">
+              <Select
+                value={file.classification || CLASSIFICATION_LEVELS.SELECT}
+                onChange={(e) => handleClassificationChange(file.id, e.target.value)}
+                variant="outlined"
+                disabled={file.status === 'pending'}
+              >
+                <MenuItem value={CLASSIFICATION_LEVELS.SELECT} disabled>
+                  {CLASSIFICATION_LEVELS.SELECT}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.UNCLASSIFIED}>
+                  {CLASSIFICATION_LEVELS.UNCLASSIFIED}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.SECRET}>
+                  {CLASSIFICATION_LEVELS.SECRET}
+                </MenuItem>
+                <MenuItem value={CLASSIFICATION_LEVELS.TOP_SECRET}>
+                  {CLASSIFICATION_LEVELS.TOP_SECRET}
+                </MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+        ))}
+      </div>
+    </Paper>
+  );
+};
+
+const DirectChat = () => {
+  const classes = useStyles();
+  const theme = useTheme();
+  const { state, dispatch } = useDirectChat();
+  const messageEndRef = useRef(null);
+  
+  // Local state management
+  const [messages, setMessages] = useState([]);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [promptHelpOpen, setPromptHelpOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [bookmarkedMessages, setBookmarkedMessages] = useState([]);
+  const [error, setError] = useState(null);
+  const [editingSession, setEditingSession] = useState(null);
+  const [editSessionName, setEditSessionName] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [classificationLevel, setClassificationLevel] = useState(0);
+
+  // Load chat sessions on component mount
+  useEffect(() => {
+    const loadChatSessions = async () => {
+      try {
+        const sessions = await getAllChatSessions();
+        setChatSessions(sessions);
+        // Set current session to the first one if none selected
+        if (sessions.length > 0 && !currentSessionId) {
+          setCurrentSessionId(sessions[0].id);
+        }
+      } catch (error) {
+        setError('Failed to load chat sessions');
+      }
+    };
+    loadChatSessions();
+  }, [currentSessionId]);
+
+  // Load chat history when session changes
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (currentSessionId) {
+        try {
+          const history = await getChatHistory(currentSessionId);
+          setMessages(history);
+        } catch (error) {
+          setError('Failed to load chat history');
+        }
+      }
+    };
+    loadChatHistory();
+  }, [currentSessionId]);
+
+  const handleSendMessage = async (event) => {
+    event.preventDefault();
+    const messageText = state.input.trim();
+    
+    if (!messageText || !currentSessionId) return;
+
+    // Add user message to UI immediately
+    const userMessage = {
+      id: Date.now(),
+      text: messageText,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
+    setIsLoading(true);
+
+    try {
+      // Send message to backend with session ID
+      const response = await sendMessage(messageText, currentSessionId);
+      
+      // Add AI response to UI
+      const aiMessage = {
+        id: Date.now() + 1,
+        text: response.message,
+        sender: 'ai',
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: 'Error: Failed to send message. Please try again.',
+        sender: 'system',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setError('Failed to send message');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewChat = async () => {
+    try {
+      const newSession = await createChatSession();
+      setChatSessions(prev => [newSession, ...prev]);
+      setCurrentSessionId(newSession.id);
+      setMessages([]); // Clear messages for new session
+    } catch (error) {
+      setError('Failed to create new chat');
+    }
+  };
+
+  const handleDeleteChat = async (sessionId) => {
+    try {
+      await deleteChatSession(sessionId);
+      setChatSessions(prev => prev.filter(session => session.id !== sessionId));
+      
+      if (sessionId === currentSessionId) {
+        const remainingSessions = chatSessions.filter(s => s.id !== sessionId);
+        if (remainingSessions.length > 0) {
+          setCurrentSessionId(remainingSessions[0].id);
+        } else {
+          setCurrentSessionId(null);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      setError('Failed to delete chat');
+    }
+  };
+
+  const handleSelectSession = async (sessionId) => {
+    if (sessionId === currentSessionId) return;
+    setCurrentSessionId(sessionId);
+    setMessages([]); // Clear messages before loading new ones
+  };
 
   const handleInputChange = (event) => {
     dispatch({ type: ACTIONS.SET_INPUT, payload: event.target.value });
@@ -987,476 +1643,340 @@ function DirectChat() {
 
   const handleKeyPress = (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-      handleSubmit(event);
+      handleSendMessage(event);
     }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!input.trim()) return;
-
-    dispatch({ 
-      type: ACTIONS.ADD_MESSAGE, 
-      payload: { 
-        id: Date.now(),
-        text: input.trim(), 
-        sender: 'user', 
-        timestamp: new Date() 
-      }
-    });
-    
-    dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
-    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-
-    try {
-      const currentSession = chatSessions.find(session => session.id === currentSessionId);
-      const teamName = currentSession?.team || 'direct_chat';
-
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: input.trim(),
-        team_name: teamName
-      });
-
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
-
-      dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
-
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: aiResponse, 
-          sender: 'ai', 
-          timestamp: new Date() 
-        }
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: 'Error: Failed to get response from AI', 
-          sender: 'system', 
-          timestamp: new Date() 
-        }
-      });
-    } finally {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
-    }
-  };
-
-  const handleNewChat = async () => {
-    setIsLoadingTeams(true);
-    setTeamError('');
-    try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
-      setAvailableTeams(response.data.teams);
-      setDialogOpen(true);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      setTeamError('Failed to load available teams. Please try again.');
-    } finally {
-      setIsLoadingTeams(false);
-    }
-  };
-
-  const handleEditSession = (sessionId) => {
-    // TODO: Implement edit functionality
-    console.log(`Edit session ${sessionId}`);
-  };
-
-  const handleDeleteSession = (sessionId) => {
-    // TODO: Implement delete functionality
-    console.log(`Delete session ${sessionId}`);
-  };
-
-  const handleDownloadSession = (sessionId) => {
-    // TODO: Implement download functionality
-    console.log(`Download session ${sessionId}`);
-  };
-
-  const toggleFullscreen = () => {
-    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !isFullscreen });
-  };
-
-  const handleHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: true });
-  };
-
-  const handleHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_HELP_DIALOG, payload: false });
-  };
-
-  const handlePromptHelpOpen = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: true });
-  };
-
-  const handlePromptHelpClose = () => {
-    dispatch({ type: ACTIONS.SET_PROMPT_HELP, payload: false });
   };
 
   const handleScroll = useCallback(({ target }) => {
     const { scrollTop, scrollHeight, clientHeight } = target;
-    
-    dispatch({ 
-      type: ACTIONS.SET_SCROLL_TOP, 
-      payload: scrollTop > 200 
-    });
-    
-    dispatch({ 
-      type: ACTIONS.SET_SCROLL_BOTTOM, 
-      payload: scrollHeight - scrollTop - clientHeight > 200 
-    });
-  }, [dispatch]);
+    setShowScrollTop(scrollTop > 200);
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 200);
+  }, []);
 
   const scrollToTop = () => {
-    messageAreaRef.current?.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const scrollToBottom = () => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleRetry = async (failedMessage) => {
-    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-
+  const handleRetry = useCallback(async (failedMessage) => {
+    setIsLoading(true);
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
-        message: failedMessage 
-      });
-
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
-
-      dispatch({ 
-        type: ACTIONS.SET_MESSAGES, 
-        payload: messages.filter(msg => 
-          !(msg.sender === 'system' && msg.text.includes('Error:'))
-        ) 
-      });
-
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: Date.now(),
-          text: aiResponse, 
-          sender: 'ai', 
-          timestamp: new Date() 
-        }
-      });
+      const response = await sendMessage(failedMessage);
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: response.message,
+        sender: 'ai',
+        timestamp: new Date().toISOString()
+      }]);
     } catch (error) {
       console.error('Error retrying message:', error);
     } finally {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleBookmark = useCallback((message) => {
-    const messageArea = messageAreaRef.current;
-    const messageElement = document.getElementById(`message-${message.id}`);
-    
-    if (messageArea && messageElement) {
-      const totalHeight = messageArea.scrollHeight;
-      const messageTop = messageElement.offsetTop;
-      const position = (messageTop / totalHeight) * 100;
-      
-      const bookmarkData = {
-        messageId: message.id,
-        text: message.text,
-        position: position
-      };
-      
-      dispatch({ 
-        type: ACTIONS.TOGGLE_BOOKMARK, 
-        payload: bookmarkData
-      });
-      shouldUpdatePositions.current = true;
-    }
-  }, [dispatch]);
-
-  // Create a debounced update function
-  const debouncedUpdate = useCallback(
-    debounce(() => {
-      if (shouldUpdatePositions.current) {
-        const updatedBookmarks = calculateBookmarkPositions(messageAreaRef, state.bookmarkedMessages);
-        dispatch({ type: ACTIONS.UPDATE_BOOKMARK_POSITIONS, payload: updatedBookmarks });
-        shouldUpdatePositions.current = false;
+    setBookmarkedMessages(prev => {
+      const exists = prev.some(msg => msg.messageId === message.id);
+      if (exists) {
+        return prev.filter(msg => msg.messageId !== message.id);
       }
-    }, 100),
-    [state.bookmarkedMessages]
-  );
+      return [...prev, { messageId: message.id, text: message.text }];
+    });
+  }, []);
 
-  // Update positions when necessary
-  useEffect(() => {
-    if (shouldUpdatePositions.current) {
-      debouncedUpdate();
+  const handleEditSession = (sessionId) => {
+    const session = chatSessions.find(s => s.id === sessionId);
+    if (session) {
+      setEditingSession(session);
+      setEditSessionName(session.name);
+      setEditDialogOpen(true);
     }
-  }, [debouncedUpdate]);
-
-  // Handle initial load and new messages
-  useEffect(() => {
-    shouldUpdatePositions.current = true;
-    debouncedUpdate();
-  }, [messages, debouncedUpdate]);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      shouldUpdatePositions.current = true;
-      debouncedUpdate();
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      debouncedUpdate.cancel();
-    };
-  }, [debouncedUpdate]);
-
-  // Handle scroll events
-  useEffect(() => {
-    const handleScroll = debounce(() => {
-      shouldUpdatePositions.current = true;
-      debouncedUpdate();
-    }, 100);
-
-    const messageArea = messageAreaRef.current;
-    if (messageArea) {
-      messageArea.addEventListener('scroll', handleScroll);
-      return () => {
-        messageArea.removeEventListener('scroll', handleScroll);
-        handleScroll.cancel();
-      };
-    }
-  }, [debouncedUpdate]);
-
-  useEffect(() => {
-    messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleCreateNewChat = () => {
-    if (!selectedTeam || !newSessionName.trim()) {
-      setTeamError('Please select a team and enter a session name');
-      return;
-    }
-    
-    const newSession = { 
-      id: Date.now(), // Using timestamp as unique ID
-      name: newSessionName.trim(),
-      team: selectedTeam
-    };
-    
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
-    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
-    dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
-    
-    setDialogOpen(false);
-    setNewSessionName('');
-    setSelectedTeam('');
-    setTeamError('');
   };
+
+  const handleEditDialogClose = () => {
+    setEditDialogOpen(false);
+    setEditingSession(null);
+    setEditSessionName('');
+  };
+
+  const handleEditSessionSubmit = async () => {
+    if (!editingSession || !editSessionName.trim()) return;
+
+    try {
+      const response = await updateSessionName(editingSession.id, editSessionName.trim());
+      setChatSessions(prev => prev.map(session => 
+        session.id === editingSession.id 
+          ? response.session 
+          : session
+      ));
+      handleEditDialogClose();
+    } catch (error) {
+      setError('Failed to update session name');
+    }
+  };
+
+  const handleDownloadSession = async (sessionId) => {
+    try {
+      const history = await getChatHistory(sessionId);
+      const chatData = JSON.stringify(history, null, 2);
+      const blob = new Blob([chatData], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-session-${sessionId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      setError('Failed to download chat session');
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => !prev);
+  };
+
+  const handleHelpOpen = () => {
+    setHelpDialogOpen(true);
+  };
+
+  const handleHelpClose = () => {
+    setHelpDialogOpen(false);
+  };
+
+  const handlePromptHelpOpen = () => {
+    setPromptHelpOpen(true);
+  };
+
+  const handlePromptHelpClose = () => {
+    setPromptHelpOpen(false);
+  };
+
+  const handleClassificationChange = (event, newValue) => {
+    setClassificationLevel(newValue);
+  };
+
+  useEffect(() => {
+    return () => {
+      setMessages([]);
+      setChatSessions([]);
+      setBookmarkedMessages([]);
+    };
+  }, []);
 
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
-        {!isFullscreen && (
-          <Paper className={classes.chatLog} elevation={3}>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              className={classes.newChatButton}
-              onClick={handleNewChat}
-            >
-              Start New Chat Session
-            </Button>
-            <List>
-              {chatSessions.map((session) => (
-                <React.Fragment key={session.id}>
-                  <ListItem button className={classes.chatSessionItem}>
-                    <ListItemText primary={session.name} />
-                    <div className={classes.sessionActions}>
-                      <Tooltip title="Edit">
-                        <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteSession(session.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download">
-                        <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
-                          <GetAppIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </div>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
-          </Paper>
-        )}
-        <Paper className={`${classes.chatArea} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
-          <div className={classes.buttonBar}>
-            <div className={classes.agentsHeader}>
-              <IconButton onClick={handleHelpOpen} size="small">
-                <HelpOutlineIcon className={classes.helpIcon} />
-              </IconButton>
-              <Typography className={classes.agentsText}>
-                Agents in this Chat:
+        <Paper className={classes.chatLog} elevation={3}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            className={classes.newChatButton}
+            onClick={handleNewChat}
+          >
+            Start New Chat Session
+          </Button>
+          <List>
+            {chatSessions.map((session) => (
+              <React.Fragment key={session.id}>
+                <ListItem 
+                  button 
+                  className={classes.chatSessionItem}
+                  selected={session.id === currentSessionId}
+                  onClick={() => handleSelectSession(session.id)}
+                >
+                  <div style={{ flex: 1 }}>
+                    <ListItemText 
+                      primary={session.name} 
+                      secondary={
+                        <Typography 
+                          variant="caption" 
+                          color="textSecondary" transparent
+                          style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
+                        >
+                          {new Date(session.created_at).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(session.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}    •••    ID: {session.id.split('-')[0]}
+                        </Typography>
+                      }
+                    />
+                  </div>
+                  <div className={classes.sessionActions}>
+                    <Tooltip title="Edit">
+                      <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteChat(session.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
+                        <GetAppIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                </ListItem>
+                <Divider />
+              </React.Fragment>
+            ))}
+          </List>
+        </Paper>
+        <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+          {!currentSessionId && (
+            <div className={classes.noSessionsOverlay}>
+              <Typography variant="h6" color="textSecondary">
+                Please create a new chat session to begin
               </Typography>
             </div>
-              <IconButton
+          )}
+          <div className={classes.buttonBar}>
+            <IconButton
               className={classes.fullscreenButton}
-                onClick={toggleFullscreen}
-                size="small"
-              >
-                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              </IconButton>
+              onClick={toggleFullscreen}
+              size="small"
+            >
+              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </IconButton>
           </div>
-          <Box 
-            ref={messageAreaRef}
-            className={classes.messageArea}
-            onScroll={handleScroll}
-          >
-            <div className={classes.bookmarkTrack}>
-              {state.bookmarkedMessages.map((bookmark, index) => (
-                <React.Fragment key={index}>
-                  <div
-                    className={classes.bookmarkTick}
-                    style={{ top: `${bookmark.position}%` }}
-                    onClick={() => {
-                      const element = document.getElementById(`message-${bookmark.messageId}`);
-                      element?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  />
-                </React.Fragment>
-              ))}
-              <div className={classes.bookmarkPreviewContainer}>
-                {state.bookmarkedMessages.map((bookmark, index) => (
-                  <div
-                    key={index}
-                    className={classes.bookmarkPreview}
-                    style={{ top: `${bookmark.position}%` }}
-                    onClick={() => {
-                      const element = document.getElementById(`message-${bookmark.messageId}`);
-                      element?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    {bookmark.text.substring(0, 100) + (bookmark.text.length > 100 ? '...' : '')}
-                  </div>
-                ))}
-              </div>
+          <MessageArea 
+            messages={messages}
+            handleRetry={handleRetry}
+            handleBookmark={handleBookmark}
+            bookmarkedMessages={bookmarkedMessages}
+            isLoading={isLoading}
+            classes={classes}
+          />
+          <form onSubmit={handleSendMessage} className={classes.inputArea}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+              <IconButton 
+                onClick={handlePromptHelpOpen}
+                size="small"
+                className={classes.inputHelpIcon}
+                title="Prompt Engineering Tips"
+              >
+                <HelpOutlineIcon />
+              </IconButton>
+              <TextField
+                className={classes.input}
+                variant="outlined"
+                placeholder="Type your message here... (Ctrl+Enter to send)"
+                value={state.input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
+                multiline
+                minRows={1}
+                maxRows={5}
+                fullWidth
+              />
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary" 
+                endIcon={<SendIcon />}
+              >
+                Send
+              </Button>
             </div>
             
-            {messages.map((message, index) => (
-              <Box 
-                key={index}
-                id={`message-${message.id}`}
-                className={`${classes.message} ${
-                  message.sender === 'user' ? classes.userMessage : classes.aiMessage
-                }`}
-                style={{ maxWidth: message.sender === 'user' ? '70%' : '85%' }}
-              >
-                <div className={classes.messageWrapper}>
-                  <MessageContent 
-                    content={message.text} 
-                    isUser={message.sender === 'user'} 
-                    timestamp={message.timestamp}
-                    sender={message.sender}
-                    onRetry={
-                      message.sender === 'system' && message.text.includes('Error:') 
-                        ? () => handleRetry(messages[messages.length - 2]?.text) 
-                        : undefined
-                    }
-                    messageId={message.id}
-                    onBookmark={() => handleBookmark(message)}
-                    isBookmarked={(state.bookmarkedMessages || []).some(msg => msg.messageId === message.id)}
+            <div className={classes.classificationSection}>
+              <Typography variant="subtitle2" gutterBottom>
+                Chat Classification & Caveats
+              </Typography>
+              
+              <div className={classes.classificationRow}>
+                <Typography className={classes.classificationLabel}>
+                  Classification:
+                </Typography>
+                <div style={{ flex: .25, marginLeft: theme.spacing(1), marginRight: theme.spacing(2) }}>
+                  <Slider
+                    className={classes.classificationSlider}
+                    value={classificationLevel}
+                    onChange={handleClassificationChange}
+                    step={null}
+                    min={0}
+                    max={2}
+                    marks={[
+                      { value: 0, label: 'Unclassified' },
+                      { value: 1, label: 'Secret' },
+                      { value: 2, label: 'Top Secret' },
+                    ]}
+                    style={{
+                      color: classificationLevel === 0 ? '#4caf50' :
+                            classificationLevel === 1 ? '#f44336' : '#ff9800'
+                    }}
                   />
                 </div>
-              </Box>
-            ))}
-            {isLoading && (
-              <div className={classes.typingIndicator}>
-                <Typography className="loading-header">
-                  One moment...
+              </div>
+              
+              <div className={classes.classificationRow}>
+                <Typography className={classes.classificationLabel}>
+                  Caveats:
                 </Typography>
-                <Typography className="loading-text">
-                  The team is gathering data, processing, reflecting, and collaborating to address your query. Depending on the complexity of your query, this may take a few moments...
-                </Typography>
-                <div className="dots">
-                  <div className="dot" />
-                  <div className="dot" />
-                  <div className="dot" />
+                <div className={classes.checkboxGroup}>
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NOFORN</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>FVEY</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>USA</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>UK</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>AUS</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NZ</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>CAN</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>NATO</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>HCS</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>SAP</Typography>}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox size="small" />}
+                    label={<Typography className={classes.checkboxLabel}>TK</Typography>}
+                  />
                 </div>
               </div>
-            )}
-            <div ref={messageEndRef} />
-            <Fade in={showScrollTop}>
-              <IconButton
-                className={classes.scrollTopButton}
-                onClick={scrollToTop}
-                size="medium"
-                title="Scroll to top"
-              >
-                <KeyboardArrowUpIcon />
-              </IconButton>
-            </Fade>
-            <Fade in={showScrollBottom}>
-              <IconButton
-                className={classes.scrollBottomButton}
-                onClick={scrollToBottom}
-                size="medium"
-                title="Scroll to bottom"
-              >
-                <KeyboardArrowDownIcon />
-              </IconButton>
-            </Fade>
-          </Box>
-          <form onSubmit={handleSubmit} className={classes.inputArea}>
-            <IconButton 
-              onClick={handlePromptHelpOpen}
-              size="small"
-              className={classes.inputHelpIcon}
-              title="Prompt Engineering Tips"
-            >
-              <HelpOutlineIcon />
-            </IconButton>
-            <TextField
-              className={classes.input}
-              variant="outlined"
-              placeholder="Type your message here... (Ctrl+Enter to send)"
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyPress}
-              multiline
-              minRows={1}
-              maxRows={5}
-              fullWidth
-            />
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary" 
-              endIcon={<SendIcon />}
-            >
-              Send
-            </Button>
+            </div>
           </form>
         </Paper>
+        <DocumentUploadPane currentSessionId={currentSessionId} />
       </div>
       <Dialog
         open={helpDialogOpen}
@@ -1581,73 +2101,36 @@ function DirectChat() {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog 
-        open={dialogOpen} 
-        onClose={() => setDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditDialogClose}
+        aria-labelledby="edit-session-dialog-title"
       >
-        <DialogTitle>Create New Chat Session</DialogTitle>
+        <DialogTitle id="edit-session-dialog-title">
+          Edit Session Name
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Session Name"
-              fullWidth
-              value={newSessionName}
-              onChange={(e) => setNewSessionName(e.target.value)}
-              error={teamError && !newSessionName.trim()}
-              helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Select Team</InputLabel>
-              <Select
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                error={teamError && !selectedTeam}
-              >
-                {isLoadingTeams ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} /> Loading teams...
-                  </MenuItem>
-                ) : (
-                  availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.file_name}>
-                      {team.name}
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-              {teamError && !selectedTeam && (
-                <Typography color="error" variant="caption">
-                  Please select a team
-                </Typography>
-              )}
-            </FormControl>
-            {teamError && (
-              <Typography color="error" variant="body2">
-                {teamError}
-              </Typography>
-            )}
-          </Box>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Session Name"
+            type="text"
+            fullWidth
+            value={editSessionName}
+            onChange={(e) => setEditSessionName(e.target.value)}
+            variant="outlined"
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setDialogOpen(false);
-            setTeamError('');
-            setNewSessionName('');
-            setSelectedTeam('');
-          }}>
+          <Button onClick={handleEditDialogClose} color="primary">
             Cancel
           </Button>
           <Button 
-            onClick={handleCreateNewChat}
+            onClick={handleEditSessionSubmit} 
             color="primary"
-            variant="contained"
-            disabled={isLoadingTeams}
+            disabled={!editSessionName.trim() || editSessionName === editingSession?.name}
           >
-            Create
+            Save
           </Button>
         </DialogActions>
       </Dialog>
@@ -1655,4 +2138,4 @@ function DirectChat() {
   );
 }
 
-export default DirectChat;
+export default React.memo(DirectChat);

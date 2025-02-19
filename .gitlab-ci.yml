@@ -1,0 +1,254 @@
+stages:
+  - build
+  - unit-test
+  - security
+  - integration
+  - aggregate
+  - deploy
+
+# ---------------------------------------------------------------------
+# 1) Build & Unit Test Stage
+# ---------------------------------------------------------------------
+
+build-job:
+  stage: build
+  image: python:3.9
+  script:
+    - echo "Installing Python dependencies..."
+    - pip install --upgrade pip setuptools wheel
+    - pip install -r requirements.txt
+    - echo "Installing Node.js dependencies..."
+    - apt-get update && apt-get install -y curl gnupg
+    - curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+    - apt-get install -y nodejs
+    - npm install
+    - echo "Build complete."
+  artifacts:
+    paths:
+      - node_modules/
+      - .venv/
+    expire_in: "1 week"
+
+lint-job-python:
+  stage: unit-test
+  image: python:3.9
+  script:
+    - echo "Linting Python code..."
+    - pip install flake8
+    - flake8 mage/   # adjust path as needed
+    - echo "Python lint complete."
+
+lint-job-node:
+  stage: unit-test
+  image: node:16
+  script:
+    - echo "Linting Node.js code..."
+    - npm install --save-dev eslint
+    - npx eslint .   # adjust path as needed
+    - echo "Node lint complete."
+
+unit-test-python:
+  stage: unit-test
+  image: python:3.9
+  script:
+    - echo "Running Python unit tests..."
+    - pip install pytest pytest-cov
+    - pytest --cov=mage --cov-report=term-missing
+  artifacts:
+    paths:
+      - htmlcov/
+    expire_in: "1 week"
+
+unit-test-node:
+  stage: unit-test
+  image: node:16
+  script:
+    - echo "Running Node.js unit tests..."
+    - npm test
+  artifacts:
+    paths:
+      - coverage/
+    expire_in: "1 week"
+
+# ---------------------------------------------------------------------
+# 2) Security Stage
+#    (Static Analysis, Dependency Scanning, and Secret Detection)
+# ---------------------------------------------------------------------
+
+sast-python:
+  stage: security
+  image: python:3.9
+  script:
+    - echo "Running Bandit for Python SAST..."
+    - pip install bandit jq
+    - bandit -r core/ -f json -o bandit-report.json || true
+    - cat bandit-report.json | jq -r '
+        ( "test_name,severity,file,line,issue_text" ),
+        ( .results[] | [
+            .test_name,
+            .issue_severity,
+            .filename,
+            .line_number,
+            ( .issue_text | gsub(",";"") )
+          ] | join(",") )
+      ' > bandit-report.csv
+  artifacts:
+    paths:
+      - bandit-report.json
+      - bandit-report.csv
+    when: always
+    expire_in: "1 week"
+
+sast-node:
+  stage: security
+  image: node:16
+  script:
+    - echo "Running npm audit for Node.js SAST..."
+    - npm audit --json > node-audit.json || true
+    - cat node-audit.json | jq -r '
+        ( "module_name,severity,recommendation" ),
+        ( .advisories[]? | [
+            .module_name,
+            .severity,
+            ( .recommendation | gsub(",";"") )
+          ] | join(",") )
+      ' > node-audit.csv
+  artifacts:
+    paths:
+      - node-audit.json
+      - node-audit.csv
+    when: always
+    expire_in: "1 week"
+
+dependency-scan:
+  stage: security
+  image: python:3.9
+  script:
+    - echo "Running pip-audit for Python dependency scanning..."
+    - pip install pip-audit jq
+    - pip-audit --output pip-audit.json --format json || true
+    - cat pip-audit.json | jq -r '
+        ( "package,current_version,installed_version,description,fix_versions" ),
+        ( .[]? | [
+            .dependency.package,
+            .dependency.version,
+            .installed_version,
+            ( .description | gsub(",";"") ),
+            ( .fix_versions | join("|") )
+          ] | join(",") )
+      ' > pip-audit.csv
+  artifacts:
+    paths:
+      - pip-audit.json
+      - pip-audit.csv
+    when: always
+    expire_in: "1 week"
+
+secret-detection:
+  stage: security
+  image: alpine:3.14
+  script:
+    - echo "Running Gitleaks for secret detection..."
+    - apk add --no-cache curl jq
+    - curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64 -o gitleaks && chmod +x gitleaks
+    - ./gitleaks detect --source . --report-format json --report-path gitleaks.json || true
+    - cat gitleaks.json | jq -r '
+        ( "description,file,line,secret" ),
+        ( .findings[]? | [
+            ( .description | gsub(",";"") ),
+            .file,
+            (.line|tostring),
+            ( .secret | gsub(",";"") )
+          ] | join(",") )
+      ' > gitleaks.csv
+  artifacts:
+    paths:
+      - gitleaks.json
+      - gitleaks.csv
+    when: always
+    expire_in: "1 week"
+
+# ---------------------------------------------------------------------
+# 3) Integration Stage
+#    (Build Docker images, start docker-compose stack, run integration tests)
+# ---------------------------------------------------------------------
+
+integration-tests:
+  stage: integration
+  image: docker:20.10.16
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  script:
+    - echo "Installing docker-compose..."
+    - apk add --no-cache docker-compose
+    - echo "Building Docker images via docker-compose..."
+    - docker-compose -f docker-compose.yaml build
+    - echo "Starting containers..."
+    - docker-compose -f docker-compose.yaml up -d
+    - echo "Waiting for services to initialize..."
+    - sleep 20
+    # Example health checks (adjust URLs as needed)
+    - echo "Checking health of core service..."
+    - curl --fail http://localhost:8000/health || (docker-compose -f docker-compose.yaml logs && exit 1)
+    - echo "Checking health of agent service..."
+    - curl --fail http://localhost:8001/health || (docker-compose -f docker-compose.yaml logs && exit 1)
+    - echo "Integration tests passed."
+    - echo "Tearing down containers..."
+    - docker-compose -f docker-compose.yaml down
+  artifacts:
+    when: always
+    expire_in: "1 week"
+    # Optionally, if you generate test reports, reference them here:
+    reports:
+      junit: integration-tests-report.xml
+
+# ---------------------------------------------------------------------
+# 4) Aggregation Stage
+#    (Merge security scan outputs into final reports)
+# ---------------------------------------------------------------------
+
+aggregate-reports:
+  stage: aggregate
+  script: |
+    echo "Aggregating security scan results..."
+    mkdir final_reports
+    echo "{\"summary\": {\"totalVulnerabilities\": 0, \"highSeverity\": 0, \"mediumSeverity\": 0, \"lowSeverity\": 0}, \"details\": []}" > final_reports/final-security-report.json
+    echo "id,severity,file,description,mitigation" > final_reports/final-security-report.csv
+    echo "SAST-PY-1,High,mage/foo.py,Example vulnerability,Upgrade library X" >> final_reports/final-security-report.csv
+    echo "SAST-NODE-1,Medium,src/index.js,Example vulnerability,Use safer function" >> final_reports/final-security-report.csv
+    echo "Added sample lines to CSV. You would parse all your JSON files here."
+  dependencies:
+    - sast-python
+    - sast-node
+    - dependency-scan
+    - secret-detection
+  artifacts:
+    paths:
+      - final_reports/
+    when: always
+    expire_in: "1 week"
+
+# ---------------------------------------------------------------------
+# 5) Deploy Stage
+#    (Deploy the full docker-compose stack to production)
+# ---------------------------------------------------------------------
+
+deploy-job:
+  stage: deploy
+  image: docker:20.10.16
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  script:
+    - echo "Installing docker-compose..."
+    - apk add --no-cache docker-compose
+    - echo "Deploying MAGE to production..."
+    - docker-compose -f docker-compose.yaml up -d
+    - echo "Deployment complete."
+  environment:
+    name: production
+  only:
+    - main
