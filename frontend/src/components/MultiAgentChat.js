@@ -52,6 +52,7 @@ import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { debounce } from 'lodash';
 import CheckIcon from '@mui/icons-material/Check';
 import rehypeRaw from 'rehype-raw';
+import { v4 as uuidv4 } from 'uuid';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -856,165 +857,132 @@ const CodeBlock = ({ inline, className, children }) => {
 const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
   const classes = useStyles();
   const [copied, setCopied] = useState(false);
-  const isErrorMessage = !isUser && content.includes('Error:');
+  
+  // Add null check and ensure content is a string
+  const safeContent = content || '';
+  const isErrorMessage = sender === 'system' && safeContent.includes('Error:');
 
-  // Parse the expert analyses into a structured format
   const parseContent = () => {
-    const parts = content.split('<details><summary>Expert Analyses</summary>');
-    if (parts.length !== 2) {
-      return { mainContent: content, experts: [] };
+    if (!safeContent) {
+      return { mainContent: '', experts: [] };
     }
 
-    const mainContent = parts[0];
-    const expertsSection = parts[1];
+    try {
+      // First check if it's a JSON string that needs parsing
+      let processedContent = safeContent;
+      if (typeof safeContent === 'string' && safeContent.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(safeContent);
+          processedContent = parsed.response || parsed.message || safeContent;
+        } catch (e) {
+          console.log('Not JSON content');
+        }
+      }
 
-    // Extract individual expert analyses
-    const expertRegex = /<details><summary>(.*?)<\/summary>\n\n([\s\S]*?)<\/details>/g;
-    const experts = [];
-    let match;
-    while ((match = expertRegex.exec(expertsSection)) !== null) {
-      experts.push({
-        title: match[1],
-        content: match[2].trim()
-      });
+      // Extract expert analyses if present
+      const parts = processedContent.split('<details><summary>Expert Analyses</summary>');
+      if (parts.length !== 2) {
+        return { mainContent: processedContent, experts: [] };
+      }
+
+      const mainContent = parts[0].trim();
+      const expertsSection = parts[1];
+
+      // Extract individual expert analyses
+      const experts = [];
+      const expertMatches = expertsSection.matchAll(/<details><summary>(.*?)<\/summary>([\s\S]*?)<\/details>/g);
+      
+      for (const match of expertMatches) {
+        if (match[1] && match[2]) {
+          experts.push({
+            title: match[1].trim(),
+            content: match[2].trim()
+          });
+        }
+      }
+
+      return { mainContent, experts };
+    } catch (error) {
+      console.error('Error parsing content:', error);
+      return { mainContent: safeContent, experts: [] };
     }
-
-    return { mainContent, experts };
   };
 
   const { mainContent, experts } = parseContent();
 
-  const handleCopy = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const processContent = (text) => {
-    return text.replace(/\n/g, '<br>');
-  };
-
   return (
-    <div className={classes.messageContainer}>
-      {isBookmarked && (
-        <>
-          <div className={`${classes.bookmarkRibbon} ${classes.topRibbon}`} />
-          <div className={`${classes.bookmarkRibbon} ${classes.bottomRibbon}`} />
-        </>
-      )}
-      
-      {!isUser && !isErrorMessage && (
-        <div className={`${classes.messageActions} ${classes.topActions}`}>
-          <IconButton
-            className={classes.copyButton}
-            onClick={() => handleCopy(content)}
-            size="small"
-            title="Copy message"
-          >
-            {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
-          </IconButton>
-          <IconButton
-            className={classes.copyButton}
-            onClick={onBookmark}
-            size="small"
-            title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-          >
-            {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
-          </IconButton>
+    <div className={classes.messageContent}>
+      <ReactMarkdown 
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          code: CodeBlock
+        }}
+        className={classes.markdown}
+      >
+        {mainContent}
+      </ReactMarkdown>
+
+      {experts.length > 0 && (
+        <div className={classes.expertAnalyses}>
+          <details>
+            <summary>Expert Analyses</summary>
+            {experts.map((expert, index) => (
+              <details key={index} className={classes.expertAnalysis}>
+                <summary>{expert.title}</summary>
+                <ReactMarkdown 
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    code: CodeBlock
+                  }}
+                  className={classes.markdown}
+                >
+                  {expert.content}
+                </ReactMarkdown>
+              </details>
+            ))}
+          </details>
         </div>
       )}
 
-      <div className={classes.messageContent}>
-        {isUser ? (
-          <Typography 
-            variant="body1" 
-            style={{ 
-              color: 'inherit',
-              whiteSpace: 'pre-wrap'
-            }}
-          >
-            {content}
-          </Typography>
-        ) : (
-          <>
-            <ReactMarkdown
-              className={classes.markdown}
-              rehypePlugins={[rehypeRaw]}
-              components={{
-                code: CodeBlock,
-                p: ({ children }) => <Typography variant="body1">{children}</Typography>,
-              }}
-            >
-              {mainContent}
-            </ReactMarkdown>
-            
-            {experts.length > 0 && (
-              <details className={classes.expertAnalyses}>
-                <summary>Expert Analyses</summary>
-                {experts.map((expert, index) => (
-                  <details key={index} className={classes.expertAnalysis}>
-                    <summary>{expert.title}</summary>
-                    <ReactMarkdown
-                      className={classes.markdown}
-                      rehypePlugins={[rehypeRaw]}
-                      components={{
-                        code: CodeBlock,
-                        p: ({ children }) => <Typography variant="body1">{children}</Typography>,
-                      }}
-                    >
-                      {expert.content}
-                    </ReactMarkdown>
-                  </details>
-                ))}
-              </details>
-            )}
-          </>
-        )}
-      </div>
-
       <div className={classes.messageFooter}>
-        <Typography className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}>
-          {new Date(timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-          })}
-        </Typography>
-        
-        {(!isErrorMessage || isUser) && (
-          <div className={classes.messageActions}>
+        {timestamp && (
+          <Typography 
+            className={`${classes.timestamp} ${isUser ? classes.userMessageTimestamp : ''}`}
+            variant="caption"
+          >
+            {new Date(timestamp).toLocaleTimeString()}
+          </Typography>
+        )}
+        {!isUser && (
+          <>
             <IconButton
               className={classes.copyButton}
-              onClick={() => handleCopy(content)}
+              onClick={() => {
+                navigator.clipboard.writeText(content);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
               size="small"
-              title="Copy message"
             >
-              {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+              {copied ? <CheckIcon /> : <ContentCopyIcon />}
             </IconButton>
-            {!isUser && (
+            <IconButton
+              className={classes.copyButton}
+              onClick={() => onBookmark()}
+              size="small"
+            >
+              {isBookmarked ? <BookmarkIcon /> : <BookmarkBorderIcon />}
+            </IconButton>
+            {isErrorMessage && onRetry && (
               <IconButton
                 className={classes.copyButton}
-                onClick={onBookmark}
+                onClick={onRetry}
                 size="small"
-                title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
               >
-                {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
+                <ReplayIcon />
               </IconButton>
             )}
-          </div>
-        )}
-        
-        {onRetry && isErrorMessage && (
-          <div className={classes.messageActions}>
-            <IconButton
-              className={classes.retryButton}
-              onClick={onRetry}
-              size="small"
-              title="Retry last message"
-            >
-              <ReplayIcon fontSize="small" />
-            </IconButton>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -1082,13 +1050,29 @@ function MultiAgentChat() {
     event.preventDefault();
     if (!input.trim()) return;
 
+    // Get the current session - if none exists, create one
+    let currentSession = chatSessions.find(session => session.id === state.currentSessionId);
+    
+    // If no current session exists, create one with default team
+    if (!currentSession) {
+      const defaultTeam = availableTeams[0];
+      currentSession = {
+        id: uuidv4(),
+        name: 'New Chat',
+        team: defaultTeam?.name || 'PRC_Team',
+        teamId: defaultTeam?.id
+      };
+      dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: currentSession });
+      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: currentSession.id });
+    }
+
     dispatch({ 
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
-        id: Date.now(),
         text: input.trim(), 
         sender: 'user', 
-        timestamp: new Date() 
+        timestamp: new Date(),
+        sessionId: currentSession.id  // Use existing session ID
       }
     });
     
@@ -1096,29 +1080,44 @@ function MultiAgentChat() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
 
     try {
-      const currentSession = chatSessions.find(session => session.id === state.currentSessionId);
-      const teamName = currentSession?.team || 'PRC_Team'; // Fallback to PRC_Team if no team selected
-
       const response = await axios.post(getApiUrl('CHAT', '/chat'), { 
         message: input.trim(), 
-        team_name: teamName
+        team_name: currentSession.team,
+        session_id: currentSession.id,  // Use same session ID for all messages
+        team_id: currentSession.teamId
       });
 
-      const aiResponse = Array.isArray(response.data.response) 
-        ? response.data.response[0] 
-        : (typeof response.data.response === 'string' 
-            ? response.data.response 
-            : JSON.stringify(response.data.response));
+      // Handle the response properly
+      let aiResponse = '';
+      const responseData = response.data;
+
+      if (responseData.error) {
+        throw new Error(responseData.error);
+      }
+
+      // Check if we have a synthesized report with expert analyses
+      if (responseData.response) {
+        aiResponse = responseData.response;
+      } else if (responseData.synthesized_report) {
+        // Build the response with expert analyses if available
+        aiResponse = responseData.synthesized_report;
+        if (responseData.expert_final_analysis) {
+          aiResponse += '\n\n<details><summary>Expert Analyses</summary>\n';
+          Object.entries(responseData.expert_final_analysis).forEach(([expert, analysis]) => {
+            aiResponse += `<details><summary>${expert}</summary>${analysis}</details>\n`;
+          });
+          aiResponse += '</details>';
+        }
+      }
 
       dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
-
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
           text: aiResponse, 
           sender: 'ai', 
-          timestamp: new Date() 
+          timestamp: new Date(),
+          sessionId: currentSession.id  // Use same session ID
         }
       });
     } catch (error) {
@@ -1126,8 +1125,7 @@ function MultiAgentChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
-          text: 'Error: Failed to get response from AI', 
+          text: `Error: Failed to get response from AI - ${error.message}`, 
           sender: 'system', 
           timestamp: new Date() 
         }
@@ -1158,14 +1156,19 @@ function MultiAgentChat() {
       return;
     }
     
+    const selectedTeamObj = availableTeams.find(team => team.name === selectedTeam);
+    
     const newSession = { 
-      id: chatSessions.length + 1, 
+      id: uuidv4(), // Generate UUID for session
       name: newSessionName.trim(),
-      team: selectedTeam 
+      team: selectedTeam,
+      teamId: selectedTeamObj?.id
     };
     
-    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    // Clear messages when creating new chat session
     dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+    dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: newSession });
+    dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: newSession.id });
     
     setDialogOpen(false);
     setNewSessionName('');
@@ -1257,7 +1260,6 @@ function MultiAgentChat() {
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
-          id: Date.now(),
           text: aiResponse, 
           sender: 'ai', 
           timestamp: new Date() 
@@ -1387,7 +1389,7 @@ function MultiAgentChat() {
                   </MenuItem>
                 ) : (
                   availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.file_name}>
+                    <MenuItem key={team.id} value={team.name}>
                       {team.name}
                     </MenuItem>
                   ))

@@ -1,15 +1,59 @@
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+import logging
 from pathlib import Path
-import shutil
-import sys
-from config_ import BUILDER_DIR
+from concurrent.futures import ThreadPoolExecutor
+from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage
+import asyncio
+from config_ import load_config
+from multiagent.processQuestion import process_question
+from typing import List, Optional
+from multiagent.session_manager import SessionManager
+from utils.llm_manager import LLMManager
+from multiagent.support_models.team_class import Team
+from multiagent.support_models.agent_class import Agent
+from utils.model_list import OllamaModelManager
 
+config = load_config()
+
+# Ensure log directory exists
+log_dir = Path(config['LOG_PATH'])
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=log_dir / 'chat_service.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class ChatMessage(BaseModel):
     message: str
-    team_name: str
+    team_id: str
+    team_name: Optional[str] = None
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
+    plan: Optional[str] = None
+    selected_agents: Optional[List[str]] = None
+
+class SessionCreate(BaseModel):
+    """
+    Model for session creation requests
+    """
+    team_id: str
+    session_name: str
+
+class SessionUpdate(BaseModel):
+    """
+    Model for session update requests
+    """
+    team_id: str
+    team_name: Optional[str] = None
+    session_name: Optional[str] = None
 
 app = FastAPI()
 
@@ -22,91 +66,391 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/chat")
-async def chat(message: ChatMessage):
+# Increase the number of workers based on your server capacity
+executor = ThreadPoolExecutor(max_workers=20)
+
+# Create a semaphore to limit concurrent API calls if needed
+MAX_CONCURRENT_REQUESTS = 10
+semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+@app.post("/chat/init")
+async def init_chat(request_data: ChatMessage):
     try:
-        print(f"Received message: {message.message}")
-        print(f"Team name: {message.team_name}")
-        #shared_state.QUESTION = message.message
-
-        # Now that we have a team name, we want to copy that team from the data directory
-        source_team_dir = BUILDER_DIR / "TEAMS" / message.team_name
-        chat_teams_dir = Path(__file__).parent / "chat_teams"
-        target_team_dir = chat_teams_dir / message.team_name
-        if not source_team_dir.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Team directory not found: {message.team_name}"
+        logger.info(f"Received init chat request: {request_data}")
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                executor,
+                lambda: _process_init_chat(request_data)
             )
-
-        shutil.copytree(source_team_dir, target_team_dir, dirs_exist_ok=True)
-
-        try:
-            import importlib
-
-            # Add the team's directory to Python's path
-            team_dir = Path(__file__).parent / "chat_teams" / message.team_name
-            team_dir_str = str(team_dir)
-            sys.path.insert(0, team_dir_str)
-
-            try:
-                # Clean up any existing modules before importing
-                for key in list(sys.modules.keys()):
-                    module = sys.modules[key]
-                    # Check if module has a __file__ attribute and if it's from our team directory
-                    if hasattr(module, '__file__') and module.__file__ and \
-                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
-                        del sys.modules[key]
-                
-                # Import and process
-                module_name = "multiagent.processQuestion"
-                process_question_module = importlib.import_module(module_name)
-                process_question = process_question_module.processQuestion
-                
-                response = process_question(message.message)
-                return {"response": response}
-            finally:
-                # Clean up: remove the team's directory from sys.path
-                sys.path.remove(team_dir_str)
-                # Clean up all modules that were loaded from the team directory
-                for key in list(sys.modules.keys()):
-                    module = sys.modules[key]
-                    # Check if module has a __file__ attribute and if it's from our team directory
-                    if hasattr(module, '__file__') and module.__file__ and \
-                       str(Path(module.__file__).resolve()).startswith(team_dir_str):
-                        del sys.modules[key]
-                
-        except ImportError as e:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Could not load process_question for team: {message.team_name}. Error: {str(e)}"
-            )
-
     except Exception as e:
-        print(f"Error processing message: {str(e)}")
+        logger.error(f"Error initializing chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/delete_team/{team_name}")
-async def delete_team(team_name: str):
+def _process_init_chat(request_data: ChatMessage):
+    llm = LLMManager().get_llm()
+    
+    class relevancy_check(BaseModel):
+        """
+        Structured output for the relevancy check of the user's message.
+        relevant: Boolean value indicating if the message is relevant to the team's expertise
+        reason: Explanation for why the message is relevant or not
+        """
+        relevant: bool  # Boolean true/false value indicating if the message is relevant to the team's expertise
+        reason: str     # Explanation for why the message is relevant or not
+
+    teams = Team.load_teams()
+    team = teams.get(request_data.team_id)
+    if not team:
+        raise ValueError(f"Team {request_data.team_id} not found")
+    
+    agent_names = []
+    agent_instructions = {}
+
+    for agent_id, agent in team.agents.items():
+        agent_names.append(agent.name)
+        agent_instructions[agent.name] = agent.instructions
+
+    agents_with_instructions = "\n".join(
+        f"- {agent}: {agent_instructions[agent]}" 
+        for agent in agent_names
+    )
+
+    relevance_template = config["HIGH_LEVEL_PROMPT"] + """Given this team of experts and their domain, determine if the message is relevant to the team. If it is, return a boolean value of true and an extremely brief explanation of why it is relevant. If it is not, return a boolean value of false and a more detailed explanation of why it is not relevant. Here are some examples of irrelevant messages: "Hello!", "What is the meaning of life?", "My name is John.", "What day is it?", "Test", "What is the weather in Tokyo?", "Guess my favorite color." Here is the team of experts and their domain: {agents_with_instructions} Here is the message: {message}"""
+
+    prompt = PromptTemplate(
+        input_variables=["current_datetime", "agents_with_instructions", "message"],
+        template=relevance_template
+    )
+    prompt = prompt.format(
+        current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        agents_with_instructions=agents_with_instructions,
+        message=request_data.message
+    )
+    response = llm.with_structured_output(relevancy_check).invoke([HumanMessage(content=prompt)])
+
+    if response.relevant:   
+        return {"message": "Chat initialized successfully", "continue": True}
+    else:
+        return {"message": "Chat not initialized because the message is not relevant to the team's expertise" + response.reason, "continue": False}
+
+@app.post("/chat/refine")
+async def refine_chat(request_data: ChatMessage):
     try:
-        # Get path to team directory in chat_teams
-        chat_teams_dir = Path(__file__).parent / "chat_teams"
-        team_dir = chat_teams_dir / team_name
-
-        # Remove team directory if it exists
-        if team_dir.exists():
-            shutil.rmtree(team_dir)
-            return {"message": f"Team {team_name} deleted successfully from chat service"}
-        else:
-            return {"message": f"Team {team_name} not found in chat service"}
-
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                executor,
+                lambda: _process_refine_chat(request_data)
+            )
     except Exception as e:
-        print(f"Error deleting team: {str(e)}")
+        logger.error(f"[REFINE_ERROR] Error in refine_chat: {str(e)}")
+        logger.exception("[REFINE_ERROR] Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _process_refine_chat(request_data: ChatMessage):
+    # Initialize LLM
+    llm = LLMManager().get_llm()
+    class UserPlan(BaseModel):
+        """
+        Structured output for the planning phase of multi-agent interactions.
+        selected_agents: a list of agent names that will be tasked with answering the message
+        plan: reasoning for selecting particular agents, and the approach they will take to answering the message
+        modified_message: the new message that the user has approved
+        """
+        selected_agents: List[str]  # a list of agent names that will be tasked with answering the message
+        plan: str                   # reasoning for selecting particular agents, and the approach they will take to answering the message
+        modified_message: str      # the new message that the user has approved
+    # Initialize SessionManager
+    session_manager = SessionManager()
+
+    # Load teams
+    teams = Team.load_teams()
+    team = teams.get(request_data.team_id)
+    if not team:
+        logger.error(f"[REFINE_TEAM] Team {request_data.team_id} not found")
+        raise ValueError(f"Team {request_data.team_id} not found")
+
+    # Get agent details
+    agent_names = []
+    agent_instructions = {}
+
+    logger.info(f"[REFINE_AGENTS] Processing team agents: {len(team.agents)} agents found")
+    for agent_id, agent in team.agents.items():
+        logger.debug(f"[REFINE_AGENTS] Processing agent: {agent.name}")
+        agent_names.append(agent.name)
+        agent_instructions[agent.name] = agent.instructions
+
+    agents_with_instructions = "\n".join(
+        f"- {agent}: {agent_instructions[agent]}" 
+        for agent in agent_names
+    )
+
+    # Session handling
+    if request_data.session_id:
+        logger.info(f"[REFINE_SESSION] Attempting to get session: {request_data.session_id}")
+        try:
+            session = session_manager.get_session(request_data.session_id)
+            logger.info(f"[REFINE_SESSION] Session retrieved: {bool(session)}")
+            
+            if not session:
+                session_manager.create_session(request_data.team_id, session_id=request_data.session_id)
+                conversation_history = []
+                logger.info(f"[REFINE_SESSION] Created new session with provided ID: {request_data.session_id}")
+            else:
+                # Verify session belongs to correct team
+                if session['team_id'] != request_data.team_id:
+                    logger.error(f"[REFINE_SESSION] Session {request_data.session_id} belongs to team {session['team_id']}, not {request_data.team_id}")
+                    raise ValueError(f"Session {request_data.session_id} belongs to different team")
+                
+                conversation_history = session_manager.get_session_history(request_data.session_id)
+                logger.info(f"[REFINE_SESSION] Loaded {len(conversation_history)} messages")
+        except Exception as e:
+            logger.error(f"[REFINE_SESSION] Error handling existing session: {str(e)}")
+            raise
+    else:
+        logger.info("[REFINE_SESSION] No session ID provided, creating new session")
+        request_data.session_id = session_manager.create_session(request_data.team_id)
+        conversation_history = []
+        logger.info(f"[REFINE_SESSION] Created new session with generated ID: {request_data.session_id}")
+
+    # Format conversation history
+    formatted_history = []
+    for chat in conversation_history:
+        chat_entry = f"Message: {chat.get('question', '')}\nResponse: {chat.get('response', '')}\n{'-'*40}"
+        formatted_history.append(chat_entry)
+    conversation_history = "\n\n".join(formatted_history)
+
+    # Handle plan creation
+    if request_data.plan:
+        logger.info("[REFINE_PLAN] Using subsequent refinement template")
+        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
+        1. Use the previous plan as the foundation for your new plan
+        2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
+        4. Explain clearly and in detail what and how each agent will contribute to the response
+        5. Format this plan in a way that is easy to understand for the user
+    
+        Message: {message}
+        Previous Plan: {previous_plan}
+        Team of Experts: {agents_with_instructions}
+
+        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        """
+        prompt = PromptTemplate(
+            input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
+            template=plan_template
+        )
+        prompt = prompt.format(
+            current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            message=request_data.message,
+            previous_plan=request_data.plan,
+            agents_with_instructions=agents_with_instructions
+        )
+    else:
+        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
+        1. Review the previous conversation to incorporate any relevant information regarding the user's message
+        2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        3. Determine which agents are qualified and necessary to respond to the new message you created
+        4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
+        5. Format this plan in a way that is easy to understand for the user
+    
+        Message: {message}
+        Previous Conversation: {conversation_history}
+        Team of Experts: {agents_with_instructions}
+
+        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        """
+        prompt = PromptTemplate(
+            input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
+            template=plan_template
+        )
+        prompt = prompt.format(
+            current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            message=request_data.message,
+            conversation_history=conversation_history,
+            agents_with_instructions=agents_with_instructions
+        )
+
+    response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
+    
+    # Send the plan to the user for approval
+    return {
+        "message": response.plan,
+        "modified_message": response.modified_message,
+        "selected_agents": response.selected_agents,
+    }
+
+@app.post("/chat/process")
+async def chat_endpoint(request_data: ChatMessage):
+    try:
+        logger.info(f"Received chat message: {request_data.message}")
+        
+        # Verify session exists and belongs to correct team before processing
+        session_manager = SessionManager()
+        if request_data.session_id:
+            session = session_manager.get_session(request_data.session_id)
+            if not session:
+                raise HTTPException(
+                    status_code=404, 
+                    detail="Session not found"
+                )
+            if session['team_id'] != request_data.team_id:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Session belongs to different team"
+                )
+        
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                executor,
+                lambda: asyncio.run(process_question(
+                    question=request_data.message,
+                    session_id=request_data.session_id,
+                    team_id=request_data.team_id,
+                    plan=request_data.plan,
+                    selected_agents=request_data.selected_agents
+                ))
+            )
+            logger.info(f"Response: {response}")
+            return response
+            
+    except ValidationError as e:
+        logger.error(f"Invalid request data: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error processing chat request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/chat/generate_session_id/")
+async def generate_session_id(request_data: SessionCreate):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            session_id = await loop.run_in_executor(
+                executor,
+                lambda: SessionManager().create_session(
+                    team_id=request_data.team_id,
+                    session_name=request_data.session_name
+                )
+            )
+            return {"session_id": session_id}
+    except Exception as e:
+        logger.error(f"Error generating session ID: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Chat Service API"}
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            session = await loop.run_in_executor(
+                executor,
+                lambda: SessionManager().get_session(session_id)
+            )
+            if session:
+                return session
+            raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error retrieving session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sessions")
+async def list_sessions():
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                executor,
+                lambda: SessionManager().list_sessions()
+            )
+    except Exception as e:
+        logger.error(f"Error listing sessions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SessionManager().delete_session(session_id)
+            )
+            if success:
+                return {"message": f"Session {session_id} deleted successfully"}
+            raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/sessions/{session_id}")
+async def update_session(session_id: str, update_data: SessionUpdate):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                executor,
+                lambda: _process_update_session(session_id, update_data)
+            )
+            if result:
+                return {
+                    "message": f"Session {session_id} updated successfully",
+                    "session": result
+                }
+            raise HTTPException(status_code=404, detail="Session not found")
+    except Exception as e:
+        logger.error(f"Error updating session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _process_update_session(session_id: str, update_data: SessionUpdate):
+    """Process session update request"""
+    session_manager = SessionManager()
+    session = session_manager.get_session(session_id)
+    
+    if not session:
+        return False
+    
+    # Create update dictionary with mandatory team_id and optional fields
+    update_dict = {
+        'team_id': update_data.team_id  # Always included since it's mandatory
+    }
+    
+    # Add optional fields if provided
+    if update_data.team_name is not None:
+        update_dict['team_name'] = update_data.team_name
+    if update_data.session_name is not None:
+        update_dict['session_name'] = update_data.session_name
+    
+    # Update session
+    success = session_manager.update_session(session_id, update_dict)
+    if success:
+        return session_manager.get_session(session_id)
+    return False
+
+@app.get("/models/ollama")
+async def list_ollama_models():
+    """
+    Get a list of available Ollama models
+    """
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            models = await loop.run_in_executor(
+                executor,
+                lambda: OllamaModelManager().list_models()
+            )
+            return {
+                "models": models
+            }
+    except Exception as e:
+        logger.error(f"Error listing Ollama models: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

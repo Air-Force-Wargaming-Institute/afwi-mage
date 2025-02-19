@@ -217,9 +217,10 @@ const formatDate = (dateString) => {
 const sanitizeInput = (input) => {
   // Remove any HTML tags and limit special characters
   return input.replace(/<[^>]*>/gm, '')
-              .replace(/'/gm, "\\'")     // Escape single quotes
-              .replace(/"/gm, '\\"')     // Escape double quotes
-              .replace(/[^\w\s.,!?()\-'"\\]/gm, ''); // Remove special chars except quotes and backslashes
+              .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '');
+              //.replace(/'/gm, "\\'")     // Escape single quotes
+              //.replace(/"/gm, '\\"')     // Escape double quotes
+              //.replace(/[^\w\s.,!?()\-'"\\]/gm, ''); // Remove special chars except quotes and backslashes
 };
 
 const validateInput = (input, field) => {
@@ -264,9 +265,8 @@ function AgentPortfolio() {
   const [newAgent, setNewAgent] = useState({
     name: '',
     description: '',
-    llm_model: 'gpt-3.5-turbo',
+    llm_model: 'hermes3:8b',
     agent_instructions: '',
-    memory_kwargs: { 'max_token_limit': 2000 },
     color: colorOptions[0]  // Default to the first color
   });
   const [snackbar, setSnackbar] = useState({
@@ -286,9 +286,22 @@ function AgentPortfolio() {
   const [descriptionError, setDescriptionError] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [editFormErrors, setEditFormErrors] = useState({});
+  const [availableModels, setAvailableModels] = useState([]);
 
   useEffect(() => {
     fetchAgents();
+    const fetchModels = async () => {
+      try {
+        const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+        const modelNames = response.data.models.map(model => model.name);
+        setAvailableModels(modelNames);
+      } catch (error) {
+        console.error('Error fetching Ollama models:', error);
+        setAvailableModels([]);
+      }
+    };
+
+    fetchModels();
   }, []);
 
   const fetchAgents = async () => {
@@ -480,10 +493,11 @@ function AgentPortfolio() {
         ...selectedAgent,
         name: sanitizeInput(selectedAgent.name),
         description: sanitizeInput(selectedAgent.description),
-        agent_instructions: sanitizeInput(selectedAgent.agent_instructions)
+        agent_instructions: sanitizeInput(selectedAgent.agent_instructions),
+        llm_model: selectedAgent.llm_model
       };
 
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.file_name}`), sanitizedAgent);
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.unique_id}`), sanitizedAgent);
       setSnackbar({
         open: true,
         message: 'Agent updated successfully!',
@@ -508,7 +522,7 @@ function AgentPortfolio() {
 
   const handleDeleteConfirm = async () => {
     try {
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_agent/${agentToDelete.file_name}`));
+      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_agent/${agentToDelete.unique_id}`));
       setSnackbar({
         open: true,
         message: 'Agent deleted successfully!',
@@ -541,10 +555,8 @@ function AgentPortfolio() {
 
   const handleDuplicateSubmit = async () => {
     try {
-      // Add default memory_type
       const agentData = {
-        ...duplicatedAgent,
-        memory_type: "ConversationBufferMemory"
+        ...duplicatedAgent
       };
       await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), agentData);
       setSnackbar({
@@ -798,8 +810,11 @@ function AgentPortfolio() {
                 onChange={handleChange}
                 required
               >
-                <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                <MenuItem value="gpt-4">GPT-4</MenuItem>
+                {availableModels.map((modelName) => (
+                  <MenuItem key={modelName} value={modelName}>
+                    {modelName}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             {renderTooltip(
@@ -913,8 +928,9 @@ function AgentPortfolio() {
                     onChange={handleAgentChange}
                     disabled={!isEditing}
                   >
-                    <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                    <MenuItem value="gpt-4">GPT-4</MenuItem>
+                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
+                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
+                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
                   </Select>
                 </FormControl>
                 {renderTooltip(
@@ -1068,8 +1084,9 @@ function AgentPortfolio() {
                     value={duplicatedAgent.llm_model}
                     onChange={handleDuplicateChange}
                   >
-                    <MenuItem value="gpt-3.5-turbo">GPT-3.5 Turbo</MenuItem>
-                    <MenuItem value="gpt-4">GPT-4</MenuItem>
+                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
+                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
+                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
                   </Select>
                 </FormControl>
                 {renderTooltip(
