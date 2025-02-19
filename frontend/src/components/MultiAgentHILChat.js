@@ -506,6 +506,12 @@ function MultiAgentHILChat() {
   const [modifiedQuestion, setModifiedQuestion] = useState('');
   const [selectedAgents, setSelectedAgents] = useState([]);
 
+  // Add new state for edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editSessionId, setEditSessionId] = useState(null);
+  const [editSessionName, setEditSessionName] = useState('');
+  const [editSessionTeam, setEditSessionTeam] = useState('');
+
   // Add this useEffect at the top level of the component
   useEffect(() => {
     const fetchSessions = async () => {
@@ -538,15 +544,66 @@ function MultiAgentHILChat() {
   }, []); // Empty dependency array means this runs once when component mounts
 
   // Add this handler for session clicks
-  const handleSessionClick = (sessionId) => {
-    dispatch({ 
-      type: ACTIONS.SET_CURRENT_SESSION, 
-      payload: sessionId 
-    });
-    dispatch({ 
-      type: ACTIONS.SET_MESSAGES, 
-      payload: [] 
-    }); // Clear messages when switching sessions
+  const handleSessionClick = async (sessionId) => {
+    try {
+      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+      
+      // Fetch session data from the backend
+      const response = await axios.get(getApiUrl('CHAT', `/sessions/${sessionId}`));
+      
+      // Update current session
+      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: sessionId });
+      
+      // If the session has a conversation history, format and set the messages
+      if (response.data && response.data.conversation_history) {
+        const formattedMessages = response.data.conversation_history.flatMap(entry => {
+          const messages = [];
+          
+          // Add user message
+          if (entry.question) {
+            messages.push({
+              id: uuidv4(),
+              text: entry.question,
+              sender: 'user',
+              timestamp: new Date(entry.timestamp),
+              sessionId: sessionId
+            });
+          }
+          
+          // Add AI response
+          if (entry.response) {
+            messages.push({
+              id: uuidv4(),
+              text: entry.response,
+              sender: 'ai',
+              timestamp: new Date(entry.timestamp),
+              sessionId: sessionId
+            });
+          }
+          
+          return messages;
+        });
+        
+        dispatch({ type: ACTIONS.SET_MESSAGES, payload: formattedMessages });
+      } else {
+        // If no conversation history, clear messages
+        dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
+      }
+    } catch (error) {
+      console.error('Error fetching session messages:', error);
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          id: uuidv4(),
+          text: 'Error loading session messages. Please try again.',
+          sender: 'system',
+          timestamp: new Date(),
+          sessionId: sessionId
+        }
+      });
+    } finally {
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+    }
   };
 
   // Modify the handleNewChat function to handle the new session ID
@@ -603,9 +660,80 @@ function MultiAgentHILChat() {
     }
   };
 
-  const handleEditSession = (sessionId) => {
-    // TODO: Implement edit functionality
-    console.log(`Edit session ${sessionId}`);
+  // Modify handleEditSession
+  const handleEditSession = async (event, sessionId) => {
+    // Prevent event from bubbling up to ListItem
+    event.stopPropagation();
+    
+    setIsLoadingTeams(true);
+    setTeamError('');
+    
+    try {
+      // Get available teams
+      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+      setAvailableTeams(response.data.teams);
+      
+      // Find current session
+      const currentSession = state.chatSessions.find(s => s.id === sessionId);
+      if (currentSession) {
+        setEditSessionId(sessionId);
+        setEditSessionName(currentSession.name);
+        setEditSessionTeam(currentSession.team);
+        
+        // Reorder teams to put current team first
+        const reorderedTeams = response.data.teams.sort((a, b) => {
+          if (a.name === currentSession.team) return -1;
+          if (b.name === currentSession.team) return 1;
+          return 0;
+        });
+        setAvailableTeams(reorderedTeams);
+      }
+      
+      setEditDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      setTeamError('Failed to load available teams. Please try again.');
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  };
+
+  // Add handler for edit submission
+  const handleEditSubmit = async () => {
+    if (!editSessionTeam || !editSessionName.trim()) {
+      setTeamError('Please select a team and enter a session name');
+      return;
+    }
+
+    try {
+      const selectedTeamObj = availableTeams.find(team => team.name === editSessionTeam);
+      
+      await axios.put(getApiUrl('CHAT', `/sessions/${editSessionId}`), {
+        session_name: editSessionName.trim(),
+        team_id: selectedTeamObj?.id,
+        team_name: editSessionTeam
+      });
+
+      // Update local state
+      dispatch({
+        type: ACTIONS.UPDATE_CHAT_SESSION,
+        payload: {
+          id: editSessionId,
+          name: editSessionName.trim(),
+          team: editSessionTeam,
+          teamId: selectedTeamObj?.id
+        }
+      });
+
+      setEditDialogOpen(false);
+      setEditSessionId(null);
+      setEditSessionName('');
+      setEditSessionTeam('');
+      setTeamError('');
+    } catch (error) {
+      console.error('Error updating session:', error);
+      setTeamError('Failed to update session. Please try again.');
+    }
   };
 
   const handleDeleteSession = async (event, sessionId) => {
@@ -884,7 +1012,11 @@ function MultiAgentHILChat() {
                     <ListItemText primary={session.name} />
                     <div className={classes.sessionActions}>
                       <Tooltip title="Edit">
-                        <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
+                        <IconButton 
+                          edge="end" 
+                          aria-label="edit" 
+                          onClick={(e) => handleEditSession(e, session.id)}
+                        >
                           <EditIcon />
                         </IconButton>
                       </Tooltip>
@@ -1191,6 +1323,83 @@ function MultiAgentHILChat() {
             style={{ borderRadius: '20px', textTransform: 'none' }}
           >
             Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => {
+          setEditDialogOpen(false);
+          setEditSessionId(null);
+          setEditSessionName('');
+          setEditSessionTeam('');
+          setTeamError('');
+        }}
+      >
+        <DialogTitle>Edit Chat Session</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Session Name"
+              fullWidth
+              value={editSessionName}
+              onChange={(e) => setEditSessionName(e.target.value)}
+              error={teamError && !editSessionName.trim()}
+              helperText={teamError && !editSessionName.trim() ? 'Session name is required' : ''}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Select Team</InputLabel>
+              <Select
+                value={editSessionTeam}
+                onChange={(e) => setEditSessionTeam(e.target.value)}
+                error={teamError && !editSessionTeam}
+              >
+                {isLoadingTeams ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> Loading teams...
+                  </MenuItem>
+                ) : (
+                  availableTeams.map(team => (
+                    <MenuItem key={team.id} value={team.name}>
+                      {team.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {teamError && !editSessionTeam && (
+                <Typography color="error" variant="caption">
+                  Please select a team
+                </Typography>
+              )}
+            </FormControl>
+            {teamError && (
+              <Typography color="error" variant="body2">
+                {teamError}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setEditDialogOpen(false);
+            setEditSessionId(null);
+            setEditSessionName('');
+            setEditSessionTeam('');
+            setTeamError('');
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSubmit}
+            color="primary"
+            variant="contained"
+            disabled={isLoadingTeams}
+          >
+            Update
           </Button>
         </DialogActions>
       </Dialog>

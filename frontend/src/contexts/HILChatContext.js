@@ -171,6 +171,18 @@ function hilChatReducer(state, action) {
       newState = getInitialState();
       break;
       
+    // New action for updating chat session
+    case ACTIONS.UPDATE_CHAT_SESSION:
+      newState = {
+        ...state,
+        chatSessions: state.chatSessions.map(session =>
+          session.id === action.payload.id
+            ? { ...session, ...action.payload }
+            : session
+        ),
+      };
+      break;
+      
     default:
       newState = state;
   }
