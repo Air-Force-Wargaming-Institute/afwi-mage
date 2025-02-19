@@ -188,15 +188,26 @@ class SessionManager:
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session"""
-        with self._file_lock:
-            try:
+        try:
+            logger.info(f"[SESSION_DELETE] Attempting to delete session: {session_id}")
+            with self._cache_lock:
+                # Reload to ensure we have latest data
+                self._sessions_cache = self._load_existing_sessions()
+                
                 if session_id in self._sessions_cache:
+                    logger.info(f"[SESSION_DELETE] Found session {session_id}, deleting")
                     del self._sessions_cache[session_id]
-                    return self._save_all_sessions(self._sessions_cache)
+                    success = self._save_all_sessions(self._sessions_cache)
+                    logger.info(f"[SESSION_DELETE] Session deleted, save result: {success}")
+                    return success
+                    
+                logger.warning(f"[SESSION_DELETE] Session {session_id} not found")
                 return False
-            except Exception as e:
-                logger.error(f"Error deleting session {session_id}: {str(e)}")
-                return False
+                
+        except Exception as e:
+            logger.error(f"[SESSION_DELETE] Error deleting session {session_id}: {str(e)}")
+            logger.exception("[SESSION_DELETE] Full traceback:")
+            return False
 
     def get_session_history(self, session_id: str) -> List[Dict]:
         """Get conversation history for a session with proper locking"""
