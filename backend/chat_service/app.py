@@ -40,12 +40,20 @@ class ChatMessage(BaseModel):
     plan: Optional[str] = None
     selected_agents: Optional[List[str]] = None
 
+class SessionCreate(BaseModel):
+    """
+    Model for session creation requests
+    """
+    team_id: str
+    session_name: str
+
 class SessionUpdate(BaseModel):
     """
     Model for session update requests
     """
     team_id: Optional[str] = None
     team_name: Optional[str] = None
+    session_name: Optional[str] = None
 
 app = FastAPI()
 
@@ -316,14 +324,21 @@ async def chat_endpoint(request_data: ChatMessage):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/chat/generate_session_id/")
-async def generate_session_id(session_name: str, team_id: str):
-    async with semaphore:
-        loop = asyncio.get_running_loop()
-        session_id = await loop.run_in_executor(
-            executor,
-            lambda: SessionManager().create_session(team_id)
-        )
-        return {"session_id": session_id}
+async def generate_session_id(request_data: SessionCreate):
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            session_id = await loop.run_in_executor(
+                executor,
+                lambda: SessionManager().create_session(
+                    team_id=request_data.team_id,
+                    session_name=request_data.session_name
+                )
+            )
+            return {"session_id": session_id}
+    except Exception as e:
+        logger.error(f"Error generating session ID: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
@@ -405,6 +420,8 @@ def _process_update_session(session_id: str, update_data: SessionUpdate):
         session['team_id'] = update_data.team_id
     if update_data.team_name is not None:
         session['team_name'] = update_data.team_name
+    if update_data.session_name is not None:
+        session['session_name'] = update_data.session_name
     
     # Save updated session
     session_manager.update_session(session_id, session)
