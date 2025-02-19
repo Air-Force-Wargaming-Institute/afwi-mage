@@ -241,4 +241,31 @@ class SessionManager:
                 'role': 'assistant',
                 'content': interaction['response']
             })
-        return formatted_history 
+        return formatted_history
+
+    def update_session(self, session_id: str, updated_session: Dict) -> bool:
+        """Update a session with new data"""
+        try:
+            logger.info(f"[SESSION_UPDATE] Attempting to update session: {session_id}")
+            with self._cache_lock:
+                # Reload to ensure we have latest data
+                self._sessions_cache = self._load_existing_sessions()
+                
+                if session_id not in self._sessions_cache:
+                    logger.warning(f"[SESSION_UPDATE] Session {session_id} not found")
+                    return False
+                
+                # Update the session with new data while preserving other fields
+                self._sessions_cache[session_id].update({
+                    **updated_session,
+                    'updated_at': datetime.now(timezone.utc).isoformat()
+                })
+                
+                success = self._save_all_sessions(self._sessions_cache)
+                logger.info(f"[SESSION_UPDATE] Session updated, save result: {success}")
+                return success
+                
+        except Exception as e:
+            logger.error(f"[SESSION_UPDATE] Error updating session {session_id}: {str(e)}")
+            logger.exception("[SESSION_UPDATE] Full traceback:")
+            return False 

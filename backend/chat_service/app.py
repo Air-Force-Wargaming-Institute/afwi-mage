@@ -51,7 +51,7 @@ class SessionUpdate(BaseModel):
     """
     Model for session update requests
     """
-    team_id: Optional[str] = None
+    team_id: str
     team_name: Optional[str] = None
     session_name: Optional[str] = None
 
@@ -409,23 +409,29 @@ async def update_session(session_id: str, update_data: SessionUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 def _process_update_session(session_id: str, update_data: SessionUpdate):
+    """Process session update request"""
     session_manager = SessionManager()
     session = session_manager.get_session(session_id)
     
     if not session:
         return False
     
-    # Only update fields that are provided in the request
-    if update_data.team_id is not None:
-        session['team_id'] = update_data.team_id
-    if update_data.team_name is not None:
-        session['team_name'] = update_data.team_name
-    if update_data.session_name is not None:
-        session['session_name'] = update_data.session_name
+    # Create update dictionary with mandatory team_id and optional fields
+    update_dict = {
+        'team_id': update_data.team_id  # Always included since it's mandatory
+    }
     
-    # Save updated session
-    session_manager.update_session(session_id, session)
-    return session
+    # Add optional fields if provided
+    if update_data.team_name is not None:
+        update_dict['team_name'] = update_data.team_name
+    if update_data.session_name is not None:
+        update_dict['session_name'] = update_data.session_name
+    
+    # Update session
+    success = session_manager.update_session(session_id, update_dict)
+    if success:
+        return session_manager.get_session(session_id)
+    return False
 
 @app.get("/models/ollama")
 async def list_ollama_models():
