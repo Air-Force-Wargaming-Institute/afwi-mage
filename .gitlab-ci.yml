@@ -34,7 +34,7 @@ security_scan:
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
     - |
-      # Validate that dependency_check.json is valid JSON before conversion
+      # Check if dependency_check.json contains valid JSON; if not, write a default CSV header.
       if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
         python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
       else 
@@ -55,27 +55,30 @@ build_test:
   stage: build_test
   image: docker:latest
   services:
-    - docker:dind
+    # Note: We no longer use docker:dind since we're bind-mounting the host's Docker socket.
     - name: postgres:13
       alias: db
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+    # These are standard credentials for the official Postgres image.
+    # Note: Your Docker Compose file still has the db service commented out,
+    # so ensure your application connects to an external/pre-configured DB if needed.
     POSTGRES_PASSWORD: password
     POSTGRES_USER: postgres
     POSTGRES_DB: dbname
   script:
     - set -x
-    # List files in the repository root to verify structure
+    # List the current directory to verify the repository structure.
     - ls -la
-    # Wait until Docker daemon is available
-    - until docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
-    # Use the docker-compose file located in the backend folder
+    # Wait until the Docker socket is present (i.e. the host's Docker daemon is available).
+    - until [ -S /var/run/docker.sock ]; do echo "Waiting for Docker socket..."; sleep 1; done
+    # Build images using the docker-compose file located in the backend folder.
     - docker-compose -f backend/docker-compose.yml --verbose build
     - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
     - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
     - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
     - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
   artifacts:
     paths:
       - unit_tests.xml
@@ -147,7 +150,7 @@ deploy:
   when: manual
   script:
     - set -x
-    - docker-compose up -d
+    - docker-compose -f backend/docker-compose.yml up -d
     - echo "Deployment completed successfully"
   environment:
     name: production
