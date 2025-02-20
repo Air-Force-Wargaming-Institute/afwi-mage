@@ -1,62 +1,144 @@
+# .gitlab-ci.yml
 stages:
-  - prebuild
   - security_scan
+  - report_aggregation
 
-prebuild_checks:
-  stage: prebuild
-  image: python:3.10
-  script:
-    - set -x
-    - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
-    - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
-    - mkdir -p app/data/logs
-    - ls -ld app/data/logs
-  artifacts:
-    paths:
-      - app/data/logs
+variables:
+  # Configure output directories for artifacts
+  REPORT_DIR: "security_reports"
+  
+# Base security scanning job template
+.security_scan_template:
+  before_script:
+    - mkdir -p $REPORT_DIR
 
-security_scan:
+# Python dependency security scan
+python-dependency-scan:
   stage: security_scan
-  image: python:3.10
+  image: python:3.11-slim
+  extends: .security_scan_template
   script:
-    - set -x
-    # Install scanning tools
-    - pip install bandit safety trufflehog
-    # Run Bandit for static analysis; output JSON
-    - bandit -r . -f json -o bandit_sast_report.json || true
-    # Convert Bandit JSON report to CSV (extract key fields from results)
+    - pip install safety
     - |
-      if python -c "import json; json.load(open('bandit_sast_report.json'))" 2>/dev/null; then 
-        python -c "import json, csv; report=json.load(open('bandit_sast_report.json')); f=csv.writer(open('bandit_sast_report.csv','w',newline='')); f.writerow(['filename','line_number','issue_severity','issue_confidence','issue_text','test_name']); [f.writerow([item.get('filename'), item.get('line_number'), item.get('issue_severity'), item.get('issue_confidence'), item.get('issue_text'), item.get('test_name')]) for item in report.get('results', [])]"
-      else 
-        echo "bandit_sast_report.json is not valid JSON, skipping CSV conversion"
-        echo "filename,line_number,issue_severity,issue_confidence,issue_text,test_name" > bandit_sast_report.csv
-      fi
-    # Run Safety for dependency vulnerability checks; output JSON
-    - safety check --json > safety_dependency_report.json || true
-    # Convert Safety JSON output to CSV
-    - |
-      if python -c "import json; json.load(open('safety_dependency_report.json'))" 2>/dev/null; then 
-        python -c "import json, csv; data=json.load(open('safety_dependency_report.json')); f=csv.writer(open('safety_dependency_report.csv','w',newline='')); f.writerow(['package','version']); [f.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]"
-      else 
-        echo "safety_dependency_report.json is not valid JSON, skipping CSV conversion"
-        echo "package,version" > safety_dependency_report.csv
-      fi
-    # Run TruffleHog to scan for secrets; output JSON
-    - trufflehog filesystem . --json > trufflehog_secret_detection.json || true
-    # Convert TruffleHog JSON output to CSV
-    - |
-      if python -c "import json; json.load(open('trufflehog_secret_detection.json'))" 2>/dev/null; then 
-        python -c "import json, csv; data=json.load(open('trufflehog_secret_detection.json')); f=csv.writer(open('trufflehog_secret_detection.csv','w',newline='')); f.writerow(['file','line','reason','entropy']); [f.writerow([item.get('file'), item.get('line'), item.get('reason'), item.get('entropy')]) for item in data]"
-      else 
-        echo "trufflehog_secret_detection.json is not valid JSON, skipping CSV conversion"
-        echo "file,line,reason,entropy" > trufflehog_secret_detection.csv
-      fi
+      for req_file in $(find . -name "requirements.txt"); do
+        echo "Scanning $req_file"
+        safety check -r $req_file --output json | 
+        jq -r '.[] | [.package, .analyzed_version, .vulnerable_spec, .advisory] | @csv' > 
+        $REPORT_DIR/python_dependencies_$(echo $req_file | tr '/' '_').csv
+      done
   artifacts:
     paths:
-      - bandit_sast_report.json
-      - bandit_sast_report.csv
-      - safety_dependency_report.json
-      - safety_dependency_report.csv
-      - trufflehog_secret_detection.json
-      - trufflehog_secret_detection.csv
+      - $REPORT_DIR/python_dependencies_*.csv
+    expire_in: 1 week
+
+# Node.js dependency security scan
+node-dependency-scan:
+  stage: security_scan
+  image: node:16
+  extends: .security_scan_template
+  script:
+    - npm install -g npm-audit-html
+    - |
+      for pkg_file in $(find . -name "package.json"); do
+        echo "Scanning $pkg_file"
+        cd $(dirname $pkg_file)
+        npm audit --json | 
+        jq -r '.advisories | to_entries | .[] | .value | [.module_name, .vulnerable_versions, .patched_versions, .title] | @csv' > 
+        $CI_PROJECT_DIR/$REPORT_DIR/node_dependencies_$(echo $pkg_file | tr '/' '_').csv
+        cd $CI_PROJECT_DIR
+      done
+  artifacts:
+    paths:
+      - $REPORT_DIR/node_dependencies_*.csv
+    expire_in: 1 week
+
+# Secret detection scan
+secret-detection:
+  stage: security_scan
+  image: python:3.11-slim
+  extends: .security_scan_template
+  script:
+    - pip install detect-secrets
+    - |
+      detect-secrets scan . --force-use-all-plugins | 
+      jq -r '.results | to_entries | .[] | [.key, .value[].type, .value[].line_number] | @csv' > 
+      $REPORT_DIR/detected_secrets.csv
+  artifacts:
+    paths:
+      - $REPORT_DIR/detected_secrets.csv
+    expire_in: 1 week
+
+# Container base image scan
+container-base-scan:
+  stage: security_scan
+  image: aquasec/trivy:latest
+  extends: .security_scan_template
+  script:
+    - |
+      for dockerfile in $(find . -name "Dockerfile"); do
+        base_image=$(grep "^FROM" $dockerfile | head -1 | awk '{print $2}')
+        echo "Scanning base image: $base_image from $dockerfile"
+        trivy image --format csv --output $REPORT_DIR/container_base_$(echo $dockerfile | tr '/' '_').csv $base_image
+      done
+  artifacts:
+    paths:
+      - $REPORT_DIR/container_base_*.csv
+    expire_in: 1 week
+
+# SAST (Static Application Security Testing)
+sast-scan:
+  stage: security_scan
+  image: python:3.11-slim
+  extends: .security_scan_template
+  script:
+    - pip install bandit
+    - |
+      # Scan Python files
+      bandit -r . -f csv -o $REPORT_DIR/python_sast_results.csv
+    - |
+      # Install and run ESLint for JavaScript files
+      apt-get update && apt-get install -y nodejs npm
+      npm install -g eslint eslint-config-security
+      find . -name "*.js" -not -path "./node_modules/*" | 
+      xargs eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' |
+      jq -r '.[] | [.filePath, .messages[].ruleId, .messages[].message, .messages[].line] | @csv' > 
+      $REPORT_DIR/js_sast_results.csv
+  artifacts:
+    paths:
+      - $REPORT_DIR/python_sast_results.csv
+      - $REPORT_DIR/js_sast_results.csv
+    expire_in: 1 week
+
+# Aggregate all reports
+aggregate-reports:
+  stage: report_aggregation
+  image: python:3.11-slim
+  script:
+    - |
+      echo "Creating summary report..."
+      echo "Security Scan Summary" > $REPORT_DIR/summary_report.csv
+      echo "Scan Type,Total Issues Found,High Severity,Medium Severity,Low Severity" >> $REPORT_DIR/summary_report.csv
+      
+      # Count issues in Python dependencies
+      python_deps=$(find $REPORT_DIR -name "python_dependencies_*.csv" | xargs cat | wc -l)
+      echo "Python Dependencies,$python_deps,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      
+      # Count issues in Node.js dependencies
+      node_deps=$(find $REPORT_DIR -name "node_dependencies_*.csv" | xargs cat | wc -l)
+      echo "Node.js Dependencies,$node_deps,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      
+      # Count detected secrets
+      secrets=$(cat $REPORT_DIR/detected_secrets.csv | wc -l)
+      echo "Detected Secrets,$secrets,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      
+      # Count SAST issues
+      sast_python=$(cat $REPORT_DIR/python_sast_results.csv | wc -l)
+      sast_js=$(cat $REPORT_DIR/js_sast_results.csv | wc -l)
+      echo "SAST (Python),$sast_python,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      echo "SAST (JavaScript),$sast_js,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+  artifacts:
+    paths:
+      - $REPORT_DIR/*
+    expire_in: 1 week
+    reports:
+      security: $REPORT_DIR/summary_report.csv
