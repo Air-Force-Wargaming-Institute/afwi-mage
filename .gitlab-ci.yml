@@ -18,22 +18,38 @@ secret-detection:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    - apt-get update && apt-get install -y git jq
-    - pip install detect-secrets
     - |
-      detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
-      if [ -s "$REPORT_DIR/secrets.json" ]; then
-        jq -r '
-          .results | to_entries[] |
-          [.key, (.value[] | .type, .line_number)] | @csv
-        ' "$REPORT_DIR/secrets.json" > "$REPORT_DIR/detected_secrets.csv"
-      else
-        echo "No secrets detected" > "$REPORT_DIR/detected_secrets.csv"
-      fi
+      Write-Host "Installing detect-secrets..."
+      pip install detect-secrets
+      
+      Write-Host "Running secret detection scan..."
+      detect-secrets scan . --force-use-all-plugins | Out-File -FilePath "$env:REPORT_DIR/secrets.json"
+      
+      Write-Host "Processing results..."
+      if (Test-Path "$env:REPORT_DIR/secrets.json") {
+        $content = Get-Content "$env:REPORT_DIR/secrets.json" | ConvertFrom-Json
+        if ($content.results.PSObject.Properties.Count -gt 0) {
+          $results = @()
+          foreach ($file in $content.results.PSObject.Properties) {
+            foreach ($finding in $file.Value) {
+              $results += [PSCustomObject]@{
+                File = $file.Name
+                Type = $finding.type
+                LineNumber = $finding.line_number
+              }
+            }
+          }
+          $results | Export-Csv -Path "$env:REPORT_DIR/detected_secrets.csv" -NoTypeInformation
+        } else {
+          "File,Type,LineNumber`nNo secrets detected" | Out-File -FilePath "$env:REPORT_DIR/detected_secrets.csv"
+        }
+      } else {
+        "File,Type,LineNumber`nScan failed" | Out-File -FilePath "$env:REPORT_DIR/detected_secrets.csv"
+      }
   artifacts:
     paths:
-      - $REPORT_DIR/detected_secrets.csv
-      - $REPORT_DIR/secrets.json
+      - $env:REPORT_DIR/detected_secrets.csv
+      - $env:REPORT_DIR/secrets.json
     expire_in: 1 week
 
 # Container base image scan
@@ -43,18 +59,26 @@ container-base-scan:
   extends: .security_scan_template
   script:
     - |
-      find . -name "Dockerfile" -type f | while read -r dockerfile; do
-        echo "Scanning $dockerfile"
-        basename=$(echo "$dockerfile" | tr '/' '_')
-        base_image=$(grep "^FROM" "$dockerfile" | head -1 | awk '{print $2}')
-        echo "Scanning base image: $base_image"
-        trivy image --format json --output "$REPORT_DIR/${basename}_scan.json" "$base_image"
-        trivy image --format csv --output "$REPORT_DIR/${basename}_scan.csv" "$base_image"
-      done
+      Write-Host "Starting container base image scan..."
+      Get-ChildItem -Path . -Filter "Dockerfile" -Recurse | ForEach-Object {
+        Write-Host "Scanning $($_.FullName)"
+        $dockerfile = $_.FullName
+        $basename = $_.Directory.Name
+        
+        # Get base image from Dockerfile
+        $baseImage = Get-Content $dockerfile | Where-Object { $_ -match '^FROM\s+(.+)' } | 
+                    Select-Object -First 1 | ForEach-Object { $matches[1] }
+        
+        Write-Host "Found base image: $baseImage"
+        
+        # Scan the base image
+        trivy image --format json --output "$env:REPORT_DIR/${basename}_scan.json" $baseImage
+        trivy image --format csv --output "$env:REPORT_DIR/${basename}_scan.csv" $baseImage
+      }
   artifacts:
     paths:
-      - $REPORT_DIR/*_scan.csv
-      - $REPORT_DIR/*_scan.json
+      - $env:REPORT_DIR/*_scan.csv
+      - $env:REPORT_DIR/*_scan.json
     expire_in: 1 week
 
 # SAST (Static Application Security Testing)
