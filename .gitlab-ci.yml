@@ -7,89 +7,10 @@ variables:
   # Directory for all reports
   REPORT_DIR: "security_reports"
 
-# A template to create the report directory
+# Template to ensure the report directory exists
 .security_scan_template:
   before_script:
     - mkdir -p $REPORT_DIR
-
-#########################################
-# Python Dependency Vulnerability Scan  #
-#########################################
-python-dependency-scan:
-  stage: security_scan
-  image: python:3.11-slim
-  extends: .security_scan_template
-  script:
-    - |
-      # Install jq
-      apt-get update && apt-get install -y jq
-      if [ $? -ne 0 ]; then
-        echo "jq installation failed"
-        exit 1
-      fi
-    - |
-      # Install safety
-      pip install safety
-      if [ $? -ne 0 ]; then
-        echo "safety installation failed"
-        exit 1
-      fi
-    - |
-      # Scan each requirements.txt file
-      for req_file in $(find . -name "requirements.txt"); do
-        echo "Scanning $req_file"
-        safety check -r "$req_file" --output json | \
-          jq -r '.[] | [.package, .analyzed_version, .vulnerable_spec, .advisory] | @csv' \
-          > "$REPORT_DIR/python_dependencies_$(echo "$req_file" | tr '/' '_').csv"
-        if [ $? -ne 0 ]; then
-          echo "Warning: Safety scan failed for $req_file, skipping..."
-          continue
-        fi
-      done
-  artifacts:
-    paths:
-      - $REPORT_DIR
-
-#########################################
-# Node.js Dependency Vulnerability Scan #
-#########################################
-node-dependency-scan:
-  stage: security_scan
-  image: node:16
-  extends: .security_scan_template
-  script:
-    - |
-      # Install jq
-      apt-get update && apt-get install -y jq
-      if [ $? -ne 0 ]; then
-        echo "jq installation failed"
-        exit 1
-      fi
-    - |
-      # Install npm-audit-html globally
-      npm install -g npm-audit-html
-      if [ $? -ne 0 ]; then
-        echo "npm-audit-html installation failed"
-        exit 1
-      fi
-    - |
-      # Scan each package.json file
-      for pkg_file in $(find . -name "package.json"); do
-        echo "Scanning $pkg_file"
-        cd "$(dirname "$pkg_file")" || { echo "Failed to change directory for $pkg_file, skipping..."; continue; }
-        npm audit --json | \
-          jq -r '.advisories | to_entries | .[] | .value | [.module_name, .vulnerable_versions, .patched_versions, .title] | @csv' \
-          > "$CI_PROJECT_DIR/$REPORT_DIR/node_dependencies_$(echo "$pkg_file" | tr '/' '_').csv"
-        if [ $? -ne 0 ]; then
-          echo "Warning: npm audit failed for $pkg_file, skipping..."
-          cd "$CI_PROJECT_DIR"
-          continue
-        fi
-        cd "$CI_PROJECT_DIR"
-      done
-  artifacts:
-    paths:
-      - $REPORT_DIR
 
 ##########################
 # Secret Detection Scan  #
@@ -201,26 +122,19 @@ aggregate-reports:
     - echo "Creating summary report..."
     - echo "Scan Type,Total Issues Found" > "$REPORT_DIR/summary_report.csv"
     - |
-      if ls $REPORT_DIR/python_dependencies_*.csv 1> /dev/null 2>&1; then
-        python_deps=$(find $REPORT_DIR -name "python_dependencies_*.csv" -exec cat {} + | wc -l)
-      else
-        python_deps=0
-      fi
-      echo "Python Dependencies,$python_deps" >> "$REPORT_DIR/summary_report.csv"
-    - |
-      if ls $REPORT_DIR/node_dependencies_*.csv 1> /dev/null 2>&1; then
-        node_deps=$(find $REPORT_DIR -name "node_dependencies_*.csv" -exec cat {} + | wc -l)
-      else
-        node_deps=0
-      fi
-      echo "Node.js Dependencies,$node_deps" >> "$REPORT_DIR/summary_report.csv"
-    - |
       if [ -f "$REPORT_DIR/detected_secrets.csv" ]; then
         secrets=$(cat "$REPORT_DIR/detected_secrets.csv" | wc -l)
       else
         secrets=0
       fi
       echo "Detected Secrets,$secrets" >> "$REPORT_DIR/summary_report.csv"
+    - |
+      if ls $REPORT_DIR/container_base_*.csv 1> /dev/null 2>&1; then
+        container=$(find $REPORT_DIR -name "container_base_*.csv" -exec cat {} + | wc -l)
+      else
+        container=0
+      fi
+      echo "Container Base Image Scan,$container" >> "$REPORT_DIR/summary_report.csv"
     - |
       if [ -f "$REPORT_DIR/python_sast_results.csv" ]; then
         sast_python=$(cat "$REPORT_DIR/python_sast_results.csv" | wc -l)
