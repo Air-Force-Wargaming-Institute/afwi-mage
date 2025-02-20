@@ -66,14 +66,16 @@ build_test:
     POSTGRES_DB: dbname
   script:
     - set -x
-    # List the current directory to verify that docker-compose.yml is present
+    # List files in the repository root to verify structure
     - ls -la
-    # If your docker-compose.yml is in a different directory, add a 'cd' command here.
-    - docker-compose --verbose build
-    - docker-compose run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
-    - docker-compose run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
-    - docker-compose run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
-    - docker-compose run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
+    # Wait until Docker daemon is available
+    - until docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
+    # Use the docker-compose file located in the backend folder
+    - docker-compose -f backend/docker-compose.yml --verbose build
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
   artifacts:
     paths:
       - unit_tests.xml
