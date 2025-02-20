@@ -6,52 +6,52 @@ prebuild_checks:
   stage: prebuild
   image: python:3.10
   script:
-    - powershell -Command "Set-StrictMode -Version Latest; python3.10 --version; if ($LASTEXITCODE -ne 0) { Write-Host 'Python 3.10 not found'; exit 1 }"
-    - powershell -Command "python3.11 --version; if ($LASTEXITCODE -ne 0) { Write-Host 'Python 3.11 not found'; exit 1 }"
-    - powershell -Command "New-Item -Force -ItemType Directory -Path 'app/data/logs'"
-    - powershell -Command "Get-ChildItem -Path 'app/data/logs' -Force"
+    - set -ex
+    - python3.10 --version || { echo "Python 3.10 not found"; exit 1; }
+    - python3.11 --version || { echo "Python 3.11 not found"; exit 1; }
+    - mkdir -p app/data/logs
+    - ls -ld app/data/logs
   artifacts:
     paths:
-      - "app/data/logs"
+      - app/data/logs
 
 security_scan:
   stage: security_scan
   image: python:3.10
   script:
-    - powershell -Command "Set-StrictMode -Version Latest; pip install bandit safety trufflehog"
+    - set -ex
+    # Install scanning tools
+    - pip install bandit safety trufflehog
     # Run Bandit for static analysis; output JSON
-    - powershell -Command "bandit -r . -f json -o bandit_sast_report.json; if ($LASTEXITCODE -ne 0) { Write-Host 'Bandit returned a non-zero exit code but continuing' }"
-    # Convert Bandit JSON report to CSV with an extra column for mitigation
-    - powershell -Command "
-        python -c \"import json; json.load(open('bandit_sast_report.json'))\" ;
-        if ($LASTEXITCODE -eq 0) {
-          python -c \"import json, csv; report=json.load(open('bandit_sast_report.json')); f=csv.writer(open('bandit_sast_report.csv','w',newline='')); f.writerow(['filename','line_number','issue_severity','issue_confidence','issue_text','test_name','Security Mitigation Approach']); [f.writerow([item.get('filename'), item.get('line_number'), item.get('issue_severity'), item.get('issue_confidence'), item.get('issue_text'), item.get('test_name'), '']) for item in report.get('results', [])]\"
-        } else {
-          Write-Host 'bandit_sast_report.json is not valid JSON, skipping CSV conversion';
-          'filename,line_number,issue_severity,issue_confidence,issue_text,test_name,Security Mitigation Approach' | Out-File -Encoding ascii bandit_sast_report.csv
-        }"
+    - bandit -r . -f json -o bandit_sast_report.json || true
+    # Convert Bandit JSON report to CSV with extra column "Security Mitigation Approach"
+    - |
+      if python -c "import json; json.load(open('bandit_sast_report.json'))" 2>/dev/null; then 
+        python -c "import json, csv; report=json.load(open('bandit_sast_report.json')); f=csv.writer(open('bandit_sast_report.csv','w',newline='')); f.writerow(['filename','line_number','issue_severity','issue_confidence','issue_text','test_name','Security Mitigation Approach']); [f.writerow([item.get('filename'), item.get('line_number'), item.get('issue_severity'), item.get('issue_confidence'), item.get('issue_text'), item.get('test_name'), '']) for item in report.get('results', [])]"
+      else 
+        echo "bandit_sast_report.json is not valid JSON, skipping CSV conversion"
+        echo "filename,line_number,issue_severity,issue_confidence,issue_text,test_name,Security Mitigation Approach" > bandit_sast_report.csv
+      fi
     # Run Safety for dependency vulnerability check; output JSON
-    - powershell -Command "safety check --json > safety_dependency_report.json; if ($LASTEXITCODE -ne 0) { Write-Host 'Safety check encountered issues, continuing' }"
-    # Convert Safety JSON to CSV with an extra column for mitigation
-    - powershell -Command "
-        python -c \"import json; json.load(open('safety_dependency_report.json'))\" ;
-        if ($LASTEXITCODE -eq 0) {
-          python -c \"import json, csv; data=json.load(open('safety_dependency_report.json')); f=csv.writer(open('safety_dependency_report.csv','w',newline='')); f.writerow(['package','version','Security Mitigation Approach']); [f.writerow([pkg.get('package'), pkg.get('version'), '']) for pkg in data.get('vulnerabilities',[])]\"
-        } else {
-          Write-Host 'safety_dependency_report.json is not valid JSON, skipping CSV conversion';
-          'package,version,Security Mitigation Approach' | Out-File -Encoding ascii safety_dependency_report.csv
-        }"
+    - safety check --json > safety_dependency_report.json || true
+    # Convert Safety JSON output to CSV with extra column "Security Mitigation Approach"
+    - |
+      if python -c "import json; json.load(open('safety_dependency_report.json'))" 2>/dev/null; then 
+        python -c "import json, csv; data=json.load(open('safety_dependency_report.json')); f=csv.writer(open('safety_dependency_report.csv','w',newline='')); f.writerow(['package','version','Security Mitigation Approach']); [f.writerow([pkg.get('package'), pkg.get('version'), '']) for pkg in data.get('vulnerabilities',[])]"
+      else 
+        echo "safety_dependency_report.json is not valid JSON, skipping CSV conversion"
+        echo "package,version,Security Mitigation Approach" > safety_dependency_report.csv
+      fi
     # Run TruffleHog for secret detection; output JSON
-    - powershell -Command "trufflehog filesystem . --json > trufflehog_secret_detection.json; if ($LASTEXITCODE -ne 0) { Write-Host 'TruffleHog encountered issues, continuing' }"
-    # Convert TruffleHog JSON to CSV with an extra column for mitigation
-    - powershell -Command "
-        python -c \"import json; json.load(open('trufflehog_secret_detection.json'))\" ;
-        if ($LASTEXITCODE -eq 0) {
-          python -c \"import json, csv; data=json.load(open('trufflehog_secret_detection.json')); f=csv.writer(open('trufflehog_secret_detection.csv','w',newline='')); f.writerow(['file','line','reason','entropy','Security Mitigation Approach']); [f.writerow([item.get('file'), item.get('line'), item.get('reason'), item.get('entropy'), '']) for item in data]\"
-        } else {
-          Write-Host 'trufflehog_secret_detection.json is not valid JSON, skipping CSV conversion';
-          'file,line,reason,entropy,Security Mitigation Approach' | Out-File -Encoding ascii trufflehog_secret_detection.csv
-        }"
+    - trufflehog filesystem . --json > trufflehog_secret_detection.json || true
+    # Convert TruffleHog JSON output to CSV with extra column "Security Mitigation Approach"
+    - |
+      if python -c "import json; json.load(open('trufflehog_secret_detection.json'))" 2>/dev/null; then 
+        python -c "import json, csv; data=json.load(open('trufflehog_secret_detection.json')); f=csv.writer(open('trufflehog_secret_detection.csv','w',newline='')); f.writerow(['file','line','reason','entropy','Security Mitigation Approach']); [f.writerow([item.get('file'), item.get('line'), item.get('reason'), item.get('entropy'), '']) for item in data]"
+      else 
+        echo "trufflehog_secret_detection.json is not valid JSON, skipping CSV conversion"
+        echo "file,line,reason,entropy,Security Mitigation Approach" > trufflehog_secret_detection.csv
+      fi
   artifacts:
     paths:
       - bandit_sast_report.json
