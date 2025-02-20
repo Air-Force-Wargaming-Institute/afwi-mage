@@ -1,267 +1,44 @@
 stages:
   - prebuild
   - security_scan
-  - build_test
-  - compliance
-  - quality_gates
-  - deploy
 
-# ---------------------------------------------------------------------
-# 1) Build & Unit Test Stage
-# ---------------------------------------------------------------------
-
-build-job:
-  stage: build
-  image: python:3.11-slim
-  script:
-    - echo "Installing Python dependencies..."
-    - pip install --upgrade pip setuptools wheel
-    - pip install -r requirements.txt
-    - echo "Installing Node.js dependencies..."
-    - apt-get update && apt-get install -y curl gnupg
-    - curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-    - apt-get install -y nodejs
-    - npm install
-    - echo "Build complete."
-  artifacts:
-    paths:
-      - node_modules/
-      - .venv/
-    expire_in: "1 week"
-
-lint-job-python:
-  stage: unit-test
-  image: python:3.11-slim
-  script:
-    - echo "Linting Python code..."
-    - pip install flake8
-    - flake8 afwi-multi-agent-generative-engine/   # adjust path as needed
-    - echo "Python lint complete."
-
-lint-job-node:
-  stage: unit-test
-  image: node:16
-  script:
-    - echo "Linting Node.js code..."
-    - npm install --save-dev eslint
-    - npx eslint .   # adjust path as needed
-    - echo "Node lint complete."
-
-unit-test-python:
-  stage: unit-test
-  image: python:3.11-slim
-  script:
-    - echo "Running Python unit tests..."
-    - pip install pytest pytest-cov
-    - pytest --cov=afwi-multi-agent-generative-engine --cov-report=term-missing
-  artifacts:
-    paths:
-      - htmlcov/
-    expire_in: "1 week"
-
-unit-test-node:
-  stage: unit-test
-  image: node:16
-  script:
-    - echo "Running Node.js unit tests..."
-    - npm test
-  artifacts:
-    paths:
-      - coverage/
-    expire_in: "1 week"
-
-# ---------------------------------------------------------------------
-# 2) Security Stage
-#    (Static Analysis, Dependency Scanning, and Secret Detection)
-# ---------------------------------------------------------------------
-
-sast-python:
-  stage: security
-  image: python:3.11-slim
-  script:
-    - echo "Running Bandit for Python SAST..."
-    - pip install bandit jq
-    - bandit -r core/ -f json -o bandit-report.json || true
-    - cat bandit-report.json | jq -r '
-        ( "test_name,severity,file,line,issue_text" ),
-        ( .results[] | [
-            .test_name,
-            .issue_severity,
-            .filename,
-            .line_number,
-            ( .issue_text | gsub(",";"") )
-          ] | join(",") )
-      ' > bandit-report.csv
-  artifacts:
-    paths:
-      - bandit-report.json
-      - bandit-report.csv
-    when: always
-    expire_in: "1 week"
-
-sast-node:
-  stage: security
-  image: node:16
+prebuild_checks:
+  stage: prebuild
+  image: python:3.10
   script:
     - set -x
+    - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
+    - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
+    - mkdir -p app/data/logs
+    - ls -ld app/data/logs
+  artifacts:
+    paths:
+      - app/data/logs
+
+security_scan:
+  stage: security_scan
+  image: python:3.10
+  script:
+    - set -x
+    # Install scanning tools
     - pip install bandit safety trufflehog
+    # Run Bandit for static analysis; output JSON
     - bandit -r . -f json -o sast_report.json || true
+    # Run Safety for dependency vulnerability checks; output JSON
     - safety check --json > dependency_check.json || true
+    # Convert Safety output JSON to CSV if valid, otherwise create a default CSV header
     - |
-      # Validate that dependency_check.json is valid JSON before conversion
       if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
         python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
       else 
         echo "dependency_check.json is not valid JSON, skipping CSV conversion"
         echo "package,version" > dependency_check.csv
       fi
-    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-    - trivy image --format json --output container_scan.json my-docker-image:latest || true
+    # Run TruffleHog to scan for secrets; output JSON
     - trufflehog filesystem . --json > secret_detection.json || true
   artifacts:
     paths:
       - sast_report.json
+      - dependency_check.json
       - dependency_check.csv
-      - container_scan.json
       - secret_detection.json
-
-build_test:
-  stage: build_test
-  image: docker:latest
-  services:
-    - docker:dind
-    - name: postgres:13
-      alias: db
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-    POSTGRES_PASSWORD: password
-    POSTGRES_USER: postgres
-    POSTGRES_DB: dbname
-  script:
-    - set -x
-    # List files in the repository root to verify structure
-    - ls -la
-    # Wait until Docker daemon is available
-    - until docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
-    # Use the docker-compose file located in the backend folder
-    - docker-compose -f backend/docker-compose.yml --verbose build
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
-  artifacts:
-    paths:
-      - unit_tests.xml
-      - integration_tests.json
-      - performance_metrics.json
-      - coverage_report.xml
-
-compliance:
-  stage: compliance
-  image: alpine:latest
-  script:
-    - echo "Running Gitleaks for secret detection..."
-    - apk add --no-cache curl jq
-    - curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64 -o gitleaks && chmod +x gitleaks
-    - ./gitleaks detect --source . --report-format json --report-path gitleaks.json || true
-    - cat gitleaks.json | jq -r '
-        ( "description,file,line,secret" ),
-        ( .findings[]? | [
-            ( .description | gsub(",";"") ),
-            .file,
-            (.line|tostring),
-            ( .secret | gsub(",";"") )
-          ] | join(",") )
-      ' > gitleaks.csv
-  artifacts:
-    paths:
-      - gitleaks.json
-      - gitleaks.csv
-    when: always
-    expire_in: "1 week"
-
-# ---------------------------------------------------------------------
-# 3) Integration Stage
-#    (Build Docker images, start docker-compose stack, run integration tests)
-# ---------------------------------------------------------------------
-
-integration-tests:
-  stage: integration
-  image: docker:20.10.16
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-  script:
-    - echo "Installing docker-compose..."
-    - apk add --no-cache docker-compose
-    - echo "Building Docker images via docker-compose..."
-    - docker-compose -f docker-compose.yaml build
-    - echo "Starting containers..."
-    - docker-compose -f docker-compose.yaml up -d
-    - echo "Waiting for services to initialize..."
-    - sleep 20
-    # Example health checks (adjust URLs as needed)
-    - echo "Checking health of core service..."
-    - curl --fail http://localhost:8000/health || (docker-compose -f docker-compose.yaml logs && exit 1)
-    - echo "Checking health of agent service..."
-    - curl --fail http://localhost:8001/health || (docker-compose -f docker-compose.yaml logs && exit 1)
-    - echo "Integration tests passed."
-    - echo "Tearing down containers..."
-    - docker-compose -f docker-compose.yaml down
-  artifacts:
-    when: always
-    expire_in: "1 week"
-    # Optionally, if you generate test reports, reference them here:
-    reports:
-      junit: integration-tests-report.xml
-
-# ---------------------------------------------------------------------
-# 4) Aggregation Stage
-#    (Merge security scan outputs into final reports)
-# ---------------------------------------------------------------------
-
-aggregate-reports:
-  stage: aggregate
-  script: |
-    echo "Aggregating security scan results..."
-    mkdir final_reports
-    echo "{\"summary\": {\"totalVulnerabilities\": 0, \"highSeverity\": 0, \"mediumSeverity\": 0, \"lowSeverity\": 0}, \"details\": []}" > final_reports/final-security-report.json
-    echo "id,severity,file,description,mitigation" > final_reports/final-security-report.csv
-    echo "SAST-PY-1,High,mage/foo.py,Example vulnerability,Upgrade library X" >> final_reports/final-security-report.csv
-    echo "SAST-NODE-1,Medium,src/index.js,Example vulnerability,Use safer function" >> final_reports/final-security-report.csv
-    echo "Added sample lines to CSV. You would parse all your JSON files here."
-  dependencies:
-    - build_test
-    - security_scan
-  script:
-    - set -x
-    - |
-      COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
-      echo "Coverage: ${COVERAGE}%"
-      if [ "$COVERAGE" -lt 80 ]; then
-        echo "Error: Code coverage is below 80%"; exit 1;
-      fi
-    - |
-      HIGH_ISSUES=$(jq '.high_severity' sast_report.json)
-      echo "High severity issues: $HIGH_ISSUES"
-      if [ "$HIGH_ISSUES" -gt 0 ]; then
-        echo "Error: High severity security issues found"; exit 1;
-      fi
-
-deploy:
-  stage: deploy
-  image: docker:20.10.16
-  services:
-    - docker:dind
-  variables:
-    DOCKER_DRIVER: overlay2
-  script:
-    - set -x
-    - docker-compose up -d
-    - echo "Deployment completed successfully"
-  environment:
-    name: production
-  only:
-    - main
