@@ -44,19 +44,54 @@ node-dependency-scan:
   image: node:16
   extends: .security_scan_template
   script:
-    - npm install -g npm-audit-html
+    - apt-get update && apt-get install -y jq
     - |
-      for pkg_file in $(find . -name "package.json"); do
+      find . -name "package.json" -type f | while read -r pkg_file; do
         echo "Scanning $pkg_file"
-        cd $(dirname $pkg_file)
-        npm audit --json | 
-        jq -r '.advisories | to_entries | .[] | .value | [.module_name, .vulnerable_versions, .patched_versions, .title] | @csv' > 
-        $CI_PROJECT_DIR/$REPORT_DIR/node_dependencies_$(echo $pkg_file | tr '/' '_').csv
-        cd $CI_PROJECT_DIR
+        dirname=$(dirname "$pkg_file")
+        basename=$(basename "$dirname")
+        
+        # Create a temporary directory for npm audit
+        temp_dir=$(mktemp -d)
+        cp "$pkg_file" "$temp_dir/"
+        
+        # If package-lock.json exists, copy it too
+        if [ -f "$dirname/package-lock.json" ]; then
+          cp "$dirname/package-lock.json" "$temp_dir/"
+        fi
+        
+        cd "$temp_dir"
+        
+        # Run npm audit and save results
+        if npm audit --json > "audit_result.json" 2>/dev/null; then
+          # Convert npm audit results to CSV format
+          jq -r '
+            if .advisories then
+              .advisories | to_entries | .[] | .value |
+              [.module_name, .vulnerable_versions, .patched_versions, .severity, .title] | @csv
+            else
+              empty
+            end
+          ' "audit_result.json" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+          
+          # If no vulnerabilities found, create an empty report
+          if [ ! -s "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv" ]; then
+            echo "No vulnerabilities found in $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+          fi
+          
+          # Save the full JSON report
+          cp "audit_result.json" "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.json"
+        else
+          echo "Error scanning $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+        fi
+        
+        cd "$CI_PROJECT_DIR"
+        rm -rf "$temp_dir"
       done
   artifacts:
     paths:
-      - $REPORT_DIR/node_dependencies_*.csv
+      - $REPORT_DIR/*_npm_audit.csv
+      - $REPORT_DIR/*_npm_audit.json
     expire_in: 1 week
 
 # Secret detection scan
