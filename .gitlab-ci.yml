@@ -1,7 +1,7 @@
 stages:
   - prebuild
   - security_scan
-  - build_test
+  - build_images
   - compliance
   - quality_gates
   - deploy
@@ -51,40 +51,83 @@ security_scan:
       - container_scan.json
       - secret_detection.json
 
-build_test:
-  stage: build_test
-  image: docker:latest
-  services:
-    # Note: We no longer use docker:dind since we're bind-mounting the host's Docker socket.
-    - name: postgres:13
-      alias: db
-  variables:
-    # These are standard credentials for the official Postgres image.
-    # Note: Your Docker Compose file still has the db service commented out,
-    # so ensure your application connects to an external/pre-configured DB if needed.
-    POSTGRES_PASSWORD: password
-    POSTGRES_USER: postgres
-    POSTGRES_DB: dbname
+kaniko_build_images:
+  stage: build_images
+  image: gcr.io/kaniko-project/executor:latest
   script:
     - set -x
-    # List the current directory to verify the repository structure.
-    - ls -la
-    # Wait until the Docker socket is present (i.e. the host's Docker daemon is available).
-    - until [ -S /var/run/docker.sock ]; do echo "Waiting for Docker socket..."; sleep 1; done
-    # Build images using the docker-compose file located in the backend folder.
-    - docker-compose -f backend/docker-compose.yml --verbose build
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
-    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-  artifacts:
-    paths:
-      - unit_tests.xml
-      - integration_tests.json
-      - performance_metrics.json
-      - coverage_report.xml
+    # Build the agent_service image
+    - echo "Building agent_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/agent_service \
+        --dockerfile $CI_PROJECT_DIR/backend/agent_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/agent_service:latest \
+        --verbosity debug
+    # Build the auth_service image
+    - echo "Building auth_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/auth_service \
+        --dockerfile $CI_PROJECT_DIR/backend/auth_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/auth_service:latest \
+        --verbosity debug
+    # Build the chat_service image
+    - echo "Building chat_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/chat_service \
+        --dockerfile $CI_PROJECT_DIR/backend/chat_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/chat_service:latest \
+        --verbosity debug
+    # Build the core_service image
+    - echo "Building core_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/core_service \
+        --dockerfile $CI_PROJECT_DIR/backend/core_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/core_service:latest \
+        --verbosity debug
+    # Build the direct_chat_service image
+    - echo "Building direct_chat_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/direct_chat_service \
+        --dockerfile $CI_PROJECT_DIR/backend/direct_chat_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/direct_chat_service:latest \
+        --verbosity debug
+    # Build the embedding_service image
+    - echo "Building embedding_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/embedding_service \
+        --dockerfile $CI_PROJECT_DIR/backend/embedding_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/embedding_service:latest \
+        --verbosity debug
+    # Build the extraction_service image
+    - echo "Building extraction_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/extraction_service \
+        --dockerfile $CI_PROJECT_DIR/backend/extraction_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/extraction_service:latest \
+        --verbosity debug
+    # Build the generation_service image
+    - echo "Building generation_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/generation_service \
+        --dockerfile $CI_PROJECT_DIR/backend/generation_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/generation_service:latest \
+        --verbosity debug
+    # Build the review_service image
+    - echo "Building review_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/review_service \
+        --dockerfile $CI_PROJECT_DIR/backend/review_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/review_service:latest \
+        --verbosity debug
+    # Build the upload_service image
+    - echo "Building upload_service image"
+    - /kaniko/executor \
+        --context $CI_PROJECT_DIR/backend/upload_service \
+        --dockerfile $CI_PROJECT_DIR/backend/upload_service/Dockerfile \
+        --destination $CI_REGISTRY_IMAGE/upload_service:latest \
+        --verbosity debug
+  only:
+    - merge-parallelization
 
 compliance:
   stage: compliance
@@ -123,7 +166,6 @@ quality_gates:
   stage: quality_gates
   image: alpine:latest
   dependencies:
-    - build_test
     - security_scan
   script:
     - set -x
