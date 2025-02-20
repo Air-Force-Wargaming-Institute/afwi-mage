@@ -18,17 +18,24 @@ python-dependency-scan:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    - pip install safety
+    - pip install safety jq
     - |
-      for req_file in $(find . -name "requirements.txt"); do
+      find . -name "requirements.txt" -type f | while read -r req_file; do
         echo "Scanning $req_file"
-        safety check -r $req_file --output json | 
-        jq -r '.[] | [.package, .analyzed_version, .vulnerable_spec, .advisory] | @csv' > 
-        $REPORT_DIR/python_dependencies_$(echo $req_file | tr '/' '_').csv
+        dirname=$(dirname "$req_file")
+        basename=$(basename "$dirname")
+        safety check -r "$req_file" --json > "$REPORT_DIR/${basename}_dependencies.json"
+        if [ -s "$REPORT_DIR/${basename}_dependencies.json" ]; then
+          jq -r '.[] | [.package,.analyzed_version,.vulnerable_spec,.advisory] | @csv' \
+            "$REPORT_DIR/${basename}_dependencies.json" > "$REPORT_DIR/${basename}_dependencies.csv"
+        else
+          echo "No vulnerabilities found in $req_file" > "$REPORT_DIR/${basename}_dependencies.csv"
+        fi
       done
   artifacts:
     paths:
-      - $REPORT_DIR/python_dependencies_*.csv
+      - $REPORT_DIR/*_dependencies.csv
+      - $REPORT_DIR/*_dependencies.json
     expire_in: 1 week
 
 # Node.js dependency security scan
