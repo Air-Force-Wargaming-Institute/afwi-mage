@@ -34,10 +34,11 @@ security_scan:
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
     - |
-      if [ -s dependency_check.json ]; then 
+      # Validate that dependency_check.json is valid JSON before conversion
+      if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
         python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
       else 
-        echo "dependency_check.json is empty, skipping CSV conversion"
+        echo "dependency_check.json is not valid JSON, skipping CSV conversion"
         echo "package,version" > dependency_check.csv
       fi
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
@@ -58,8 +59,8 @@ build_test:
     - name: postgres:13
       alias: db
   variables:
-    # These environment variables are standard for the Postgres image.
-    # Note: The db service is commented out in your Docker Compose file.
+    # These are standard credentials for the official Postgres image.
+    # Note: The db service in your Docker Compose file is commented out.
     # Ensure your application connects to an external or pre-configured DB if you leave it commented.
     POSTGRES_PASSWORD: password
     POSTGRES_USER: postgres
