@@ -92,6 +92,7 @@ quality_gates:
     - security_scan  # Removed build_test dependency
   script:
     - set -x
+    - apk add --no-cache jq  # Install jq before using it
     - |
       if [ -f coverage_report.xml ]; then
         COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
@@ -108,6 +109,7 @@ quality_gates:
       if [ "$HIGH_ISSUES" -gt 0 ]; then
         echo "Error: High severity security issues found"; exit 1;
       fi
+
 
 deploy:
   stage: deploy
