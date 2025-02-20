@@ -4,42 +4,36 @@ stages:
   - report_aggregation
 
 variables:
-  # Directory for all reports
+  # All reports will be placed in this directory
   REPORT_DIR: "security_reports"
 
-# Template to ensure the report directory exists
+# Template job to ensure the reports directory exists
 .security_scan_template:
   before_script:
-    - mkdir -p $REPORT_DIR
+    - |
+      New-Item -ItemType Directory -Force -Path $env:REPORT_DIR | Out-Null
 
 ##########################
 # Secret Detection Scan  #
 ##########################
 secret-detection:
   stage: security_scan
-  image: python:3.11-slim
+  # Note: image is ignored for shell executors.
   extends: .security_scan_template
   script:
     - |
-      apt-get update && apt-get install -y jq
-      if [ $? -ne 0 ]; then
-        echo "jq installation failed"
-        exit 1
-      fi
-    - |
+      Write-Host "Running Secret Detection Scan..."
+      Write-Host "Assuming 'jq' is pre-installed on this Windows runner."
       pip install detect-secrets
-      if [ $? -ne 0 ]; then
-        echo "detect-secrets installation failed"
-        exit 1
-      fi
-    - |
-      detect-secrets scan . --force-use-all-plugins | \
-        jq -r '.results | to_entries | .[] | [.key, (.value[] | .type), (.value[] | .line_number)] | @csv' \
-        > "$REPORT_DIR/detected_secrets.csv"
-      if [ $? -ne 0 ]; then
-        echo "Warning: Secret detection failed, continuing..."
-        touch "$REPORT_DIR/detected_secrets.csv"
-      fi
+      if ($LASTEXITCODE -ne 0) {
+          Write-Host "detect-secrets installation failed"
+          exit 1
+      }
+      detect-secrets scan . --force-use-all-plugins | jq -r '.results | to_entries | .[] | [.key, (.value[] | .type), (.value[] | .line_number)] | @csv' > "$env:REPORT_DIR\detected_secrets.csv"
+      if ($LASTEXITCODE -ne 0) {
+          Write-Host "Warning: Secret detection scan failed, continuing..."
+          New-Item -Path "$env:REPORT_DIR\detected_secrets.csv" -ItemType File -Force | Out-Null
+      }
   artifacts:
     paths:
       - $REPORT_DIR
@@ -49,19 +43,27 @@ secret-detection:
 ###########################################
 container-base-scan:
   stage: security_scan
-  image: aquasec/trivy:latest
+  # Assumes that trivy is installed and available in PATH on Windows.
   extends: .security_scan_template
   script:
     - |
-      for dockerfile in $(find . -name "Dockerfile"); do
-        base_image=$(grep "^FROM" "$dockerfile" | head -1 | awk '{print $2}')
-        echo "Scanning base image: $base_image from $dockerfile"
-        trivy image --format csv --output "$REPORT_DIR/container_base_$(echo "$dockerfile" | tr '/' '_').csv" "$base_image"
-        if [ $? -ne 0 ]; then
-          echo "Warning: Trivy scan failed for $dockerfile, skipping..."
-          continue
-        fi
-      done
+      Write-Host "Running Container Base Image Vulnerability Scan..."
+      ForEach ($dockerfile in Get-ChildItem -Path . -Filter "Dockerfile" -Recurse) {
+          $baseImageLine = (Get-Content $dockerfile.FullName | Select-String "^FROM" | Select-Object -First 1).Line
+          if ($baseImageLine) {
+              $base_image = $baseImageLine.Split()[1]
+              Write-Host "Scanning base image: $base_image from $($dockerfile.FullName)"
+              # Replace invalid filename characters with underscores
+              $safeName = $dockerfile.FullName -replace '[\\/:]', '_'
+              trivy image --format csv --output "$env:REPORT_DIR\container_base_$safeName.csv" $base_image
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Host "Warning: Trivy scan failed for $($dockerfile.FullName), skipping..."
+              }
+          }
+          else {
+              Write-Host "No FROM line found in $($dockerfile.FullName), skipping..."
+          }
+      }
   artifacts:
     paths:
       - $REPORT_DIR
@@ -71,42 +73,45 @@ container-base-scan:
 ###############################
 sast-scan:
   stage: security_scan
-  image: python:3.11-slim
   extends: .security_scan_template
   script:
     - |
-      apt-get update && apt-get install -y jq nodejs npm
-      if [ $? -ne 0 ]; then
-        echo "Dependency installation failed"
-        exit 1
-      fi
-    - |
+      Write-Host "Running SAST Scan..."
+      Write-Host "Assuming jq, nodejs, and npm are pre-installed on this Windows runner."
       pip install bandit
-      if [ $? -ne 0 ]; then
-        echo "bandit installation failed"
-        exit 1
-      fi
-    - |
-      bandit -r . -f csv -o "$REPORT_DIR/python_sast_results.csv"
-      if [ $? -ne 0 ]; then
-        echo "Warning: Python SAST scan failed, continuing..."
-        touch "$REPORT_DIR/python_sast_results.csv"
-      fi
-    - |
+      if ($LASTEXITCODE -ne 0) {
+          Write-Host "bandit installation failed"
+          exit 1
+      }
+      bandit -r . -f csv -o "$env:REPORT_DIR\python_sast_results.csv"
+      if ($LASTEXITCODE -ne 0) {
+          Write-Host "Warning: Python SAST scan failed, continuing..."
+          New-Item -Path "$env:REPORT_DIR\python_sast_results.csv" -ItemType File -Force | Out-Null
+      }
       npm install -g eslint eslint-config-security
-      if [ $? -ne 0 ]; then
-        echo "ESLint installation failed"
-        exit 1
-      fi
-    - |
-      output=$(find . -name "*.js" -not -path "./node_modules/*" | \
-                xargs eslint --format=json --no-eslintrc -c '{"extends": ["security"]}')
-      if [ $? -ne 0 ]; then
-        echo "Warning: JavaScript SAST scan failed, continuing..."
-        touch "$REPORT_DIR/js_sast_results.csv"
-      else
-        echo "$output" > "$REPORT_DIR/js_sast_results.csv"
-      fi
+      if ($LASTEXITCODE -ne 0) {
+          Write-Host "ESLint installation failed"
+          exit 1
+      }
+      $jsFiles = Get-ChildItem -Path . -Recurse -Include *.js | Where-Object { $_.FullName -notmatch "node_modules" }
+      if ($jsFiles.Count -eq 0) {
+          Write-Host "No JavaScript files found; creating empty ESLint report"
+          New-Item -Path "$env:REPORT_DIR\js_sast_results.csv" -ItemType File -Force | Out-Null
+      }
+      else {
+          $output = ""
+          foreach ($file in $jsFiles) {
+              $result = eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' $file.FullName
+              $output += $result
+          }
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host "Warning: JavaScript SAST scan failed, continuing..."
+              New-Item -Path "$env:REPORT_DIR\js_sast_results.csv" -ItemType File -Force | Out-Null
+          }
+          else {
+              $output | Out-File "$env:REPORT_DIR\js_sast_results.csv" -Encoding utf8
+          }
+      }
   artifacts:
     paths:
       - $REPORT_DIR
@@ -116,39 +121,36 @@ sast-scan:
 #########################################
 aggregate-reports:
   stage: report_aggregation
-  image: python:3.11-slim
+  extends: .security_scan_template
   script:
-    - mkdir -p $REPORT_DIR
-    - echo "Creating summary report..."
-    - echo "Scan Type,Total Issues Found" > "$REPORT_DIR/summary_report.csv"
     - |
-      if [ -f "$REPORT_DIR/detected_secrets.csv" ]; then
-        secrets=$(cat "$REPORT_DIR/detected_secrets.csv" | wc -l)
-      else
-        secrets=0
-      fi
-      echo "Detected Secrets,$secrets" >> "$REPORT_DIR/summary_report.csv"
-    - |
-      if ls $REPORT_DIR/container_base_*.csv 1> /dev/null 2>&1; then
-        container=$(find $REPORT_DIR -name "container_base_*.csv" -exec cat {} + | wc -l)
-      else
-        container=0
-      fi
-      echo "Container Base Image Scan,$container" >> "$REPORT_DIR/summary_report.csv"
-    - |
-      if [ -f "$REPORT_DIR/python_sast_results.csv" ]; then
-        sast_python=$(cat "$REPORT_DIR/python_sast_results.csv" | wc -l)
-      else
-        sast_python=0
-      fi
-      echo "SAST (Python),$sast_python" >> "$REPORT_DIR/summary_report.csv"
-    - |
-      if [ -f "$REPORT_DIR/js_sast_results.csv" ]; then
-        sast_js=$(cat "$REPORT_DIR/js_sast_results.csv" | wc -l)
-      else
-        sast_js=0
-      fi
-      echo "SAST (JavaScript),$sast_js" >> "$REPORT_DIR/summary_report.csv"
+      Write-Host "Creating summary report..."
+      "Scan Type,Total Issues Found" | Out-File "$env:REPORT_DIR\summary_report.csv" -Encoding utf8
+      if (Test-Path "$env:REPORT_DIR\detected_secrets.csv") {
+          $secrets = (Get-Content "$env:REPORT_DIR\detected_secrets.csv" | Measure-Object -Line).Lines
+      } else {
+          $secrets = 0
+      }
+      "Detected Secrets,$secrets" | Out-File "$env:REPORT_DIR\summary_report.csv" -Append -Encoding utf8
+      $containerFiles = Get-ChildItem -Path $env:REPORT_DIR -Filter "container_base_*.csv" -ErrorAction SilentlyContinue
+      if ($containerFiles) {
+          $containerCount = ($containerFiles | Get-Content | Measure-Object -Line).Lines
+      } else {
+          $containerCount = 0
+      }
+      "Container Base Image Scan,$containerCount" | Out-File "$env:REPORT_DIR\summary_report.csv" -Append -Encoding utf8
+      if (Test-Path "$env:REPORT_DIR\python_sast_results.csv") {
+          $sast_python = (Get-Content "$env:REPORT_DIR\python_sast_results.csv" | Measure-Object -Line).Lines
+      } else {
+          $sast_python = 0
+      }
+      "SAST (Python),$sast_python" | Out-File "$env:REPORT_DIR\summary_report.csv" -Append -Encoding utf8
+      if (Test-Path "$env:REPORT_DIR\js_sast_results.csv") {
+          $sast_js = (Get-Content "$env:REPORT_DIR\js_sast_results.csv" | Measure-Object -Line).Lines
+      } else {
+          $sast_js = 0
+      }
+      "SAST (JavaScript),$sast_js" | Out-File "$env:REPORT_DIR\summary_report.csv" -Append -Encoding utf8
   artifacts:
     paths:
       - $REPORT_DIR
