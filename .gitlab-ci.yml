@@ -1,230 +1,150 @@
-name: AFWI MAGE CI/CD Pipeline
+stages:
+  - prebuild
+  - security_scan
+  - build_test
+  - compliance
+  - quality_gates
+  - deploy
+  - audit_trail
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+# Pre‑Build Checks: Verify Python versions, NVIDIA drivers, and initialize required directories.
+prebuild_checks:
+  stage: prebuild
+  image: python:3.10
+  script:
+    - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
+    - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
+    - command -v nvidia-smi || (echo "NVIDIA drivers not installed or not in PATH" && exit 1)
+    - nvidia-smi
+    - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
+    - mkdir -p app/models/{base_models,fine_tuned_models}
+    - mkdir -p app/nltk_data
+    - ls -ld app/data/uploads
+  artifacts:
+    paths:
+      - app/data/logs
 
-jobs:
-  prebuild-checks:
-    runs-on: ubuntu-latest
-    name: "Pre-Build Checks"
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+# Security Scan: Run SAST, dependency, container, and secret scanning; generate JSON/CSV reports.
+security_scan:
+  stage: security_scan
+  image: python:3.10
+  script:
+    - pip install bandit safety trufflehog
+    - bandit -r . -f json -o sast_report.json
+    - safety check --json > dependency_check.json
+    - python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+    - trivy image --format json --output container_scan.json my-docker-image:latest || true
+    - trufflehog filesystem . --json > secret_detection.json || true
+  artifacts:
+    paths:
+      - sast_report.json
+      - dependency_check.csv
+      - container_scan.json
+      - secret_detection.json
 
-      - name: Verify Python Versions
-        run: |
-          # Ensure Python 3.10 is available for Core Service
-          python3.10 --version || { echo "Python 3.10 not found"; exit 1; }
-          # Ensure Python 3.11 is available for other services
-          python3.11 --version || { echo "Python 3.11 not found"; exit 1; }
+# Build & Test: Build Docker images, run unit, integration, and performance tests, plus code coverage.
+build_test:
+  stage: build_test
+  image: docker:latest
+  services:
+    - docker:dind
+    - name: postgres:13
+      alias: db
+  variables:
+    POSTGRES_PASSWORD: password
+    POSTGRES_USER: postgres
+    POSTGRES_DB: dbname
+  script:
+    - docker-compose build
+    - docker-compose run --rm core pytest --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
+    - docker-compose run --rm core pytest tests/integration --json-report --json-report-file=integration_tests.json
+    - docker-compose run --rm core pytest tests/performance --json-report --json-report-file=performance_metrics.json
+    - docker-compose run --rm core pytest --cov=. --cov-report=xml:coverage_report.xml
+  artifacts:
+    paths:
+      - unit_tests.xml
+      - integration_tests.json
+      - performance_metrics.json
+      - coverage_report.xml
 
-      - name: Check NVIDIA Drivers
-        run: |
-          if ! command -v nvidia-smi; then
-            echo "NVIDIA drivers not installed or not in PATH"; exit 1;
-          fi
-          nvidia-smi
+# Compliance: Generate YAML healthcheck artifacts for direct chat service, database, and dependencies.
+compliance:
+  stage: compliance
+  image: alpine:latest
+  script:
+    - |
+      cat <<'EOF' > direct_chat_healthcheck.yaml
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8011/api/v1/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 10s
+      EOF
+    - |
+      cat <<'EOF' > database_healthcheck.yaml
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+      EOF
+    - |
+      cat <<'EOF' > service_dependencies.yaml
+      depends_on:
+        condition: service_healthy
+      EOF
+  artifacts:
+    paths:
+      - direct_chat_healthcheck.yaml
+      - database_healthcheck.yaml
+      - service_dependencies.yaml
 
-      - name: Ensure Directory Structure & Permissions
-        run: |
-          mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
-          mkdir -p app/models/{base_models,fine_tuned_models}
-          mkdir -p app/nltk_data
-          # Example permission check (customize as needed)
-          ls -ld app/data/uploads
+# Quality Gates: Validate minimum 80% code coverage and ensure no high-severity SAST issues.
+quality_gates:
+  stage: quality_gates
+  image: alpine:latest
+  dependencies:
+    - build_test
+    - security_scan
+  script:
+    - |
+      COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
+      echo "Coverage: ${COVERAGE}%"
+      if [ "$COVERAGE" -lt 80 ]; then
+        echo "Error: Code coverage is below 80%"; exit 1;
+      fi
+    - |
+      HIGH_ISSUES=$(jq '.high_severity' sast_report.json)
+      echo "High severity issues: $HIGH_ISSUES"
+      if [ "$HIGH_ISSUES" -gt 0 ]; then
+        echo "Error: High severity security issues found"; exit 1;
+      fi
 
-  security-scan:
-    runs-on: ubuntu-latest
-    name: "Code Quality & Security Scanning"
-    needs: prebuild-checks
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+# Deploy: Manual approval required; deploy only on the main branch.
+deploy:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  only:
+    - main
+  when: manual
+  script:
+    - docker-compose up -d
+    - echo "Deployment completed successfully"
+  environment:
+    name: production
 
-      # --- SAST ---
-      - name: Run Bandit SAST Scan
-        run: |
-          pip install bandit
-          bandit -r . -f json -o sast_report.json
-
-      # --- Dependency Scanning ---
-      - name: Run Dependency Check with Safety
-        run: |
-          pip install safety
-          safety check --json > dependency_check.json
-          # Convert JSON output to CSV (custom conversion)
-          python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
-
-      # --- Container Security ---
-      - name: Run Container Image Scan with Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          # Replace "my-docker-image:latest" with your actual image name
-          trivy image --format json --output container_scan.json my-docker-image:latest || true
-
-      # --- Secret Detection ---
-      - name: Run Secret Detection Scan with TruffleHog
-        run: |
-          pip install trufflehog
-          trufflehog filesystem . --json > secret_detection.json || true
-
-      - name: Upload Security Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-artifacts
-          path: |
-            sast_report.json
-            dependency_check.csv
-            container_scan.json
-            secret_detection.json
-
-  build-test:
-    runs-on: ubuntu-latest
-    name: "Build and Test"
-    needs: security-scan
-    services:
-      db:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: password
-          POSTGRES_USER: postgres
-          POSTGRES_DB: dbname
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Build Docker Images via Docker Compose
-        run: docker-compose build
-
-      - name: Run Unit Tests (JUnit XML)
-        run: docker-compose run --rm core pytest --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
-
-      - name: Run Integration Tests (JSON Report)
-        run: docker-compose run --rm core pytest tests/integration --json-report --json-report-file=integration_tests.json
-
-      - name: Run Performance Tests (JSON Report)
-        run: docker-compose run --rm core pytest tests/performance --json-report --json-report-file=performance_metrics.json
-
-      - name: Generate Code Coverage Report (XML)
-        run: docker-compose run --rm core pytest --cov=. --cov-report=xml:coverage_report.xml
-
-      - name: Upload Test Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-artifacts
-          path: |
-            unit_tests.xml
-            integration_tests.json
-            performance_metrics.json
-            coverage_report.xml
-
-  compliance:
-    runs-on: ubuntu-latest
-    name: "Security Compliance & Healthcheck Artifacts"
-    needs: build-test
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Generate Direct Chat Service Healthcheck YAML
-        run: |
-          cat <<'EOF' > direct_chat_healthcheck.yaml
-          healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8011/api/v1/health"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-            start_period: 10s
-          EOF
-
-      - name: Generate Database Healthcheck YAML
-        run: |
-          cat <<'EOF' > database_healthcheck.yaml
-          healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres"]
-            interval: 5s
-            timeout: 5s
-            retries: 5
-          EOF
-
-      - name: Generate Service Dependencies YAML
-        run: |
-          cat <<'EOF' > service_dependencies.yaml
-          depends_on:
-            condition: service_healthy
-          EOF
-
-      - name: Upload Compliance Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: compliance-artifacts
-          path: |
-            direct_chat_healthcheck.yaml
-            database_healthcheck.yaml
-            service_dependencies.yaml
-
-  quality-gates:
-    runs-on: ubuntu-latest
-    name: "Quality Gates Verification"
-    needs: [security-scan, build-test, compliance]
-    steps:
-      - name: Check Code Coverage Threshold
-        run: |
-          # Extract coverage percentage from the XML report (example extraction)
-          COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
-          echo "Coverage: ${COVERAGE}%"
-          if [ "$COVERAGE" -lt 80 ]; then
-            echo "Error: Code coverage is below 80%"; exit 1;
-          fi
-
-      - name: Check SAST Report for High Severity Issues
-        run: |
-          HIGH_ISSUES=$(jq '.high_severity' sast_report.json)
-          echo "High severity issues: $HIGH_ISSUES"
-          if [ "$HIGH_ISSUES" -gt 0 ]; then
-            echo "Error: High severity security issues found"; exit 1;
-          fi
-
-      - name: Verify Service Health Checks
-        run: |
-          # Implement custom health-check verifications if available; here we simulate success.
-          echo "All health checks passed"
-
-  deploy:
-    runs-on: ubuntu-latest
-    name: "Deployment (Manual Approval Required)"
-    needs: quality-gates
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Await Manual Approval
-        run: echo "Manual approval required before deployment" && sleep 10
-        # In practice, integrate a proper manual approval step using your preferred method
-
-      - name: Deploy to Production via Docker Compose
-        run: |
-          docker-compose up -d
-          echo "Deployment completed successfully"
-
-  audit-trail:
-    runs-on: ubuntu-latest
-    name: "Archive Build Logs & Audit Trail"
-    needs: [prebuild-checks, security-scan, build-test, compliance, quality-gates, deploy]
-    steps:
-      - name: Archive Build Logs
-        run: |
-          tar -czf build_logs.tar.gz app/data/logs/
-      - name: Upload Audit Trail Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: audit-trail
-          path: build_logs.tar.gz
+# Audit Trail: Archive build logs for audit and troubleshooting.
+audit_trail:
+  stage: audit_trail
+  image: alpine:latest
+  dependencies:
+    - prebuild_checks
+  script:
+    - tar -czf build_logs.tar.gz app/data/logs/
+  artifacts:
+    paths:
+      - build_logs.tar.gz
