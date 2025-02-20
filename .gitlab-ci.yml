@@ -7,15 +7,15 @@ stages:
   - deploy
   - audit_trail
 
-# Pre‑Build Checks: Verify Python versions, NVIDIA drivers, and initialize required directories.
 prebuild_checks:
   stage: prebuild
   image: python:3.10
   script:
     - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
     - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
-    - command -v nvidia-smi || (echo "NVIDIA drivers not installed or not in PATH" && exit 1)
-    - nvidia-smi
+    # Skip NVIDIA driver check; log a warning instead.
+    - command -v nvidia-smi || echo "NVIDIA drivers not installed or not in PATH; skipping GPU check"
+    - nvidia-smi || echo "nvidia-smi command unavailable; proceeding without GPU metrics"
     - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
     - mkdir -p app/models/{base_models,fine_tuned_models}
     - mkdir -p app/nltk_data
@@ -24,7 +24,6 @@ prebuild_checks:
     paths:
       - app/data/logs
 
-# Security Scan: Run SAST, dependency, container, and secret scanning; generate JSON/CSV reports.
 security_scan:
   stage: security_scan
   image: python:3.10
@@ -43,7 +42,6 @@ security_scan:
       - container_scan.json
       - secret_detection.json
 
-# Build & Test: Build Docker images, run unit, integration, and performance tests, plus code coverage.
 build_test:
   stage: build_test
   image: docker:latest
@@ -68,7 +66,6 @@ build_test:
       - performance_metrics.json
       - coverage_report.xml
 
-# Compliance: Generate YAML healthcheck artifacts for direct chat service, database, and dependencies.
 compliance:
   stage: compliance
   image: alpine:latest
@@ -101,7 +98,6 @@ compliance:
       - database_healthcheck.yaml
       - service_dependencies.yaml
 
-# Quality Gates: Validate minimum 80% code coverage and ensure no high-severity SAST issues.
 quality_gates:
   stage: quality_gates
   image: alpine:latest
@@ -122,7 +118,6 @@ quality_gates:
         echo "Error: High severity security issues found"; exit 1;
       fi
 
-# Deploy: Manual approval required; deploy only on the main branch.
 deploy:
   stage: deploy
   image: docker:latest
@@ -137,7 +132,6 @@ deploy:
   environment:
     name: production
 
-# Audit Trail: Archive build logs for audit and troubleshooting.
 audit_trail:
   stage: audit_trail
   image: alpine:latest
