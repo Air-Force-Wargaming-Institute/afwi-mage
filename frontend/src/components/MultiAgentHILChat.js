@@ -864,15 +864,18 @@ function MultiAgentHILChat() {
 
       // If continue was false, display the init response
       dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
+      const messagePayload = { 
+        id: uuidv4(),
+        text: response.data.message, 
+        sender: 'ai', 
+        timestamp: new Date(),
+        sessionId: state.currentSessionId  // Use state.currentSessionId instead of currentSession.id
+      };
+      
+      // Add message to chat
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
-        payload: { 
-          id: uuidv4(),
-          text: response.data.response || response.data.message, 
-          sender: 'ai', 
-          timestamp: new Date(),
-          sessionId: currentSession.id
-        }
+        payload: messagePayload
       });
 
     } catch (error) {

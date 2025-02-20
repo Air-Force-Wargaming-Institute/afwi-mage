@@ -39,12 +39,14 @@ const ACTIONS = {
   // Message Actions
   SET_MESSAGES: 'SET_MESSAGES',
   ADD_MESSAGE: 'ADD_MESSAGE',
+  REMOVE_ERROR_MESSAGES: 'REMOVE_ERROR_MESSAGES',
   
   // Session Actions
   SET_CHAT_SESSIONS: 'SET_CHAT_SESSIONS',
   ADD_CHAT_SESSION: 'ADD_CHAT_SESSION',
   DELETE_CHAT_SESSION: 'DELETE_CHAT_SESSION',
   SET_CURRENT_SESSION: 'SET_CURRENT_SESSION',
+  UPDATE_CHAT_SESSION: 'UPDATE_CHAT_SESSION',
   SET_SESSION_DIALOG: 'SET_SESSION_DIALOG',
   SET_SESSION_NAME: 'SET_SESSION_NAME',
   SET_SELECTED_TEAM: 'SET_SELECTED_TEAM',
@@ -86,6 +88,12 @@ function hilChatReducer(state, action) {
       break;
     case ACTIONS.ADD_MESSAGE:
       newState = { ...state, messages: [...state.messages, action.payload] };
+      break;
+    case ACTIONS.REMOVE_ERROR_MESSAGES:
+      newState = {
+        ...state,
+        messages: state.messages.filter(msg => msg.sender !== 'system')
+      };
       break;
       
     // Session Actions
