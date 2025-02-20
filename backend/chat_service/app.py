@@ -1,7 +1,7 @@
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +16,7 @@ from utils.llm_manager import LLMManager
 from multiagent.support_models.team_class import Team
 from multiagent.support_models.agent_class import Agent
 from utils.model_list import OllamaModelManager
+from utils.prompt_manager import SystemPromptManager
 
 config = load_config()
 
@@ -54,6 +55,18 @@ class SessionUpdate(BaseModel):
     team_id: str
     team_name: Optional[str] = None
     session_name: Optional[str] = None
+
+class PromptData(BaseModel):
+    """Model for prompt data"""
+    name: str = Field(..., description="Name of the prompt")
+    description: str = Field(..., description="Description of the prompt")
+    content: str = Field(..., description="Content of the prompt")
+    template_type: str = Field(..., description="Type of the template")
+    variables: List[str] = Field(default_factory=list, description="List of variables")
+
+class PromptUpdate(PromptData):
+    """Model for prompt updates"""
+    pass
 
 app = FastAPI()
 
@@ -450,6 +463,152 @@ async def list_ollama_models():
             }
     except Exception as e:
         logger.error(f"Error listing Ollama models: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/list")
+async def list_prompts():
+    """Get all system prompts"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            prompts = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().load_prompts()
+            )
+            return prompts
+    except Exception as e:
+        logger.error(f"Error listing prompts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/{prompt_id}")
+async def get_prompt(prompt_id: str):
+    """Get a specific prompt by ID"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            prompt = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().get_prompt(prompt_id)
+            )
+            if prompt:
+                return prompt
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error getting prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts")
+async def create_prompt(prompt_data: PromptData):
+    """Create a new system prompt"""
+    try:
+        logger.info(f"Received create prompt request with data: {prompt_data.dict()}")
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().add_prompt(None, prompt_data.dict())
+            )
+            logger.info(f"Add prompt result: {success}")
+            
+            if success:
+                # The ID will be the sanitized name
+                prompt_id = prompt_data.name.lower().replace(" ", "_")
+                response_data = {"id": prompt_id, **prompt_data.dict()}
+                logger.info(f"Returning successful response: {response_data}")
+                return response_data
+                
+            logger.error("Failed to create prompt")
+            raise HTTPException(status_code=400, detail="Failed to create prompt")
+            
+    except Exception as e:
+        logger.error(f"Error creating prompt: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/prompts/{prompt_id}")
+async def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
+    """Update an existing system prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().update_prompt(prompt_id, prompt_data.dict())
+            )
+            if success:
+                return {"id": prompt_id, **prompt_data.dict()}
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error updating prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/prompts/{prompt_id}")
+async def delete_prompt(prompt_id: str):
+    """Delete a system prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().delete_prompt(prompt_id)
+            )
+            if success:
+                return {"message": f"Prompt {prompt_id} deleted successfully"}
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error deleting prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/{prompt_id}/variables")
+async def get_prompt_variables(prompt_id: str):
+    """Get variables for a specific prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            variables = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().get_prompt_variables(prompt_id)
+            )
+            return variables
+    except Exception as e:
+        logger.error(f"Error getting prompt variables: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts/{prompt_id}/variables")
+async def add_prompt_variable(
+    prompt_id: str,
+    variable_name: str = Query(..., description="Name of the variable to add")
+):
+    """Add a new variable to a prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().add_variable(prompt_id, variable_name)
+            )
+            if success:
+                return {"message": f"Variable {variable_name} added successfully"}
+            raise HTTPException(status_code=400, detail="Failed to add variable")
+    except Exception as e:
+        logger.error(f"Error adding prompt variable: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/prompts/{prompt_id}/variables/{variable_name}")
+async def remove_prompt_variable(prompt_id: str, variable_name: str):
+    """Remove a variable from a prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().remove_variable(prompt_id, variable_name)
+            )
+            if success:
+                return {"message": f"Variable {variable_name} removed successfully"}
+            raise HTTPException(status_code=404, detail="Variable not found")
+    except Exception as e:
+        logger.error(f"Error removing prompt variable: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

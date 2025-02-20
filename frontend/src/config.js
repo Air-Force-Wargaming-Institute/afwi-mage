@@ -15,8 +15,9 @@ const API_URLS = {
 
 export const getApiUrl = (service, endpoint) => {
   const baseUrl = API_URLS[service];
-  if (service === 'DIRECT_CHAT') {
-    return `${baseUrl}/api/v1${endpoint}`;
-  }
-  return `${baseUrl}${endpoint}`;
+  const url = service === 'DIRECT_CHAT' ? 
+    `${baseUrl}/api/v1${endpoint}` : 
+    `${baseUrl}${endpoint}`;
+  console.log('API URL:', url); // Debug log
+  return url;
 };

@@ -33,6 +33,9 @@ LOG_PATH: '/app/data/logs'
 # Path to session storage
 SESSION_PATH: '/app/data/multiagent_sessions'
 
+# Path to system prompts
+PROMPT_PATH: '/app/data/system_prompts'
+
 # Location to persist the vector store 
 VS_PERSIST_DIR: './vectorstore2'
 
