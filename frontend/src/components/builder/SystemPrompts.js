@@ -61,6 +61,10 @@ const useStyles = makeStyles((theme) => ({
   },
   addVariableButton: {
     marginTop: theme.spacing(1),
+  },
+  llmSelect: {
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(2),
   }
 }));
 
@@ -73,6 +77,7 @@ function SystemPrompts() {
   const [selectedTemplateType, setSelectedTemplateType] = useState('system');
   const [availableVariables, setAvailableVariables] = useState([]);
   const [newVariable, setNewVariable] = useState('');
+  const [availableLLMs, setAvailableLLMs] = useState([]);
 
   const templateTypes = [
     { value: 'system', label: 'System Prompt' },
@@ -83,6 +88,7 @@ function SystemPrompts() {
 
   useEffect(() => {
     fetchPrompts();
+    fetchAvailableLLMs();
     if (editingPrompt?.id) {
       fetchAvailableVariables(editingPrompt.id);
     }
@@ -112,20 +118,42 @@ function SystemPrompts() {
     }
   };
 
+  const fetchAvailableLLMs = async () => {
+    try {
+      const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+      const llms = response.data.models.map(model => ({
+        id: model.name,  // Use model name as ID
+        name: model.name,
+        provider: 'Ollama'
+      }));
+      setAvailableLLMs(llms);
+    } catch (error) {
+      console.error('Error fetching Ollama models:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error loading available language models',
+        severity: 'error'
+      });
+      setAvailableLLMs([]); // Reset to empty array on error
+    }
+  };
+
   const handleEditPrompt = (promptId) => {
     if (promptId) {
       setEditingPrompt({
         id: promptId,
-        ...prompts[promptId]
+        ...prompts[promptId],
+        llm_id: prompts[promptId].llm || '' // Map llm to llm_id for the form
       });
     } else {
-      // Initialize a new prompt without an id
+      // Initialize a new prompt with default llm_id
       setEditingPrompt({
         name: '',
         description: '',
         content: '',
         variables: [],
-        template_type: selectedTemplateType
+        template_type: selectedTemplateType,
+        llm_id: availableLLMs.length > 0 ? availableLLMs[0].id : ''
       });
     }
     setDialogOpen(true);
@@ -151,33 +179,27 @@ function SystemPrompts() {
     }
 
     try {
-      console.log('Saving prompt...'); // Debug log
       const promptData = {
         name: editingPrompt.name.trim(),
         description: editingPrompt.description || '',
         content: editingPrompt.content.trim(),
         template_type: selectedTemplateType,
-        variables: availableVariables
+        variables: availableVariables,
+        llm: editingPrompt.llm_id || ''
       };
-
-      console.log('Prompt data:', promptData); // Debug log
 
       let response;
       if (editingPrompt.id && editingPrompt.id.trim()) {
-        console.log('Updating existing prompt...'); // Debug log
         response = await axios.put(
           getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}`),
           promptData
         );
       } else {
-        console.log('Creating new prompt...'); // Debug log
         response = await axios.post(
           getApiUrl('CHAT', '/api/prompts'),
           promptData
         );
       }
-
-      console.log('API response:', response); // Debug log
 
       setSnackbar({
         open: true,
@@ -296,9 +318,14 @@ function SystemPrompts() {
                   <Typography variant="body2" color="textSecondary">
                     {prompt.description}
                   </Typography>
-                  <Typography variant="caption" color="textSecondary">
+                  <Typography variant="caption" color="textSecondary" display="block">
                     ID for interpolation: {id}
                   </Typography>
+                  {prompt.llm && (
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      LLM: {availableLLMs.find(llm => llm.id === prompt.llm)?.name || prompt.llm}
+                    </Typography>
+                  )}
                 </React.Fragment>
               }
             />
@@ -338,6 +365,23 @@ function SystemPrompts() {
               {templateTypes.map(type => (
                 <MenuItem key={type.value} value={type.value}>
                   {type.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <FormControl fullWidth className={classes.llmSelect}>
+            <InputLabel>Language Model</InputLabel>
+            <Select
+              value={editingPrompt?.llm_id || ''}
+              onChange={(e) => setEditingPrompt({
+                ...editingPrompt,
+                llm_id: e.target.value
+              })}
+            >
+              {availableLLMs.map(llm => (
+                <MenuItem key={llm.id} value={llm.id}>
+                  {llm.name} {/* Remove provider since all are from Ollama */}
                 </MenuItem>
               ))}
             </Select>

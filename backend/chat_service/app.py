@@ -63,6 +63,7 @@ class PromptData(BaseModel):
     content: str = Field(..., description="Content of the prompt")
     template_type: str = Field(..., description="Type of the template")
     variables: List[str] = Field(default_factory=list, description="List of variables")
+    llm: Optional[str] = Field(default="", description="Selected LLM for this prompt")
 
 class PromptUpdate(PromptData):
     """Model for prompt updates"""
@@ -129,13 +130,13 @@ def _process_init_chat(request_data: ChatMessage):
         for agent in agent_names
     )
 
-    relevance_template = config["HIGH_LEVEL_PROMPT"] + """Given this team of experts and their domain, determine if the message is relevant to the team. If it is, return a boolean value of true and an extremely brief explanation of why it is relevant. If it is not, return a boolean value of false and a more detailed explanation of why it is not relevant. Here are some examples of irrelevant messages: "Hello!", "What is the meaning of life?", "My name is John.", "What day is it?", "Test", "What is the weather in Tokyo?", "Guess my favorite color." Here is the team of experts and their domain: {agents_with_instructions} Here is the message: {message}"""
+    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
 
-    prompt = PromptTemplate(
-        input_variables=["current_datetime", "agents_with_instructions", "message"],
-        template=relevance_template
-    )
-    prompt = prompt.format(
+    # prompt = PromptTemplate(
+    #     input_variables=["current_datetime", "agents_with_instructions", "message"],
+    #     template=relevance_prompt
+    # )
+    prompt = relevance_prompt.format(
         current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         agents_with_instructions=agents_with_instructions,
         message=request_data.message
@@ -237,23 +238,24 @@ def _process_refine_chat(request_data: ChatMessage):
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
-        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
-        1. Use the previous plan as the foundation for your new plan
-        2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
-        4. Explain clearly and in detail what and how each agent will contribute to the response
-        5. Format this plan in a way that is easy to understand for the user
+        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
+        # 1. Use the previous plan as the foundation for your new plan
+        # 2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        # 3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
+        # 4. Explain clearly and in detail what and how each agent will contribute to the response
+        # 5. Format this plan in a way that is easy to understand for the user
     
-        Message: {message}
-        Previous Plan: {previous_plan}
-        Team of Experts: {agents_with_instructions}
+        # Message: {message}
+        # Previous Plan: {previous_plan}
+        # Team of Experts: {agents_with_instructions}
 
-        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        """
-        prompt = PromptTemplate(
-            input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
-            template=plan_template
-        )
+        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        # """
+        # prompt = PromptTemplate(
+        #     input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
+        #     template=plan_template
+        # )
+        prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_previous_plan")
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
@@ -261,23 +263,24 @@ def _process_refine_chat(request_data: ChatMessage):
             agents_with_instructions=agents_with_instructions
         )
     else:
-        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
-        1. Review the previous conversation to incorporate any relevant information regarding the user's message
-        2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        3. Determine which agents are qualified and necessary to respond to the new message you created
-        4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
-        5. Format this plan in a way that is easy to understand for the user
+        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
+        # 1. Review the previous conversation to incorporate any relevant information regarding the user's message
+        # 2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        # 3. Determine which agents are qualified and necessary to respond to the new message you created
+        # 4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
+        # 5. Format this plan in a way that is easy to understand for the user
     
-        Message: {message}
-        Previous Conversation: {conversation_history}
-        Team of Experts: {agents_with_instructions}
+        # Message: {message}
+        # Previous Conversation: {conversation_history}
+        # Team of Experts: {agents_with_instructions}
 
-        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        """
-        prompt = PromptTemplate(
-            input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
-            template=plan_template
-        )
+        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        # """
+        # prompt = PromptTemplate(
+        #     input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
+        #     template=plan_template
+        # )
+        prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_conversation_history")
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,

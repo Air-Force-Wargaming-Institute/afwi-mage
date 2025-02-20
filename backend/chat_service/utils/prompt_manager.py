@@ -5,8 +5,18 @@ from typing import Dict, Optional, List
 from config_ import load_config
 from langchain_core.prompts import PromptTemplate
 from threading import RLock
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+class PromptData(BaseModel):
+    """Model for prompt data"""
+    name: str = Field(..., description="Name of the prompt")
+    description: str = Field(..., description="Description of the prompt")
+    content: str = Field(..., description="Content of the prompt")
+    template_type: str = Field(..., description="Type of the template")
+    variables: List[str] = Field(default_factory=list, description="List of variables")
+    llm: Optional[str] = Field(default="", description="Selected LLM for this prompt")
 
 class SystemPromptManager:
     """Manages system-level prompts used across the application"""
@@ -77,7 +87,14 @@ class SystemPromptManager:
                     return {}
                 
                 with open(self.prompt_file, 'r') as f:
-                    return json.load(f)
+                    prompts = json.load(f)
+                    
+                # Ensure all prompts have the llm field
+                for prompt in prompts.values():
+                    if "llm" not in prompt:
+                        prompt["llm"] = ""
+                        
+                return prompts
                     
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding JSON from prompts file: {e}")
@@ -182,6 +199,8 @@ class SystemPromptManager:
                     prompt_data["variables"] = prompts[prompt_id].get("variables", [])
                 if "template_type" not in prompt_data:
                     prompt_data["template_type"] = prompts[prompt_id].get("template_type", "system")
+                if "llm" not in prompt_data:
+                    prompt_data["llm"] = prompts[prompt_id].get("llm", "")
                     
                 prompts[prompt_id].update(prompt_data)
                 return self.save_prompts(prompts)
@@ -205,6 +224,8 @@ class SystemPromptManager:
                     
                 # Make a copy of the data to avoid modifying the input
                 new_prompt = prompt_data.copy()
+                if "llm" not in new_prompt:
+                    new_prompt["llm"] = ""
                 prompts[prompt_id] = new_prompt
                 
                 return self.save_prompts(prompts)
