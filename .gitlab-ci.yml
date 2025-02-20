@@ -59,14 +59,16 @@ build_test:
     - name: postgres:13
       alias: db
   variables:
-    # These are standard credentials for the official Postgres image.
-    # Note: The db service in your Docker Compose file is commented out.
-    # Ensure your application connects to an external or pre-configured DB if you leave it commented.
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
     POSTGRES_PASSWORD: password
     POSTGRES_USER: postgres
     POSTGRES_DB: dbname
   script:
     - set -x
+    # List the current directory to verify that docker-compose.yml is present
+    - ls -la
+    # If your docker-compose.yml is in a different directory, add a 'cd' command here.
     - docker-compose --verbose build
     - docker-compose run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
     - docker-compose run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
