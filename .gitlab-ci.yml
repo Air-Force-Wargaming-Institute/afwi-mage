@@ -31,11 +31,11 @@ build-job:
 
 lint-job-python:
   stage: unit-test
-  image: python:3.9
+  image: python:3.11-slim
   script:
     - echo "Linting Python code..."
     - pip install flake8
-    - flake8 mage/   # adjust path as needed
+    - flake8 afwi-multi-agent-generative-engine/   # adjust path as needed
     - echo "Python lint complete."
 
 lint-job-node:
@@ -49,11 +49,11 @@ lint-job-node:
 
 unit-test-python:
   stage: unit-test
-  image: python:3.9
+  image: python:3.11-slim
   script:
     - echo "Running Python unit tests..."
     - pip install pytest pytest-cov
-    - pytest --cov=mage --cov-report=term-missing
+    - pytest --cov=afwi-multi-agent-generative-engine --cov-report=term-missing
   artifacts:
     paths:
       - htmlcov/
@@ -77,7 +77,7 @@ unit-test-node:
 
 sast-python:
   stage: security
-  image: python:3.9
+  image: python:3.11-slim
   script:
     - echo "Running Bandit for Python SAST..."
     - pip install bandit jq
@@ -122,7 +122,7 @@ sast-node:
 
 dependency-scan:
   stage: security
-  image: python:3.9
+  image: python:3.11-slim
   script:
     - echo "Running pip-audit for Python dependency scanning..."
     - pip install pip-audit jq
