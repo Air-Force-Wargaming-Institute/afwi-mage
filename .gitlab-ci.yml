@@ -18,7 +18,8 @@ secret-detection:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    - pip install detect-secrets jq
+    - apt-get update && apt-get install -y git jq
+    - pip install detect-secrets
     - |
       detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
       if [ -s "$REPORT_DIR/secrets.json" ]; then
@@ -63,37 +64,56 @@ sast-scan:
   extends: .security_scan_template
   script:
     - pip install bandit
-    - apt-get update && apt-get install -y nodejs npm jq
-    - npm install -g eslint eslint-config-security
+    - pip install jq
+    # Install Node.js using proper Windows commands
     - |
-      # Scan Python files
-      echo "Running Python SAST scan..."
-      bandit -r . -f json -o "$REPORT_DIR/python_sast.json" || true
-      if [ -s "$REPORT_DIR/python_sast.json" ]; then
-        jq -r '.results[] | [.filename, .issue_severity, .issue_text, .line_number] | @csv' \
-          "$REPORT_DIR/python_sast.json" > "$REPORT_DIR/python_sast_results.csv"
-      else
-        echo "No Python security issues found" > "$REPORT_DIR/python_sast_results.csv"
-      fi
+      Write-Host "Installing Node.js and npm..."
+      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+      Invoke-WebRequest -Uri https://nodejs.org/dist/v16.20.2/node-v16.20.2-x64.msi -OutFile node.msi
+      Start-Process msiexec.exe -Wait -ArgumentList '/i node.msi /quiet'
+      $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
     - |
-      # Scan JavaScript files
-      echo "Running JavaScript SAST scan..."
-      find . -name "*.js" -not -path "./node_modules/*" -type f | while read -r js_file; do
-        eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' "$js_file" >> "$REPORT_DIR/js_sast.json" 2>/dev/null || true
-      done
-      if [ -s "$REPORT_DIR/js_sast.json" ]; then
-        jq -r '.[] | select(.messages[].ruleId != null) | 
-          .messages[] | [.ruleId, .severity, .message, .line] | @csv' \
-          "$REPORT_DIR/js_sast.json" > "$REPORT_DIR/js_sast_results.csv"
-      else
-        echo "No JavaScript security issues found" > "$REPORT_DIR/js_sast_results.csv"
-      fi
+      Write-Host "Installing ESLint and security plugins..."
+      npm install -g eslint
+      npm install -g eslint-plugin-security
+    - |
+      Write-Host "Running Python SAST scan..."
+      bandit -r . -f json -o "$env:REPORT_DIR/python_sast.json"
+      if (Test-Path "$env:REPORT_DIR/python_sast.json") {
+        Get-Content "$env:REPORT_DIR/python_sast.json" | 
+          ConvertFrom-Json | 
+          Select-Object -ExpandProperty results | 
+          ForEach-Object {
+            "$($_.filename),$($_.issue_severity),$($_.issue_text),$($_.line_number)"
+          } | Out-File -FilePath "$env:REPORT_DIR/python_sast_results.csv"
+      } else {
+        "No Python security issues found" | Out-File -FilePath "$env:REPORT_DIR/python_sast_results.csv"
+      }
+    - |
+      Write-Host "Running JavaScript SAST scan..."
+      Get-ChildItem -Path . -Filter "*.js" -Recurse -Exclude "node_modules" | 
+        ForEach-Object {
+          Write-Host "Scanning $($_.FullName)"
+          eslint --format=json --no-eslintrc -c "{`"plugins`":[`"security`"],`"extends`":[`"plugin:security/recommended`"]}" $_.FullName |
+            Out-File -Append -FilePath "$env:REPORT_DIR/js_sast.json"
+        }
+      if (Test-Path "$env:REPORT_DIR/js_sast.json") {
+        Get-Content "$env:REPORT_DIR/js_sast.json" | 
+          ConvertFrom-Json | 
+          ForEach-Object { $_.messages } | 
+          Where-Object { $_.ruleId -ne $null } |
+          ForEach-Object {
+            "$($_.ruleId),$($_.severity),$($_.message),$($_.line)"
+          } | Out-File -FilePath "$env:REPORT_DIR/js_sast_results.csv"
+      } else {
+        "No JavaScript security issues found" | Out-File -FilePath "$env:REPORT_DIR/js_sast_results.csv"
+      }
   artifacts:
     paths:
-      - $REPORT_DIR/python_sast*.csv
-      - $REPORT_DIR/python_sast*.json
-      - $REPORT_DIR/js_sast*.csv
-      - $REPORT_DIR/js_sast*.json
+      - $env:REPORT_DIR/python_sast*.csv
+      - $env:REPORT_DIR/python_sast*.json
+      - $env:REPORT_DIR/js_sast*.csv
+      - $env:REPORT_DIR/js_sast*.json
     expire_in: 1 week
 
 # Aggregate all reports
