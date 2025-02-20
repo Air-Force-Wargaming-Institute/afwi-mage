@@ -44,63 +44,53 @@ node-dependency-scan:
   image: node:16
   extends: .security_scan_template
   script:
-    - New-Item -ItemType Directory -Force -Path $env:REPORT_DIR
+    - apt-get update && apt-get install -y jq
     - |
-      $packageFiles = Get-ChildItem -Path . -Filter "package.json" -Recurse
-      foreach ($pkgFile in $packageFiles) {
-        Write-Host "Scanning $($pkgFile.FullName)"
-        $dirname = $pkgFile.Directory.Name
+      find . -name "package.json" -type f | while read -r pkg_file; do
+        echo "Scanning $pkg_file"
+        dirname=$(dirname "$pkg_file")
+        basename=$(basename "$dirname")
         
         # Create temp directory
-        $tempDir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString())) -Force
+        temp_dir=$(mktemp -d)
         
-        try {
-          # Copy package files
-          Copy-Item $pkgFile.FullName -Destination $tempDir
-          if (Test-Path (Join-Path $pkgFile.Directory.FullName "package-lock.json")) {
-            Copy-Item (Join-Path $pkgFile.Directory.FullName "package-lock.json") -Destination $tempDir
-          }
-          
-          # Change to temp directory
-          Push-Location $tempDir
-          
-          # Run npm audit
-          $auditResult = npm audit --json | ConvertFrom-Json
-          
-          # Create CSV report
-          $csvPath = Join-Path $env:CI_PROJECT_DIR $env:REPORT_DIR "${dirname}_npm_audit.csv"
-          $jsonPath = Join-Path $env:CI_PROJECT_DIR $env:REPORT_DIR "${dirname}_npm_audit.json"
-          
-          if ($auditResult.advisories) {
-            $auditResult.advisories.PSObject.Properties | ForEach-Object {
-              $advisory = $_.Value
-              "$($advisory.module_name),$($advisory.vulnerable_versions),$($advisory.patched_versions),$($advisory.severity),$($advisory.title)" |
-                Out-File -FilePath $csvPath -Append -Encoding UTF8
-            }
-          } else {
-            "No vulnerabilities found in $($pkgFile.Name)" | Out-File -FilePath $csvPath -Encoding UTF8
-          }
-          
-          # Save JSON report
-          $auditResult | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
-          
-          # Return to original directory
-          Pop-Location
-          
-        } catch {
-          Write-Host "Error processing $($pkgFile.FullName): $_"
-          "Error scanning $($pkgFile.Name)" | Out-File -FilePath $csvPath -Encoding UTF8
-        } finally {
-          # Cleanup
-          if (Test-Path $tempDir) {
-            Remove-Item -Path $tempDir -Recurse -Force
-          }
-        }
-      }
+        # Copy package files
+        cp "$pkg_file" "$temp_dir/"
+        if [ -f "$dirname/package-lock.json" ]; then
+          cp "$dirname/package-lock.json" "$temp_dir/"
+        fi
+        
+        # Change to temp directory and run audit
+        cd "$temp_dir"
+        if npm audit --json > "audit_result.json" 2>/dev/null; then
+          # Process audit results
+          if [ -s "audit_result.json" ]; then
+            jq -r '
+              if .advisories then
+                .advisories | to_entries | .[] | .value |
+                [.module_name, .vulnerable_versions, .patched_versions, .severity, .title] | @csv
+              else
+                empty
+              end
+            ' "audit_result.json" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+            
+            # Copy full JSON report
+            cp "audit_result.json" "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.json"
+          else
+            echo "No vulnerabilities found in $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+          fi
+        else
+          echo "Error scanning $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+        fi
+        
+        # Return to original directory and cleanup
+        cd "$CI_PROJECT_DIR"
+        rm -rf "$temp_dir"
+      done
   artifacts:
     paths:
-      - $env:REPORT_DIR/*_npm_audit.csv
-      - $env:REPORT_DIR/*_npm_audit.json
+      - $REPORT_DIR/*_npm_audit.csv
+      - $REPORT_DIR/*_npm_audit.json
     expire_in: 1 week
 
 # Secret detection scan
@@ -109,14 +99,21 @@ secret-detection:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    - pip install detect-secrets
+    - pip install detect-secrets jq
     - |
-      detect-secrets scan . --force-use-all-plugins | 
-      jq -r '.results | to_entries | .[] | [.key, .value[].type, .value[].line_number] | @csv' > 
-      $REPORT_DIR/detected_secrets.csv
+      detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
+      if [ -s "$REPORT_DIR/secrets.json" ]; then
+        jq -r '
+          .results | to_entries[] |
+          [.key, (.value[] | .type, .line_number)] | @csv
+        ' "$REPORT_DIR/secrets.json" > "$REPORT_DIR/detected_secrets.csv"
+      else
+        echo "No secrets detected" > "$REPORT_DIR/detected_secrets.csv"
+      fi
   artifacts:
     paths:
       - $REPORT_DIR/detected_secrets.csv
+      - $REPORT_DIR/secrets.json
     expire_in: 1 week
 
 # Container base image scan
@@ -126,14 +123,18 @@ container-base-scan:
   extends: .security_scan_template
   script:
     - |
-      for dockerfile in $(find . -name "Dockerfile"); do
-        base_image=$(grep "^FROM" $dockerfile | head -1 | awk '{print $2}')
-        echo "Scanning base image: $base_image from $dockerfile"
-        trivy image --format csv --output $REPORT_DIR/container_base_$(echo $dockerfile | tr '/' '_').csv $base_image
+      find . -name "Dockerfile" -type f | while read -r dockerfile; do
+        echo "Scanning $dockerfile"
+        basename=$(echo "$dockerfile" | tr '/' '_')
+        base_image=$(grep "^FROM" "$dockerfile" | head -1 | awk '{print $2}')
+        echo "Scanning base image: $base_image"
+        trivy image --format json --output "$REPORT_DIR/${basename}_scan.json" "$base_image"
+        trivy image --format csv --output "$REPORT_DIR/${basename}_scan.csv" "$base_image"
       done
   artifacts:
     paths:
-      - $REPORT_DIR/container_base_*.csv
+      - $REPORT_DIR/*_scan.csv
+      - $REPORT_DIR/*_scan.json
     expire_in: 1 week
 
 # SAST (Static Application Security Testing)
@@ -143,21 +144,37 @@ sast-scan:
   extends: .security_scan_template
   script:
     - pip install bandit
+    - apt-get update && apt-get install -y nodejs npm jq
+    - npm install -g eslint eslint-config-security
     - |
       # Scan Python files
-      bandit -r . -f csv -o $REPORT_DIR/python_sast_results.csv
+      echo "Running Python SAST scan..."
+      bandit -r . -f json -o "$REPORT_DIR/python_sast.json" || true
+      if [ -s "$REPORT_DIR/python_sast.json" ]; then
+        jq -r '.results[] | [.filename, .issue_severity, .issue_text, .line_number] | @csv' \
+          "$REPORT_DIR/python_sast.json" > "$REPORT_DIR/python_sast_results.csv"
+      else
+        echo "No Python security issues found" > "$REPORT_DIR/python_sast_results.csv"
+      fi
     - |
-      # Install and run ESLint for JavaScript files
-      apt-get update && apt-get install -y nodejs npm
-      npm install -g eslint eslint-config-security
-      find . -name "*.js" -not -path "./node_modules/*" | 
-      xargs eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' |
-      jq -r '.[] | [.filePath, .messages[].ruleId, .messages[].message, .messages[].line] | @csv' > 
-      $REPORT_DIR/js_sast_results.csv
+      # Scan JavaScript files
+      echo "Running JavaScript SAST scan..."
+      find . -name "*.js" -not -path "./node_modules/*" -type f | while read -r js_file; do
+        eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' "$js_file" >> "$REPORT_DIR/js_sast.json" 2>/dev/null || true
+      done
+      if [ -s "$REPORT_DIR/js_sast.json" ]; then
+        jq -r '.[] | select(.messages[].ruleId != null) | 
+          .messages[] | [.ruleId, .severity, .message, .line] | @csv' \
+          "$REPORT_DIR/js_sast.json" > "$REPORT_DIR/js_sast_results.csv"
+      else
+        echo "No JavaScript security issues found" > "$REPORT_DIR/js_sast_results.csv"
+      fi
   artifacts:
     paths:
-      - $REPORT_DIR/python_sast_results.csv
-      - $REPORT_DIR/js_sast_results.csv
+      - $REPORT_DIR/python_sast*.csv
+      - $REPORT_DIR/python_sast*.json
+      - $REPORT_DIR/js_sast*.csv
+      - $REPORT_DIR/js_sast*.json
     expire_in: 1 week
 
 # Aggregate all reports
@@ -167,26 +184,39 @@ aggregate-reports:
   script:
     - |
       echo "Creating summary report..."
-      echo "Security Scan Summary" > $REPORT_DIR/summary_report.csv
-      echo "Scan Type,Total Issues Found,High Severity,Medium Severity,Low Severity" >> $REPORT_DIR/summary_report.csv
+      echo "Security Scan Summary" > "$REPORT_DIR/summary_report.csv"
+      echo "Scan Type,Total Issues Found,High Severity,Medium Severity,Low Severity" >> "$REPORT_DIR/summary_report.csv"
       
-      # Count issues in Python dependencies
-      python_deps=$(find $REPORT_DIR -name "python_dependencies_*.csv" | xargs cat | wc -l)
-      echo "Python Dependencies,$python_deps,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      # Function to count CSV lines excluding header
+      count_csv_issues() {
+        if [ -f "$1" ]; then
+          tail -n +2 "$1" | wc -l
+        else
+          echo "0"
+        fi
+      }
       
-      # Count issues in Node.js dependencies
-      node_deps=$(find $REPORT_DIR -name "node_dependencies_*.csv" | xargs cat | wc -l)
-      echo "Node.js Dependencies,$node_deps,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      # Count Python dependencies
+      python_deps=$(find "$REPORT_DIR" -name "*_dependencies.csv" -exec cat {} \; | wc -l)
+      echo "Python Dependencies,$python_deps,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
       
-      # Count detected secrets
-      secrets=$(cat $REPORT_DIR/detected_secrets.csv | wc -l)
-      echo "Detected Secrets,$secrets,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      # Count Node.js vulnerabilities
+      node_deps=$(find "$REPORT_DIR" -name "*_npm_audit.csv" -exec cat {} \; | wc -l)
+      echo "Node.js Dependencies,$node_deps,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
+      
+      # Count secrets
+      secrets=$(count_csv_issues "$REPORT_DIR/detected_secrets.csv")
+      echo "Detected Secrets,$secrets,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
+      
+      # Count container vulnerabilities
+      container_issues=$(find "$REPORT_DIR" -name "*_scan.csv" -exec cat {} \; | wc -l)
+      echo "Container Security,$container_issues,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
       
       # Count SAST issues
-      sast_python=$(cat $REPORT_DIR/python_sast_results.csv | wc -l)
-      sast_js=$(cat $REPORT_DIR/js_sast_results.csv | wc -l)
-      echo "SAST (Python),$sast_python,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
-      echo "SAST (JavaScript),$sast_js,N/A,N/A,N/A" >> $REPORT_DIR/summary_report.csv
+      sast_python=$(count_csv_issues "$REPORT_DIR/python_sast_results.csv")
+      sast_js=$(count_csv_issues "$REPORT_DIR/js_sast_results.csv")
+      echo "SAST (Python),$sast_python,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
+      echo "SAST (JavaScript),$sast_js,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
   artifacts:
     paths:
       - $REPORT_DIR/*
