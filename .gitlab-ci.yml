@@ -1,4 +1,4 @@
-stages: 
+stages:
   - prebuild
   - security_scan
 
