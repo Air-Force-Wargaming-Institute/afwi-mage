@@ -4,10 +4,10 @@ stages:
   - report_aggregation
 
 variables:
-  # Define the directory where all reports will be stored
+  # Directory for all reports
   REPORT_DIR: "security_reports"
 
-# A base template to ensure the reports directory exists
+# A template to create the report directory
 .security_scan_template:
   before_script:
     - mkdir -p $REPORT_DIR
@@ -20,14 +20,31 @@ python-dependency-scan:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    # Install required tools; exit if installation fails.
-    - apt-get update && apt-get install -y jq || { echo "jq installation failed"; exit 1; }
-    - pip install safety || { echo "safety installation failed"; exit 1; }
     - |
+      # Install jq
+      apt-get update && apt-get install -y jq
+      if [ $? -ne 0 ]; then
+        echo "jq installation failed"
+        exit 1
+      fi
+    - |
+      # Install safety
+      pip install safety
+      if [ $? -ne 0 ]; then
+        echo "safety installation failed"
+        exit 1
+      fi
+    - |
+      # Scan each requirements.txt file
       for req_file in $(find . -name "requirements.txt"); do
         echo "Scanning $req_file"
-        safety check -r "$req_file" --output json | jq -r '.[] | [.package, .analyzed_version, .vulnerable_spec, .advisory] | @csv' \
-          > "$REPORT_DIR/python_dependencies_$(echo "$req_file" | tr '/' '_').csv" || { echo "Warning: Safety scan failed for $req_file, skipping..."; continue; }
+        safety check -r "$req_file" --output json | \
+          jq -r '.[] | [.package, .analyzed_version, .vulnerable_spec, .advisory] | @csv' \
+          > "$REPORT_DIR/python_dependencies_$(echo "$req_file" | tr '/' '_').csv"
+        if [ $? -ne 0 ]; then
+          echo "Warning: Safety scan failed for $req_file, skipping..."
+          continue
+        fi
       done
   artifacts:
     paths:
@@ -41,15 +58,33 @@ node-dependency-scan:
   image: node:16
   extends: .security_scan_template
   script:
-    # Install jq and required npm tools.
-    - apt-get update && apt-get install -y jq || { echo "jq installation failed"; exit 1; }
-    - npm install -g npm-audit-html || { echo "npm-audit-html installation failed"; exit 1; }
     - |
+      # Install jq
+      apt-get update && apt-get install -y jq
+      if [ $? -ne 0 ]; then
+        echo "jq installation failed"
+        exit 1
+      fi
+    - |
+      # Install npm-audit-html globally
+      npm install -g npm-audit-html
+      if [ $? -ne 0 ]; then
+        echo "npm-audit-html installation failed"
+        exit 1
+      fi
+    - |
+      # Scan each package.json file
       for pkg_file in $(find . -name "package.json"); do
         echo "Scanning $pkg_file"
         cd "$(dirname "$pkg_file")" || { echo "Failed to change directory for $pkg_file, skipping..."; continue; }
-        npm audit --json | jq -r '.advisories | to_entries | .[] | .value | [.module_name, .vulnerable_versions, .patched_versions, .title] | @csv' \
-          > "$CI_PROJECT_DIR/$REPORT_DIR/node_dependencies_$(echo "$pkg_file" | tr '/' '_').csv" || { echo "Warning: npm audit failed for $pkg_file, skipping..."; cd "$CI_PROJECT_DIR"; continue; }
+        npm audit --json | \
+          jq -r '.advisories | to_entries | .[] | .value | [.module_name, .vulnerable_versions, .patched_versions, .title] | @csv' \
+          > "$CI_PROJECT_DIR/$REPORT_DIR/node_dependencies_$(echo "$pkg_file" | tr '/' '_').csv"
+        if [ $? -ne 0 ]; then
+          echo "Warning: npm audit failed for $pkg_file, skipping..."
+          cd "$CI_PROJECT_DIR"
+          continue
+        fi
         cd "$CI_PROJECT_DIR"
       done
   artifacts:
@@ -64,18 +99,33 @@ secret-detection:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    - apt-get update && apt-get install -y jq || { echo "jq installation failed"; exit 1; }
-    - pip install detect-secrets || { echo "detect-secrets installation failed"; exit 1; }
-    - detect-secrets scan . --force-use-all-plugins | \
-      jq -r '.results | to_entries | .[] | [.key, (.value[] | .type), (.value[] | .line_number)] | @csv' \
-      > "$REPORT_DIR/detected_secrets.csv" || { echo "Warning: Secret detection failed, continuing..."; touch "$REPORT_DIR/detected_secrets.csv"; }
+    - |
+      apt-get update && apt-get install -y jq
+      if [ $? -ne 0 ]; then
+        echo "jq installation failed"
+        exit 1
+      fi
+    - |
+      pip install detect-secrets
+      if [ $? -ne 0 ]; then
+        echo "detect-secrets installation failed"
+        exit 1
+      fi
+    - |
+      detect-secrets scan . --force-use-all-plugins | \
+        jq -r '.results | to_entries | .[] | [.key, (.value[] | .type), (.value[] | .line_number)] | @csv' \
+        > "$REPORT_DIR/detected_secrets.csv"
+      if [ $? -ne 0 ]; then
+        echo "Warning: Secret detection failed, continuing..."
+        touch "$REPORT_DIR/detected_secrets.csv"
+      fi
   artifacts:
     paths:
       - $REPORT_DIR
 
-#######################################
-# Container Base Image Vulnerability Scan
-#######################################
+###########################################
+# Container Base Image Vulnerability Scan #
+###########################################
 container-base-scan:
   stage: security_scan
   image: aquasec/trivy:latest
@@ -85,7 +135,11 @@ container-base-scan:
       for dockerfile in $(find . -name "Dockerfile"); do
         base_image=$(grep "^FROM" "$dockerfile" | head -1 | awk '{print $2}')
         echo "Scanning base image: $base_image from $dockerfile"
-        trivy image --format csv --output "$REPORT_DIR/container_base_$(echo "$dockerfile" | tr '/' '_').csv" "$base_image" || { echo "Warning: Trivy scan failed for $dockerfile, skipping..."; continue; }
+        trivy image --format csv --output "$REPORT_DIR/container_base_$(echo "$dockerfile" | tr '/' '_').csv" "$base_image"
+        if [ $? -ne 0 ]; then
+          echo "Warning: Trivy scan failed for $dockerfile, skipping..."
+          continue
+        fi
       done
   artifacts:
     paths:
@@ -99,16 +153,39 @@ sast-scan:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
-    # Install dependencies for both Python and JavaScript scans.
-    - apt-get update && apt-get install -y jq nodejs npm || { echo "Dependency installation failed"; exit 1; }
-    - pip install bandit || { echo "bandit installation failed"; exit 1; }
-    # Run Bandit for Python; if it fails, log a warning and create an empty file.
-    - bandit -r . -f csv -o "$REPORT_DIR/python_sast_results.csv" || { echo "Warning: Python SAST scan failed, continuing..."; touch "$REPORT_DIR/python_sast_results.csv"; }
-    - npm install -g eslint eslint-config-security || { echo "ESLint installation failed"; exit 1; }
     - |
-      find . -name "*.js" -not -path "./node_modules/*" | xargs eslint --format=json --no-eslintrc -c '{"extends": ["security"]}' | \
-      jq -r '.[] | (.filePath) as $file | .messages[]? | [$file, .ruleId, .message, .line] | @csv' \
-      > "$REPORT_DIR/js_sast_results.csv" || { echo "Warning: JavaScript SAST scan failed, continuing..."; touch "$REPORT_DIR/js_sast_results.csv"; }
+      apt-get update && apt-get install -y jq nodejs npm
+      if [ $? -ne 0 ]; then
+        echo "Dependency installation failed"
+        exit 1
+      fi
+    - |
+      pip install bandit
+      if [ $? -ne 0 ]; then
+        echo "bandit installation failed"
+        exit 1
+      fi
+    - |
+      bandit -r . -f csv -o "$REPORT_DIR/python_sast_results.csv"
+      if [ $? -ne 0 ]; then
+        echo "Warning: Python SAST scan failed, continuing..."
+        touch "$REPORT_DIR/python_sast_results.csv"
+      fi
+    - |
+      npm install -g eslint eslint-config-security
+      if [ $? -ne 0 ]; then
+        echo "ESLint installation failed"
+        exit 1
+      fi
+    - |
+      output=$(find . -name "*.js" -not -path "./node_modules/*" | \
+                xargs eslint --format=json --no-eslintrc -c '{"extends": ["security"]}')
+      if [ $? -ne 0 ]; then
+        echo "Warning: JavaScript SAST scan failed, continuing..."
+        touch "$REPORT_DIR/js_sast_results.csv"
+      else
+        echo "$output" > "$REPORT_DIR/js_sast_results.csv"
+      fi
   artifacts:
     paths:
       - $REPORT_DIR
