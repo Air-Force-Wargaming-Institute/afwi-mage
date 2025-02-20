@@ -33,7 +33,13 @@ security_scan:
     - pip install bandit safety trufflehog
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
-    - python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
+    - |
+      if [ -s dependency_check.json ]; then 
+        python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
+      else 
+        echo "dependency_check.json is empty, skipping CSV conversion"
+        echo "package,version" > dependency_check.csv
+      fi
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
     - trivy image --format json --output container_scan.json my-docker-image:latest || true
     - trufflehog filesystem . --json > secret_detection.json || true
