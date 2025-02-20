@@ -11,11 +11,12 @@ prebuild_checks:
   stage: prebuild
   image: python:3.10
   script:
+    - set -x  # Enable command tracing for debugging
     - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
     - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
     # Skip NVIDIA driver check; log a warning instead.
-    - command -v nvidia-smi || echo "NVIDIA drivers not installed or not in PATH; skipping GPU check"
-    - nvidia-smi || echo "nvidia-smi command unavailable; proceeding without GPU metrics"
+    - command -v nvidia-smi || echo "NVIDIA drivers not installed; skipping GPU check"
+    - nvidia-smi || echo "nvidia-smi unavailable; proceeding without GPU metrics"
     - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
     - mkdir -p app/models/{base_models,fine_tuned_models}
     - mkdir -p app/nltk_data
@@ -28,6 +29,7 @@ security_scan:
   stage: security_scan
   image: python:3.10
   script:
+    - set -x
     - pip install bandit safety trufflehog
     - bandit -r . -f json -o sast_report.json
     - safety check --json > dependency_check.json
@@ -50,15 +52,19 @@ build_test:
     - name: postgres:13
       alias: db
   variables:
+    # These environment variables are standard for the Postgres image.
+    # Note: The db service is commented out in your Docker Compose file.
+    # Ensure your application connects to an external or pre-configured DB if you leave it commented.
     POSTGRES_PASSWORD: password
     POSTGRES_USER: postgres
     POSTGRES_DB: dbname
   script:
-    - docker-compose build
-    - docker-compose run --rm core pytest --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
-    - docker-compose run --rm core pytest tests/integration --json-report --json-report-file=integration_tests.json
-    - docker-compose run --rm core pytest tests/performance --json-report --json-report-file=performance_metrics.json
-    - docker-compose run --rm core pytest --cov=. --cov-report=xml:coverage_report.xml
+    - set -x
+    - docker-compose --verbose build
+    - docker-compose run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
+    - docker-compose run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
+    - docker-compose run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
+    - docker-compose run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
   artifacts:
     paths:
       - unit_tests.xml
@@ -70,6 +76,7 @@ compliance:
   stage: compliance
   image: alpine:latest
   script:
+    - set -x
     - |
       cat <<'EOF' > direct_chat_healthcheck.yaml
       healthcheck:
@@ -105,6 +112,7 @@ quality_gates:
     - build_test
     - security_scan
   script:
+    - set -x
     - |
       COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
       echo "Coverage: ${COVERAGE}%"
@@ -127,6 +135,7 @@ deploy:
     - main
   when: manual
   script:
+    - set -x
     - docker-compose up -d
     - echo "Deployment completed successfully"
   environment:
@@ -138,6 +147,7 @@ audit_trail:
   dependencies:
     - prebuild_checks
   script:
+    - set -x
     - tar -czf build_logs.tar.gz app/data/logs/
   artifacts:
     paths:
