@@ -1,7 +1,7 @@
 stages:
   - prebuild
   - security_scan
-  - build_images
+  - build_test
   - compliance
   - quality_gates
   - deploy
@@ -34,7 +34,7 @@ security_scan:
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
     - |
-      # Check if dependency_check.json contains valid JSON; if not, write a default CSV header.
+      # Validate that dependency_check.json is valid JSON before conversion
       if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
         python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
       else 
@@ -51,83 +51,37 @@ security_scan:
       - container_scan.json
       - secret_detection.json
 
-kaniko_build_images:
-  stage: build_images
-  image: gcr.io/kaniko-project/executor:latest
+build_test:
+  stage: build_test
+  image: docker:latest
+  services:
+    - docker:dind
+    - name: postgres:13
+      alias: db
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    POSTGRES_PASSWORD: password
+    POSTGRES_USER: postgres
+    POSTGRES_DB: dbname
   script:
     - set -x
-    # Build the agent_service image
-    - echo "Building agent_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/agent_service \
-        --dockerfile $CI_PROJECT_DIR/backend/agent_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/agent_service:latest \
-        --verbosity debug
-    # Build the auth_service image
-    - echo "Building auth_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/auth_service \
-        --dockerfile $CI_PROJECT_DIR/backend/auth_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/auth_service:latest \
-        --verbosity debug
-    # Build the chat_service image
-    - echo "Building chat_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/chat_service \
-        --dockerfile $CI_PROJECT_DIR/backend/chat_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/chat_service:latest \
-        --verbosity debug
-    # Build the core_service image
-    - echo "Building core_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/core_service \
-        --dockerfile $CI_PROJECT_DIR/backend/core_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/core_service:latest \
-        --verbosity debug
-    # Build the direct_chat_service image
-    - echo "Building direct_chat_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/direct_chat_service \
-        --dockerfile $CI_PROJECT_DIR/backend/direct_chat_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/direct_chat_service:latest \
-        --verbosity debug
-    # Build the embedding_service image
-    - echo "Building embedding_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/embedding_service \
-        --dockerfile $CI_PROJECT_DIR/backend/embedding_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/embedding_service:latest \
-        --verbosity debug
-    # Build the extraction_service image
-    - echo "Building extraction_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/extraction_service \
-        --dockerfile $CI_PROJECT_DIR/backend/extraction_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/extraction_service:latest \
-        --verbosity debug
-    # Build the generation_service image
-    - echo "Building generation_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/generation_service \
-        --dockerfile $CI_PROJECT_DIR/backend/generation_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/generation_service:latest \
-        --verbosity debug
-    # Build the review_service image
-    - echo "Building review_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/review_service \
-        --dockerfile $CI_PROJECT_DIR/backend/review_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/review_service:latest \
-        --verbosity debug
-    # Build the upload_service image
-    - echo "Building upload_service image"
-    - /kaniko/executor \
-        --context $CI_PROJECT_DIR/backend/upload_service \
-        --dockerfile $CI_PROJECT_DIR/backend/upload_service/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE/upload_service:latest \
-        --verbosity debug
-  only:
-    - merge-parallelization
+    # List files in the repository root to verify structure
+    - ls -la
+    # Wait until Docker daemon is available
+    - until docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
+    # Use the docker-compose file located in the backend folder
+    - docker-compose -f backend/docker-compose.yml --verbose build
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose tests/performance --json-report --json-report-file=performance_metrics.json
+    - docker-compose -f backend/docker-compose.yml run --rm core pytest --verbose --cov=. --cov-report=xml:coverage_report.xml
+  artifacts:
+    paths:
+      - unit_tests.xml
+      - integration_tests.json
+      - performance_metrics.json
+      - coverage_report.xml
 
 compliance:
   stage: compliance
@@ -166,6 +120,7 @@ quality_gates:
   stage: quality_gates
   image: alpine:latest
   dependencies:
+    - build_test
     - security_scan
   script:
     - set -x
@@ -192,7 +147,7 @@ deploy:
   when: manual
   script:
     - set -x
-    - docker-compose -f backend/docker-compose.yml up -d
+    - docker-compose up -d
     - echo "Deployment completed successfully"
   environment:
     name: production
