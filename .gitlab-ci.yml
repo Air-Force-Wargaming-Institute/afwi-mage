@@ -26,53 +26,53 @@ security-scan:
     - apt-get update && apt-get install -y nodejs
 
     # Create reports directory
-    - mkdir -p $REPORT_DIR
+    - mkdir -p $env:REPORT_DIR
     
     # Install Python dependencies
     - python -m pip install --upgrade pip
-    - pip install bandit==$BANDIT_VERSION --no-cache-dir
+    - pip install bandit==$env:BANDIT_VERSION --no-cache-dir
     
-    # Install Node.js dependencies
-    - npm install -g eslint@$ESLINT_VERSION eslint-plugin-security@$ESLINT_PLUGIN_SECURITY_VERSION --no-audit
+    # Install Node.js dependencies locally instead of globally
+    - npm init -y
+    - npm install eslint@$env:ESLINT_VERSION eslint-plugin-security@$env:ESLINT_PLUGIN_SECURITY_VERSION --save-dev
+    - $env:PATH = "$(Get-Location)\node_modules\.bin;$env:PATH"
 
   script:
     # Initialize results files
-    - echo "filename,test_name,test_id,issue_severity,issue_text,issue_confidence,line_number,line_range,more_info" > "$REPORT_DIR/python_sast.csv"
-    - echo "file,rule_id,severity,message,line,column" > "$REPORT_DIR/js_sast.csv"
+    - echo "filename,test_name,test_id,issue_severity,issue_text,issue_confidence,line_number,line_range,more_info" | Out-File -FilePath "$env:REPORT_DIR\python_sast.csv"
+    - echo "file,rule_id,severity,message,line,column" | Out-File -FilePath "$env:REPORT_DIR\js_sast.csv"
 
     # Python Security Scan
     - |
-      echo "Running Python security scan..."
-      python_dirs=(
-        "backend/agent_service"
-        "backend/auth_service"
-        "backend/chat_service"
-        "backend/core_service"
-        "backend/direct_chat_service"
-        "backend/embedding_service"
-        "backend/extraction_service"
-        "backend/generation_service"
-        "backend/review_service"
-        "backend/upload_service"
-        "backend/tools"
+      Write-Host "Running Python security scan..."
+      $python_dirs = @(
+        "backend\agent_service",
+        "backend\auth_service",
+        "backend\chat_service",
+        "backend\core_service",
+        "backend\direct_chat_service",
+        "backend\embedding_service",
+        "backend\extraction_service",
+        "backend\generation_service",
+        "backend\review_service",
+        "backend\upload_service",
+        "backend\tools"
       )
       
-      for dir in "${python_dirs[@]}"; do
-        if [ -d "$dir" ]; then
-          echo "Scanning $dir..."
-          bandit -r "$dir" -f csv -o "$REPORT_DIR/temp.csv" 2>/dev/null || true
-          if [ -f "$REPORT_DIR/temp.csv" ]; then
-            tail -n +2 "$REPORT_DIR/temp.csv" >> "$REPORT_DIR/python_sast.csv"
-            rm "$REPORT_DIR/temp.csv"
-          fi
-        fi
-      done
+      foreach ($dir in $python_dirs) {
+        if (Test-Path $dir) {
+          Write-Host "Scanning $dir..."
+          bandit -r $dir -f csv -o "$env:REPORT_DIR\temp.csv" 2>$null
+          if (Test-Path "$env:REPORT_DIR\temp.csv") {
+            Get-Content "$env:REPORT_DIR\temp.csv" | Select-Object -Skip 1 | Add-Content "$env:REPORT_DIR\python_sast.csv"
+            Remove-Item "$env:REPORT_DIR\temp.csv" -Force
+          }
+        }
+      }
 
-    # JavaScript Security Scan
+    # JavaScript Security Scan - Create ESLint config
     - |
-      echo "Running JavaScript security scan..."
-      cat > .eslintrc.json << 'EOF'
-      {
+      $eslintConfig = '{
         "plugins": ["security"],
         "extends": ["plugin:security/recommended"],
         "parserOptions": {
@@ -83,68 +83,66 @@ security-scan:
           "node": true,
           "browser": true
         }
-      }
-      EOF
+      }'
+      Set-Content -Path ".eslintrc.json" -Value $eslintConfig
 
     # Create Python script for processing ESLint output
     - |
-      cat > process_eslint.py << 'EOF'
-      import sys
+      $pythonScript = 'import sys
       import json
       
       try:
           for result in json.load(sys.stdin):
-              for msg in result.get('messages', []):
-                  print('{},{},{},{},{},{}'.format(
-                      result['filePath'],
-                      msg.get('ruleId',''),
-                      msg.get('severity',''),
-                      msg.get('message','').replace(',', ';'),
-                      msg.get('line',''),
-                      msg.get('column','')
+              for msg in result.get("messages", []):
+                  print("{},{},{},{},{},{}".format(
+                      result["filePath"],
+                      msg.get("ruleId",""),
+                      msg.get("severity",""),
+                      msg.get("message","").replace(",", ";"),
+                      msg.get("line",""),
+                      msg.get("column","")
                   ))
       except json.JSONDecodeError:
           pass
       except Exception as e:
-          print('Error processing file:', str(e), file=sys.stderr)
-      EOF
+          print("Error processing file:", str(e), file=sys.stderr)'
+      Set-Content -Path "process_eslint.py" -Value $pythonScript
 
     # Run JavaScript scans
     - |
-      echo "Scanning JavaScript/TypeScript files..."
-      find frontend/src -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) \
-        -not -path "*/node_modules/*" | while read file; do
-        echo "Scanning $file..."
-        eslint --format=json --quiet "$file" 2>/dev/null | python3 process_eslint.py >> "$REPORT_DIR/js_sast.csv" || true
-      done
+      Write-Host "Scanning JavaScript/TypeScript files..."
+      Get-ChildItem -Path "frontend\src" -Recurse -Include "*.js","*.jsx","*.ts","*.tsx" -Exclude "node_modules" | ForEach-Object {
+        Write-Host "Scanning $($_.FullName)..."
+        $result = eslint --format=json --quiet $_.FullName 2>$null
+        if ($result) {
+          $result | python process_eslint.py >> "$env:REPORT_DIR\js_sast.csv"
+        }
+      }
 
     # Generate summary report
     - |
-      {
-        echo "# Security Scan Summary"
-        echo
-        echo "## Python Security Issues"
-        python_count=$(tail -n +2 "$REPORT_DIR/python_sast.csv" | wc -l)
-        echo "Found $python_count issues in Python code"
-        echo
-        echo "## JavaScript Security Issues"
-        js_count=$(tail -n +2 "$REPORT_DIR/js_sast.csv" | wc -l)
-        echo "Found $js_count issues in JavaScript code"
-      } > "$REPORT_DIR/sast-report.txt"
+      $reportContent = "# Security Scan Summary`n`n"
+      $reportContent += "## Python Security Issues`n"
+      $pythonCount = (Get-Content "$env:REPORT_DIR\python_sast.csv" | Measure-Object -Line).Lines - 1
+      $reportContent += "$pythonCount issues found in Python code`n`n"
+      $reportContent += "## JavaScript Security Issues`n"
+      $jsCount = (Get-Content "$env:REPORT_DIR\js_sast.csv" | Measure-Object -Line).Lines - 1
+      $reportContent += "$jsCount issues found in JavaScript code"
+      Set-Content -Path "$env:REPORT_DIR\sast-report.txt" -Value $reportContent
 
   after_script:
     # Cleanup temporary files
-    - rm -f .eslintrc.json process_eslint.py
+    - Remove-Item -Path ".eslintrc.json", "process_eslint.py", "package.json", "package-lock.json", "node_modules" -Recurse -Force -ErrorAction SilentlyContinue
 
   artifacts:
-    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME"
+    name: "${env:CI_JOB_NAME}-${env:CI_COMMIT_REF_NAME}"
     when: always
     expire_in: 1 week
     paths:
-      - $REPORT_DIR/*.csv
-      - $REPORT_DIR/*.txt
+      - "${env:REPORT_DIR}\\*.csv"
+      - "${env:REPORT_DIR}\\*.txt"
     reports:
-      junit: $REPORT_DIR/*.csv
+      junit: "${env:REPORT_DIR}\\*.csv"
   
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
