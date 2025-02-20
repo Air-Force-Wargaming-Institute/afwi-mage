@@ -56,6 +56,8 @@ security_scan:
 build_test:
   stage: build_test
   image: docker:latest
+  tags:
+    - USG-DOD-Global-Custom-Docker-Containers-BuildRunner1
   services:
     - docker:dind
     - name: postgres:13
@@ -83,6 +85,7 @@ build_test:
       - integration_tests.json
       - performance_metrics.json
       - coverage_report.xml
+
 
 compliance:
   stage: compliance
