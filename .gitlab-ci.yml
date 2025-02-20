@@ -7,14 +7,17 @@ stages:
   - deploy
   - audit_trail
 
+variables:
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+  DOCKER_TLS_CERTDIR: ""
+
 prebuild_checks:
   stage: prebuild
   image: python:3.10
   script:
-    - set -x  # Enable command tracing for debugging
+    - set -x
     - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
     - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
-    # Skip NVIDIA driver check; log a warning instead.
     - command -v nvidia-smi || echo "NVIDIA drivers not installed; skipping GPU check"
     - nvidia-smi || echo "nvidia-smi unavailable; proceeding without GPU metrics"
     - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
@@ -34,7 +37,6 @@ security_scan:
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
     - |
-      # Validate that dependency_check.json is valid JSON before conversion
       if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
         python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
       else 
@@ -59,16 +61,17 @@ build_test:
     - name: postgres:13
       alias: db
   variables:
-    DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
     POSTGRES_PASSWORD: password
     POSTGRES_USER: postgres
     POSTGRES_DB: dbname
-  script:
+  before_script:
     - set -x
-    # List the current directory to verify that docker-compose.yml is present
+    - until docker info >/dev/null 2>&1; do sleep 3; echo "Waiting for Docker to be ready..."; done
+    - docker version
+    - docker-compose version
+  script:
     - ls -la
-    # If your docker-compose.yml is in a different directory, add a 'cd' command here.
     - docker-compose --verbose build
     - docker-compose run --rm core pytest --verbose --junitxml=unit_tests.xml --maxfail=1 --disable-warnings
     - docker-compose run --rm core pytest --verbose tests/integration --json-report --json-report-file=integration_tests.json
@@ -143,6 +146,8 @@ deploy:
   only:
     - main
   when: manual
+  before_script:
+    - until docker info >/dev/null 2>&1; do sleep 3; echo "Waiting for Docker to be ready..."; done
   script:
     - set -x
     - docker-compose up -d
