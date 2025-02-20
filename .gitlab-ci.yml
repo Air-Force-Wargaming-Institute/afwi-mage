@@ -22,35 +22,35 @@ security_scan:
     - set -x
     # Install scanning tools
     - pip install bandit safety trufflehog
-    # Run Bandit for static analysis; output JSON
+    # Run Bandit for static analysis; output JSON with a clear file name
     - bandit -r . -f json -o bandit_sast_report.json || true
-    # Convert Bandit JSON report to CSV (extract key fields from results)
+    # Convert Bandit JSON report to CSV with an extra column for mitigation
     - |
       if python -c "import json; json.load(open('bandit_sast_report.json'))" 2>/dev/null; then 
-        python -c "import json, csv; report=json.load(open('bandit_sast_report.json')); f=csv.writer(open('bandit_sast_report.csv','w',newline='')); f.writerow(['filename','line_number','issue_severity','issue_confidence','issue_text','test_name']); [f.writerow([item.get('filename'), item.get('line_number'), item.get('issue_severity'), item.get('issue_confidence'), item.get('issue_text'), item.get('test_name')]) for item in report.get('results', [])]"
+        python -c "import json, csv; report=json.load(open('bandit_sast_report.json')); f=csv.writer(open('bandit_sast_report.csv','w',newline='')); f.writerow(['filename','line_number','issue_severity','issue_confidence','issue_text','test_name','Security Mitigation Approach']); [f.writerow([item.get('filename'), item.get('line_number'), item.get('issue_severity'), item.get('issue_confidence'), item.get('issue_text'), item.get('test_name'), '']) for item in report.get('results', [])]"
       else 
         echo "bandit_sast_report.json is not valid JSON, skipping CSV conversion"
-        echo "filename,line_number,issue_severity,issue_confidence,issue_text,test_name" > bandit_sast_report.csv
+        echo "filename,line_number,issue_severity,issue_confidence,issue_text,test_name,Security Mitigation Approach" > bandit_sast_report.csv
       fi
-    # Run Safety for dependency vulnerability checks; output JSON
+    # Run Safety for dependency vulnerability checks; output JSON with a clear file name
     - safety check --json > safety_dependency_report.json || true
-    # Convert Safety JSON output to CSV
+    # Convert Safety JSON output to CSV with an extra column for mitigation
     - |
       if python -c "import json; json.load(open('safety_dependency_report.json'))" 2>/dev/null; then 
-        python -c "import json, csv; data=json.load(open('safety_dependency_report.json')); f=csv.writer(open('safety_dependency_report.csv','w',newline='')); f.writerow(['package','version']); [f.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]"
+        python -c "import json, csv; data=json.load(open('safety_dependency_report.json')); f=csv.writer(open('safety_dependency_report.csv','w',newline='')); f.writerow(['package','version','Security Mitigation Approach']); [f.writerow([pkg.get('package'), pkg.get('version'), '']) for pkg in data.get('vulnerabilities',[])]"
       else 
         echo "safety_dependency_report.json is not valid JSON, skipping CSV conversion"
-        echo "package,version" > safety_dependency_report.csv
+        echo "package,version,Security Mitigation Approach" > safety_dependency_report.csv
       fi
-    # Run TruffleHog to scan for secrets; output JSON
+    # Run TruffleHog to scan for secrets; output JSON with a clear file name
     - trufflehog filesystem . --json > trufflehog_secret_detection.json || true
-    # Convert TruffleHog JSON output to CSV
+    # Convert TruffleHog JSON output to CSV with an extra column for mitigation
     - |
       if python -c "import json; json.load(open('trufflehog_secret_detection.json'))" 2>/dev/null; then 
-        python -c "import json, csv; data=json.load(open('trufflehog_secret_detection.json')); f=csv.writer(open('trufflehog_secret_detection.csv','w',newline='')); f.writerow(['file','line','reason','entropy']); [f.writerow([item.get('file'), item.get('line'), item.get('reason'), item.get('entropy')]) for item in data]"
+        python -c "import json, csv; data=json.load(open('trufflehog_secret_detection.json')); f=csv.writer(open('trufflehog_secret_detection.csv','w',newline='')); f.writerow(['file','line','reason','entropy','Security Mitigation Approach']); [f.writerow([item.get('file'), item.get('line'), item.get('reason'), item.get('entropy'), '']) for item in data]"
       else 
         echo "trufflehog_secret_detection.json is not valid JSON, skipping CSV conversion"
-        echo "file,line,reason,entropy" > trufflehog_secret_detection.csv
+        echo "file,line,reason,entropy,Security Mitigation Approach" > trufflehog_secret_detection.csv
       fi
   artifacts:
     paths:
