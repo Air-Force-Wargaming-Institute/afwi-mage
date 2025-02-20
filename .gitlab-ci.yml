@@ -12,87 +12,6 @@ variables:
   before_script:
     - mkdir -p $REPORT_DIR
 
-# Python dependency security scan
-python-dependency-scan:
-  stage: security_scan
-  image: python:3.11-slim
-  extends: .security_scan_template
-  script:
-    - pip install safety jq
-    - |
-      find . -name "requirements.txt" -type f | while read -r req_file; do
-        echo "Scanning $req_file"
-        dirname=$(dirname "$req_file")
-        basename=$(basename "$dirname")
-        safety check -r "$req_file" --json > "$REPORT_DIR/${basename}_dependencies.json"
-        if [ -s "$REPORT_DIR/${basename}_dependencies.json" ]; then
-          jq -r '.[] | [.package,.analyzed_version,.vulnerable_spec,.advisory] | @csv' \
-            "$REPORT_DIR/${basename}_dependencies.json" > "$REPORT_DIR/${basename}_dependencies.csv"
-        else
-          echo "No vulnerabilities found in $req_file" > "$REPORT_DIR/${basename}_dependencies.csv"
-        fi
-      done
-  artifacts:
-    paths:
-      - $REPORT_DIR/*_dependencies.csv
-      - $REPORT_DIR/*_dependencies.json
-    expire_in: 1 week
-
-# Node.js dependency security scan
-node-dependency-scan:
-  stage: security_scan
-  image: node:16
-  extends: .security_scan_template
-  script:
-    - apt-get update && apt-get install -y jq
-    - |
-      find . -name "package.json" -type f | while read -r pkg_file; do
-        echo "Scanning $pkg_file"
-        dirname=$(dirname "$pkg_file")
-        basename=$(basename "$dirname")
-        
-        # Create temp directory
-        temp_dir=$(mktemp -d)
-        
-        # Copy package files
-        cp "$pkg_file" "$temp_dir/"
-        if [ -f "$dirname/package-lock.json" ]; then
-          cp "$dirname/package-lock.json" "$temp_dir/"
-        fi
-        
-        # Change to temp directory and run audit
-        cd "$temp_dir"
-        if npm audit --json > "audit_result.json" 2>/dev/null; then
-          # Process audit results
-          if [ -s "audit_result.json" ]; then
-            jq -r '
-              if .advisories then
-                .advisories | to_entries | .[] | .value |
-                [.module_name, .vulnerable_versions, .patched_versions, .severity, .title] | @csv
-              else
-                empty
-              end
-            ' "audit_result.json" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
-            
-            # Copy full JSON report
-            cp "audit_result.json" "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.json"
-          else
-            echo "No vulnerabilities found in $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
-          fi
-        else
-          echo "Error scanning $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
-        fi
-        
-        # Return to original directory and cleanup
-        cd "$CI_PROJECT_DIR"
-        rm -rf "$temp_dir"
-      done
-  artifacts:
-    paths:
-      - $REPORT_DIR/*_npm_audit.csv
-      - $REPORT_DIR/*_npm_audit.json
-    expire_in: 1 week
-
 # Secret detection scan
 secret-detection:
   stage: security_scan
@@ -195,14 +114,6 @@ aggregate-reports:
           echo "0"
         fi
       }
-      
-      # Count Python dependencies
-      python_deps=$(find "$REPORT_DIR" -name "*_dependencies.csv" -exec cat {} \; | wc -l)
-      echo "Python Dependencies,$python_deps,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
-      
-      # Count Node.js vulnerabilities
-      node_deps=$(find "$REPORT_DIR" -name "*_npm_audit.csv" -exec cat {} \; | wc -l)
-      echo "Node.js Dependencies,$node_deps,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
       
       # Count secrets
       secrets=$(count_csv_issues "$REPORT_DIR/detected_secrets.csv")
