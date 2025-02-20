@@ -44,54 +44,63 @@ node-dependency-scan:
   image: node:16
   extends: .security_scan_template
   script:
-    - apt-get update && apt-get install -y jq
+    - New-Item -ItemType Directory -Force -Path $env:REPORT_DIR
     - |
-      find . -name "package.json" -type f | while read -r pkg_file; do
-        echo "Scanning $pkg_file"
-        dirname=$(dirname "$pkg_file")
-        basename=$(basename "$dirname")
+      $packageFiles = Get-ChildItem -Path . -Filter "package.json" -Recurse
+      foreach ($pkgFile in $packageFiles) {
+        Write-Host "Scanning $($pkgFile.FullName)"
+        $dirname = $pkgFile.Directory.Name
         
-        # Create a temporary directory for npm audit
-        temp_dir=$(mktemp -d)
-        cp "$pkg_file" "$temp_dir/"
+        # Create temp directory
+        $tempDir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString())) -Force
         
-        # If package-lock.json exists, copy it too
-        if [ -f "$dirname/package-lock.json" ]; then
-          cp "$dirname/package-lock.json" "$temp_dir/"
-        fi
-        
-        cd "$temp_dir"
-        
-        # Run npm audit and save results
-        if npm audit --json > "audit_result.json" 2>/dev/null; then
-          # Convert npm audit results to CSV format
-          jq -r '
-            if .advisories then
-              .advisories | to_entries | .[] | .value |
-              [.module_name, .vulnerable_versions, .patched_versions, .severity, .title] | @csv
-            else
-              empty
-            end
-          ' "audit_result.json" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
+        try {
+          # Copy package files
+          Copy-Item $pkgFile.FullName -Destination $tempDir
+          if (Test-Path (Join-Path $pkgFile.Directory.FullName "package-lock.json")) {
+            Copy-Item (Join-Path $pkgFile.Directory.FullName "package-lock.json") -Destination $tempDir
+          }
           
-          # If no vulnerabilities found, create an empty report
-          if [ ! -s "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv" ]; then
-            echo "No vulnerabilities found in $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
-          fi
+          # Change to temp directory
+          Push-Location $tempDir
           
-          # Save the full JSON report
-          cp "audit_result.json" "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.json"
-        else
-          echo "Error scanning $pkg_file" > "$CI_PROJECT_DIR/$REPORT_DIR/${basename}_npm_audit.csv"
-        fi
-        
-        cd "$CI_PROJECT_DIR"
-        rm -rf "$temp_dir"
-      done
+          # Run npm audit
+          $auditResult = npm audit --json | ConvertFrom-Json
+          
+          # Create CSV report
+          $csvPath = Join-Path $env:CI_PROJECT_DIR $env:REPORT_DIR "${dirname}_npm_audit.csv"
+          $jsonPath = Join-Path $env:CI_PROJECT_DIR $env:REPORT_DIR "${dirname}_npm_audit.json"
+          
+          if ($auditResult.advisories) {
+            $auditResult.advisories.PSObject.Properties | ForEach-Object {
+              $advisory = $_.Value
+              "$($advisory.module_name),$($advisory.vulnerable_versions),$($advisory.patched_versions),$($advisory.severity),$($advisory.title)" |
+                Out-File -FilePath $csvPath -Append -Encoding UTF8
+            }
+          } else {
+            "No vulnerabilities found in $($pkgFile.Name)" | Out-File -FilePath $csvPath -Encoding UTF8
+          }
+          
+          # Save JSON report
+          $auditResult | ConvertTo-Json -Depth 10 | Out-File -FilePath $jsonPath -Encoding UTF8
+          
+          # Return to original directory
+          Pop-Location
+          
+        } catch {
+          Write-Host "Error processing $($pkgFile.FullName): $_"
+          "Error scanning $($pkgFile.Name)" | Out-File -FilePath $csvPath -Encoding UTF8
+        } finally {
+          # Cleanup
+          if (Test-Path $tempDir) {
+            Remove-Item -Path $tempDir -Recurse -Force
+          }
+        }
+      }
   artifacts:
     paths:
-      - $REPORT_DIR/*_npm_audit.csv
-      - $REPORT_DIR/*_npm_audit.json
+      - $env:REPORT_DIR/*_npm_audit.csv
+      - $env:REPORT_DIR/*_npm_audit.json
     expire_in: 1 week
 
 # Secret detection scan
