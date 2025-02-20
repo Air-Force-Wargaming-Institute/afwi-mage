@@ -18,33 +18,31 @@ secret-detection:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
+    - echo "Installing detect-secrets..."
+    - pip install detect-secrets
+    - echo "Running secret detection scan..."
+    - detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
+    - echo "Processing results..."
     - |
-      echo "Installing detect-secrets..."
-      pip install detect-secrets
-      
-      echo "Running secret detection scan..."
-      detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
-      
-      echo "Processing results..."
       if [ -s "$REPORT_DIR/secrets.json" ]; then
-        python3 -c '
+        python3 -c "
 import json
 import csv
 import sys
 
-with open("'"$REPORT_DIR"'/secrets.json", "r") as f:
+with open('$REPORT_DIR/secrets.json', 'r') as f:
     data = json.load(f)
 
-with open("'"$REPORT_DIR"'/detected_secrets.csv", "w", newline="") as f:
+with open('$REPORT_DIR/detected_secrets.csv', 'w', newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(["File", "Type", "LineNumber"])
-    if data["results"]:
-        for file_path, findings in data["results"].items():
+    writer.writerow(['File', 'Type', 'LineNumber'])
+    if data['results']:
+        for file_path, findings in data['results'].items():
             for finding in findings:
-                writer.writerow([file_path, finding["type"], finding["line_number"]])
+                writer.writerow([file_path, finding['type'], finding['line_number']])
     else:
-        writer.writerow(["No secrets detected", "", ""])
-'
+        writer.writerow(['No secrets detected', '', ''])
+"
       else
         echo "File,Type,LineNumber" > "$REPORT_DIR/detected_secrets.csv"
         echo "Scan failed or no results," >> "$REPORT_DIR/detected_secrets.csv"
@@ -61,27 +59,20 @@ container-base-scan:
   image: aquasec/trivy:latest
   extends: .security_scan_template
   script:
+    - echo "Starting container base image scan..."
     - |
-      Write-Host "Starting container base image scan..."
-      Get-ChildItem -Path . -Filter "Dockerfile" -Recurse | ForEach-Object {
-        Write-Host "Scanning $($_.FullName)"
-        $dockerfile = $_.FullName
-        $basename = $_.Directory.Name
-        
-        # Get base image from Dockerfile
-        $baseImage = Get-Content $dockerfile | Where-Object { $_ -match '^FROM\s+(.+)' } | 
-                    Select-Object -First 1 | ForEach-Object { $matches[1] }
-        
-        Write-Host "Found base image: $baseImage"
-        
-        # Scan the base image
-        trivy image --format json --output "$env:REPORT_DIR/${basename}_scan.json" $baseImage
-        trivy image --format csv --output "$env:REPORT_DIR/${basename}_scan.csv" $baseImage
-      }
+      for dockerfile in $(find . -name "Dockerfile"); do
+        echo "Scanning $dockerfile"
+        basename=$(basename $(dirname "$dockerfile"))
+        base_image=$(grep "^FROM" "$dockerfile" | head -1 | awk '{print $2}')
+        echo "Found base image: $base_image"
+        trivy image --format json --output "$REPORT_DIR/${basename}_scan.json" "$base_image"
+        trivy image --format csv --output "$REPORT_DIR/${basename}_scan.csv" "$base_image"
+      done
   artifacts:
     paths:
-      - $env:REPORT_DIR/*_scan.csv
-      - $env:REPORT_DIR/*_scan.json
+      - $REPORT_DIR/*_scan.csv
+      - $REPORT_DIR/*_scan.json
     expire_in: 1 week
 
 # SAST (Static Application Security Testing)
@@ -90,57 +81,55 @@ sast-scan:
   image: python:3.11-slim
   extends: .security_scan_template
   script:
+    - echo "Installing dependencies..."
+    - apt-get update && apt-get install -y nodejs npm
     - pip install bandit
-    - pip install jq
-    # Install Node.js using proper Windows commands
+    - npm install -g eslint eslint-plugin-security
+    - echo "Running Python SAST scan..."
     - |
-      Write-Host "Installing Node.js and npm..."
-      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Invoke-WebRequest -Uri https://nodejs.org/dist/v16.20.2/node-v16.20.2-x64.msi -OutFile node.msi
-      Start-Process msiexec.exe -Wait -ArgumentList '/i node.msi /quiet'
-      $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+      bandit -r . -f json -o "$REPORT_DIR/python_sast.json" || true
+      if [ -s "$REPORT_DIR/python_sast.json" ]; then
+        python3 -c "
+import json
+with open('$REPORT_DIR/python_sast.json', 'r') as f:
+    data = json.load(f)
+with open('$REPORT_DIR/python_sast_results.csv', 'w') as f:
+    f.write('File,Severity,Issue,Line\n')
+    for result in data.get('results', []):
+        f.write(f'{result[\"filename\"]},{result[\"issue_severity\"]},{result[\"issue_text\"]},{result[\"line_number\"]}\n')
+"
+      else
+        echo "File,Severity,Issue,Line" > "$REPORT_DIR/python_sast_results.csv"
+        echo "No Python security issues found" >> "$REPORT_DIR/python_sast_results.csv"
+      fi
+    - echo "Running JavaScript SAST scan..."
     - |
-      Write-Host "Installing ESLint and security plugins..."
-      npm install -g eslint
-      npm install -g eslint-plugin-security
-    - |
-      Write-Host "Running Python SAST scan..."
-      bandit -r . -f json -o "$env:REPORT_DIR/python_sast.json"
-      if (Test-Path "$env:REPORT_DIR/python_sast.json") {
-        Get-Content "$env:REPORT_DIR/python_sast.json" | 
-          ConvertFrom-Json | 
-          Select-Object -ExpandProperty results | 
-          ForEach-Object {
-            "$($_.filename),$($_.issue_severity),$($_.issue_text),$($_.line_number)"
-          } | Out-File -FilePath "$env:REPORT_DIR/python_sast_results.csv"
-      } else {
-        "No Python security issues found" | Out-File -FilePath "$env:REPORT_DIR/python_sast_results.csv"
-      }
-    - |
-      Write-Host "Running JavaScript SAST scan..."
-      Get-ChildItem -Path . -Filter "*.js" -Recurse -Exclude "node_modules" | 
-        ForEach-Object {
-          Write-Host "Scanning $($_.FullName)"
-          eslint --format=json --no-eslintrc -c "{`"plugins`":[`"security`"],`"extends`":[`"plugin:security/recommended`"]}" $_.FullName |
-            Out-File -Append -FilePath "$env:REPORT_DIR/js_sast.json"
-        }
-      if (Test-Path "$env:REPORT_DIR/js_sast.json") {
-        Get-Content "$env:REPORT_DIR/js_sast.json" | 
-          ConvertFrom-Json | 
-          ForEach-Object { $_.messages } | 
-          Where-Object { $_.ruleId -ne $null } |
-          ForEach-Object {
-            "$($_.ruleId),$($_.severity),$($_.message),$($_.line)"
-          } | Out-File -FilePath "$env:REPORT_DIR/js_sast_results.csv"
-      } else {
-        "No JavaScript security issues found" | Out-File -FilePath "$env:REPORT_DIR/js_sast_results.csv"
-      }
+      for jsfile in $(find . -name "*.js" -not -path "./node_modules/*"); do
+        echo "Scanning $jsfile"
+        eslint --format=json --no-eslintrc -c '{"plugins":["security"],"extends":["plugin:security/recommended"]}' "$jsfile" >> "$REPORT_DIR/js_sast.json" || true
+      done
+      if [ -s "$REPORT_DIR/js_sast.json" ]; then
+        python3 -c "
+import json
+with open('$REPORT_DIR/js_sast.json', 'r') as f:
+    data = json.load(f)
+with open('$REPORT_DIR/js_sast_results.csv', 'w') as f:
+    f.write('Rule,Severity,Message,Line\n')
+    for file_result in data:
+        for msg in file_result.get('messages', []):
+            if msg.get('ruleId'):
+                f.write(f'{msg[\"ruleId\"]},{msg[\"severity\"]},{msg[\"message\"]},{msg[\"line\"]}\n')
+"
+      else
+        echo "Rule,Severity,Message,Line" > "$REPORT_DIR/js_sast_results.csv"
+        echo "No JavaScript security issues found" >> "$REPORT_DIR/js_sast_results.csv"
+      fi
   artifacts:
     paths:
-      - $env:REPORT_DIR/python_sast*.csv
-      - $env:REPORT_DIR/python_sast*.json
-      - $env:REPORT_DIR/js_sast*.csv
-      - $env:REPORT_DIR/js_sast*.json
+      - $REPORT_DIR/python_sast*.csv
+      - $REPORT_DIR/python_sast*.json
+      - $REPORT_DIR/js_sast*.csv
+      - $REPORT_DIR/js_sast*.json
     expire_in: 1 week
 
 # Aggregate all reports
@@ -148,33 +137,37 @@ aggregate-reports:
   stage: report_aggregation
   image: python:3.11-slim
   script:
+    - echo "Creating summary report..."
     - |
-      echo "Creating summary report..."
-      echo "Security Scan Summary" > "$REPORT_DIR/summary_report.csv"
-      echo "Scan Type,Total Issues Found,High Severity,Medium Severity,Low Severity" >> "$REPORT_DIR/summary_report.csv"
-      
-      # Function to count CSV lines excluding header
-      count_csv_issues() {
-        if [ -f "$1" ]; then
-          tail -n +2 "$1" | wc -l
-        else
-          echo "0"
-        fi
-      }
-      
-      # Count secrets
-      secrets=$(count_csv_issues "$REPORT_DIR/detected_secrets.csv")
-      echo "Detected Secrets,$secrets,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
-      
-      # Count container vulnerabilities
-      container_issues=$(find "$REPORT_DIR" -name "*_scan.csv" -exec cat {} \; | wc -l)
-      echo "Container Security,$container_issues,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
-      
-      # Count SAST issues
-      sast_python=$(count_csv_issues "$REPORT_DIR/python_sast_results.csv")
-      sast_js=$(count_csv_issues "$REPORT_DIR/js_sast_results.csv")
-      echo "SAST (Python),$sast_python,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
-      echo "SAST (JavaScript),$sast_js,N/A,N/A,N/A" >> "$REPORT_DIR/summary_report.csv"
+      python3 -c "
+import csv
+import glob
+import os
+
+def count_csv_lines(file_path):
+    if not os.path.exists(file_path):
+        return 0
+    with open(file_path, 'r') as f:
+        return max(0, sum(1 for line in f) - 1)  # Subtract 1 for header
+
+report_dir = '$REPORT_DIR'
+with open(f'{report_dir}/summary_report.csv', 'w') as f:
+    f.write('Scan Type,Total Issues Found,High Severity,Medium Severity,Low Severity\n')
+    
+    # Count secrets
+    secrets = count_csv_lines(f'{report_dir}/detected_secrets.csv')
+    f.write(f'Detected Secrets,{secrets},N/A,N/A,N/A\n')
+    
+    # Count container vulnerabilities
+    container_issues = sum(count_csv_lines(f) for f in glob.glob(f'{report_dir}/*_scan.csv'))
+    f.write(f'Container Security,{container_issues},N/A,N/A,N/A\n')
+    
+    # Count SAST issues
+    sast_python = count_csv_lines(f'{report_dir}/python_sast_results.csv')
+    sast_js = count_csv_lines(f'{report_dir}/js_sast_results.csv')
+    f.write(f'SAST (Python),{sast_python},N/A,N/A,N/A\n')
+    f.write(f'SAST (JavaScript),{sast_js},N/A,N/A,N/A\n')
+"
   artifacts:
     paths:
       - $REPORT_DIR/*
