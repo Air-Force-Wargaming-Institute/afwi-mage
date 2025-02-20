@@ -207,6 +207,7 @@ function AgentTeams() {
   const [agentDescriptions, setAgentDescriptions] = useState({});
   const [nameError, setNameError] = useState(false);
   const [nameErrorMessage, setNameErrorMessage] = useState('');
+  const [agentMapping, setAgentMapping] = useState({});
 
   useEffect(() => {
     fetchTeams();
@@ -233,6 +234,13 @@ function AgentTeams() {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
       setAvailableAgents(response.data.agents);
       setAllAgents(response.data.agents);
+      
+      // Create a mapping of agent names to unique_ids
+      const mapping = {};
+      response.data.agents.forEach(agent => {
+        mapping[agent.name] = agent.unique_id;
+      });
+      setAgentMapping(mapping);
     } catch (error) {
       console.error('Error fetching available agents:', error);
       setSnackbar({
@@ -346,8 +354,12 @@ function AgentTeams() {
     }
 
     try {
-      // Filter out empty agent slots and create a compact list
-      const compactAgents = newTeam.agents.filter(agent => agent !== '');
+      // Filter out empty agent slots and map names to unique_ids
+      const compactAgents = newTeam.agents
+        .filter(agentName => agentName !== '')
+        .map(agentName => agentMapping[agentName])
+        .filter(id => id !== undefined);
+
       const submissionData = {
         ...newTeam,
         agents: compactAgents
@@ -383,17 +395,18 @@ function AgentTeams() {
     }
 
     try {
-      // Filter out empty agent slots and remove _expert suffix
+      // Filter out empty agent slots and map names to unique_ids
       const compactAgents = editingTeam.agents
-        .filter(agent => agent !== '')
-        .map(agent => agent.replace('_expert', ''));
-        
+        .filter(agentName => agentName !== '')
+        .map(agentName => agentMapping[agentName])
+        .filter(id => id !== undefined);
+
       const submissionData = {
         ...editingTeam,
         agents: compactAgents
       };
 
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.file_name}`), submissionData);
+      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.unique_id}`), submissionData);
       setEditOpen(false);
       setSnackbar({
         open: true,
@@ -418,7 +431,7 @@ function AgentTeams() {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Modify this function to work for both new and editing teams
+  // Update getAvailableAgentsForDropdown to work with agent names
   const getAvailableAgentsForDropdown = (index, team) => {
     // Ensure team.agents is an array
     const agentsList = Array.isArray(team.agents) 
@@ -428,7 +441,7 @@ function AgentTeams() {
         : [];
         
     const selectedAgents = agentsList.filter((agent, i) => i !== index && agent !== '');
-    return allAgents.filter(agent => !selectedAgents.includes(agent.file_name.replace('_expert', '')));
+    return allAgents.filter(agent => !selectedAgents.includes(agent.name));
   };
 
   const handleDeleteClick = (team) => {
@@ -438,9 +451,9 @@ function AgentTeams() {
 
   const handleDeleteConfirm = async () => {
     try {
-      // Delete from agent and chat service
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.file_name}`));
-      await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
+      // Delete from agent and chat service TODO: do we need to delete from chat service?
+      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.unique_id}`));
+      //await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
       
       setDeleteConfirmOpen(false);
       setSnackbar({
@@ -470,10 +483,9 @@ function AgentTeams() {
     // Create a copy of the team with all 8 agent slots
     const fullTeam = {
       ...team,
-      // Map each agent filename to the full agent filename with _expert suffix
       agents: [
-        ...agentsList.map(agentName => `${agentName}_expert`),
-        ...Array(8 - agentsList.length).fill('')
+        ...agentsList,                            // First, include all existing agents
+        ...Array(8 - agentsList.length).fill('')  // Then fill remaining slots with empty strings
       ]
     };
     setEditingTeam(fullTeam);
@@ -483,11 +495,17 @@ function AgentTeams() {
   const handleDuplicateClick = async (team) => {
     try {
       // Create a new team object based on the existing team
+      // Map agent names to their unique IDs before sending
+      const agentIds = team.agents
+        .filter(agentName => agentName !== '')
+        .map(agentName => agentMapping[agentName])
+        .filter(id => id !== undefined);
+
       const duplicateTeam = {
         name: `Copy of ${team.name}`,
         description: team.description,
         color: team.color,
-        agents: team.agents, // Backend will handle _expert suffix
+        agents: agentIds  // Now sending IDs instead of names
       };
 
       const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
@@ -697,14 +715,14 @@ function AgentTeams() {
                     <em>None</em>
                   </MenuItem>
                   {getAvailableAgentsForDropdown(index, newTeam).map((agent) => (
-                    <MenuItem key={agent.file_name} value={agent.file_name}>
+                    <MenuItem key={agent.unique_id} value={agent.name}>
                       {agent.name}
                     </MenuItem>
                   ))}
                 </Select>
                 {newTeam.agents[index] && (
                   <Typography className={classes.agentDescription}>
-                    {allAgents.find(agent => agent.file_name === newTeam.agents[index])?.description}
+                    {allAgents.find(agent => agent.name === newTeam.agents[index])?.description}
                   </Typography>
                 )}
               </FormControl>
@@ -812,14 +830,14 @@ function AgentTeams() {
                     <em>None</em>
                   </MenuItem>
                   {getAvailableAgentsForDropdown(index, editingTeam).map((agent) => (
-                    <MenuItem key={agent.file_name} value={agent.file_name}>
+                    <MenuItem key={agent.name} value={agent.name}>
                       {agent.name}
                     </MenuItem>
                   ))}
                 </Select>
                 {agentFileName && (
                   <Typography className={classes.agentDescription}>
-                    {allAgents.find(agent => agent.file_name === agentFileName)?.description}
+                    {allAgents.find(agent => agent.name === agentFileName)?.description}
                   </Typography>
                 )}
               </FormControl>

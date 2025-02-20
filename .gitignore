@@ -38,10 +38,8 @@ Thumbs.db
 /backend/models/base_models/*
 /backend/extraction_service/nltk_data/*
 /backend/chat_service/chat_teams/*
-/backend/agent_service/agents/individual_agents/*.py
-/backend/agent_service/agents/teams/*.py
-/data/builder/AGENTS/*
-/data/builder/TEAMS/*
+!/data/builder/AGENTS/example.json
+!/data/builder/TEAMS/example.json
 
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*
