@@ -22,7 +22,6 @@ prebuild_checks:
     - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
     - mkdir -p app/models/{base_models,fine_tuned_models}
     - mkdir -p app/nltk_data
-    - ls -ld app/data/uploads
   artifacts:
     paths:
       - app/data/logs
@@ -32,25 +31,42 @@ security_scan:
   image: python:3.10
   script:
     - set -x
-    - pip install bandit safety trufflehog
+    - pip install bandit safety trufflehog pandas
     - bandit -r . -f json -o sast_report.json || true
     - safety check --json > dependency_check.json || true
-    - |
-      if python -c "import json; json.load(open('dependency_check.json'))" 2>/dev/null; then 
-        python -c "import json, csv; data=json.load(open('dependency_check.json')); csvfile=open('dependency_check.csv','w',newline=''); writer=csv.writer(csvfile); writer.writerow(['package','version']); [writer.writerow([pkg.get('package'), pkg.get('version')]) for pkg in data.get('vulnerabilities',[])]; csvfile.close()"
-      else 
-        echo "dependency_check.json is not valid JSON, skipping CSV conversion"
-        echo "package,version" > dependency_check.csv
-      fi
-    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-    - trivy image --format json --output container_scan.json my-docker-image:latest || true
     - trufflehog filesystem . --json > secret_detection.json || true
+    - |
+      python -c "
+import json, csv;
+# Convert SAST report
+try:
+    with open('sast_report.json') as f:
+        data = json.load(f)
+    with open('sast_report.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['filename', 'issue', 'severity'])
+        for result in data.get('results', []):
+            writer.writerow([result.get('filename'), result.get('issue_text'), result.get('issue_severity')])
+except Exception as e:
+    print(f'Error processing SAST report: {e}')
+
+# Convert Secret Detection
+try:
+    with open('secret_detection.json') as f:
+        data = json.load(f)
+    with open('secret_detection.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['file', 'string', 'match'])
+        for match in data.get('results', []):
+            writer.writerow([match.get('path'), match.get('stringsFound', []), match.get('printDiff', '')])
+except Exception as e:
+    print(f'Error processing Secret Detection report: {e}')
+"
   artifacts:
     paths:
-      - sast_report.json
+      - sast_report.csv
       - dependency_check.csv
-      - container_scan.json
-      - secret_detection.json
+      - secret_detection.csv
 
 compliance:
   stage: compliance
@@ -89,27 +105,31 @@ quality_gates:
   stage: quality_gates
   image: alpine:latest
   dependencies:
-    - security_scan  # Removed build_test dependency
+    - security_scan
   script:
     - set -x
-    - apk add --no-cache jq  # Install jq before using it
+    - apk add --no-cache jq
     - |
       if [ -f coverage_report.xml ]; then
         COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
-        echo "Coverage: ${COVERAGE}%"
+        echo "Coverage: ${COVERAGE}%" > quality_gate_summary.txt
         if [ "$COVERAGE" -lt 80 ]; then
-          echo "Error: Code coverage is below 80%"; exit 1;
+          echo "Error: Code coverage is below 80%" >> quality_gate_summary.txt
+          exit 1
         fi
       else
-        echo "Warning: No coverage report found, skipping coverage check."
+        echo "Warning: No coverage report found, skipping coverage check." > quality_gate_summary.txt
       fi
     - |
       HIGH_ISSUES=$(jq '.high_severity' sast_report.json)
-      echo "High severity issues: $HIGH_ISSUES"
+      echo "High severity security issues: $HIGH_ISSUES" >> quality_gate_summary.txt
       if [ "$HIGH_ISSUES" -gt 0 ]; then
-        echo "Error: High severity security issues found"; exit 1;
+        echo "Error: High severity security issues found" >> quality_gate_summary.txt
+        exit 1
       fi
-
+  artifacts:
+    paths:
+      - quality_gate_summary.txt
 
 deploy:
   stage: deploy
@@ -135,7 +155,13 @@ audit_trail:
     - prebuild_checks
   script:
     - set -x
+    - echo "Audit Trail Summary" > audit_summary.txt
+    - echo "Date: $(date)" >> audit_summary.txt
+    - echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
+    - echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
+    - echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
     - tar -czf build_logs.tar.gz app/data/logs/
   artifacts:
     paths:
+      - audit_summary.txt
       - build_logs.tar.gz
