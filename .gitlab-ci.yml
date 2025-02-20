@@ -19,37 +19,40 @@ secret-detection:
   extends: .security_scan_template
   script:
     - |
-      Write-Host "Installing detect-secrets..."
+      echo "Installing detect-secrets..."
       pip install detect-secrets
       
-      Write-Host "Running secret detection scan..."
-      detect-secrets scan . --force-use-all-plugins | Out-File -FilePath "$env:REPORT_DIR/secrets.json"
+      echo "Running secret detection scan..."
+      detect-secrets scan . --force-use-all-plugins > "$REPORT_DIR/secrets.json"
       
-      Write-Host "Processing results..."
-      if (Test-Path "$env:REPORT_DIR/secrets.json") {
-        $content = Get-Content "$env:REPORT_DIR/secrets.json" | ConvertFrom-Json
-        if ($content.results.PSObject.Properties.Count -gt 0) {
-          $results = @()
-          foreach ($file in $content.results.PSObject.Properties) {
-            foreach ($finding in $file.Value) {
-              $results += [PSCustomObject]@{
-                File = $file.Name
-                Type = $finding.type
-                LineNumber = $finding.line_number
-              }
-            }
-          }
-          $results | Export-Csv -Path "$env:REPORT_DIR/detected_secrets.csv" -NoTypeInformation
-        } else {
-          "File,Type,LineNumber`nNo secrets detected" | Out-File -FilePath "$env:REPORT_DIR/detected_secrets.csv"
-        }
-      } else {
-        "File,Type,LineNumber`nScan failed" | Out-File -FilePath "$env:REPORT_DIR/detected_secrets.csv"
-      }
+      echo "Processing results..."
+      if [ -s "$REPORT_DIR/secrets.json" ]; then
+        python3 -c '
+import json
+import csv
+import sys
+
+with open("'"$REPORT_DIR"'/secrets.json", "r") as f:
+    data = json.load(f)
+
+with open("'"$REPORT_DIR"'/detected_secrets.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["File", "Type", "LineNumber"])
+    if data["results"]:
+        for file_path, findings in data["results"].items():
+            for finding in findings:
+                writer.writerow([file_path, finding["type"], finding["line_number"]])
+    else:
+        writer.writerow(["No secrets detected", "", ""])
+'
+      else
+        echo "File,Type,LineNumber" > "$REPORT_DIR/detected_secrets.csv"
+        echo "Scan failed or no results," >> "$REPORT_DIR/detected_secrets.csv"
+      fi
   artifacts:
     paths:
-      - $env:REPORT_DIR/detected_secrets.csv
-      - $env:REPORT_DIR/secrets.json
+      - $REPORT_DIR/detected_secrets.csv
+      - $REPORT_DIR/secrets.json
     expire_in: 1 week
 
 # Container base image scan
