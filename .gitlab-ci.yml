@@ -155,11 +155,12 @@ audit_trail:
     - prebuild_checks
   script:
     - set -x
-    - echo "Audit Trail Summary" > audit_summary.txt
-    - echo "Date: $(date)" >> audit_summary.txt
-    - echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
-    - echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
-    - echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
+    - |
+      echo "Audit Trail Summary" > audit_summary.txt
+      echo "Date: $(date)" >> audit_summary.txt
+      echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
+      echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
+      echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
     - tar -czf build_logs.tar.gz app/data/logs/
   artifacts:
     paths:
