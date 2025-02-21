@@ -165,8 +165,9 @@ audit_trail:
       echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
       echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
       echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
-    - tar -czf build_logs.tar.gz app/data/logs/
+    - apk add --no-cache zip
+    - zip -r build_logs.zip app/data/logs/
   artifacts:
     paths:
       - audit_summary.txt
-      - build_logs.tar.gz
+      - build_logs.zip
