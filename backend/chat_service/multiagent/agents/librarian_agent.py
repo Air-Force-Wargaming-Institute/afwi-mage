@@ -5,6 +5,7 @@ from utils.llm_manager import LLMManager
 from config_ import load_config
 from multiagent.retriever_manager import RetrieverManager
 from multiagent.agents.helpers import create_banner
+from utils.prompt_manager import SystemPromptManager
 
 def librarian(requester:str, agent_request:str):
     print(create_banner("LIBRARIAN"))
@@ -22,12 +23,12 @@ def librarian(requester:str, agent_request:str):
     # Begin by retrieving documents relevant to the agent request
     relevant_docs = retriever.invoke(agent_request.strip())
 
+    prompt = SystemPromptManager().get_prompt_template("librarian_summary_prompt")
+    prompt_data = SystemPromptManager().get_prompt("librarian_summary_prompt")
+    llm = LLMManager().get_llm(prompt_data.get("llm"))
+
     # Do we actually want the librarian to summerize the documents? Would it be better to have the experts get unedited information?
     # This increases token usage, so trade off consideration
-    prompt = PromptTemplate(
-        input_variables=["relevant_docs", "agent_request", "requester"],
-        template="You are the Librarian that retrieves information from documents to support the analysis and report writing of a panel of experts. Your role is to:\n1. Search for the most relevant documents related to each request you receive.\n2. Summarize the key points from these documents clearly and concisely.\n3. Provide factual information without embellishment or personal interpretation.\n4. If information is not available or is unclear, state this explicitly.\n5. When available, always include sources or references. Do not make up sources or references if none are clear and available.\n\n Here is the request you received from the {requester} expert: {agent_request}\n\nRelevant Documents: {relevant_docs}\n\nSearch Query:"
-    )
     
     chain = prompt | llm | StrOutputParser()
     

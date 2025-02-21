@@ -4,7 +4,7 @@ from multiagent.graphState import ExpertState, CollabState
 from multiagent.agents.helpers import determine_collaboration, create_banner
 from utils.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
-
+from utils.prompt_manager import SystemPromptManager
 def get_librarian_request(whoami: str, question: str, agent_instructions: str, context: str = "") -> str:
     """Generate a librarian request with optional context."""
     base_request = f"""I am the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. 
@@ -22,31 +22,6 @@ def create_chain(prompt: PromptTemplate, model: str = None, **kwargs) -> str:
     llm = LLMManager().get_llm(model)
     chain = prompt | llm | StrOutputParser()
     return chain.invoke(kwargs)
-
-def process_collaborator_feedback(state: ExpertState, whoami: str) -> tuple[str, PromptTemplate]:
-    """Process collaborator feedback and return appropriate prompt."""
-    collaborators = state['expert_collaborators_list'][whoami]
-    if not collaborators:
-        return "", create_final_report_prompt(with_collab=False)
-    
-    collab_report = "\n\t".join([
-        f"- {collaborator}: {next((entry['report'] for entry in state['expert_collaborator_analysis'] if entry['name'] == whoami and entry['expert'] == collaborator), '')}"
-        for collaborator in collaborators
-    ])
-    
-    return collab_report, create_final_report_prompt(with_collab=True)
-
-def create_final_report_prompt(with_collab: bool) -> PromptTemplate:
-    """Create the appropriate final report prompt template."""
-    variables = ["old_analysis", "critique", "question", "document_summary", "relevant_docs", "whoami", "agent_instructions"]
-    
-    if not with_collab:
-        template = """You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions} You have been working to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n It is time to write your final report. Your focus should be to speak from your own expertise. Be sure not to simply rewrite your previous report. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{whoami} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your final report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query. Format your report using Markdown."""
-    else:
-        variables.append("collab_report")
-        template = """You are the {whoami} expert in a collaborative panel of multi-discipline subject matter experts. Here is your job description: {agent_instructions} You have been working with a team of experts to write a report from your expert perspective on the following question/query:\n{question}\n\n In your first draft attempt to address the question, you had previously written the following report:\n{old_analysis}\n\n Here is feedback you received on how to improve on your first draft report: \n{critique}\n\n You also collaborated with other subject matter experts, and they provided the following feedback and suggestions to improve your report from their expert perspective: \n{collab_report}\n\n It is time to write your final report. While your focus is to speak to your own expertise, please remember to consider and incorporate the feedback and collaborative inputs of the perspectives from the other experts. Be sure not to simply rewrite your previous report. As appropriate, briefly site where you incorporated the inputs from the other experts. To help you, some information was retrieved from relevant documentation. Here is a brief summary of the information retrieved from those relevant documents: \n{document_summary}\n\n Here is the actual text from the relevant documents that have been provided to help you: \n{relevant_docs}\n\n At the start of your report, please provide a short title that includes '{whoami} FINAL REPORT on:' and then restate the question/query but paraphrased from your perspective. Then, write your final report using a military white paper structure that includes the following sections: 'Bottom Line Up Front:' (1-3 sentences that summarize the main points/considerations of the report), 'Background Information:' (detailed summary of the relevant information, ideas, and facts that provide the reader with context for the report's main points/considerations), 'Discussion:' (detailed discussion of the main points/considerations that are relevant to the question/query), and 'Conclusion/Recommendations:' (Final thoughts and recommendations that address the question/query). Your final report should be well organized, thorough, and comprehensive. Do not embellish or exaggerate. Where appropriate, be sure to cite sources and provide specific examples from the documents that were given to you as you draft your report to address the question/query. Format your report using Markdown."""
-    
-    return PromptTemplate(input_variables=variables, template=template)
 
 def create_initial_report_prompt() -> PromptTemplate:
     """Create the initial report prompt template."""
@@ -80,8 +55,18 @@ def expert_subgraph_report(state: ExpertState):
     request = get_librarian_request(whoami, state['question'], agent_instructions)
     document_summary, relevant_documents = librarian(whoami, request)
     
-    # Process collaborator feedback
-    collab_report, prompt = process_collaborator_feedback(state, whoami)
+    
+    collaborators = state['expert_collaborators_list'][whoami]
+    if not collaborators:
+        collab_report = ""
+        prompt =SystemPromptManager().get_prompt_template("Expert_Final_Report_no_collab")
+    
+    else:
+        collab_report = "\n\t".join([
+            f"- {collaborator}: {next((entry['report'] for entry in state['expert_collaborator_analysis'] if entry['name'] == whoami and entry['expert'] == collaborator), '')}"
+            for collaborator in collaborators
+        ])
+        prompt = SystemPromptManager().get_prompt_template("Expert_Final_Report")
     
     # Generate final analysis
     analysis_inputs = {

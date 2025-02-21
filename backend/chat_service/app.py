@@ -14,9 +14,9 @@ from typing import List, Optional
 from multiagent.session_manager import SessionManager
 from utils.llm_manager import LLMManager
 from multiagent.support_models.team_class import Team
-from multiagent.support_models.agent_class import Agent
 from utils.model_list import OllamaModelManager
 from utils.prompt_manager import SystemPromptManager
+import os
 
 config = load_config()
 
@@ -69,6 +69,16 @@ class PromptUpdate(PromptData):
     """Model for prompt updates"""
     pass
 
+
+def init_directories():
+    """Initialize required directories for the application"""
+    try:
+        os.makedirs(config['CONVERSATION_PATH'], exist_ok=True)
+        logger.info(f"Ensured conversation logs directory exists at: {config['CONVERSATION_PATH']}")
+    except Exception as e:
+        logger.error(f"Failed to create conversation logs directory: {e}")
+        raise
+
 app = FastAPI()
 
 # Configure CORS
@@ -79,6 +89,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize required directories
+init_directories()
 
 # Increase the number of workers based on your server capacity
 executor = ThreadPoolExecutor(max_workers=20)

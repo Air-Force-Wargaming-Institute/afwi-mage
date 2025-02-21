@@ -1,5 +1,7 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from pydantic import BaseModel, Field
+from typing import Dict, Optional
 import json
 import os
 from datetime import datetime
@@ -9,68 +11,65 @@ from multiagent.graphState import GraphState
 from utils.llm_manager import LLMManager
 from multiagent.agents.helpers import create_banner
 from utils.prompt_manager import SystemPromptManager
+from config_ import load_config
 
 logger = logging.getLogger(__name__)
 
+class ExpertAnalyses(BaseModel):
+    """Structure containing expert analyses for synthesis
+    
+    This model represents a collection of expert analyses on a given question,
+    where each expert provides their specialized perspective based on their domain expertise.
+    The synthesis should consider how different expert viewpoints complement or contrast with each other.
+    """
+    question: str = Field(
+        description="The original question or topic that was analyzed by the experts. "
+                   "This question serves as the central focus for all expert analyses."
+    )
+    analyses: Dict[str, str] = Field(
+        description="A mapping of expert names to their detailed analyses. "
+                   "Each expert provides their unique perspective based on their specialized domain knowledge. "
+                   "The key is the expert's identifier/name, and the value is their comprehensive analysis. "
+                   "Empty or null analyses have been filtered out."
+    )
+
 def synthesis_agent(state: GraphState) -> GraphState:
+    config = load_config()
     print(create_banner("SYNTHESIS AGENT"))
-    """
-    The Synthesis Agent
-    Consolidates insights from all other agents into a comprehensive report.
-    """
     logger.info("Starting synthesis agent")
-    
-    # Get the prompt template
+
     prompt = SystemPromptManager().get_prompt_template("synthesis_agent_prompt")
-    if not prompt:
-        logger.error("Failed to get synthesis agent prompt template")
-        return {"response": "Error: Could not load synthesis agent prompt"}
-        
-    logger.info(f"Got prompt template: {prompt}")
-    
-    # Get the LLM
-    llm = LLMManager().get_llm(SystemPromptManager().get_prompt("synthesis_agent_prompt")["llm"])
-    if not llm:
-        logger.error("Failed to get LLM for synthesis agent")
-        return {"response": "Error: Could not load language model"}
-        
+    prompt_data = SystemPromptManager().get_prompt("synthesis_agent_prompt")
+    llm = LLMManager().get_llm(prompt_data.get("llm"))
+
     try:
-        question = state['question']
-
-        # Define expert name mappings
-        analyses = {
-            expert: state['expert_final_analysis'].get(expert, "")
-            for expert in state['expert_list']
-        }
-
-        # Safely handle empty analyses
-        if not analyses:
-            analyses_text = "No expert analyses available."
-        else:
-            analyses_text = "\n\n".join([f"{key} Analysis:\n{value}" for key, value in analyses.items() if value])
+        # Create analyses object
+        analyses = ExpertAnalyses(
+            question=state['question'],
+            analyses={
+                expert: state['expert_final_analysis'].get(expert, "")
+                for expert in state['expert_list']
+                if state['expert_final_analysis'].get(expert)  # Only include non-empty analyses
+            }
+        )
 
         # Create and run the chain
         chain = prompt | llm | StrOutputParser()
         response = chain.invoke({
-            "question": question,
-            "analyses": analyses_text
+            "question": analyses.question,
+            "analyses": analyses.analyses
         })
-        
-        #TODO: create the conversation history completely instead of throughout the agents
-        # Create a conversation log directory if it doesn't exist
-        log_dir = "conversation_logs"
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # Create a timestamp for the filename
+
+        # Use configured path for conversation logs
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(log_dir, f"conversation_{timestamp}.json")
+        filename = os.path.join(config['CONVERSATION_PATH'], f"conversation_{timestamp}.json")
         
         # Create the conversation data structure
         conversation_data = {
             "timestamp": timestamp,
             "iteration": state['iteration'],
-            "question": question,
-            "analyses": analyses_text,
+            "question": analyses.question,
+            "analyses": analyses.analyses,
             "synthesized_report": response,
             "full_conversation": state['conversation_history']
         }

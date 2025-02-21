@@ -195,6 +195,23 @@ class SystemPromptManager:
         with self._file_lock:
             prompts = self.load_prompts()
             if prompt_id in prompts:
+                # Check if name is being updated
+                new_name = prompt_data.get("name")
+                if new_name and new_name.lower().replace(" ", "_") != prompt_id:
+                    # Create new ID from the new name
+                    new_id = new_name.lower().replace(" ", "_")
+                    
+                    # Check if new ID would conflict with existing prompt
+                    if new_id in prompts and new_id != prompt_id:
+                        logger.error(f"Cannot update prompt name: ID {new_id} already exists")
+                        return False
+                    
+                    # Copy prompt to new ID and delete old one
+                    prompts[new_id] = prompts[prompt_id].copy()
+                    del prompts[prompt_id]
+                    prompt_id = new_id  # Update prompt_id for remaining operations
+                
+                # Update the prompt data
                 if "variables" not in prompt_data:
                     prompt_data["variables"] = prompts[prompt_id].get("variables", [])
                 if "template_type" not in prompt_data:
