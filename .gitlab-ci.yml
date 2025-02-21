@@ -1,153 +1,167 @@
-# .gitlab-ci.yml 
-
 stages:
+  - prebuild
   - security_scan
+  - compliance
+  - quality_gates
+  - deploy
+  - audit_trail
 
 variables:
-  REPORT_DIR: "security_reports"
-  BANDIT_VERSION: "1.7.5"
-  ESLINT_VERSION: "8.56.0"
-  ESLINT_PLUGIN_SECURITY_VERSION: "1.7.1"
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+  DOCKER_TLS_CERTDIR: ""
 
-default:
-  interruptible: true
-  retry:
-    max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
-
-security-scan:
-  stage: security_scan
-  image: python:3.11
-  before_script:
-    # Install Node.js
-    - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    - apt-get update && apt-get install -y nodejs
-
-    # Create reports directory
-    - mkdir -p $env:REPORT_DIR
-    
-    # Install Python dependencies
-    - python -m pip install --upgrade pip
-    - pip install bandit==$env:BANDIT_VERSION --no-cache-dir
-    
-    # Install Node.js dependencies locally instead of globally
-    - npm init -y
-    - npm install eslint@$env:ESLINT_VERSION eslint-plugin-security@$env:ESLINT_PLUGIN_SECURITY_VERSION --save-dev
-    - $env:PATH = "$(Get-Location)\node_modules\.bin;$env:PATH"
-
+prebuild_checks:
+  stage: prebuild
+  image: python:3.10
   script:
-    # Initialize results files
-    - echo "filename,test_name,test_id,issue_severity,issue_text,issue_confidence,line_number,line_range,more_info" | Out-File -FilePath "$env:REPORT_DIR\python_sast.csv"
-    - echo "file,rule_id,severity,message,line,column" | Out-File -FilePath "$env:REPORT_DIR\js_sast.csv"
-
-    # Python Security Scan
-    - |
-      Write-Host "Running Python security scan..."
-      $python_dirs = @(
-        "backend\agent_service",
-        "backend\auth_service",
-        "backend\chat_service",
-        "backend\core_service",
-        "backend\direct_chat_service",
-        "backend\embedding_service",
-        "backend\extraction_service",
-        "backend\generation_service",
-        "backend\review_service",
-        "backend\upload_service",
-        "backend\tools"
-      )
-      
-      foreach ($dir in $python_dirs) {
-        if (Test-Path $dir) {
-          Write-Host "Scanning $dir..."
-          bandit -r $dir -f csv -o "$env:REPORT_DIR\temp.csv" 2>$null
-          if (Test-Path "$env:REPORT_DIR\temp.csv") {
-            Get-Content "$env:REPORT_DIR\temp.csv" | Select-Object -Skip 1 | Add-Content "$env:REPORT_DIR\python_sast.csv"
-            Remove-Item "$env:REPORT_DIR\temp.csv" -Force
-          }
-        }
-      }
-
-    # JavaScript Security Scan - Create ESLint config
-    - |
-      $eslintConfig = '{
-        "plugins": ["security"],
-        "extends": ["plugin:security/recommended"],
-        "parserOptions": {
-          "ecmaVersion": 2022
-        },
-        "env": {
-          "es6": true,
-          "node": true,
-          "browser": true
-        }
-      }'
-      Set-Content -Path ".eslintrc.json" -Value $eslintConfig
-
-    # Create Python script for processing ESLint output
-    - |
-      $pythonScript = 'import sys
-      import json
-      
-      try:
-          for result in json.load(sys.stdin):
-              for msg in result.get("messages", []):
-                  print("{},{},{},{},{},{}".format(
-                      result["filePath"],
-                      msg.get("ruleId",""),
-                      msg.get("severity",""),
-                      msg.get("message","").replace(",", ";"),
-                      msg.get("line",""),
-                      msg.get("column","")
-                  ))
-      except json.JSONDecodeError:
-          pass
-      except Exception as e:
-          print("Error processing file:", str(e), file=sys.stderr)'
-      Set-Content -Path "process_eslint.py" -Value $pythonScript
-
-    # Run JavaScript scans
-    - |
-      Write-Host "Scanning JavaScript/TypeScript files..."
-      Get-ChildItem -Path "frontend\src" -Recurse -Include "*.js","*.jsx","*.ts","*.tsx" -Exclude "node_modules" | ForEach-Object {
-        Write-Host "Scanning $($_.FullName)..."
-        $result = eslint --format=json --quiet $_.FullName 2>$null
-        if ($result) {
-          $result | python process_eslint.py >> "$env:REPORT_DIR\js_sast.csv"
-        }
-      }
-
-    # Generate summary report
-    - |
-      $reportContent = "# Security Scan Summary`n`n"
-      $reportContent += "## Python Security Issues`n"
-      $pythonCount = (Get-Content "$env:REPORT_DIR\python_sast.csv" | Measure-Object -Line).Lines - 1
-      $reportContent += "$pythonCount issues found in Python code`n`n"
-      $reportContent += "## JavaScript Security Issues`n"
-      $jsCount = (Get-Content "$env:REPORT_DIR\js_sast.csv" | Measure-Object -Line).Lines - 1
-      $reportContent += "$jsCount issues found in JavaScript code"
-      Set-Content -Path "$env:REPORT_DIR\sast-report.txt" -Value $reportContent
-
-  after_script:
-    # Cleanup temporary files
-    - Remove-Item -Path ".eslintrc.json", "process_eslint.py", "package.json", "package-lock.json", "node_modules" -Recurse -Force -ErrorAction SilentlyContinue
-
+    - set -x
+    - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
+    - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
+    - command -v nvidia-smi || echo "NVIDIA drivers not installed; skipping GPU check"
+    - nvidia-smi || echo "nvidia-smi unavailable; proceeding without GPU metrics"
+    - mkdir -p app/data/{uploads,extraction,datasets,outputs,logs,temp_conversions,builder/AGENTS,builder/TEAMS}
+    - mkdir -p app/models/{base_models,fine_tuned_models}
+    - mkdir -p app/nltk_data
   artifacts:
-    name: "${env:CI_JOB_NAME}-${env:CI_COMMIT_REF_NAME}"
-    when: always
-    expire_in: 1 week
     paths:
-      - "${env:REPORT_DIR}\\*.csv"
-      - "${env:REPORT_DIR}\\*.txt"
-    reports:
-      junit: "${env:REPORT_DIR}\\*.csv"
-  
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: always
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - if: $CI_COMMIT_TAG
-      when: never
+      - app/data/logs
+
+security_scan:
+  stage: security_scan
+  image: python:3.10
+  script:
+    - set -x
+    - pip install bandit safety trufflehog pandas
+    - bandit -r . -f json -o sast_report.json || true
+    - safety check --json > dependency_check.json || true
+    - trufflehog filesystem . --json > secret_detection.json || true
+    - |
+      python -c "
+import json, csv;
+# Convert SAST report
+try:
+    with open('sast_report.json') as f:
+        data = json.load(f)
+    with open('sast_report.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['filename', 'issue', 'severity'])
+        for result in data.get('results', []):
+            writer.writerow([result.get('filename'), result.get('issue_text'), result.get('issue_severity')])
+except Exception as e:
+    print(f'Error processing SAST report: {e}')
+
+# Convert Secret Detection
+try:
+    with open('secret_detection.json') as f:
+        data = json.load(f)
+    with open('secret_detection.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['file', 'string', 'match'])
+        for match in data.get('results', []):
+            writer.writerow([match.get('path'), match.get('stringsFound', []), match.get('printDiff', '')])
+except Exception as e:
+    print(f'Error processing Secret Detection report: {e}')
+"
+  artifacts:
+    paths:
+      - sast_report.csv
+      - dependency_check.csv
+      - secret_detection.csv
+
+compliance:
+  stage: compliance
+  image: alpine:latest
+  script:
+    - set -x
+    - |
+      cat <<'EOF' > direct_chat_healthcheck.yaml
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8011/api/v1/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 10s
+      EOF
+    - |
+      cat <<'EOF' > database_healthcheck.yaml
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+      EOF
+    - |
+      cat <<'EOF' > service_dependencies.yaml
+      depends_on:
+        condition: service_healthy
+      EOF
+  artifacts:
+    paths:
+      - direct_chat_healthcheck.yaml
+      - database_healthcheck.yaml
+      - service_dependencies.yaml
+
+quality_gates:
+  stage: quality_gates
+  image: alpine:latest
+  dependencies:
+    - security_scan
+  script:
+    - set -x
+    - apk add --no-cache jq
+    - |
+      if [ -f coverage_report.xml ]; then
+        COVERAGE=$(grep -o 'line-rate="[^"]*' coverage_report.xml | head -1 | cut -d'"' -f2 | awk '{printf "%d", $1 * 100}')
+        echo "Coverage: ${COVERAGE}%" > quality_gate_summary.txt
+        if [ "$COVERAGE" -lt 80 ]; then
+          echo "Error: Code coverage is below 80%" >> quality_gate_summary.txt
+          exit 1
+        fi
+      else
+        echo "Warning: No coverage report found, skipping coverage check." > quality_gate_summary.txt
+      fi
+    - |
+      HIGH_ISSUES=$(jq '.high_severity' sast_report.json)
+      echo "High severity security issues: $HIGH_ISSUES" >> quality_gate_summary.txt
+      if [ "$HIGH_ISSUES" -gt 0 ]; then
+        echo "Error: High severity security issues found" >> quality_gate_summary.txt
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - quality_gate_summary.txt
+
+deploy:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  only:
+    - main
+  when: manual
+  before_script:
+    - until docker info >/dev/null 2>&1; do sleep 3; echo "Waiting for Docker to be ready..."; done
+  script:
+    - set -x
+    - docker-compose up -d
+    - echo "Deployment completed successfully"
+  environment:
+    name: production
+
+audit_trail:
+  stage: audit_trail
+  image: alpine:latest
+  dependencies:
+    - prebuild_checks
+  script:
+    - set -x
+    - echo "Audit Trail Summary" > audit_summary.txt
+    - echo "Date: $(date)" >> audit_summary.txt
+    - echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
+    - echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
+    - echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
+    - tar -czf build_logs.tar.gz app/data/logs/
+  artifacts:
+    paths:
+      - audit_summary.txt
+      - build_logs.tar.gz
