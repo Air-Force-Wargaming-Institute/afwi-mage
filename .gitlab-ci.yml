@@ -62,7 +62,12 @@ security_scan:
           print(f"Error processing Secret Detection report: {e}")
       '
   artifacts:
+    reports:
+      sast: sast_report.json
     paths:
+      - sast_report.json
+      - dependency_check.json
+      - secret_detection.json
       - sast_report.csv
       - dependency_check.csv
       - secret_detection.csv
