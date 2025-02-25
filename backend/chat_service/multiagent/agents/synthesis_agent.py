@@ -34,7 +34,7 @@ class ExpertAnalyses(BaseModel):
     )
 
 def synthesis_agent(state: GraphState) -> GraphState:
-    config = load_config()
+    # config = load_config()
     print(create_banner("SYNTHESIS AGENT"))
     logger.info("Starting synthesis agent")
 
@@ -62,21 +62,21 @@ def synthesis_agent(state: GraphState) -> GraphState:
 
         # Use configured path for conversation logs
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(config['CONVERSATION_PATH'], f"conversation_{timestamp}.json")
+        # filename = os.path.join(config['CONVERSATION_PATH'], f"conversation_{timestamp}.json")
         
-        # Create the conversation data structure
-        conversation_data = {
-            "timestamp": timestamp,
-            "iteration": state['iteration'],
-            "question": analyses.question,
-            "analyses": analyses.analyses,
-            "synthesized_report": response,
-            "full_conversation": state['conversation_history']
-        }
+        # # Create the conversation data structure
+        # conversation_data = {
+        #     "timestamp": timestamp,
+        #     "iteration": state['iteration'],
+        #     "question": analyses.question,
+        #     "analyses": analyses.analyses,
+        #     "synthesized_report": response,
+        #     "full_conversation": state['conversation_history']
+        # }
         
         # Write to JSON file
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(conversation_data, f, indent=4, ensure_ascii=False)
+        # with open(filename, 'w', encoding='utf-8') as f:
+        #     json.dump(conversation_data, f, indent=4, ensure_ascii=False)
         
         return {**state, 'synthesized_report': response}
         

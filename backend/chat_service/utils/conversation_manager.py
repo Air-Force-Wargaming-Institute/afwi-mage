@@ -5,6 +5,7 @@ from typing import Dict, Optional, List, Any
 from threading import RLock
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+import os
 
 from .conversation_tracking import ConversationTree
 
@@ -31,8 +32,14 @@ class ConversationManager:
         self._executor = ThreadPoolExecutor(max_workers=4)
         
         self.conversation_path = Path('/app/data/conversation_logs')
-        self.conversation_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Initialized conversation manager at {self.conversation_path}")
+        try:
+            self.conversation_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Initialized conversation manager at {self.conversation_path}")
+            logger.info(f"Directory exists: {self.conversation_path.exists()}")
+            logger.info(f"Directory is writable: {os.access(str(self.conversation_path), os.W_OK)}")
+        except Exception as e:
+            logger.error(f"Error creating conversation directory: {e}", exc_info=True)
+            raise
 
     def __del__(self):
         if hasattr(self, '_executor'):
@@ -40,21 +47,24 @@ class ConversationManager:
 
     # Public API
     async def create_conversation(self, question: str, session_id: str, **metadata) -> str:
-        """Create a new conversation and save it
-        
-        Args:
-            question: The initial question/prompt
-            session_id: ID of the associated session
-            **metadata: Additional metadata for the conversation
-        """
-        conversation = ConversationTree(
-            question=question,
-            session_id=session_id,
-            metadata=metadata
-        )
-        self._conversations[conversation.id] = conversation
-        await self._save_conversation_async(conversation.id)
-        return conversation.id
+        """Create a new conversation and save it"""
+        logger.info(f"Creating new conversation with session_id: {session_id}")
+        try:
+            conversation = ConversationTree(
+                question=question,
+                session_id=session_id,
+                metadata=metadata
+            )
+            logger.info(f"Created conversation with ID: {conversation.id}")
+            self._conversations[conversation.id] = conversation
+            
+            save_result = await self._save_conversation_async(conversation.id)
+            logger.info(f"Save result for conversation {conversation.id}: {save_result}")
+            
+            return conversation.id
+        except Exception as e:
+            logger.error(f"Error creating conversation: {e}", exc_info=True)
+            raise
 
     async def add_expert(self, conversation_id: str, name: str, **metadata) -> str:
         """Add an expert and save the conversation"""
@@ -131,6 +141,75 @@ class ConversationManager:
         # Return ID of most recent conversation based on timestamp
         return max(session_conversations, key=lambda x: x["timestamp"])["id"]
 
+    async def list_conversations(self) -> List[Dict[str, Any]]:
+        """List all conversations with basic metadata"""
+        conversations = []
+        for file in self.conversation_path.glob("conversation_*.json"):
+            try:
+                with open(file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # Fix nested metadata structure
+                    if "metadata" in data and "metadata" in data["metadata"]:
+                        data["metadata"] = data["metadata"]["metadata"]
+                    
+                    for node in data["nodes"].values():
+                        if "metadata" in node and "metadata" in node["metadata"]:
+                            node["metadata"] = node["metadata"]["metadata"]
+                        for interaction in node.get("interactions", []):
+                            if "metadata" in interaction and "metadata" in interaction["metadata"]:
+                                interaction["metadata"] = interaction["metadata"]["metadata"]
+                    
+                    conversations.append({
+                        "id": data["id"],
+                        "session_id": data.get("session_id", ""),
+                        "timestamp": data["timestamp"],
+                        "question": data["question"],
+                        "nodes": data["nodes"],
+                        "metadata": data["metadata"]
+                    })
+            except Exception as e:
+                logger.error(f"Error reading conversation file {file}: {e}")
+        
+        return sorted(conversations, key=lambda x: x["timestamp"], reverse=True)
+
+    async def get_conversation(self, conversation_id: str) -> Optional[ConversationTree]:
+        """Get a specific conversation by ID"""
+        if conversation_id in self._conversations:
+            return self._conversations[conversation_id]
+            
+        try:
+            filepath = self.conversation_path / f"conversation_{conversation_id}.json"
+            if filepath.exists():
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    conversation = ConversationTree(**data)
+                    self._conversations[conversation_id] = conversation
+                    return conversation
+        except Exception as e:
+            logger.error(f"Error loading conversation {conversation_id}: {e}")
+        return None
+
+    async def get_conversations_by_session(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get all conversations for a specific session"""
+        conversations = []
+        for file in self.conversation_path.glob("conversation_*.json"):
+            try:
+                with open(file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if data.get("session_id") == session_id:
+                        conversations.append({
+                            "id": data["id"],
+                            "timestamp": data["timestamp"],
+                            "question": data["question"],
+                            "nodes": data["nodes"],
+                            "metadata": data["metadata"]
+                        })
+            except Exception as e:
+                logger.error(f"Error reading conversation file {file}: {e}")
+        
+        return sorted(conversations, key=lambda x: x["timestamp"], reverse=True)
+
     # Private methods
     async def _save_conversation_async(self, conversation_id: str) -> bool:
         """Internal method to save conversation asynchronously"""
@@ -164,6 +243,7 @@ class ConversationManager:
         """Internal method to save conversation to disk"""
         conversation = self._get_conversation(conversation_id)
         if not conversation:
+            logger.error(f"Conversation {conversation_id} not found")
             raise ValueError(f"Conversation {conversation_id} not found")
 
         with self._file_lock:
@@ -175,10 +255,9 @@ class ConversationManager:
                     json.dump(conversation.to_storage_dict(), f, indent=4, ensure_ascii=False)
                 
                 temp_file.replace(filepath)
-                logger.info(f"Saved conversation {conversation_id} to {filepath}")
                 return True
             except Exception as e:
-                logger.error(f"Error saving conversation: {e}")
+                logger.error(f"Error saving conversation: {e}", exc_info=True)
                 return False
 
     def _load_conversation(self, conversation_id: str) -> Optional[ConversationTree]:
@@ -234,3 +313,38 @@ class ConversationManager:
         if not isinstance(metadata, dict):
             raise ValueError("Metadata must be a dictionary")
         return metadata
+
+    def create_conversation_sync(self, question: str, session_id: str, **metadata) -> str:
+        """Synchronous version of create_conversation"""
+        try:
+            conversation = ConversationTree(
+                question=question,
+                session_id=session_id,
+                metadata=metadata
+            )
+            self._conversations[conversation.id] = conversation
+            self._save_conversation(conversation.id)
+            return conversation.id
+        except Exception as e:
+            logger.error(f"Error creating conversation: {e}", exc_info=True)
+            raise
+
+    def add_system_node_sync(self, conversation_id: str, name: str, **metadata) -> str:
+        """Synchronous version of add_system_node"""
+        node_id = self._add_node(conversation_id, 'system', name, None, metadata)
+        self._save_conversation(conversation_id)
+        return node_id
+
+    def add_interaction_sync(self, conversation_id: str, node_id: str, prompt: str, response: str, **metadata) -> str:
+        """Synchronous version of add_interaction"""
+        conversation = self._get_conversation(conversation_id)
+        
+        # Add prompt_name to metadata if this is a relevancy check
+        if metadata.get("metadata", {}).get("type") == "relevancy_check":
+            if "metadata" not in metadata:
+                metadata["metadata"] = {}
+            metadata["metadata"]["prompt_name"] = "relevance_prompt"
+            
+        interaction_id = conversation.add_interaction(node_id, prompt, response, **metadata)
+        self._save_conversation(conversation_id)
+        return interaction_id

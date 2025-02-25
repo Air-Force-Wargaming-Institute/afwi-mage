@@ -17,6 +17,7 @@ from multiagent.support_models.team_class import Team
 from utils.model_list import OllamaModelManager
 from utils.prompt_manager import SystemPromptManager
 import os
+from utils.conversation_manager import ConversationManager
 
 config = load_config()
 
@@ -143,23 +144,55 @@ def _process_init_chat(request_data: ChatMessage):
         for agent in agent_names
     )
 
-    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
+    # Initialize conversation manager and create new conversation
+    conversation_manager = ConversationManager()
+    conversation_id = conversation_manager.create_conversation_sync(
+        question=request_data.message,
+        session_id=request_data.session_id,
+        metadata={"team_id": request_data.team_id}
+    )
 
-    # prompt = PromptTemplate(
-    #     input_variables=["current_datetime", "agents_with_instructions", "message"],
-    #     template=relevance_prompt
-    # )
+    # Add relevancy check as system node
+    system_node_id = conversation_manager.add_system_node_sync(
+        conversation_id=conversation_id,
+        name="Relevancy Checker",
+        metadata={"type": "relevancy_check"}
+    )
+
+    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
     prompt = relevance_prompt.format(
         current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         agents_with_instructions=agents_with_instructions,
         message=request_data.message
     )
+    
     response = llm.with_structured_output(relevancy_check).invoke([HumanMessage(content=prompt)])
 
+    # Record the interaction
+    conversation_manager.add_interaction_sync(
+        conversation_id=conversation_id,
+        node_id=system_node_id,
+        prompt=prompt,
+        response=response.reason,
+        metadata={
+            "prompt_name": "relevance_prompt",
+            "relevant": response.relevant,
+            "model": llm.model_name
+        }
+    )
+
     if response.relevant:   
-        return {"message": "Chat initialized successfully", "continue": True}
+        return {
+            "message": "Chat initialized successfully", 
+            "continue": True,
+            "conversation_id": conversation_id
+        }
     else:
-        return {"message": "Chat not initialized because the message is not relevant to the team's expertise" + response.reason, "continue": False}
+        return {
+            "message": "Chat not initialized because the message is not relevant to the team's expertise: " + response.reason, 
+            "continue": False,
+            "conversation_id": conversation_id
+        }
 
 @app.post("/chat/refine")
 async def refine_chat(request_data: ChatMessage):
@@ -625,6 +658,41 @@ async def remove_prompt_variable(prompt_id: str, variable_name: str):
             raise HTTPException(status_code=404, detail="Variable not found")
     except Exception as e:
         logger.error(f"Error removing prompt variable: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/list")
+async def list_conversations():
+    """Get a list of all conversations"""
+    try:
+        conversation_manager = ConversationManager()
+        conversations = await conversation_manager.list_conversations()
+        return conversations
+    except Exception as e:
+        logger.error(f"Error listing conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get details of a specific conversation"""
+    try:
+        conversation_manager = ConversationManager()
+        conversation = await conversation_manager.get_conversation(conversation_id)
+        if conversation:
+            return conversation.to_frontend_tree()
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    except Exception as e:
+        logger.error(f"Error getting conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/by-session/{session_id}")
+async def get_conversations_by_session(session_id: str):
+    """Get all conversations for a specific session"""
+    try:
+        conversation_manager = ConversationManager()
+        conversations = await conversation_manager.get_conversations_by_session(session_id)
+        return conversations
+    except Exception as e:
+        logger.error(f"Error getting conversations by session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
