@@ -1,13 +1,14 @@
 from pathlib import Path
 import json
 import logging
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Union
 from threading import RLock
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import os
 
 from .conversation_tracking import ConversationTree
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -335,16 +336,45 @@ class ConversationManager:
         self._save_conversation(conversation_id)
         return node_id
 
-    def add_interaction_sync(self, conversation_id: str, node_id: str, prompt: str, response: str, **metadata) -> str:
+    def add_interaction_sync(self, conversation_id: str, node_id: str, prompt: str, 
+                            response: Union[str, BaseModel], **metadata) -> str:
         """Synchronous version of add_interaction"""
         conversation = self._get_conversation(conversation_id)
         
-        # Add prompt_name to metadata if this is a relevancy check
-        if metadata.get("metadata", {}).get("type") == "relevancy_check":
+        # Handle response based on type
+        if isinstance(response, BaseModel):
+            try:
+                response_data = response.to_dict()
+                response_text = getattr(response, 'reason', str(response))
+                if "metadata" not in metadata:
+                    metadata["metadata"] = {}
+                metadata["metadata"]["response_type"] = response_data["type"]
+                metadata["metadata"]["response_data"] = response_data
+            except AttributeError:
+                # Fallback if to_dict() is not available
+                response_text = str(response)
+                if hasattr(response, 'reason'):
+                    response_text = response.reason
+        else:
+            response_text = str(response)
+        
+        # Add prompt_name from metadata if provided
+        if metadata.get("prompt_name"):
             if "metadata" not in metadata:
                 metadata["metadata"] = {}
-            metadata["metadata"]["prompt_name"] = "relevance_prompt"
-            
-        interaction_id = conversation.add_interaction(node_id, prompt, response, **metadata)
+            metadata["metadata"]["prompt_name"] = metadata.pop("prompt_name")
+        
+        # Add model info if provided
+        if metadata.get("model"):
+            if "metadata" not in metadata:
+                metadata["metadata"] = {}
+            metadata["metadata"]["model"] = metadata.pop("model")
+        
+        interaction_id = conversation.add_interaction(
+            node_id, 
+            prompt, 
+            response_text, 
+            **metadata
+        )
         self._save_conversation(conversation_id)
         return interaction_id

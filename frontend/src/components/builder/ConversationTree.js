@@ -148,6 +148,44 @@ function ConversationTree() {
     });
   };
 
+  const renderResponse = (response, metadata, classes) => {
+    // If we have structured response data, render it accordingly
+    if (metadata?.response_type && metadata?.response_data) {
+      switch (metadata.response_type) {
+        case 'relevancy_check':
+          return (
+            <>
+              <ReactMarkdown className={classes.markdown}>
+                {metadata.response_data.reason}
+              </ReactMarkdown>
+              <Box mt={1}>
+                <Chip
+                  className={classes.relevancyChip}
+                  icon={metadata.response_data.relevant ? <CheckCircleIcon /> : <CancelIcon />}
+                  label={metadata.response_data.relevant ? "Relevant" : "Not Relevant"}
+                  color={metadata.response_data.relevant ? "primary" : "default"}
+                  size="small"
+                />
+              </Box>
+            </>
+          );
+        default:
+          return (
+            <ReactMarkdown className={classes.markdown}>
+              {response}
+            </ReactMarkdown>
+          );
+      }
+    }
+    
+    // Default string response
+    return (
+      <ReactMarkdown className={classes.markdown}>
+        {response}
+      </ReactMarkdown>
+    );
+  };
+
   const renderInteraction = (interaction, classes) => (
     <Box key={interaction.id} className={classes.interaction}>
       <Box className={classes.prompt}>
@@ -162,21 +200,10 @@ function ConversationTree() {
       </Box>
       <Box className={classes.response}>
         <Typography variant="caption" color="textSecondary">Response:</Typography>
-        <ReactMarkdown className={classes.markdown}>
-          {interaction.response}
-        </ReactMarkdown>
+        {renderResponse(interaction.response, interaction.metadata, classes)}
       </Box>
       {interaction.metadata && (
         <Box mt={1}>
-          {interaction.metadata.relevant !== undefined && (
-            <Chip
-              className={classes.relevancyChip}
-              icon={interaction.metadata.relevant ? <CheckCircleIcon /> : <CancelIcon />}
-              label={interaction.metadata.relevant ? "Relevant" : "Not Relevant"}
-              color={interaction.metadata.relevant ? "primary" : "default"}
-              size="small"
-            />
-          )}
           {interaction.metadata.model && (
             <Chip
               className={classes.chip}

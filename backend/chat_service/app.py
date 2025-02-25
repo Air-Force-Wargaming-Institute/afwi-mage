@@ -141,7 +141,7 @@ def _process_init_chat(request_data: ChatMessage):
 
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
-        for agent in agent_names
+        for agent in sorted(agent_names)
     )
 
     # Initialize conversation manager and create new conversation
@@ -173,10 +173,9 @@ def _process_init_chat(request_data: ChatMessage):
         conversation_id=conversation_id,
         node_id=system_node_id,
         prompt=prompt,
-        response=response.reason,
+        response=response,
         metadata={
             "prompt_name": "relevance_prompt",
-            "relevant": response.relevant,
             "model": llm.model_name
         }
     )
@@ -235,15 +234,13 @@ def _process_refine_chat(request_data: ChatMessage):
     agent_names = []
     agent_instructions = {}
 
-    logger.info(f"[REFINE_AGENTS] Processing team agents: {len(team.agents)} agents found")
     for agent_id, agent in team.agents.items():
-        logger.debug(f"[REFINE_AGENTS] Processing agent: {agent.name}")
         agent_names.append(agent.name)
         agent_instructions[agent.name] = agent.instructions
 
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
-        for agent in agent_names
+        for agent in sorted(agent_names)
     )
 
     # Session handling
