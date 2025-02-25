@@ -148,6 +148,7 @@ class ConversationTree(BaseModel):
         """Convert the conversation tree to a storage format"""
         return {
             "id": self.id,
+            "session_id": self.session_id,
             "timestamp": self.timestamp,
             "question": self.question,
             "nodes": {
