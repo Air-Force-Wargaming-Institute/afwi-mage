@@ -3,7 +3,7 @@ from config_ import load_config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from utils.llm_manager import LLMManager
-
+from utils.prompt_manager import SystemPromptManager
 
 class CollabList(BaseModel):
     collaborators:list[str]
@@ -18,13 +18,14 @@ def determine_collaboration(reflection: str, analysis: str, expert_agents_withou
     '''
     expert_agents_str = "\n".join(f"- {expert}" for expert in expert_agents_withoutme)
 
-    llm = LLMManager().llm
-    collab_template = PromptTemplate(
-            input_variables=["reflection", "analysis", "expert_agents"],
-            template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n"
-    )
+    llm = LLMManager().get_llm(SystemPromptManager().get_prompt("collaborator_prompt")["llm"])
+    # collab_template = PromptTemplate(
+    #         input_variables=["reflection", "analysis", "expert_agents"],
+    #         template="Given a report and a reflection on that report, please identify some number of experts from the following list that could best help improve the report: {expert_agents}.\n\nReport: {analysis}\n\nReflection: {reflection}\n\n"
+    # )
+    prompt = SystemPromptManager().get_prompt_template("collaborator_prompt")
 
-    prompt = collab_template.format(
+    prompt = prompt.format(
         reflection=reflection,
         analysis=analysis,
         expert_agents=expert_agents_str

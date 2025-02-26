@@ -17,6 +17,10 @@ import { Link } from 'react-router-dom';
 import LLMLibrary from './builder/LLMLibrary';
 import AgentPortfolio from './builder/AgentPortfolio';
 import AgentTeams from './builder/AgentTeams';
+import SystemPrompts from './builder/SystemPrompts';
+import TextFieldsIcon from '@material-ui/icons/TextFields';
+import AccountTreeIcon from '@material-ui/icons/AccountTree';
+import ConversationTree from './builder/ConversationTree';
 
 function MultiAgentBuilder() {
   const location = useLocation();
@@ -59,6 +63,20 @@ function MultiAgentBuilder() {
         }} 
       />,
       component: AgentTeams
+    },
+    {
+      id: 'system-prompts',
+      label: 'System Prompts',
+      path: '/multi-agent/builder/system-prompts',
+      icon: <TextFieldsIcon />,
+      component: SystemPrompts
+    },
+    {
+      id: 'conversation-tree',
+      label: 'Conversation Tree',
+      path: '/multi-agent/builder/conversation-tree',
+      icon: <AccountTreeIcon />,
+      component: ConversationTree
     }
   ];
 
@@ -97,6 +115,8 @@ function MultiAgentBuilder() {
           <Route exact path="/multi-agent/builder/llm-library" component={LLMLibrary} />
           <Route exact path="/multi-agent/builder/agent-portfolio" component={AgentPortfolio} />
           <Route exact path="/multi-agent/builder/agent-teams" component={AgentTeams} />
+          <Route exact path="/multi-agent/builder/system-prompts" component={SystemPrompts} />
+          <Route exact path="/multi-agent/builder/conversation-tree" component={ConversationTree} />
           <Route path="/multi-agent/builder">
             <Redirect to="/multi-agent/builder/llm-library" />
           </Route>
