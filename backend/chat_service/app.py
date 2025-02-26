@@ -1,7 +1,7 @@
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -14,8 +14,10 @@ from typing import List, Optional
 from multiagent.session_manager import SessionManager
 from utils.llm_manager import LLMManager
 from multiagent.support_models.team_class import Team
-from multiagent.support_models.agent_class import Agent
 from utils.model_list import OllamaModelManager
+from utils.prompt_manager import SystemPromptManager
+import os
+from utils.conversation_manager import ConversationManager
 
 config = load_config()
 
@@ -55,6 +57,29 @@ class SessionUpdate(BaseModel):
     team_name: Optional[str] = None
     session_name: Optional[str] = None
 
+class PromptData(BaseModel):
+    """Model for prompt data"""
+    name: str = Field(..., description="Name of the prompt")
+    description: str = Field(..., description="Description of the prompt")
+    content: str = Field(..., description="Content of the prompt")
+    template_type: str = Field(..., description="Type of the template")
+    variables: List[str] = Field(default_factory=list, description="List of variables")
+    llm: Optional[str] = Field(default="", description="Selected LLM for this prompt")
+
+class PromptUpdate(PromptData):
+    """Model for prompt updates"""
+    pass
+
+
+def init_directories():
+    """Initialize required directories for the application"""
+    try:
+        os.makedirs(config['CONVERSATION_PATH'], exist_ok=True)
+        logger.info(f"Ensured conversation logs directory exists at: {config['CONVERSATION_PATH']}")
+    except Exception as e:
+        logger.error(f"Failed to create conversation logs directory: {e}")
+        raise
+
 app = FastAPI()
 
 # Configure CORS
@@ -65,6 +90,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize required directories
+init_directories()
 
 # Increase the number of workers based on your server capacity
 executor = ThreadPoolExecutor(max_workers=20)
@@ -113,26 +141,57 @@ def _process_init_chat(request_data: ChatMessage):
 
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
-        for agent in agent_names
+        for agent in sorted(agent_names)
     )
 
-    relevance_template = config["HIGH_LEVEL_PROMPT"] + """Given this team of experts and their domain, determine if the message is relevant to the team. If it is, return a boolean value of true and an extremely brief explanation of why it is relevant. If it is not, return a boolean value of false and a more detailed explanation of why it is not relevant. Here are some examples of irrelevant messages: "Hello!", "What is the meaning of life?", "My name is John.", "What day is it?", "Test", "What is the weather in Tokyo?", "Guess my favorite color." Here is the team of experts and their domain: {agents_with_instructions} Here is the message: {message}"""
-
-    prompt = PromptTemplate(
-        input_variables=["current_datetime", "agents_with_instructions", "message"],
-        template=relevance_template
+    # Initialize conversation manager and create new conversation
+    conversation_manager = ConversationManager()
+    conversation_id = conversation_manager.create_conversation_sync(
+        question=request_data.message,
+        session_id=request_data.session_id,
+        metadata={"team_id": request_data.team_id}
     )
-    prompt = prompt.format(
+
+    # Add relevancy check as system node
+    system_node_id = conversation_manager.add_system_node_sync(
+        conversation_id=conversation_id,
+        name="Relevancy Checker",
+        metadata={"type": "relevancy_check"}
+    )
+
+    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
+    prompt = relevance_prompt.format(
         current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         agents_with_instructions=agents_with_instructions,
         message=request_data.message
     )
+    
     response = llm.with_structured_output(relevancy_check).invoke([HumanMessage(content=prompt)])
 
+    # Record the interaction
+    conversation_manager.add_interaction_sync(
+        conversation_id=conversation_id,
+        node_id=system_node_id,
+        prompt=prompt,
+        response=response,
+        metadata={
+            "prompt_name": "relevance_prompt",
+            "model": llm.model_name
+        }
+    )
+
     if response.relevant:   
-        return {"message": "Chat initialized successfully", "continue": True}
+        return {
+            "message": "Chat initialized successfully", 
+            "continue": True,
+            "conversation_id": conversation_id
+        }
     else:
-        return {"message": "Chat not initialized because the message is not relevant to the team's expertise" + response.reason, "continue": False}
+        return {
+            "message": "Chat not initialized because the message is not relevant to the team's expertise: " + response.reason, 
+            "continue": False,
+            "conversation_id": conversation_id
+        }
 
 @app.post("/chat/refine")
 async def refine_chat(request_data: ChatMessage):
@@ -175,15 +234,13 @@ def _process_refine_chat(request_data: ChatMessage):
     agent_names = []
     agent_instructions = {}
 
-    logger.info(f"[REFINE_AGENTS] Processing team agents: {len(team.agents)} agents found")
     for agent_id, agent in team.agents.items():
-        logger.debug(f"[REFINE_AGENTS] Processing agent: {agent.name}")
         agent_names.append(agent.name)
         agent_instructions[agent.name] = agent.instructions
 
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
-        for agent in agent_names
+        for agent in sorted(agent_names)
     )
 
     # Session handling
@@ -224,23 +281,24 @@ def _process_refine_chat(request_data: ChatMessage):
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
-        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
-        1. Use the previous plan as the foundation for your new plan
-        2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
-        4. Explain clearly and in detail what and how each agent will contribute to the response
-        5. Format this plan in a way that is easy to understand for the user
+        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
+        # 1. Use the previous plan as the foundation for your new plan
+        # 2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        # 3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
+        # 4. Explain clearly and in detail what and how each agent will contribute to the response
+        # 5. Format this plan in a way that is easy to understand for the user
     
-        Message: {message}
-        Previous Plan: {previous_plan}
-        Team of Experts: {agents_with_instructions}
+        # Message: {message}
+        # Previous Plan: {previous_plan}
+        # Team of Experts: {agents_with_instructions}
 
-        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        """
-        prompt = PromptTemplate(
-            input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
-            template=plan_template
-        )
+        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        # """
+        # prompt = PromptTemplate(
+        #     input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
+        #     template=plan_template
+        # )
+        prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_previous_plan")
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
@@ -248,23 +306,24 @@ def _process_refine_chat(request_data: ChatMessage):
             agents_with_instructions=agents_with_instructions
         )
     else:
-        plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
-        1. Review the previous conversation to incorporate any relevant information regarding the user's message
-        2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        3. Determine which agents are qualified and necessary to respond to the new message you created
-        4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
-        5. Format this plan in a way that is easy to understand for the user
+        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
+        # 1. Review the previous conversation to incorporate any relevant information regarding the user's message
+        # 2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        # 3. Determine which agents are qualified and necessary to respond to the new message you created
+        # 4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
+        # 5. Format this plan in a way that is easy to understand for the user
     
-        Message: {message}
-        Previous Conversation: {conversation_history}
-        Team of Experts: {agents_with_instructions}
+        # Message: {message}
+        # Previous Conversation: {conversation_history}
+        # Team of Experts: {agents_with_instructions}
 
-        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        """
-        prompt = PromptTemplate(
-            input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
-            template=plan_template
-        )
+        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        # """
+        # prompt = PromptTemplate(
+        #     input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
+        #     template=plan_template
+        # )
+        prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_conversation_history")
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
@@ -450,6 +509,187 @@ async def list_ollama_models():
             }
     except Exception as e:
         logger.error(f"Error listing Ollama models: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/list")
+async def list_prompts():
+    """Get all system prompts"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            prompts = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().load_prompts()
+            )
+            return prompts
+    except Exception as e:
+        logger.error(f"Error listing prompts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/{prompt_id}")
+async def get_prompt(prompt_id: str):
+    """Get a specific prompt by ID"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            prompt = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().get_prompt(prompt_id)
+            )
+            if prompt:
+                return prompt
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error getting prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts")
+async def create_prompt(prompt_data: PromptData):
+    """Create a new system prompt"""
+    try:
+        logger.info(f"Received create prompt request with data: {prompt_data.dict()}")
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().add_prompt(None, prompt_data.dict())
+            )
+            logger.info(f"Add prompt result: {success}")
+            
+            if success:
+                # The ID will be the sanitized name
+                prompt_id = prompt_data.name.lower().replace(" ", "_")
+                response_data = {"id": prompt_id, **prompt_data.dict()}
+                logger.info(f"Returning successful response: {response_data}")
+                return response_data
+                
+            logger.error("Failed to create prompt")
+            raise HTTPException(status_code=400, detail="Failed to create prompt")
+            
+    except Exception as e:
+        logger.error(f"Error creating prompt: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/prompts/{prompt_id}")
+async def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
+    """Update an existing system prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().update_prompt(prompt_id, prompt_data.dict())
+            )
+            if success:
+                return {"id": prompt_id, **prompt_data.dict()}
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error updating prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/prompts/{prompt_id}")
+async def delete_prompt(prompt_id: str):
+    """Delete a system prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().delete_prompt(prompt_id)
+            )
+            if success:
+                return {"message": f"Prompt {prompt_id} deleted successfully"}
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    except Exception as e:
+        logger.error(f"Error deleting prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/prompts/{prompt_id}/variables")
+async def get_prompt_variables(prompt_id: str):
+    """Get variables for a specific prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            variables = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().get_prompt_variables(prompt_id)
+            )
+            return variables
+    except Exception as e:
+        logger.error(f"Error getting prompt variables: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts/{prompt_id}/variables")
+async def add_prompt_variable(
+    prompt_id: str,
+    variable_name: str = Query(..., description="Name of the variable to add")
+):
+    """Add a new variable to a prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().add_variable(prompt_id, variable_name)
+            )
+            if success:
+                return {"message": f"Variable {variable_name} added successfully"}
+            raise HTTPException(status_code=400, detail="Failed to add variable")
+    except Exception as e:
+        logger.error(f"Error adding prompt variable: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/prompts/{prompt_id}/variables/{variable_name}")
+async def remove_prompt_variable(prompt_id: str, variable_name: str):
+    """Remove a variable from a prompt"""
+    try:
+        async with semaphore:
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                executor,
+                lambda: SystemPromptManager().remove_variable(prompt_id, variable_name)
+            )
+            if success:
+                return {"message": f"Variable {variable_name} removed successfully"}
+            raise HTTPException(status_code=404, detail="Variable not found")
+    except Exception as e:
+        logger.error(f"Error removing prompt variable: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/list")
+async def list_conversations():
+    """Get a list of all conversations"""
+    try:
+        conversation_manager = ConversationManager()
+        conversations = await conversation_manager.list_conversations()
+        return conversations
+    except Exception as e:
+        logger.error(f"Error listing conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get details of a specific conversation"""
+    try:
+        conversation_manager = ConversationManager()
+        conversation = await conversation_manager.get_conversation(conversation_id)
+        if conversation:
+            return conversation.to_frontend_tree()
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    except Exception as e:
+        logger.error(f"Error getting conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/by-session/{session_id}")
+async def get_conversations_by_session(session_id: str):
+    """Get all conversations for a specific session"""
+    try:
+        conversation_manager = ConversationManager()
+        conversations = await conversation_manager.get_conversations_by_session(session_id)
+        return conversations
+    except Exception as e:
+        logger.error(f"Error getting conversations by session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

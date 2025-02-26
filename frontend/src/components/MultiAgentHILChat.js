@@ -239,6 +239,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     marginRight: theme.spacing(2),
+    minWidth: '30%',
   },
   newChatButton: {
     margin: theme.spacing(2),
@@ -1102,7 +1103,7 @@ function MultiAgentHILChat() {
             <TextField
               autoFocus
               margin="dense"
-              label="Session Name"
+              label="Session Name*"
               fullWidth
               value={newSessionName}
               onChange={(e) => setNewSessionName(e.target.value)}
@@ -1110,7 +1111,7 @@ function MultiAgentHILChat() {
               helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
             />
             <FormControl fullWidth>
-              <InputLabel>Select Team</InputLabel>
+              <InputLabel>Select Team*</InputLabel>
               <Select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
