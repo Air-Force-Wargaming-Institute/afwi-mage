@@ -12,10 +12,9 @@ variables:
 
 prebuild_checks:
   stage: prebuild
-  image: python:3.10
+  image: python:3.11
   script:
     - set -x
-    - python3.10 --version || (echo "Python 3.10 not found" && exit 1)
     - python3.11 --version || (echo "Python 3.11 not found" && exit 1)
     - command -v nvidia-smi || echo "NVIDIA drivers not installed; skipping GPU check"
     - nvidia-smi || echo "nvidia-smi unavailable; proceeding without GPU metrics"
@@ -28,7 +27,7 @@ prebuild_checks:
 
 security_scan:
   stage: security_scan
-  image: python:3.10
+  image: python:3.11
   script:
     - set -x
     - pip install bandit safety trufflehog pandas
@@ -36,34 +35,39 @@ security_scan:
     - safety check --json > dependency_check.json || true
     - trufflehog filesystem . --json > secret_detection.json || true
     - |
-      python -c "
-import json, csv;
-# Convert SAST report
-try:
-    with open('sast_report.json') as f:
-        data = json.load(f)
-    with open('sast_report.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['filename', 'issue', 'severity'])
-        for result in data.get('results', []):
-            writer.writerow([result.get('filename'), result.get('issue_text'), result.get('issue_severity')])
-except Exception as e:
-    print(f'Error processing SAST report: {e}')
+      python -c '
+      import json, csv
+      # Convert SAST report
+      try:
+          with open("sast_report.json") as f:
+              data = json.load(f)
+          with open("sast_report.csv", "w", newline="") as csvfile:
+              writer = csv.writer(csvfile)
+              writer.writerow(["filename", "issue", "severity"])
+              for result in data.get("results", []):
+                  writer.writerow([result.get("filename"), result.get("issue_text"), result.get("issue_severity")])
+      except Exception as e:
+          print(f"Error processing SAST report: {e}")
 
-# Convert Secret Detection
-try:
-    with open('secret_detection.json') as f:
-        data = json.load(f)
-    with open('secret_detection.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['file', 'string', 'match'])
-        for match in data.get('results', []):
-            writer.writerow([match.get('path'), match.get('stringsFound', []), match.get('printDiff', '')])
-except Exception as e:
-    print(f'Error processing Secret Detection report: {e}')
-"
+      # Convert Secret Detection
+      try:
+          with open("secret_detection.json") as f:
+              data = json.load(f)
+          with open("secret_detection.csv", "w", newline="") as csvfile:
+              writer = csv.writer(csvfile)
+              writer.writerow(["file", "string", "match"])
+              for match in data.get("results", []):
+                  writer.writerow([match.get("path"), match.get("stringsFound", []), match.get("printDiff", "")])
+      except Exception as e:
+          print(f"Error processing Secret Detection report: {e}")
+      '
   artifacts:
+    reports:
+      sast: sast_report.json
     paths:
+      - sast_report.json
+      - dependency_check.json
+      - secret_detection.json
       - sast_report.csv
       - dependency_check.csv
       - secret_detection.csv
@@ -155,13 +159,15 @@ audit_trail:
     - prebuild_checks
   script:
     - set -x
-    - echo "Audit Trail Summary" > audit_summary.txt
-    - echo "Date: $(date)" >> audit_summary.txt
-    - echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
-    - echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
-    - echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
-    - tar -czf build_logs.tar.gz app/data/logs/
+    - |
+      echo "Audit Trail Summary" > audit_summary.txt
+      echo "Date: $(date)" >> audit_summary.txt
+      echo "Pipeline Run ID: $CI_PIPELINE_ID" >> audit_summary.txt
+      echo "Branch: $CI_COMMIT_BRANCH" >> audit_summary.txt
+      echo "Commit Hash: $CI_COMMIT_SHA" >> audit_summary.txt
+    - apk add --no-cache zip
+    - zip -r build_logs.zip app/data/logs/
   artifacts:
     paths:
       - audit_summary.txt
-      - build_logs.tar.gz
+      - build_logs.zip
