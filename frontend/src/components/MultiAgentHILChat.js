@@ -440,6 +440,9 @@ function MultiAgentHILChat() {
   const messageAreaRef = useRef(null);
   const shouldUpdatePositions = useRef(false);
 
+  // Add original message state
+  const [originalMessage, setOriginalMessage] = useState('');
+  
   // Update scroll handling to use useCallback with debounce
   const handleScroll = useCallback(
     debounce(({ target }) => {
@@ -503,8 +506,10 @@ function MultiAgentHILChat() {
   const [planChoice, setPlanChoice] = useState('');
   const [rejectionText, setRejectionText] = useState('');
   const [planContent, setPlanContent] = useState('');
+  const [planNotes, setPlanNotes] = useState('');
   const [modifiedQuestion, setModifiedQuestion] = useState('');
   const [selectedAgents, setSelectedAgents] = useState([]);
+  const [messageChoice, setMessageChoice] = useState('modified');
 
   // Add new state for edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -809,8 +814,12 @@ function MultiAgentHILChat() {
       dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: currentSession.id });
     }
 
+    // Store the original message
+    const userMessage = state.input.trim();
+    setOriginalMessage(userMessage);
+
     const messageData = { 
-      message: state.input.trim(), 
+      message: userMessage, 
       team_name: currentSession.team,
       session_id: currentSession.id,
       team_id: currentSession.teamId
@@ -821,7 +830,7 @@ function MultiAgentHILChat() {
       type: ACTIONS.ADD_MESSAGE, 
       payload: { 
         id: uuidv4(),
-        text: state.input.trim(), 
+        text: userMessage, 
         sender: 'user', 
         timestamp: new Date(),
         sessionId: currentSession.id
@@ -835,48 +844,24 @@ function MultiAgentHILChat() {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
       
       // First, send to init endpoint
-      let response = await axios.post(getApiUrl('CHAT', '/chat/init'), messageData);
+      let response = await axios.post(getApiUrl('CHAT', '/chat/refine'), messageData);
 
       // Handle any errors
       if (response.data.error) {
         throw new Error(response.data.error);
       }
 
-      // Check if we need to continue to refinement
-      if (response.data.continue === true) {
-        // Send to refine endpoint with the same data
-        response = await axios.post(getApiUrl('CHAT', '/chat/refine'), messageData);
+      // Clear loading before showing dialog
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
         
-        if (response.data.error) {
-          throw new Error(response.data.error);
-        }
-
-        // Clear loading before showing dialog
-        dispatch({ type: ACTIONS.SET_LOADING, payload: false });
-        
-        // Store plan, modified question, and selected agents
-        setPlanContent(response.data.plan || response.data.response || response.data.message);
-        setModifiedQuestion(response.data.modified_message || '');
-        setSelectedAgents(response.data.selected_agents || []);
-        setPlanDialogOpen(true);
-        return;
-      }
-
-      // If continue was false, display the init response
-      dispatch({ type: ACTIONS.REMOVE_ERROR_MESSAGES });
-      const messagePayload = { 
-        id: uuidv4(),
-        text: response.data.message, 
-        sender: 'ai', 
-        timestamp: new Date(),
-        sessionId: state.currentSessionId  // Use state.currentSessionId instead of currentSession.id
-      };
-      
-      // Add message to chat
-      dispatch({ 
-        type: ACTIONS.ADD_MESSAGE, 
-        payload: messagePayload
-      });
+      // Store plan, modified question, and selected agents
+      setPlanContent(response.data.plan || response.data.response || response.data.message);
+      setPlanNotes(response.data.plan_notes || '');
+      setModifiedQuestion(response.data.modified_message || '');
+      setMessageChoice('modified');
+      setSelectedAgents(response.data.selected_agents || []);
+      setPlanDialogOpen(true);
+      return;
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -903,14 +888,23 @@ function MultiAgentHILChat() {
       return;
     }
 
+    //Maybe add the plan message to the chat if plan is accepted
+
     const currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
+    
+    // Determine which message to send based on user selection
+    const messageToSend = messageChoice === 'original' ? originalMessage : modifiedQuestion;
+    
     const messageData = {
-      message: planChoice === 'accept' ? modifiedQuestion : rejectionText.trim(),
+      message: messageToSend,
       plan: planContent,
+      plan_notes: planNotes,
+      original_message: originalMessage,
       team_name: currentSession.team,
       session_id: currentSession.id,
       team_id: currentSession.teamId,
-      selected_agents: selectedAgents
+      selected_agents: selectedAgents,
+      comments: rejectionText.trim()
     };
 
     // Close dialog and show loading first
@@ -931,6 +925,7 @@ function MultiAgentHILChat() {
         dispatch({ type: ACTIONS.SET_LOADING, payload: false });
         
         setPlanContent(response.data.plan || response.data.response || response.data.message);
+        setPlanNotes(response.data.plan_notes || '');
         setModifiedQuestion(response.data.modified_message || '');
         setSelectedAgents(response.data.selected_agents || []);
         setPlanDialogOpen(true);
@@ -948,6 +943,8 @@ function MultiAgentHILChat() {
           sessionId: currentSession.id
         }
       });
+
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
 
     } catch (error) {
       console.error('Error submitting plan choice:', error);
@@ -1203,16 +1200,74 @@ function MultiAgentHILChat() {
             </Paper>
           </Box>
           
-          {modifiedQuestion && (
+          {planNotes && (
             <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Modified Question</Typography>
-              <Paper elevation={1} className={classes.modifiedQuestionBox}>
-                <Typography variant="body1">
-                  {modifiedQuestion}
-                </Typography>
+              <Typography variant="h6" gutterBottom>Plan Notes</Typography>
+              <Paper elevation={1} className={classes.planBox}>
+                <ReactMarkdown
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    code: CodeBlock
+                  }}
+                >
+                  {planNotes}
+                </ReactMarkdown>
               </Paper>
             </Box>
           )}
+          
+          <Box mb={3}>
+            <Typography variant="h6" gutterBottom>Message Selection</Typography>
+            <Paper elevation={1} className={classes.modifiedQuestionBox}>
+              <Box mb={2}>
+                <FormControlLabel
+                  control={
+                    <Radio
+                      checked={messageChoice === 'original'}
+                      onChange={() => setMessageChoice('original')}
+                      color="primary"
+                    />
+                  }
+                  label="Original Message"
+                />
+                <Typography 
+                  variant="body1" 
+                  style={{ 
+                    padding: '8px',
+                    backgroundColor: messageChoice === 'original' ? '#f0f7ff' : 'transparent',
+                    borderRadius: '4px'
+                  }}
+                >
+                  {originalMessage}
+                </Typography>
+              </Box>
+              
+              {modifiedQuestion && (
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={messageChoice === 'modified'}
+                        onChange={() => setMessageChoice('modified')}
+                        color="primary"
+                      />
+                    }
+                    label="Modified Message"
+                  />
+                  <Typography 
+                    variant="body1" 
+                    style={{ 
+                      padding: '8px',
+                      backgroundColor: messageChoice === 'modified' ? '#f0f7ff' : 'transparent',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    {modifiedQuestion}
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Box>
 
           <RadioGroup
             value={planChoice}
