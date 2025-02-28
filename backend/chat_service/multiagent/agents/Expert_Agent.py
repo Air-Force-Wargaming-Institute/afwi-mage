@@ -74,11 +74,18 @@ def expert_subgraph_report(state: ExpertState):
     print(create_banner(f"{state['expert']} AFTER REFLECTION & COLLABORATION").upper())
     
     whoami = state['expert']
+    vs = state['vectorstore']
     agent_instructions = state['expert_instructions'][whoami]
     
     # Get document summary
     request = get_librarian_request(whoami, state['question'], agent_instructions)
-    document_summary, relevant_documents = librarian(whoami, request)
+    
+    try:
+        document_summary, relevant_documents = librarian(whoami, request, vs)
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        document_summary = f"No relevant documents found for {whoami}'s request: {request}"
+        relevant_documents = []
     
     # Process collaborator feedback
     collab_report, prompt = process_collaborator_feedback(state, whoami)
@@ -104,12 +111,13 @@ def collab_subgraph_entry(state: CollabState):
     print(create_banner(f"{state['expert']} - {state['collaborator']} COLLABORATOR ENTRY"))
     """Process collaboration entry point for experts."""
     whoami = state['collaborator']
+    vs = state['vectorstore']
     my_expert = state['expert']
     
     # Get document summary with collaboration context
     context = f"Report from {my_expert}:\n{state['expert_analysis'][my_expert]}\nAreas needing work:\n{state['expert_collab_areas'][my_expert]}"
     request = get_librarian_request(whoami, "", state['expert_instructions'][whoami], context)
-    document_summary, relevant_documents = librarian(whoami, request)
+    document_summary, relevant_documents = librarian(whoami, request, vs)
     
     # Generate collaboration analysis
     prompt = PromptTemplate(
@@ -132,12 +140,13 @@ def collab_subgraph_entry(state: CollabState):
 def expert_subgraph_entry(state: ExpertState):
     """Initial entry point for expert analysis."""
     whoami = state['expert']
+    vs = state['vectorstore']
     print(create_banner(f"{whoami} SUBGRAPH ENTRY").upper())
     
     # Get initial document summary
     agent_instructions = state['expert_instructions'][whoami]
     request = get_librarian_request(whoami, state['question'], agent_instructions)
-    document_summary, relevant_documents = librarian(whoami, request)
+    document_summary, relevant_documents = librarian(whoami, request, vs)
     
     # Generate initial analysis
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])

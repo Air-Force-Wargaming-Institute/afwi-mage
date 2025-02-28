@@ -13,6 +13,7 @@ class Team(BaseModel):
     color: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_modified: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    vectorstore: List[str]
 
     @model_validator(mode='before')
     def update_last_modified(cls, values):
@@ -25,6 +26,7 @@ class Team(BaseModel):
                name: str,
                description: str,
                color: str,
+               vectorstore: Optional[List[str]] = None,
                agents: Optional[Dict[str, Agent]] = None) -> 'Team':
         """
         Create a new Team instance with the given parameters.
@@ -42,6 +44,7 @@ class Team(BaseModel):
             name=name,
             description=description,
             color=color,
+            vectorstore=vectorstore or [],
             agents=agents or {},
             created_at=datetime.now(timezone.utc),
             last_modified=datetime.now(timezone.utc)
