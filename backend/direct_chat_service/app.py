@@ -650,12 +650,19 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
             {"configurable": {"session_id": request.session_id}}
         )
 
+        # Process the response to ensure proper formatting
+        response_content = response.content
+        if "<details><summary>Thinking Process</summary>" not in response_content:
+            # If the model didn't use the proper format, try to structure it
+            main_response = response_content
+            response_content = f"{main_response}\n\n<details><summary>Thinking Process</summary>\n\n<details><summary>Direct Response</summary>\nProvided direct answer based on knowledge and context.\n</details>\n\n</details>"
+
         # Create AI response data for logging
         ai_message_data = {
             "message_id": str(uuid.uuid4()),
             "timestamp": datetime.now().isoformat(),
             "sender": "ai",
-            "content": response.content,
+            "content": response_content,
             "metadata": {
                 "session_id": request.session_id,
                 "user_id": user_id
@@ -667,7 +674,7 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
         await chat_logger.log_message(user_id, request.session_id, ai_message_data)
 
         return ChatResponse(
-            message=response.content,
+            message=response_content,
             timestamp=datetime.now()
         )
     except Exception as e:
@@ -966,6 +973,83 @@ async def update_document_classification(
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/test/thinking-format")
+async def test_thinking_format():
+    """Test endpoint that returns a message with the thinking format"""
+    return {
+        "message": """<think>
+Let me think about how to solve this problem step by step.
+
+First, I need to understand what the user is asking. They want to know how to optimize a React application. This is a broad topic, so I should break it down into key components:
+
+1. Performance optimization
+2. Bundle size reduction
+3. Rendering optimization
+4. State management
+5. Code splitting
+
+For performance optimization, the main techniques include:
+- Using React.memo for functional components
+- Implementing shouldComponentUpdate for class components
+- Using the useCallback hook for functions
+- Using the useMemo hook for computed values
+- Avoiding unnecessary re-renders
+
+These are the fundamental techniques that can significantly improve React performance.
+
+For bundle size reduction, I should mention:
+- Code splitting to load only necessary code
+- Tree shaking to eliminate dead code
+- Using smaller libraries or alternatives
+- Lazy loading components and routes
+
+For rendering optimization:
+- Virtualization for long lists
+- Avoiding expensive calculations during render
+- Proper use of useEffect dependencies
+
+Let me also consider state management approaches:
+- Local state for component-specific data
+- Context API for shared state that changes infrequently
+- Redux for complex global state management
+- Optimizing selectors and reducers
+
+I believe these key points will provide a comprehensive answer about React optimization.
+</think>
+
+# Optimizing React Applications
+
+Here are the most effective ways to optimize your React application:
+
+## Performance Optimization
+- Implement memoization with `React.memo`, `useCallback`, and `useMemo`
+- Avoid unnecessary re-renders by controlling component updates
+- Use virtualization for long lists with react-window or react-virtualized
+
+## Bundle Size Reduction
+- Code splitting with dynamic imports
+- Tree shaking with proper import/export
+- Optimizing dependencies and removing unused ones
+
+## Rendering Optimization
+- Implement lazy loading for components and routes
+- Use windowing techniques for long lists
+- Consider using Web Workers for heavy computations
+
+## State Management
+- Keep state as local as possible
+- Consider using Context API for global state that changes infrequently
+- Use Redux only when necessary and with proper selectors
+
+## Additional Tips
+- Enable production mode
+- Implement progressive loading strategies
+- Use performance profiling tools regularly
+
+Would you like me to elaborate on any specific optimization technique?""",
+        "timestamp": datetime.now()
+    }
 
 # Include router in app
 app.include_router(router)

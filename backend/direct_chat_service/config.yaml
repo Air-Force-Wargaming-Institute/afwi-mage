@@ -17,7 +17,7 @@ ollama:
   
   # Maximum number of tokens in context window
   # Determines how much previous conversation the model can see
-  context_window: 8000
+  context_window: 20000
   
   # Nucleus sampling, cumulative probability cutoff (range: 0.0-1.0)
   # Lower values = more focused on likely tokens
@@ -60,4 +60,4 @@ chat_logging:
   enabled: true
   base_path: "sessions"
   history_window: 100  # Number of messages to keep in memory
-  max_token_window: 8000  # Maximum tokens to include in context
+  max_token_window: 20000  # Maximum tokens to include in context
