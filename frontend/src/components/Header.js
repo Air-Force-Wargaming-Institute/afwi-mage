@@ -289,6 +289,7 @@ function Header() {
               </Link>
             </li>
             <li><Link to="/retrieval/build-databases" className={isActive('/retrieval/build-databases')}><StorageIcon /> Build Retrieval Databases</Link></li>
+            <li><Link to="/retrieval/manage-databases" className={isActive('/retrieval/manage-databases')}><StorageIcon /> Manage Retrieval Databases</Link></li>
             <li>
               <Link to="/retrieval/librarian-agents" className={isActive('/retrieval/librarian-agents')}>
                 <img src={robotIcon} alt="Robot Icon" style={{ width: '24px', height: '24px', marginRight: '5px' }} />

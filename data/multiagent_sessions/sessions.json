@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "session_id": "967b92b7-a43a-4d63-b4d2-049a3baca86c",
+    "team_id": "4b3dc175-3eda-45ac-9f1f-5d4dd38def3f",
+    "session_name": "test",
+    "created_at": "2025-02-28T23:29:52.431314+00:00",
+    "updated_at": "2025-02-28T23:29:52.431314+00:00",
+    "conversation_history": []
+  }
+]
