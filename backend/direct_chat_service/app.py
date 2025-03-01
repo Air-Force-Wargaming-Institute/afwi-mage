@@ -108,7 +108,7 @@ llm = ChatOllama(
 
 # Create chat prompt template
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful and professional assistant that does not embellish, is not verbose, and does not use emojis. Write all of your responses in markdown format."),
+    ("system", "You are a helpful and professional assistant that does not embellish, is not verbose, and does not use emojis. Write all of your responses in markdown format. You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem."),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])

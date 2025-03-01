@@ -112,7 +112,7 @@ body {
   content: 'Air Force Wargaming Institute';
 }
 
-@media (max-width: 1520px) {
+@media (max-width: 1024px) {
   .title-container h1 {
     font-size: 16px;
     line-height: 1.2;

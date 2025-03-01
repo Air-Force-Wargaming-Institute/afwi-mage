@@ -363,6 +363,7 @@ const useStyles = makeStyles((theme) => ({
     zIndex: 1300,
     width: '100%',
     maxHeight: 'calc(100vh)',
+    borderRadius: '12px',
   },
   buttonBar: {
     display: 'flex',
