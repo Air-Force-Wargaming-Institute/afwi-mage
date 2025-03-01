@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback, memo } from 'react';
-import { makeStyles, useTheme } from '@material-ui/core/styles';
+import React, { useState, useEffect, useRef, useCallback, memo, useReducer } from 'react';
+import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
   Paper, 
@@ -22,7 +22,9 @@ import {
   MenuItem,
   FormControl,
   FormControlLabel,
+  Fade,
 } from '@material-ui/core';
+import { useTheme } from '@material-ui/core/styles';
 import SendIcon from '@material-ui/icons/Send';
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
@@ -36,12 +38,8 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import Fade from '@material-ui/core/Fade';
-import { FixedSizeList, VariableSizeList } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 import memoize from 'memoize-one';
+import { useDropzone } from 'react-dropzone';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -68,9 +66,33 @@ import {
 } from '../services/directChatService';
 import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { useDropzone } from 'react-dropzone';
 import Slider from '@material-ui/core/Slider';
 import rehypeRaw from 'rehype-raw';
+
+// Suppress ResizeObserver errors
+// This is a workaround for the "ResizeObserver loop completed with undelivered notifications" error
+// that can occur when using virtualized lists with dynamic content
+const originalConsoleError = console.error;
+console.error = function(msg, ...args) {
+  if (typeof msg === 'string' && (
+    msg.includes('ResizeObserver loop') || 
+    msg.includes('ResizeObserver loop completed with undelivered notifications')
+  )) {
+    // Ignore ResizeObserver loop errors completely
+    return;
+  }
+  originalConsoleError(msg, ...args);
+};
+
+// Also suppress at window error level to prevent React error boundary triggers
+const originalOnError = window.onerror;
+window.onerror = function(message, source, lineno, colno, error) {
+  if (message.includes('ResizeObserver loop') || (error && error.message && error.message.includes('ResizeObserver loop'))) {
+    // Prevent the error from being reported in the console
+    return true;
+  }
+  return originalOnError ? originalOnError(message, source, lineno, colno, error) : false;
+};
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -218,6 +240,23 @@ const useStyles = makeStyles((theme) => ({
       outline: 'none',
     }
   },
+  messagesContainer: {
+    scrollbarWidth: 'thin',
+    scrollbarColor: `${theme.palette.grey[300]} transparent`,
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[300],
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.grey[400],
+      },
+    },
+  },
   inputArea: {
     display: 'flex',
     flexDirection: 'column',
@@ -302,40 +341,56 @@ const useStyles = makeStyles((theme) => ({
     wordBreak: 'break-word',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
     backgroundColor: theme.palette.background.paper,
+    animation: '$messageAppear 0.3s ease-out',
+    maxWidth: '85%',
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
     },
   },
+  '@keyframes messageAppear': {
+    '0%': {
+      opacity: 0,
+      transform: 'translateY(10px)',
+    },
+    '100%': {
+      opacity: 1,
+      transform: 'translateY(0)',
+    },
+  },
   userMessage: {
     backgroundColor: theme.palette.primary.main,
-    color: '#ffffff',
-    alignSelf: 'flex-end',
-    borderRadius: '12px 12px 0 12px',
-    border: 'none',
-    '& $messageContent': {
-      color: '#ffffff',
+    color: '#ffffff !important', // Add !important to force white color
+    borderRadius: '18px 18px 4px 18px',
+    padding: theme.spacing(1.5, 2),
+    position: 'relative',
+    marginBottom: theme.spacing(1),
+    maxWidth: '75%',
+    boxShadow: theme.shadows[1],
+    '&:hover $messageActions, &:hover $topActions': {
+      opacity: 1,
     },
-    '& p, & div': {
-      color: '#ffffff !important',
-    },
-    '& .MuiTypography-root': {
-      color: '#ffffff !important',
+    '& $copyButton, & $bookmarkButton': {
+      backgroundColor: 'rgba(255, 255, 255, 0.95)', // Higher contrast against dark backgrounds
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)', // Stronger shadow against dark backgrounds
+      '& .MuiSvgIcon-root': {
+        color: theme.palette.primary.dark, // Dark icon for better contrast on white button
+      },
     },
   },
   aiMessage: {
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
-    borderRadius: '12px 12px 12px 0',
-    '& pre': {
-      margin: '8px 0',
-      borderRadius: '4px',
-      overflow: 'auto',
-    },
-    '& code': {
-      fontFamily: 'monospace',
+    borderRadius: '18px 18px 18px 4px',
+    padding: theme.spacing(1.5, 2),
+    position: 'relative',
+    marginBottom: theme.spacing(1),
+    maxWidth: '75%',
+    boxShadow: theme.shadows[1],
+    '&:hover $messageActions, &:hover $topActions': {
+      opacity: 1,
     },
   },
   chatSessionItem: {
@@ -422,6 +477,8 @@ const useStyles = makeStyles((theme) => ({
     '& p': {
       margin: theme.spacing(1, 0),
     },
+    position: 'relative', // Ensure proper positioning
+    zIndex: 1, // Lower than the buttons
   },
   messageFooter: {
     display: 'flex',
@@ -450,17 +507,20 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.7,
+    opacity: 0.85, // Increased from 0.7 for better visibility
     transition: 'all 0.2s ease',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Increased from 0.8 for better contrast
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)', // Added shadow for better visibility
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
       opacity: 1,
+      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)', // Enhanced shadow on hover
     },
     zIndex: 1,
     '& .MuiSvgIcon-root': {
-      fontSize: '18px',
+      fontSize: '20px', // Increased from 18px for better visibility
       margin: 'auto',
+      color: theme.palette.primary.main, // Setting icon color to primary for better visibility
     },
   },
   agentsHeader: {
@@ -600,10 +660,12 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: theme.palette.background.paper,
     borderRadius: '30px',
     maxWidth: '410px',
     zIndex: 1000,
+    boxShadow: theme.shadows[3],
+    animation: '$fadeIn 0.3s ease-in-out',
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -618,7 +680,7 @@ const useStyles = makeStyles((theme) => ({
         transparent 100%)`,
       backgroundSize: '200% 100%',
       backgroundRepeat: 'no-repeat',
-      animation: '$borderZip 3s linear infinite',
+      animation: '$borderZip 2s linear infinite',
       opacity: 0.1,
       clipPath: `
         polygon(
@@ -655,15 +717,16 @@ const useStyles = makeStyles((theme) => ({
     },
     '& .dots': {
       display: 'flex',
-      gap: '4px',
+      gap: '6px',
       justifyContent: 'center',
     },
     '& .dot': {
-      width: '8px',
-      height: '8px',
-      backgroundColor: theme.palette.grey[400],
+      width: '10px',
+      height: '10px',
+      backgroundColor: theme.palette.primary.main,
       borderRadius: '50%',
-      animation: '$bounce 3s infinite ease-in-out both',
+      opacity: 0.7,
+      animation: '$bounce 1.4s infinite ease-in-out both',
       '&:nth-child(1)': {
         animationDelay: '-0.32s',
       },
@@ -672,12 +735,32 @@ const useStyles = makeStyles((theme) => ({
       },
     },
   },
+  '@keyframes fadeIn': {
+    from: {
+      opacity: 0,
+      transform: 'translate(-50%, 20px)',
+    },
+    to: {
+      opacity: 1,
+      transform: 'translate(-50%, 0)',
+    },
+  },
   '@keyframes bounce': {
     '0%, 80%, 100%': {
-      transform: 'scale(0)',
+      transform: 'scale(0.6)',
+      opacity: 0.5,
     },
     '40%': {
       transform: 'scale(1)',
+      opacity: 1,
+    },
+  },
+  '@keyframes dotFadeInOut': {
+    '0%, 80%, 100%': {
+      opacity: 0.3,
+    },
+    '40%': {
+      opacity: 1,
     },
   },
   '@keyframes pulseBorder': {
@@ -700,52 +783,6 @@ const useStyles = makeStyles((theme) => ({
     },
     '100%': {
       backgroundPosition: '-200% 0',
-    },
-  },
-  scrollTopButton: {
-    position: 'absolute',
-    right: theme.spacing(2),
-    bottom: theme.spacing(16),
-    backgroundColor: theme.palette.background.paper,
-    boxShadow: theme.shadows[2],
-    width: '40px',
-    height: '40px',
-    padding: 0,
-    border: '1px solid rgba(0, 0, 0, 0.12)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    '&:hover': {
-      backgroundColor: theme.palette.grey[100],
-    },
-    zIndex: 1000,
-    '& .MuiSvgIcon-root': {
-      fontSize: '24px',
-      margin: 0,
-      padding: 0,
-    },
-  },
-  scrollBottomButton: {
-    position: 'absolute',
-    right: theme.spacing(2),
-    bottom: theme.spacing(10),
-    backgroundColor: theme.palette.background.paper,
-    boxShadow: theme.shadows[2],
-    width: '40px',
-    height: '40px',
-    padding: 0,
-    border: '1px solid rgba(0, 0, 0, 0.12)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    '&:hover': {
-      backgroundColor: theme.palette.grey[100],
-    },
-    zIndex: 1000,
-    '& .MuiSvgIcon-root': {
-      fontSize: '24px',
-      margin: 0,
-      padding: 0,
     },
   },
   retryButton: {
@@ -792,16 +829,20 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.7,
+    opacity: 0.85, // Increased from 0.7 for better visibility
     transition: 'all 0.2s ease',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Added background color for contrast
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)', // Added shadow
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
       opacity: 1,
+      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)', // Enhanced shadow on hover
     },
     zIndex: 1,
     '& .MuiSvgIcon-root': {
-      fontSize: '18px',
+      fontSize: '20px', // Increased from 18px for better visibility
       margin: 'auto',
+      color: theme.palette.primary.main, // Setting icon color to primary for better visibility
     },
   },
   bookmarkTooltip: {
@@ -814,17 +855,43 @@ const useStyles = makeStyles((theme) => ({
     bottom: theme.spacing(1),
     display: 'flex',
     gap: theme.spacing(1),
-    opacity: 0,
+    opacity: 0.2, // Changed from 0 to have a slight visibility even when not hovering
     transition: 'opacity 0.2s ease',
+    zIndex: 10, // Increase z-index to ensure buttons are clickable
   },
   topActions: {
     position: 'absolute',
     top: theme.spacing(1),
     right: theme.spacing(1),
+    bottom: 'auto', // Ensure it doesn't overlap with bottom positioning
     display: 'flex',
     gap: theme.spacing(1),
-    opacity: 0,
+    opacity: 0.2, // Changed from 0 to have a slight visibility even when not hovering
     transition: 'opacity 0.2s ease',
+    zIndex: 10, // Increase z-index to ensure buttons are clickable
+    pointerEvents: 'auto', // Ensure clicks reach the buttons
+  },
+  userMessageActions: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    bottom: theme.spacing(1),
+    top: 'auto', // Override any top positioning
+    display: 'flex',
+    gap: theme.spacing(1),
+    opacity: 0.2,
+    transition: 'opacity 0.2s ease',
+    zIndex: 3, // Ensure buttons are above text
+  },
+  userMessageText: {
+    fontSize: '0.95rem',
+    color: '#FFFFFF !important', // White text with !important to override any conflicting styles
+    whiteSpace: 'pre-wrap',
+    textAlign: 'left', // Explicitly set left alignment
+    wordBreak: 'break-word',
+    paddingRight: '40px', // Prevent overlap with action buttons
+    '& *': { // Apply to all child elements
+      color: '#FFFFFF !important' // Ensure all child elements inherit white color
+    }
   },
   bookmarkRibbon: {
     position: 'absolute',
@@ -945,6 +1012,10 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '1.1rem',
   },
   markdown: {
+    textAlign: 'left', // Set markdown content to left-align by default
+    '& p, & ul, & ol, & li, & blockquote': {
+      textAlign: 'left', // Ensure all text elements are left-aligned
+    },
     '& details': {
       margin: '1em 0',
       padding: '0.5em',
@@ -1016,25 +1087,57 @@ const useStyles = makeStyles((theme) => ({
       backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%231976d2\'%3E%3Cpath d=\'M5 12h14\'/%3E%3C/svg%3E")',
     },
   },
+  userMessageActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    marginRight: theme.spacing(1),
+  },
 }));
 
-const CodeBlock = ({ inline, className, children }) => {
+// CodeBlock component with memoization for better performance
+const CodeBlock = memo(({ inline, className, children }) => {
   const match = /language-(\w+)/.exec(className || '');
   const language = match ? match[1] : '';
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [children]);
   
   if (!inline && language) {
     return (
-      <SyntaxHighlighter
-        style={materialDark}
-        language={language}
-        PreTag="div"
-      >
-        {String(children).replace(/\n$/, '')}
-      </SyntaxHighlighter>
+      <div style={{ position: 'relative' }}>
+        <Button 
+          onClick={handleCopy} 
+          size="small" 
+          style={{ 
+            position: 'absolute', 
+            right: 8, 
+            top: 8, 
+            minWidth: 'auto',
+            padding: '4px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            zIndex: 1
+          }}
+        >
+          {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+        </Button>
+        <SyntaxHighlighter
+          style={materialDark}
+          language={language}
+          PreTag="div"
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      </div>
     );
   }
   return <code className={className}>{children}</code>;
-};
+});
 
 const MessageContent = ({ 
   content, 
@@ -1049,6 +1152,7 @@ const MessageContent = ({
   onToggleExpand 
 }) => {
   const classes = useStyles();
+  const theme = useTheme(); // Get the current theme
   const [copied, setCopied] = useState(false);
   const isErrorMessage = !isUser && content.includes('Error:');
   const messageRef = useRef(null);
@@ -1062,7 +1166,6 @@ const MessageContent = ({
   // Use the parent's toggle function if provided, otherwise use local state
   const handleToggle = (id) => {
     if (onToggleExpand) {
-      // Record the current scroll position and element height before toggling
       onToggleExpand(id, messageRef.current);
     }
   };
@@ -1080,7 +1183,7 @@ const MessageContent = ({
           const parsed = JSON.parse(content);
           processedContent = parsed.response || parsed.message || content;
         } catch (e) {
-          console.log('Not JSON content');
+          // Not JSON content
         }
       }
 
@@ -1093,20 +1196,17 @@ const MessageContent = ({
       }));
       
       // Remove <think></think> tags and their content from the main content
-      // Using a more direct approach to ensure complete removal
-      let mainContent = processedContent.replace(thinkRegex, '');
+      let mainContent = processedContent;
+      thinkMatches.forEach(match => {
+        mainContent = mainContent.replace(match[0], '');
+      });
       
       // Remove any <details><summary>Thinking Process</summary> sections from the main content
       const thinkingProcessRegex = /<details><summary>Thinking Process<\/summary>[\s\S]*?<\/details>/gi;
       mainContent = mainContent.replace(thinkingProcessRegex, '');
       
       // Clean up any extra whitespace caused by removal
-      // Fix multiple consecutive line breaks
-      mainContent = mainContent.replace(/\n{3,}/g, '\n\n');
-      // Remove whitespace at the beginning
-      mainContent = mainContent.replace(/^\s+/, '');
-      // Remove whitespace at the end
-      mainContent = mainContent.replace(/\s+$/, '');
+      mainContent = mainContent.replace(/\n{3,}/g, '\n\n').trim();
       
       // Fix case where removal creates empty message
       if (!mainContent.trim()) {
@@ -1132,20 +1232,33 @@ const MessageContent = ({
       )}
       
       {!isUser && !isErrorMessage && (
-        <div className={`${classes.messageActions} ${classes.topActions}`}>
+        <div 
+          className={`${classes.messageActions} ${classes.topActions}`}
+          style={{ pointerEvents: 'auto' }} // Ensure container is clickable
+        >
           <IconButton
             className={classes.copyButton}
-            onClick={() => handleCopy(content)}
+            onClick={() => {
+              navigator.clipboard.writeText(content);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
             size="small"
             title="Copy message"
+            style={{ pointerEvents: 'auto' }} // Ensure button is clickable
           >
             {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
           </IconButton>
           <IconButton
-            className={classes.copyButton}
-            onClick={onBookmark}
+            className={classes.bookmarkButton} // Use proper bookmark button class
+            onClick={() => {
+              if (onBookmark) {
+                onBookmark();
+              }
+            }}
             size="small"
             title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+            style={{ pointerEvents: 'auto' }} // Ensure button is clickable
           >
             {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
           </IconButton>
@@ -1154,38 +1267,46 @@ const MessageContent = ({
 
       <Box className={classes.messageContent}>
         {isUser ? (
-          <Typography 
-            variant="body1" 
-            sx={{ 
-              color: 'inherit',
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.2,
-              my: 0,
-              textAlign: 'left',
-              width: '100%'
-            }}
-          >
-            {mainContent}
-          </Typography>
+          <div className={classes.userMessageText}> {/* Use our dedicated class */}
+            <Typography 
+              variant="body1"
+              className={classes.userMessageText}
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                lineHeight: 1.2,
+                my: 0,
+                textAlign: 'left',
+                width: '100%',
+                paddingRight: '40px', // Add right padding to prevent button overlap
+                wordBreak: 'break-word', // Ensure long words don't overflow
+                color: 'white !important', // Use keyword 'white' with !important flag
+              }}
+              style={{ color: 'white' }} // Direct style override as additional safety
+            >
+              {mainContent}
+            </Typography>
+          </div>
         ) : (
           <>
             {/* Main content first (the answer) */}
             <ReactMarkdown
-              rehypePlugins={[rehypeRaw]}
               remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
               components={{
-                code: CodeBlock,
+                code: CodeBlock, // Restore the CodeBlock component
                 details: ({ node, children, ...props }) => {
                   const detailsIndex = node.position ? node.position.start.line : Math.random();
                   const id = `message-${messageId}-details-${detailsIndex}`;
-
+                  
                   return (
                     <details
                       {...props}
                       open={expandedSections[id] || false}
                       onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggle(id);
+                        if (e.target.tagName.toLowerCase() === 'summary') {
+                          e.preventDefault();
+                          handleToggle(id);
+                        }
                       }}
                       className={classes.markdownDetails}
                     >
@@ -1193,8 +1314,33 @@ const MessageContent = ({
                     </details>
                   );
                 },
+                pre: (props) => <pre {...props} style={{ margin: '16px 0', overflow: 'auto', maxWidth: '100%' }} />,
+                p: (props) => <p {...props} style={{ margin: '8px 0', maxWidth: '100%', textAlign: 'left' }} />,
+                h1: (props) => <h1 {...props} style={{ textAlign: 'left' }} />,
+                h2: (props) => <h2 {...props} style={{ textAlign: 'left' }} />,
+                h3: (props) => <h3 {...props} style={{ textAlign: 'left' }} />,
+                h4: (props) => <h4 {...props} style={{ textAlign: 'left' }} />,
+                h5: (props) => <h5 {...props} style={{ textAlign: 'left' }} />,
+                h6: (props) => <h6 {...props} style={{ textAlign: 'left' }} />,
+                blockquote: (props) => <blockquote {...props} style={{ textAlign: 'left' }} />,
+                img: (props) => (
+                  <img 
+                    {...props} 
+                    style={{ 
+                      maxWidth: '100%', 
+                      height: 'auto', 
+                      display: 'block',
+                      margin: '16px 0' 
+                    }}
+                    loading="lazy" 
+                  />
+                ),
+                ul: (props) => <ul {...props} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />,
+                ol: (props) => <ol {...props} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />,
+                li: (props) => <li {...props} style={{ textAlign: 'left' }} />,
               }}
               className={classes.markdown}
+              skipHtml={false}
             >
               {mainContent}
             </ReactMarkdown>
@@ -1213,7 +1359,7 @@ const MessageContent = ({
                     }
                   }}
                 >
-                  <summary>AI Thinking Process</summary>
+                  <summary>AI Reasoning</summary>
                   <div style={{ padding: '8px 0' }}>
                     {thinkSections.map((section, index) => (
                       <div key={`section-${messageId}-${index}`} style={{ marginBottom: index < thinkSections.length - 1 ? '12px' : 0 }}>
@@ -1251,7 +1397,10 @@ const MessageContent = ({
         </Typography>
         
         {(!isErrorMessage || isUser) && (
-          <div className={classes.messageActions}>
+          <div 
+            className={`${classes.messageActions} ${isUser ? classes.userMessageActions : ''}`}
+            style={{ pointerEvents: 'auto' }} // Ensure container is clickable
+          >
             <IconButton
               className={classes.copyButton}
               onClick={() => handleCopy(content)}
@@ -1262,7 +1411,7 @@ const MessageContent = ({
             </IconButton>
             {!isUser && (
               <IconButton
-                className={classes.copyButton}
+                className={classes.bookmarkButton}
                 onClick={onBookmark}
                 size="small"
                 title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
@@ -1288,271 +1437,150 @@ const MessageContent = ({
   );
 };
 
-const calculateBookmarkPositions = (messageAreaRef, bookmarkedMessages) => {
-  const messageArea = messageAreaRef.current;
-  if (!messageArea) return bookmarkedMessages;
+// Calculate bookmark positions for the message track
+const calculateBookmarkPositions = (scrollContainerRef, bookmarkedMessages) => {
+  if (!scrollContainerRef.current || !bookmarkedMessages.length) return [];
   
-  const totalHeight = messageArea.scrollHeight;
+  // Get the container element
+  const containerElement = scrollContainerRef.current;
+  
+  // Calculate total height of scroll container
+  const totalHeight = containerElement.scrollHeight;
   
   return bookmarkedMessages.map(bookmark => {
+    // Find the actual message element
     const messageElement = document.getElementById(`message-${bookmark.messageId}`);
-    if (messageElement) {
-      const messageTop = messageElement.offsetTop;
-      const position = (messageTop / totalHeight) * 100;
-      return { ...bookmark, position };
-    }
-    return bookmark;
-  });
+    
+    if (!messageElement) return null;
+    
+    // Calculate relative position in container
+    const messageTop = messageElement.offsetTop;
+    const relativePosition = messageTop / totalHeight;
+    
+    return {
+      id: bookmark.messageId,
+      position: relativePosition,
+      timestamp: bookmark.timestamp
+    };
+  }).filter(Boolean);
 };
 
 // Memoize the MessageContent component
 const MemoizedMessageContent = React.memo(MessageContent);
 
 // Create a memoized item renderer for the virtualized list
-const createItemData = memoize((messages, handleRetry, handleBookmark, bookmarkedMessages) => ({
+const createItemData = memoize((messages, handleRetry, handleBookmark, bookmarkedMessages, expandedSections, handleToggleExpand) => ({
   messages,
   handleRetry,
   handleBookmark,
-  bookmarkedMessages
+  bookmarkedMessages,
+  expandedSections,
+  handleToggleExpand
 }));
 
-// Row renderer for virtualized list
-const Row = React.memo(({ index, style, data }) => {
-  const message = data.messages[index];
-  const classes = useStyles();
-  const isBookmarked = data.bookmarkedMessages.some(msg => msg.messageId === message.id);
-
-  return (
-    <div style={{
-      ...style,
-      paddingTop: '8px',
-      paddingBottom: '8px',
-      paddingLeft: '16px',
-      paddingRight: '16px',
-    }}>
-      <Box 
-        id={`message-${message.id}`}
-        className={`${classes.message} ${
-          message.sender === 'user' ? classes.userMessage : classes.aiMessage
-        }`}
-        style={{ 
-          maxWidth: message.sender === 'user' ? '70%' : '85%',
-          margin: message.sender === 'user' ? '0 0 0 auto' : '0',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div className={classes.messageWrapper}>
-          <MemoizedMessageContent 
-            content={message.text} 
-            isUser={message.sender === 'user'} 
-            timestamp={message.timestamp}
-            sender={message.sender}
-            onRetry={
-              message.sender === 'system' && message.text.includes('Error:') 
-                ? () => data.handleRetry(data.messages[data.messages.length - 2]?.text) 
-                : undefined
-            }
-            messageId={message.id}
-            onBookmark={() => data.handleBookmark(message)}
-            isBookmarked={isBookmarked}
-            expandedSections={data.expandedSections}
-            onToggleExpand={data.handleToggleExpand}
-          />
-        </div>
-      </Box>
-    </div>
-  );
-});
+// Helper for debouncing
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 
 // Update the message area in the DirectChat component
 const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMessages, isLoading, classes }) => {
-  const messageEndRef = useRef(null);
-  const listRef = useRef(null);
-  const [scrollToIndex, setScrollToIndex] = useState(undefined);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  // Replace virtuosoRef with scrollContainerRef
+  const scrollContainerRef = useRef(null);
   const [expandedSections, setExpandedSections] = useState({});
-  const sizeMap = useRef({});
-  const scrollPositionRef = useRef(0);
-  const isScrollingRef = useRef(false);
+  const [showMessageDetail, setShowMessageDetail] = useState(null);
   
-  // Preserve scroll position after state updates
-  const saveScrollPosition = useCallback(() => {
-    if (listRef.current && listRef.current._outerRef) {
-      scrollPositionRef.current = listRef.current._outerRef.scrollTop;
-    }
+  // Basic scroll tracking - we'll enhance this in Phase 2
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  
+  // Simple scroll handler to track position
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Consider "at bottom" if within 20px of actual bottom
+    const atBottom = distanceFromBottom < 20;
+    
+    setIsAtBottom(atBottom);
+    setShowScrollToBottom(!atBottom);
   }, []);
   
-  const restoreScrollPosition = useCallback(() => {
-    if (listRef.current && listRef.current._outerRef) {
-      listRef.current._outerRef.scrollTop = scrollPositionRef.current;
-    }
-  }, []);
-  
-  // More accurate height estimation
-  const getItemSize = useCallback((index) => {
-    // Return cached height if available
-    if (sizeMap.current[index]) {
-      return sizeMap.current[index];
-    }
-    
-    const message = messages[index];
-    let height = 120; // Base height (increased for better padding)
-    
-    // Calculate based on content
-    const textLength = message.text.length;
-    const lines = message.text.split('\n').length;
-    
-    // Add height for text content
-    height += Math.min(lines * 22, textLength * 0.08); 
-    
-    // Additional height for code blocks
-    const codeBlockCount = (message.text.match(/```/g) || []).length / 2;
-    if (codeBlockCount > 0) {
-      height += codeBlockCount * 150;
-    }
-    
-    // Additional height for thinking sections
-    if (message.text.includes('<think>') && expandedSections[`message-${message.id}-think`]) {
-      const thinkContent = message.text.match(/<think>([\s\S]*?)<\/think>/);
-      if (thinkContent && thinkContent[1]) {
-        const thinkLines = thinkContent[1].split('\n').length;
-        height += thinkLines * 20 + 50; // Additional height for expanded thinking section
-      }
-    }
-    
-    // Store in cache
-    sizeMap.current[index] = height;
-    return height;
-  }, [messages, expandedSections]);
-  
-  // Clear size cache when messages change
-  useEffect(() => {
-    sizeMap.current = {};
-  }, [messages]);
-  
-  // Track expanded state
-  const handleToggleExpand = useCallback((id, elementRef) => {
-    // Save scroll position before state change
-    saveScrollPosition();
-    
-    // If we have a direct reference to the element, use it for more precise handling
-    const initialHeight = elementRef ? elementRef.offsetHeight : null;
-    const initialScrollTop = scrollPositionRef.current;
-    
-    setExpandedSections(prev => {
-      const newState = {
-        ...prev,
-        [id]: !prev[id]
-      };
-      
-      // Reset size cache when expansion state changes
-      sizeMap.current = {};
-      
-      // Request recalculation after state update
-      setTimeout(() => {
-        if (listRef.current) {
-          listRef.current.resetAfterIndex(0);
-          
-          // After list resets, restore scroll position with compensation if needed
-          requestAnimationFrame(() => {
-            if (elementRef) {
-              // Calculate height change and adjust scroll position if needed
-              const heightDiff = elementRef.offsetHeight - initialHeight;
-              
-              // If expanding and element is above current view, adjust position
-              if (heightDiff > 0 && newState[id]) {
-                const elementTop = elementRef.getBoundingClientRect().top;
-                const containerTop = listRef.current._outerRef.getBoundingClientRect().top;
-                
-                // If element is above viewport, adjust scroll to maintain relative position
-                if (elementTop < containerTop) {
-                  listRef.current._outerRef.scrollTop = initialScrollTop + heightDiff;
-                }
-              }
-            } else {
-              // Fall back to simple position restore if no element reference
-              restoreScrollPosition();
-            }
-          });
-        }
-      }, 0);
-      
-      return newState;
-    });
-  }, [saveScrollPosition, restoreScrollPosition]);
-
-  // Handle scroll events
-  const handleScroll = useCallback((e) => {
-    if (!isScrollingRef.current) {
-      // Save position only during user scrolling
-      scrollPositionRef.current = e.currentTarget.scrollTop;
-    }
-  }, []);
-
-  useEffect(() => {
-    // Add scroll event listener to the outer container
-    if (listRef.current && listRef.current._outerRef) {
-      const outerElement = listRef.current._outerRef;
-      outerElement.addEventListener('scroll', handleScroll);
-      return () => outerElement.removeEventListener('scroll', handleScroll);
-    }
-  }, [handleScroll]);
-
+  // Simple scroll to bottom function
   const scrollToBottom = useCallback(() => {
-    if (listRef.current && messages.length > 0) {
-      isScrollingRef.current = true;
-      listRef.current.scrollToItem(messages.length - 1);
-      // Reset the scrolling flag after animation completes
-      setTimeout(() => {
-        isScrollingRef.current = false;
-      }, 300);
+    if (!scrollContainerRef.current) return;
+    
+    scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+  }, []);
+  
+  // Simplified toggle expand handler with no scroll logic
+  const handleToggleExpand = useCallback((id, elementRef) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  }, []);
+  
+  // Create a style stabilizer to prevent frequent style changes
+  const stableMessageStyles = React.useMemo(() => ({
+    userWrapper: {
+      display: 'flex',
+      padding: '8px 16px',
+      width: '100%',
+      justifyContent: 'flex-end',
+      alignItems: 'flex-start'
+    },
+    aiWrapper: {
+      display: 'flex',
+      padding: '8px 16px',
+      width: '100%',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-start'
+    },
+    userMessage: { 
+      width: 'auto',
+      maxWidth: '70%',
+      marginLeft: 'auto',
+      marginRight: '0'
+    },
+    aiMessage: { 
+      width: 'auto',
+      maxWidth: '85%',
+      marginLeft: '0',
+      marginRight: 'auto'
     }
-  }, [messages.length]);
+  }), []);
 
-  // Only auto-scroll when new messages arrive
-  useEffect(() => {
-    // Only scroll to bottom when a new message is added
-    if (messages.length > 0) {
-      const timer = setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [messages.length, scrollToBottom]);
-
-  const renderMessage = useCallback(({ index, style }) => {
-    const message = messages[index];
+  // Render a message item (adapted from the previous renderItem function)
+  const renderMessage = useCallback((message) => {
     const isBookmarked = bookmarkedMessages.some(msg => msg.messageId === message.id);
+    const isUserMessage = message.sender === 'user';
 
     return (
-      <ListItem 
-        style={{
-          ...style,
-          display: 'flex',
-          padding: '8px 0',
-          width: '100%',
-          justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
-          alignItems: 'flex-start'
-        }}
-        disableGutters
+      <Box 
+        sx={isUserMessage ? stableMessageStyles.userWrapper : stableMessageStyles.aiWrapper}
+        key={`message-wrapper-${message.id}`}
       >
         <Box 
           id={`message-${message.id}`}
           className={`${classes.message} ${
-            message.sender === 'user' ? classes.userMessage : classes.aiMessage
+            isUserMessage ? classes.userMessage : classes.aiMessage
           }`}
-          style={{ 
-            width: 'auto',
-            maxWidth: '80%',
-            marginLeft: message.sender === 'user' ? 'auto' : '0',
-            marginRight: message.sender === 'user' ? '0' : 'auto'
-          }}
+          style={isUserMessage ? stableMessageStyles.userMessage : stableMessageStyles.aiMessage}
         >
           <MemoizedMessageContent 
             content={message.text} 
-            isUser={message.sender === 'user'} 
+            isUser={isUserMessage} 
             timestamp={message.timestamp}
             sender={message.sender}
             onRetry={
@@ -1567,63 +1595,107 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
             onToggleExpand={handleToggleExpand}
           />
         </Box>
-      </ListItem>
+      </Box>
     );
-  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages, expandedSections, handleToggleExpand]);
+  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages, expandedSections, handleToggleExpand, stableMessageStyles]);
+
+  // Scroll to bottom on initial render and when messages change
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom]);
 
   return (
     <Box className={classes.messageArea}>
-      <AutoSizer>
-        {({ height, width }) => (
-          <VariableSizeList
-            ref={listRef}
-            height={height - (isLoading ? 100 : 0)}
-            width={width}
-            itemCount={messages.length}
-            itemSize={getItemSize}
-            overscanCount={10}
-            onItemsRendered={({ visibleStartIndex }) => {
-              const isAtTop = visibleStartIndex === 0;
-              const isAtBottom = visibleStartIndex + 10 >= messages.length;
-              setShowScrollTop(!isAtTop);
-              setShowScrollBottom(!isAtBottom);
+      <div 
+        ref={scrollContainerRef}
+        className={classes.messagesContainer}
+        onScroll={handleScroll}
+        style={{
+          height: '100%',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '8px 0',
+          position: 'relative', // Add position relative for absolute positioning context
+        }}
+      >
+        {messages.map(message => renderMessage(message))}
+        
+        {/* Show loading indicator at the bottom if isLoading */}
+        {isLoading && (
+          <div 
+            className={classes.typingIndicator} 
+            style={{ 
+              position: 'sticky', // Use sticky instead of absolute to keep it visible when scrolling
+              bottom: '16px',     // Distance from bottom of container
+              left: '50%',        // Center horizontally
+              transform: 'translateX(-50%)', // Center horizontally
+              marginTop: '16px',  // Add some space after the last message
+              alignSelf: 'center', // For flex alignment
+              width: 'fit-content' // Ensure it's not taking full width
             }}
-            useIsScrolling={false}
           >
-            {renderMessage}
-          </VariableSizeList>
-        )}
-      </AutoSizer>
-
-      {isLoading && (
-        <div className={classes.typingIndicator}>
-          <Typography className="loading-header">
-            One moment...
-          </Typography>
-          <Typography className="loading-text">
-            Response is being generated...
-          </Typography>
-          <div className="dots">
-            <div className="dot" />
-            <div className="dot" />
-            <div className="dot" />
+            <Typography className="loading-header">
+              One moment...
+            </Typography>
+            <Typography className="loading-text">
+              Response is being generated...
+            </Typography>
+            <div className="dots" style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+              <span style={{ 
+                fontSize: '24px', 
+                lineHeight: '10px',
+                marginRight: '4px',
+                animation: 'dotFadeInOut 1.4s infinite',
+                animationDelay: '0s'
+              }}>.</span>
+              <span style={{ 
+                fontSize: '24px', 
+                lineHeight: '10px',
+                marginRight: '4px',
+                animation: 'dotFadeInOut 1.4s infinite',
+                animationDelay: '0.2s'
+              }}>.</span>
+              <span style={{ 
+                fontSize: '24px', 
+                lineHeight: '10px',
+                animation: 'dotFadeInOut 1.4s infinite',
+                animationDelay: '0.4s'
+              }}>.</span>
+            </div>
           </div>
-        </div>
-      )}
-
-      {showScrollBottom && (
+        )}
+      </div>
+      
+      {/* Simple scroll to bottom button - will enhance in Phase 2 */}
+      {showScrollToBottom && (
         <Button
-          className={classes.scrollBottomButton}
-          onClick={scrollToBottom}
           variant="contained"
           size="small"
+          onClick={scrollToBottom}
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            right: '16px',
+            zIndex: 10,
+            minWidth: 'auto',
+            borderRadius: '50%',
+            padding: '8px',
+          }}
         >
-          <KeyboardArrowDownIcon />
+          ↓
         </Button>
       )}
-
-      <div ref={messageEndRef} />
     </Box>
+  );
+}, (prevProps, nextProps) => {
+  // Simple memoization check - we'll enhance this in Phase 3
+  return (
+    prevProps.messages === nextProps.messages &&
+    prevProps.bookmarkedMessages === nextProps.bookmarkedMessages &&
+    prevProps.isLoading === nextProps.isLoading
   );
 });
 
@@ -1966,11 +2038,14 @@ const DirectChat = () => {
     event.preventDefault();
     const messageText = state.input.trim();
     
-    if (!messageText || !currentSessionId) return;
+    if (!messageText || !currentSessionId || isLoading) return;
 
+    // Generate a unique ID for the message
+    const userMessageId = `user-${Date.now()}`;
+    
     // Add user message to UI immediately
     const userMessage = {
-      id: Date.now(),
+      id: userMessageId,
       text: messageText,
       sender: 'user',
       timestamp: new Date().toISOString()
@@ -1986,7 +2061,7 @@ const DirectChat = () => {
       
       // Add AI response to UI
       const aiMessage = {
-        id: Date.now() + 1,
+        id: `ai-${Date.now()}`,
         text: response.message,
         sender: 'ai',
         timestamp: new Date().toISOString()
@@ -1994,9 +2069,10 @@ const DirectChat = () => {
       
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
+      console.error("Error sending message:", error);
       const errorMessage = {
-        id: Date.now() + 1,
-        text: 'Error: Failed to send message. Please try again.',
+        id: `error-${Date.now()}`,
+        text: `Error: Failed to send message. ${error.message || 'Please try again.'}`,
         sender: 'system',
         timestamp: new Date().toISOString()
       };
@@ -2059,18 +2135,18 @@ const DirectChat = () => {
     }
   };
 
-  const handleScroll = useCallback(({ target }) => {
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    setShowScrollTop(scrollTop > 200);
-    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 200);
+  // Removed interactive scroll functions and tracking
+  const handleScroll = useCallback(() => {
+    // Not tracking anything - giving full control to the user
   }, []);
 
+  // Empty implementations - these were used by scroll buttons which are now removed
   const scrollToTop = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Disabled - no auto-scrolling
   };
 
   const scrollToBottom = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Disabled - no auto-scrolling
   };
 
   const handleRetry = useCallback(async (failedMessage) => {
@@ -2181,11 +2257,15 @@ const DirectChat = () => {
     }));
   };
 
+  // Cleanup
   useEffect(() => {
     return () => {
       setMessages([]);
       setChatSessions([]);
       setBookmarkedMessages([]);
+      setCurrentSessionId(null);
+      setError(null);
+      setIsLoading(false);
     };
   }, []);
 
