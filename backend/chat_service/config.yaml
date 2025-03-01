@@ -3,7 +3,7 @@
 # Name of the local LLM to use 
 #LOCAL_LLM: 'NousResearch/Hermes-3-Llama-3.1-8B-GGUF/Hermes-3-Llama-3.1-8B.Q8_0.gguf'
 #LOCAL_LLM: 'hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:Q8_0'
-LOCAL_LLM: "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+LOCAL_LLM: "huihui_ai/deephermes3-abliterated:latest"
 #LOCAL_LLM: "hermes3:8b"
 
 # Whether to use streaming LLM or not

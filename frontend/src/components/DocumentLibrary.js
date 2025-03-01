@@ -781,6 +781,8 @@ function DocumentLibrary() {
       }
 
       await fetchDocuments(parentPath);
+      await updateBreadcrumbs(parentPath);
+      await setCurrentPath(parentPath);
       setSelectedDocs([]);
     } catch (error) {
       console.error('Error moving items:', error);

@@ -78,8 +78,8 @@ function Header() {
           <div className="logo-title-container">
             <img src={logo} alt="AFWI Logo" className="logo" />
             <div className="title-container" style={{textAlign:'left'}}>
-              <h2 style={{color:'white'}}>Air Force Wargaming Institute</h2>
-              <h1 style={{color:'white'}}>Multi-Agent Generative Engine</h1>
+              <h2 style={{color:'white'}}></h2>
+              <h1 style={{color:'white'}}></h1>
             </div>
           </div>
           
@@ -143,62 +143,62 @@ function Header() {
               </li>
             </ul>
           </nav>
-        </div>
 
-        <div className="user-account" style={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <div style={{ 
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end'
+          <div className="user-account" style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '0.5rem'
           }}>
-            <span style={{ 
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: '0.75rem',
-              fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-              lineHeight: '1',
-              marginBottom: '0.25rem'
+            <div style={{ 
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end'
             }}>
-              Logged in as
-            </span>
-            <span style={{ 
-              color: 'white',
-              fontSize: '1rem',
-              fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-              lineHeight: '1.2'
-            }}>
-              {user?.username}
-            </span>
-          </div>
-          <IconButton 
-            onClick={handleClick}
-            style={{ padding: '8px' }}
-          >
-            <Avatar style={{ width: 32, height: 32 }}>
-              <AccountCircleIcon style={{ color: '#fff' }} />
-            </Avatar>
-          </IconButton>
-          <div className={`user-menu ${menuOpen ? 'open' : ''}`}>
-            {user?.permission === 'admin' && (
-              <div className="menu-item" onClick={handleAdminClick}>
-                <SupervisorAccountIcon />
-                Admin Dashboard
+              <span style={{ 
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.75rem',
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                lineHeight: '1',
+                marginBottom: '0.25rem'
+              }}>
+                Logged in as
+              </span>
+              <span style={{ 
+                color: 'white',
+                fontSize: '1rem',
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                lineHeight: '1.2'
+              }}>
+                {user?.username}
+              </span>
+            </div>
+            <IconButton 
+              onClick={handleClick}
+              style={{ padding: '8px' }}
+            >
+              <Avatar style={{ width: 32, height: 32 }}>
+                <AccountCircleIcon style={{ color: '#fff' }} />
+              </Avatar>
+            </IconButton>
+            <div className={`user-menu ${menuOpen ? 'open' : ''}`}>
+              {user?.permission === 'admin' && (
+                <div className="menu-item" onClick={handleAdminClick}>
+                  <SupervisorAccountIcon />
+                  Admin Dashboard
+                </div>
+              )}
+              <div className="menu-item" onClick={handleLogout}>
+                <ExitToAppIcon />
+                Logout
               </div>
-            )}
-            <div className="menu-item" onClick={handleLogout}>
-              <ExitToAppIcon />
-              Logout
-            </div>
-            <div className="menu-item">
-              <SettingsIcon />
-              Settings
-            </div>
-            <div className="menu-item">
-              <HelpIcon />
-              Help/Support
+              <div className="menu-item">
+                <SettingsIcon />
+                Settings
+              </div>
+              <div className="menu-item">
+                <HelpIcon />
+                Help/Support
+              </div>
             </div>
           </div>
         </div>

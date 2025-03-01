@@ -51,6 +51,7 @@ body {
   position: relative;
   top: 0;
   z-index: 1000;
+  min-height: 80px;
   background-color: var(--header-footer-bg-color);
   box-shadow: var(--box-shadow);
   padding: 10px 20px;
@@ -66,7 +67,7 @@ body {
 .header-left-content {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 16px;
 }
 
 .logo-title-container {
@@ -94,12 +95,46 @@ body {
   color: white !important;
 }
 
+.title-container h1::before {
+  content: 'Multi-Agent Generative Engine';
+}
+
 .title-container h2 {
   margin: 0;
   font-size: 14px;
   font-weight: normal;
   line-height: 1.2;
   text-align: left;
+  color: white !important;
+}
+
+.title-container h2::before {
+  content: 'Air Force Wargaming Institute';
+}
+
+@media (max-width: 1024px) {
+  .title-container h1 {
+    font-size: 16px;
+    line-height: 1.2;
+    text-align: left;
+    color: white !important;
+  }
+  
+  .title-container h2 {
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.2;
+    text-align: left;
+    color: white !important;
+  }
+
+  .title-container h1::before {
+    content: 'MAGE';
+  }
+  
+  .title-container h2::before {
+    content: 'AFWI';
+  }
 }
 
 /* Navigation Styles */
@@ -517,7 +552,7 @@ tr:hover {
   padding: 0;
   margin: 0;
   display: flex;
-  gap: 1rem;
+  /* gap: 1rem; */
 }
 
 .main-nav ul li a {
@@ -566,9 +601,16 @@ tr:hover {
 }
 
 .user-account {
-  position: absolute;
-  top: 10px;
+  display: flex;
+  position: fixed;
+  align-items: center;
+  padding: 10px;
   right: var(--user-account-right-offset);
+}
+@media (max-width: 1520px) {
+  .user-account {
+    display: none !important;
+  }
 }
 
 .user-menu {
@@ -1004,7 +1046,7 @@ tr:hover {
 /* Add specific styles for the main nav list items */
 .main-nav li {
   font-size: 20x;
-  margin: 0 15px;
+  margin: 0 8px;
   display: flex;
   align-items: center;
 }
@@ -1023,12 +1065,6 @@ tr:hover {
   width: 100%;
 }
 
-/* Add new container for logo and main nav */
-.header-left-content {
-  display: flex;
-  align-items: center;
-  gap: 40px;  /* Space between logo and main nav */
-}
 
 /* Update main nav styles */
 .main-nav {
@@ -1042,12 +1078,6 @@ tr:hover {
   margin: 0;
   padding: 0;
   align-items: center;
-}
-
-/* Remove the previous margin/padding styles */
-.main-nav li {
-  margin: 0 15px;
-  padding: 0;
 }
 
 /* Adjust workflow nav position */
