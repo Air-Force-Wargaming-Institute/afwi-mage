@@ -7,10 +7,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create necessary directories
+RUN mkdir -p /app/data/vectorstores /app/data/uploads /app/doc_staging
+
+# Copy application code directly to the app directory
 COPY . .
 
+# Set environment variables
+ENV PYTHONPATH="/app"
+ENV HOST="0.0.0.0"
+ENV PORT=8006
+ENV UPLOAD_DIR="/app/data/uploads"
+ENV VECTORSTORE_DIR="/app/data/vectorstores"
+ENV DOC_STAGING_DIR="/app/doc_staging"
+
+# Run the application
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8006"]
 
