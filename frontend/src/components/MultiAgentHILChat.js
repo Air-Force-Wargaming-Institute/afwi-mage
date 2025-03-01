@@ -478,6 +478,7 @@ function MultiAgentHILChat() {
   const { state, dispatch } = useHILChat();
   const messageEndRef = useRef(null);
   const messageAreaRef = useRef(null);
+  const inputRef = useRef(null);
   const shouldUpdatePositions = useRef(false);
 
   // Update scroll handling to use useCallback with debounce
@@ -629,6 +630,12 @@ function MultiAgentHILChat() {
         // If no conversation history, clear messages
         dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
       }
+
+      // Focus on input field after state updates
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+
     } catch (error) {
       console.error('Error fetching session messages:', error);
       dispatch({ 
@@ -654,6 +661,11 @@ function MultiAgentHILChat() {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
       setAvailableTeams(response.data.teams);
       setDialogOpen(true);
+      
+      // Focus on input field after dialog closes and new chat is created
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('Error fetching teams:', error);
       setTeamError('Failed to load available teams. Please try again.');
@@ -1134,6 +1146,7 @@ function MultiAgentHILChat() {
               minRows={1}
               maxRows={5}
               fullWidth
+              inputRef={inputRef}
             />
             <Button 
               type="submit" 

@@ -367,11 +367,25 @@ const useStyles = makeStyles((theme) => ({
   },
   buttonBar: {
     display: 'flex',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
+    position: 'relative',
+  },
+  sessionName: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    color: theme.palette.text.primary,
+    fontWeight: 600,
+    fontSize: '1rem',
+    textAlign: 'center',
+  },
+  buttonBarActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
   },
   agentsText: {
     color: theme.palette.text.secondary,
@@ -577,16 +591,18 @@ const useStyles = makeStyles((theme) => ({
     marginTop: '2px',
   },
   typingIndicator: {
-    alignSelf: 'flex-start',
+    position: 'absolute',
+    bottom: theme.spacing(2),
+    left: '50%',
+    transform: 'translateX(-50%)',
     display: 'flex',
     flexDirection: 'column',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
     backgroundColor: theme.palette.grey[100],
     borderRadius: '30px',
-    margin: theme.spacing(1, 0),
     maxWidth: '410px',
-    position: 'relative',
+    zIndex: 1000,
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -1507,6 +1523,7 @@ const DirectChat = () => {
   const theme = useTheme();
   const { state, dispatch } = useDirectChat();
   const messageEndRef = useRef(null);
+  const inputRef = useRef(null);
   
   // Local state management
   const [messages, setMessages] = useState([]);
@@ -1524,6 +1541,38 @@ const DirectChat = () => {
   const [editSessionName, setEditSessionName] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [classificationLevel, setClassificationLevel] = useState(0);
+
+  // Add state for caveats checkboxes
+  const [caveatStates, setCaveatStates] = useState({
+    NOFORN: false,
+    FVEY: false,
+    USA: false,
+    UK: false,
+    AUS: false,
+    NZ: false,
+    CAN: false,
+    NATO: false,
+    HCS: false,
+    SAP: false,
+    TK: false
+  });
+
+  // Function to reset all caveats
+  const resetCaveats = () => {
+    setCaveatStates({
+      NOFORN: false,
+      FVEY: false,
+      USA: false,
+      UK: false,
+      AUS: false,
+      NZ: false,
+      CAN: false,
+      NATO: false,
+      HCS: false,
+      SAP: false,
+      TK: false
+    });
+  };
 
   // Load chat sessions on component mount
   useEffect(() => {
@@ -1608,6 +1657,9 @@ const DirectChat = () => {
       setChatSessions(prev => [newSession, ...prev]);
       setCurrentSessionId(newSession.id);
       setMessages([]); // Clear messages for new session
+      setClassificationLevel(0); // Reset classification to Unclassified
+      resetCaveats(); // Reset all caveats checkboxes
+      setTimeout(() => inputRef.current?.focus(), 100);
     } catch (error) {
       setError('Failed to create new chat');
     }
@@ -1636,6 +1688,9 @@ const DirectChat = () => {
     if (sessionId === currentSessionId) return;
     setCurrentSessionId(sessionId);
     setMessages([]); // Clear messages before loading new ones
+    setClassificationLevel(0); // Reset classification to Unclassified
+    resetCaveats(); // Reset all caveats checkboxes
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleInputChange = (event) => {
@@ -1762,6 +1817,14 @@ const DirectChat = () => {
     setClassificationLevel(newValue);
   };
 
+  // Add handler for checkbox changes
+  const handleCaveatChange = (caveat) => (event) => {
+    setCaveatStates(prev => ({
+      ...prev,
+      [caveat]: event.target.checked
+    }));
+  };
+
   useEffect(() => {
     return () => {
       setMessages([]);
@@ -1845,13 +1908,18 @@ const DirectChat = () => {
             </div>
           )}
           <div className={classes.buttonBar}>
-            <IconButton
-              className={classes.fullscreenButton}
-              onClick={toggleFullscreen}
-              size="small"
-            >
-              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-            </IconButton>
+            <Typography className={classes.sessionName}>
+              {isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
+            </Typography>
+            <div className={classes.buttonBarActions}>
+              <IconButton
+                className={classes.fullscreenButton}
+                onClick={toggleFullscreen}
+                size="small"
+              >
+                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
+            </div>
           </div>
           <MessageArea 
             messages={messages}
@@ -1872,6 +1940,7 @@ const DirectChat = () => {
                 <HelpOutlineIcon />
               </IconButton>
               <TextField
+                inputRef={inputRef}
                 className={classes.input}
                 variant="outlined"
                 placeholder="Type your message here... (Ctrl+Enter to send)"
@@ -1929,47 +1998,113 @@ const DirectChat = () => {
                 </Typography>
                 <div className={classes.checkboxGroup}>
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NOFORN}
+                        onChange={handleCaveatChange('NOFORN')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NOFORN</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.FVEY}
+                        onChange={handleCaveatChange('FVEY')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>FVEY</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.USA}
+                        onChange={handleCaveatChange('USA')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>USA</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.UK}
+                        onChange={handleCaveatChange('UK')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>UK</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.AUS}
+                        onChange={handleCaveatChange('AUS')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>AUS</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NZ}
+                        onChange={handleCaveatChange('NZ')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NZ</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.CAN}
+                        onChange={handleCaveatChange('CAN')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>CAN</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NATO}
+                        onChange={handleCaveatChange('NATO')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NATO</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.HCS}
+                        onChange={handleCaveatChange('HCS')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>HCS</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.SAP}
+                        onChange={handleCaveatChange('SAP')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>SAP</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.TK}
+                        onChange={handleCaveatChange('TK')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>TK</Typography>}
                   />
                 </div>
