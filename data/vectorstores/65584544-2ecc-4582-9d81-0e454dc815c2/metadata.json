@@ -1,0 +1,29 @@
+{
+  "id": "65584544-2ecc-4582-9d81-0e454dc815c2",
+  "name": "Test1",
+  "description": "Test1",
+  "embedding_model": "nomic-embed-text",
+  "created_at": "2025-03-01T18:03:45.275004",
+  "updated_at": null,
+  "files": [
+    {
+      "filename": "2024-03-11 Chinese Nuclear Command and Control (1).pdf",
+      "original_path": "2024-03-11 Chinese Nuclear Command and Control (1).pdf",
+      "staged_path": "/app/doc_staging/0d296916-4315-4670-8c13-0fd42c891fe6.pdf",
+      "security_classification": "Secret",
+      "content_security_classification": "Secret"
+    },
+    {
+      "filename": "2024-03-11 Chinese Nuclear Command and Control.pdf",
+      "original_path": "2024-03-11 Chinese Nuclear Command and Control.pdf",
+      "staged_path": "/app/doc_staging/8918ad4e-d09d-4209-bcc0-759c83275aab.pdf",
+      "security_classification": "Confidential//REL TO USA, UK",
+      "content_security_classification": "Confidential//REL TO USA, UK"
+    }
+  ],
+  "chunking_method": "paragraph",
+  "max_paragraph_length": 1500,
+  "min_paragraph_length": 50,
+  "chunk_size": null,
+  "chunk_overlap": null
+}

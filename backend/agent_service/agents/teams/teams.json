@@ -78,9 +78,10 @@
         ],
         "color": "#FF0000",
         "created_at": "2025-02-28T20:07:48.459398Z",
-        "last_modified": "2025-02-28T21:55:36.179802Z",
+        "last_modified": "2025-03-01T18:06:57.829737Z",
         "vectorstore": [
-            "vectorstore2"
+            "vectorstore2",
+            "65584544-2ecc-4582-9d81-0e454dc815c2"
         ]
     },
     {
