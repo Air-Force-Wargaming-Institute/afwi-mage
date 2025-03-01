@@ -7,7 +7,7 @@
     "variables": [
       "current_datetime"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "synthesis_agent_prompt": {
     "name": "Synthesis Agent Prompt",
@@ -18,7 +18,7 @@
       "question",
       "analyses"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "moderator_guidance": {
     "name": "moderator_guidance",
@@ -29,7 +29,7 @@
       "question",
       "expert"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "plan_prompt_with_previous_plan": {
     "name": "plan_prompt_with_previous_plan",
@@ -42,7 +42,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "plan_prompt_with_conversation_history": {
     "name": "plan_prompt_with_conversation_history",
@@ -55,7 +55,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "relevance_prompt": {
     "name": "relevance_prompt",
@@ -67,7 +67,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "collaborator_prompt": {
     "name": "collaborator_prompt",
@@ -79,7 +79,7 @@
       "analysis",
       "expert_agents"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "librarian_summary_prompt": {
     "name": "librarian_summary_prompt",
@@ -91,7 +91,7 @@
       "agent_request",
       "requester"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "expert_final_report_no_collab": {
     "name": "Expert_Final_Report_no_collab",
@@ -107,7 +107,7 @@
       "whoami",
       "agent_instructions"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "expert_final_report": {
     "name": "Expert_Final_Report",
@@ -124,6 +124,6 @@
       "agent_instructions",
       "collab_report"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   }
 }

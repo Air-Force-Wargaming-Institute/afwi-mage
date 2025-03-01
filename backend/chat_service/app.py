@@ -76,8 +76,16 @@ def init_directories():
     try:
         os.makedirs(config['CONVERSATION_PATH'], exist_ok=True)
         logger.info(f"Ensured conversation logs directory exists at: {config['CONVERSATION_PATH']}")
+        
+        # Ensure vectorstore directory exists
+        vectorstore_dir = Path('/app/data/vectorstore')
+        vectorstore_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Ensured vectorstore directory exists at: {vectorstore_dir}")
+        
+        logger.info(f"Directory exists: {config['CONVERSATION_PATH']} - {Path(config['CONVERSATION_PATH']).exists()}")
+        logger.info(f"Directory is writable: {os.access(str(config['CONVERSATION_PATH']), os.W_OK)}")
     except Exception as e:
-        logger.error(f"Failed to create conversation logs directory: {e}")
+        logger.error(f"Failed to create required directories: {e}")
         raise
 
 app = FastAPI()

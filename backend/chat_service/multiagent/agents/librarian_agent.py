@@ -7,7 +7,7 @@ from multiagent.retriever_manager import RetrieverManager
 from multiagent.agents.helpers import create_banner
 from utils.prompt_manager import SystemPromptManager
 
-def librarian(requester:str, agent_request:str):
+def librarian(requester:str, agent_request:str, vs:str):
     print(create_banner("LIBRARIAN"))
     """
     The Librarian Agent
@@ -17,11 +17,17 @@ def librarian(requester:str, agent_request:str):
     config = load_config()
     TOP_N_DOCUMENTS = config['TOP_N_DOCUMENTS']
 
-    retriever = RetrieverManager().retriever
+    # Use the RetrieverManager to get the retriever with standardized path
+    retriever = RetrieverManager().get_retriever(vs)
     llm = LLMManager().get_llm()  # Uses default model from config
 
     # Begin by retrieving documents relevant to the agent request
-    relevant_docs = retriever.invoke(agent_request.strip())
+    relevant_docs = retriever.invoke(agent_request.strip()) if retriever else []
+
+    # If no documents were retrieved, return an empty summary
+    if not relevant_docs:
+        logger.warning(f"No relevant documents found for {requester}'s request: {agent_request}")
+        return f"No relevant documents found for {requester}'s request: {agent_request}", []
 
     prompt = SystemPromptManager().get_prompt_template("librarian_summary_prompt")
     prompt_data = SystemPromptManager().get_prompt("librarian_summary_prompt")

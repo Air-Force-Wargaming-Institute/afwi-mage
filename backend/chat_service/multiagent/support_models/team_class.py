@@ -19,6 +19,7 @@ class Team(BaseModel):
     color: str
     created_at: datetime
     last_modified: datetime
+    vectorstore: List[str] = []
 
     class Config:
         underscore_attrs_are_private = False

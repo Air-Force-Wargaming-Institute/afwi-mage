@@ -69,6 +69,7 @@ class TeamCreate(BaseModel):
     color: str
     agents: List[str]
     team_instructions: str = ""
+    vectorstore: List[str] = []
     memory_type: str = "ConversationBufferMemory"
     memory_kwargs: Dict[str, int] = Field(default_factory=lambda: {"max_token_limit": 2000})
 
@@ -170,7 +171,8 @@ async def create_team(team_data: TeamCreate):
             name=team_data.name,
             description=team_data.description,
             color=team_data.color,
-            agents=team_data.agents
+            agents=team_data.agents,
+            vectorstore=team_data.vectorstore
         )
         teams.append(json.loads(team.model_dump_json()))
         
@@ -271,7 +273,8 @@ async def list_teams():
                 "color": team["color"],
                 "agents": agent_names,
                 "createdAt": team["created_at"],
-                "modifiedAt": team["last_modified"]
+                "modifiedAt": team["last_modified"],
+                "vectorstore": team.get("vectorstore", [])  # Ensure vectorstore field is included
             }
             teams.append(team_details)
         logger.info(f"Total teams found: {len(teams)}")
@@ -441,6 +444,7 @@ async def update_team(unique_id: str, team_data: TeamCreate):
         selected_team.description = team_data.description
         selected_team.color = team_data.color
         selected_team.agents = team_data.agents
+        selected_team.vectorstore = team_data.vectorstore
 
         teams[team_index] = json.loads(selected_team.model_dump_json())
 
@@ -497,40 +501,6 @@ async def delete_team(unique_id: str):
         logger.error(f"Error deleting team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting team: {str(e)}")
 
-# @router.post("/duplicate_team/{team_name}")
-# async def duplicate_team(team_name: str):
-#     try:
-#         original_team_path = f"{TEAMS_PATH}/{team_name}.py"
-#         if not os.path.exists(original_team_path):
-#             raise HTTPException(status_code=404, detail=f"Team {team_name} not found")
-        
-#         with open(original_team_path, 'r') as f:
-#             content = f.read()
-        
-#         # Update team name
-#         original_team_name = content.split('TEAM_NAME = "')[1].split('"')[0]
-#         new_team_name = f"Copy of {original_team_name}"
-#         content = content.replace(f'TEAM_NAME = "{original_team_name}"', f'TEAM_NAME = "{new_team_name}"')
-        
-#         # Update file name
-#         new_file_name = format_team_name(new_team_name)
-#         content = content.replace(f'TEAM_FILE_NAME = "{team_name}"', f'TEAM_FILE_NAME = "{new_file_name}"')
-        
-#         # Update creation and modification dates
-#         current_time = datetime.now().isoformat()
-#         content = content.replace('CREATED_AT = "', f'CREATED_AT = "{current_time}')
-#         content = content.replace('MODIFIED_AT = "', f'MODIFIED_AT = "{current_time}')
-        
-#         # Save the new team file
-#         new_team_path = f"{TEAMS_PATH}/{new_file_name}.py"
-#         with open(new_team_path, "w") as f:
-#             f.write(content)
-        
-#         return {"message": f"Team {new_team_name} created successfully", "file_name": new_file_name}
-#     except Exception as e:
-#         logger.error(f"Error duplicating team: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Error duplicating team: {str(e)}")
-
 @router.get("/available_teams/")
 async def get_available_teams():
     teams = []
@@ -563,3 +533,53 @@ async def get_available_teams():
     except Exception as e:
         logger.error(f"Error listing teams: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing teams: {str(e)}")
+
+@router.get("/list_vs/")
+async def list_vectorstores():
+    """
+    List all available vectorstores from the /app/data/vectorstores/ directory.
+    
+    For each vectorstore folder, extract the folder name (unique_id) and the name from metadata.json.
+    Returns a list of vectorstores with their unique_id and name.
+    """
+    vectorstores = []
+    logger = logging.getLogger(__name__)
+    vectorstores_dir = Path("/app/data/vectorstores")
+    logger.info(f"Listing vectorstores from directory: {vectorstores_dir}")
+    
+    try:
+        # Check if the directory exists
+        if not vectorstores_dir.exists():
+            logger.info(f"Vectorstores directory not found: {vectorstores_dir}")
+            return {"vectorstores": []}
+        
+        # Iterate through all subdirectories in the vectorstores directory
+        for vs_folder in vectorstores_dir.iterdir():
+            if vs_folder.is_dir():
+                unique_id = vs_folder.name
+                metadata_file = vs_folder / "metadata.json"
+                
+                # Check if the required files exist
+                if metadata_file.exists() and (vs_folder / "index.faiss").exists() and (vs_folder / "index.pkl").exists():
+                    try:
+                        with open(metadata_file, "r") as f:
+                            metadata = json.load(f)
+                            
+                        # Extract the name from metadata
+                        name = metadata.get("name", unique_id)
+                        
+                        # Add to the list of vectorstores
+                        vectorstores.append({
+                            "unique_id": unique_id,
+                            "name": name
+                        })
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Error decoding metadata.json for vectorstore {unique_id}: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error processing vectorstore {unique_id}: {str(e)}")
+        
+        logger.info(f"Total vectorstores found: {len(vectorstores)}")
+        return {"vectorstores": vectorstores}
+    except Exception as e:
+        logger.error(f"Error listing vectorstores: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error listing vectorstores: {str(e)}")

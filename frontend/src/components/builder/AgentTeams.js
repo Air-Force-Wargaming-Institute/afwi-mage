@@ -194,6 +194,8 @@ function AgentTeams() {
     description: '',
     color: colorOptions[0],
     agents: Array(8).fill(''),
+    team_instructions: '',
+    vectorstore: []
   });
   const [editingTeam, setEditingTeam] = useState(null);
   const [snackbar, setSnackbar] = useState({
@@ -208,16 +210,19 @@ function AgentTeams() {
   const [nameError, setNameError] = useState(false);
   const [nameErrorMessage, setNameErrorMessage] = useState('');
   const [agentMapping, setAgentMapping] = useState({});
+  const [vectorstores, setVectorstores] = useState([]);
 
   useEffect(() => {
     fetchTeams();
     fetchAvailableAgents();
     fetchAgentDescriptions();
+    fetchVectorstores();
   }, []);
 
   const fetchTeams = async () => {
     try {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      console.log("Teams received from backend:", response.data.teams);
       setTeams(response.data.teams);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -251,14 +256,32 @@ function AgentTeams() {
     }
   };
 
+  const fetchVectorstores = async () => {
+    try {
+      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_vs/'));
+      console.log("Vectorstores received from backend:", response.data.vectorstores);
+      setVectorstores(response.data.vectorstores);
+    } catch (error) {
+      console.error('Error fetching vectorstores:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error fetching vectorstores. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
   const handleEditOpen = (team) => {
     // Create a copy of the team with all 8 agent slots
     const fullTeam = {
       ...team,
-      agents: [...team.agents, ...Array(8 - team.agents.length).fill('')]
+      agents: [...team.agents, ...Array(8 - team.agents.length).fill('')],
+      // Ensure vectorstore is initialized as an array
+      vectorstore: team.vectorstore || []
     };
+    console.log("Opening team for editing:", fullTeam);
     setEditingTeam(fullTeam);
     setEditOpen(true);
   };
@@ -354,7 +377,6 @@ function AgentTeams() {
     }
 
     try {
-      // Filter out empty agent slots and map names to unique_ids
       const compactAgents = newTeam.agents
         .filter(agentName => agentName !== '')
         .map(agentName => agentMapping[agentName])
@@ -362,7 +384,8 @@ function AgentTeams() {
 
       const submissionData = {
         ...newTeam,
-        agents: compactAgents
+        agents: compactAgents,
+        vectorstore: newTeam.vectorstore || []
       };
 
       const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), submissionData);
@@ -395,7 +418,6 @@ function AgentTeams() {
     }
 
     try {
-      // Filter out empty agent slots and map names to unique_ids
       const compactAgents = editingTeam.agents
         .filter(agentName => agentName !== '')
         .map(agentName => agentMapping[agentName])
@@ -403,9 +425,11 @@ function AgentTeams() {
 
       const submissionData = {
         ...editingTeam,
-        agents: compactAgents
+        agents: compactAgents,
+        vectorstore: editingTeam.vectorstore || []
       };
 
+      console.log("Submitting team update with data:", submissionData);
       await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.unique_id}`), submissionData);
       setEditOpen(false);
       setSnackbar({
@@ -494,8 +518,6 @@ function AgentTeams() {
 
   const handleDuplicateClick = async (team) => {
     try {
-      // Create a new team object based on the existing team
-      // Map agent names to their unique IDs before sending
       const agentIds = team.agents
         .filter(agentName => agentName !== '')
         .map(agentName => agentMapping[agentName])
@@ -505,7 +527,8 @@ function AgentTeams() {
         name: `Copy of ${team.name}`,
         description: team.description,
         color: team.color,
-        agents: agentIds  // Now sending IDs instead of names
+        agents: agentIds,
+        vectorstore: team.vectorstore || []
       };
 
       const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
@@ -682,6 +705,44 @@ function AgentTeams() {
             </Typography>
           </Box>
           <Typography className={classes.sectionTitle}>
+            Select Document Vectorstore
+          </Typography>
+          <FormControl fullWidth className={classes.formControl}>
+            <InputLabel id="documents-select-label">Store</InputLabel>
+            <Select
+              labelId="documents-select-label"
+              value={newTeam.vectorstore}
+              onChange={(e) => {
+                setNewTeam(prev => ({
+                  ...prev,
+                  vectorstore: e.target.value || []
+                }));
+              }}
+              multiple
+              renderValue={(selected) => {
+                if (selected.length === 0) {
+                  return <em>Select vectorstores</em>;
+                }
+                return selected.map(id => 
+                  vectorstores.find(vs => vs.unique_id === id)?.name || id
+                ).join(', ');
+              }}
+              MenuProps={{
+                getContentAnchorEl: null,
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }
+              }}
+            >
+              {vectorstores.map((vs) => (
+                <MenuItem key={vs.unique_id} value={vs.unique_id}>
+                  {vs.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography className={classes.sectionTitle}>
             Assemble Agent Team
           </Typography>
           <Typography variant="body2" className={classes.teamInfoBlurb}>
@@ -796,6 +857,45 @@ function AgentTeams() {
               {editingTeam ? editingTeam.description.length : 0}/140 characters
             </Typography>
           </Box>
+          <Typography className={classes.sectionTitle}>
+            Select Document Vectorstore
+          </Typography>
+          <FormControl fullWidth className={classes.formControl}>
+            <InputLabel id="documents-select-label">Store</InputLabel>
+            <Select
+              labelId="documents-select-label"
+              value={editingTeam?.vectorstore || []}
+              onChange={(e) => {
+                console.log("Selected vectorstore:", e.target.value);
+                setEditingTeam(prev => ({
+                  ...prev,
+                  vectorstore: e.target.value || []
+                }));
+              }}
+              multiple
+              renderValue={(selected) => {
+                if (!selected || selected.length === 0) {
+                  return <em>Select vectorstores</em>;
+                }
+                return selected.map(id => 
+                  vectorstores.find(vs => vs.unique_id === id)?.name || id
+                ).join(', ');
+              }}
+              MenuProps={{
+                getContentAnchorEl: null,
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }
+              }}
+            >
+              {vectorstores.map((vs) => (
+                <MenuItem key={vs.unique_id} value={vs.unique_id}>
+                  {vs.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Typography className={classes.sectionTitle}>
             Build Your Multi-Agent Team
           </Typography>
