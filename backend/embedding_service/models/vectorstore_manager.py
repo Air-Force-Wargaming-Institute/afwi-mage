@@ -7,9 +7,9 @@ import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
-from langchain.vectorstores import FAISS
-from langchain.schema import Document
-from langchain.embeddings.base import Embeddings
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
 from ..utils.metadata import (
     create_vectorstore_metadata, 
@@ -107,7 +107,10 @@ class VectorStoreManager:
             "updated_at": metadata.get("updated_at", ""),
             "files": file_details,
             "chunk_size": metadata.get("chunk_size", 1000),
-            "chunk_overlap": metadata.get("chunk_overlap", 100)
+            "chunk_overlap": metadata.get("chunk_overlap", 100),
+            "chunking_method": metadata.get("chunking_method", "fixed"),
+            "max_paragraph_length": metadata.get("max_paragraph_length", 1500),
+            "min_paragraph_length": metadata.get("min_paragraph_length", 50)
         }
     
     def create_vectorstore(

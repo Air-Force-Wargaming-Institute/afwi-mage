@@ -6,9 +6,9 @@ import os
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-from langchain.schema import Document
-from langchain.embeddings.base import Embeddings
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
 
 
 class NomicEmbeddings(HuggingFaceEmbeddings):

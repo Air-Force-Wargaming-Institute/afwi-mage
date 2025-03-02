@@ -14,6 +14,8 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
 import uuid
+import time
+import math
 
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +24,10 @@ from pydantic import BaseModel, Field
 
 # Import for embedding models and vector stores
 import numpy as np
-from langchain.embeddings.base import Embeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter, TextSplitter
+from langchain_core.embeddings import Embeddings
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter, TextSplitter
+from langchain_community.vectorstores import FAISS
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +39,90 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("embedding_service")
+
+# Job tracking for long-running operations
+job_progress = {}
+
+class JobStatus(BaseModel):
+    """Job status for tracking long-running operations."""
+    job_id: str
+    status: str  # 'pending', 'processing', 'completed', 'failed'
+    operation_type: str  # 'create_vectorstore', 'update_vectorstore', etc.
+    total_items: int = 0
+    processed_items: int = 0
+    started_at: str
+    completed_at: Optional[str] = None
+    details: Dict[str, Any] = {}
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+def generate_job_id():
+    """Generate a unique job ID."""
+    return str(uuid.uuid4())
+
+def register_job(operation_type: str, total_items: int = 0, details: Dict[str, Any] = {}):
+    """Register a new job and return its ID."""
+    job_id = generate_job_id()
+    job_progress[job_id] = JobStatus(
+        job_id=job_id,
+        status="pending",
+        operation_type=operation_type,
+        total_items=total_items,
+        processed_items=0,
+        started_at=datetime.now().isoformat(),
+        details=details
+    )
+    return job_id
+
+def update_job_progress(job_id: str, processed_items: int, status: str = None):
+    """Update the progress of a job."""
+    if job_id not in job_progress:
+        logger.warning(f"Attempted to update non-existent job {job_id}")
+        return False
+    
+    job = job_progress[job_id]
+    job.processed_items = processed_items
+    
+    if status:
+        job.status = status
+    
+    # If job is completed or failed, set completed_at timestamp
+    if status in ["completed", "failed"]:
+        job.completed_at = datetime.now().isoformat()
+    
+    return True
+
+def complete_job(job_id: str, result: Dict[str, Any] = None):
+    """Mark a job as completed with optional result."""
+    if job_id not in job_progress:
+        logger.warning(f"Attempted to complete non-existent job {job_id}")
+        return False
+    
+    job = job_progress[job_id]
+    job.status = "completed"
+    job.completed_at = datetime.now().isoformat()
+    
+    if result:
+        job.result = result
+    
+    return True
+
+def fail_job(job_id: str, error: str):
+    """Mark a job as failed with error message."""
+    if job_id not in job_progress:
+        logger.warning(f"Attempted to fail non-existent job {job_id}")
+        return False
+    
+    job = job_progress[job_id]
+    job.status = "failed"
+    job.completed_at = datetime.now().isoformat()
+    job.error = error
+    
+    return True
+
+def get_job_status(job_id: str) -> Optional[JobStatus]:
+    """Get the status of a job."""
+    return job_progress.get(job_id)
 
 # Configuration
 HOST = os.environ.get("HOST", "0.0.0.0")
@@ -94,6 +182,9 @@ class VectorStoreDetailInfo(BaseModel):
     files: List[Dict[str, Any]]
     chunk_size: int = 1000
     chunk_overlap: int = 100
+    chunking_method: Optional[str] = "fixed"
+    max_paragraph_length: Optional[int] = 1500
+    min_paragraph_length: Optional[int] = 50
 
 class ParagraphTextSplitter(TextSplitter):
     """Custom text splitter that splits text into paragraphs."""
@@ -162,21 +253,42 @@ class CreateVectorStoreRequest(BaseModel):
     min_paragraph_length: int = 50
     chunk_size: int = 1000
     chunk_overlap: int = 100
+    batch_processing: bool = True
+    file_batch_size: int = 5
+    doc_batch_size: int = 1000
 
 class CreateVectorStoreResponse(BaseModel):
     success: bool
     message: str
     vectorstore_id: Optional[str] = None
+    job_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
 
 class UpdateVectorStoreRequest(BaseModel):
-    vectorstore_id: str
     files: List[str]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    batch_processing: bool = True
+    file_batch_size: int = 5
+    doc_batch_size: int = 1000
 
 class UpdateVectorStoreResponse(BaseModel):
     success: bool
     message: str
+    job_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    operation_type: str
+    total_items: int
+    processed_items: int
+    progress_percentage: float
+    started_at: str
+    completed_at: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 # Ollama embedding model implementation
 class OllamaEmbeddings(Embeddings):
@@ -233,7 +345,7 @@ def get_available_embedding_models():
 # Document loading functions
 def get_document_loader(file_path):
     """Get appropriate document loader based on file extension."""
-    from langchain.document_loaders import (
+    from langchain_community.document_loaders import (
         TextLoader, PyPDFLoader, Docx2txtLoader, 
         UnstructuredMarkdownLoader, UnstructuredCSVLoader, 
         UnstructuredExcelLoader, UnstructuredHTMLLoader
@@ -288,67 +400,125 @@ def copy_files_to_staging(file_paths, upload_dir, staging_dir):
     
     return file_mapping
 
-def load_documents(file_paths, use_paragraph_chunking=True, max_paragraph_length=1500, min_paragraph_length=50, chunk_size=1000, chunk_overlap=100):
-    """Load and process documents from the specified file paths using paragraph-based chunking or traditional chunking."""
+def load_documents(
+    file_paths,
+    use_paragraph_chunking=True,
+    max_paragraph_length=1500,
+    min_paragraph_length=50,
+    chunk_size=1000,
+    chunk_overlap=100,
+    batch_size=5,
+    job_id=None
+):
+    """Load and process documents from the provided file paths in batches.
     
-    all_documents = []
+    Args:
+        file_paths: List of file paths to process
+        use_paragraph_chunking: Whether to use paragraph-based chunking
+        max_paragraph_length: Maximum length of paragraphs when using paragraph chunking
+        min_paragraph_length: Minimum length of paragraphs when using paragraph chunking
+        chunk_size: Chunk size for fixed-length chunking
+        chunk_overlap: Chunk overlap for fixed-length chunking
+        batch_size: Number of files to process in each batch
+        job_id: Job ID for tracking progress
+    
+    Returns:
+        tuple: (documents, skipped_files)
+    """
+    total_files = len(file_paths)
+    logger.info(f"Processing {total_files} files in batches of {batch_size}")
+    
+    documents = []
     skipped_files = []
     
-    # Create the appropriate text splitter based on the chunking method
-    if use_paragraph_chunking:
-        text_splitter = ParagraphTextSplitter(
-            max_paragraph_length=max_paragraph_length,
-            min_paragraph_length=min_paragraph_length
-        )
-        logger.info(f"Using paragraph-based chunking with max length: {max_paragraph_length}, min length: {min_paragraph_length}")
-    else:
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len
-        )
-        logger.info(f"Using traditional chunking with chunk size: {chunk_size}, overlap: {chunk_overlap}")
+    # Create text splitter based on chunking method
+    text_splitter = get_text_splitter(
+        use_paragraph_chunking,
+        max_paragraph_length,
+        min_paragraph_length,
+        chunk_size,
+        chunk_overlap
+    )
     
-    for file_path in file_paths:
-        try:
-            # Get the appropriate loader
-            loader = get_document_loader(file_path)
-            
-            if loader is None:
-                logger.warning(f"No loader available for {file_path}")
-                skipped_files.append(file_path)
-                continue
-            
-            # Load the document
-            docs = loader.load()
-            
-            if not docs:
-                logger.warning(f"No content loaded from {file_path}")
-                skipped_files.append(file_path)
-                continue
-            
-            # Split the document using the selected chunking method
-            splits = text_splitter.split_documents(docs)
-            
-            # Log chunk statistics
-            chunk_lengths = [len(chunk.page_content) for chunk in splits]
-            avg_chunk_length = sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0
-            
-            logger.info(f"File: {file_path}, Chunks: {len(splits)}, Avg Chunk Length: {avg_chunk_length:.0f} chars")
-            
-            # Add metadata to track the source file for each chunk
-            for chunk in splits:
-                chunk.metadata["source"] = file_path
-                # Add chunk statistics to metadata
-                chunk.metadata["chunk_length"] = len(chunk.page_content)
-            
-            all_documents.extend(splits)
-            
-        except Exception as e:
-            logger.error(f"Error processing {file_path}: {str(e)}")
-            skipped_files.append(file_path)
+    # Process files in batches
+    batches = [file_paths[i:i + batch_size] for i in range(0, len(file_paths), batch_size)]
     
-    return all_documents, skipped_files
+    for batch_idx, batch in enumerate(batches):
+        logger.info(f"Processing batch {batch_idx + 1}/{len(batches)}: {len(batch)} files")
+        
+        batch_documents = []
+        for file_idx, file_path in enumerate(batch):
+            current_file_idx = batch_idx * batch_size + file_idx
+            
+            # Update job progress if job_id is provided
+            if job_id:
+                update_job_progress(
+                    job_id,
+                    current_file_idx,
+                    f"Processing file {current_file_idx + 1}/{total_files}"
+                )
+            
+            try:
+                # Get appropriate document loader based on file extension
+                loader = get_document_loader(file_path)
+                if not loader:
+                    logger.warning(f"Unsupported file type: {file_path}")
+                    skipped_files.append(os.path.basename(file_path))
+                    continue
+                
+                # Load and process the document
+                loader_docs = loader.load()
+                
+                if not loader_docs:
+                    logger.warning(f"No content extracted from: {file_path}")
+                    skipped_files.append(os.path.basename(file_path))
+                    continue
+                
+                # Split documents into chunks
+                chunks = []
+                for doc in loader_docs:
+                    doc_chunks = text_splitter.split_documents([doc])
+                    chunks.extend(doc_chunks)
+                
+                if not chunks:
+                    logger.warning(f"No chunks created from: {file_path}")
+                    skipped_files.append(os.path.basename(file_path))
+                    continue
+                
+                # Log successful processing
+                avg_chunk_length = sum(len(chunk.page_content) for chunk in chunks) / len(chunks)
+                logger.info(f"Processed {file_path} into {len(chunks)} chunks with avg length: {avg_chunk_length:.0f}")
+                batch_documents.extend(chunks)
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {str(e)}")
+                skipped_files.append(os.path.basename(file_path))
+        
+        # Add batch documents to total documents list
+        documents.extend(batch_documents)
+        logger.info(f"Batch complete. Total documents so far: {len(documents)}")
+        
+        # Update job progress with batch completion if job_id is provided
+        if job_id:
+            # Calculate progress based on processed files, not chunks
+            processed_files = min((batch_idx + 1) * batch_size, total_files)
+            update_job_progress(
+                job_id,
+                processed_files,
+                f"Processed {processed_files}/{total_files} files"
+            )
+    
+    logger.info(f"Document processing complete: {len(documents)} documents, {len(skipped_files)} skipped files")
+    
+    # Update job status if job_id is provided
+    if job_id:
+        update_job_progress(
+            job_id,
+            total_files,
+            "Document processing complete"
+        )
+    
+    return documents, skipped_files
 
 # Metadata functions
 def get_file_security_info(file_paths, upload_dir):
@@ -498,103 +668,324 @@ class VectorStoreManager:
             return None
     
     def create_vectorstore(
-        self, 
-        name, 
-        description, 
-        documents, 
-        embedding_model, 
-        model_name,
-        file_infos, 
-        use_paragraph_chunking=True,
-        max_paragraph_length=1500,
-        min_paragraph_length=50,
-        chunk_size=1000, 
-        chunk_overlap=100
-    ):
-        """Create a new vector store."""
-        from langchain.vectorstores import FAISS
+        self,
+        name: str,
+        description: str,
+        documents: List[Document],
+        embedding_model: Any,
+        embedding_model_name: str,
+        file_infos: List[Dict[str, str]],
+        chunking_method: str = "paragraph",
+        max_paragraph_length: int = 1500,
+        min_paragraph_length: int = 50,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 100,
+        batch_size: int = 1000,
+        job_id: Optional[str] = None,
+    ) -> str:
+        """Create a new vector store from a list of documents."""
+        if not documents:
+            logger.error("No documents provided for vector store creation")
+            return None
         
-        # Generate a unique ID for the vector store
-        vs_id = str(uuid.uuid4())
-        
-        # Create the vector store directory
-        vs_dir = self.base_dir / vs_id
-        vs_dir.mkdir(exist_ok=True)
-        
-        # Create the FAISS vector store
-        vectorstore = FAISS.from_documents(
-            documents=documents,
-            embedding=embedding_model
-        )
-        
-        # Save the vector store directly in the vectorstore directory (same as metadata.json)
-        vectorstore.save_local(str(vs_dir))
-        
-        # Create and save metadata
-        metadata = create_vectorstore_metadata(
-            vs_id=vs_id,
-            name=name,
-            description=description,
-            embedding_model=model_name,
-            file_infos=file_infos,
-            use_paragraph_chunking=use_paragraph_chunking,
-            max_paragraph_length=max_paragraph_length,
-            min_paragraph_length=min_paragraph_length,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
-        )
-        
-        save_metadata(metadata, vs_dir / "metadata.json")
-        
-        return vs_id
+        try:
+            # Generate a unique ID for the vector store
+            vectorstore_id = str(uuid.uuid4())
+            logger.info(f"Creating vector store with ID: {vectorstore_id}")
+            
+            # Create the directory for the vector store
+            vs_dir = os.path.join(self.base_dir, vectorstore_id)
+            
+            # Check if directory already exists
+            if os.path.exists(vs_dir):
+                logger.warning(f"Vector store directory already exists: {vs_dir}, using a new ID")
+                vectorstore_id = str(uuid.uuid4())
+                vs_dir = os.path.join(self.base_dir, vectorstore_id)
+            
+            # Create directory
+            os.makedirs(vs_dir, exist_ok=True)
+            
+            logger.info(f"Created directory for vector store {vectorstore_id}: {vs_dir}")
+            
+            # Process documents in batches and add to the vector store
+            total_batches = math.ceil(len(documents) / batch_size)
+            logger.info(f"Processing {len(documents)} documents in {total_batches} batches of size {batch_size}")
+            
+            # Initialize FAISS index
+            try:
+                logger.info(f"Initializing FAISS index for vector store {vectorstore_id}")
+                vectorstore = None
+                
+                for i in range(total_batches):
+                    start_idx = i * batch_size
+                    end_idx = min((i + 1) * batch_size, len(documents))
+                    batch = documents[start_idx:end_idx]
+                    
+                    logger.info(f"Processing batch {i+1}/{total_batches} with {len(batch)} documents")
+                    
+                    # Update job progress
+                    if job_id:
+                        progress = (end_idx / len(documents)) * 100
+                        update_job_progress(job_id, progress, f"batch {i+1}/{total_batches}")
+                    
+                    # For the first batch, create the vector store
+                    if i == 0:
+                        logger.info(f"Creating initial FAISS vectorstore with {len(batch)} documents")
+                        vectorstore = FAISS.from_documents(batch, embedding_model)
+                    # For subsequent batches, add to the existing vector store
+                    else:
+                        logger.info(f"Adding batch {i+1} to FAISS vectorstore")
+                        vectorstore.add_documents(batch)
+                
+                if not vectorstore:
+                    logger.error(f"Failed to create vectorstore {vectorstore_id}: FAISS index initialization failed")
+                    return None
+                
+                # Save the FAISS index directly in the vector store directory
+                logger.info(f"Saving FAISS index to {vs_dir}")
+                vectorstore.save_local(vs_dir)
+                logger.info(f"FAISS index saved successfully for vector store {vectorstore_id}")
+            
+            except Exception as e:
+                import traceback
+                logger.error(f"Error processing documents for vector store {vectorstore_id}: {str(e)}")
+                logger.error(f"Error details: {traceback.format_exc()}")
+                
+                # Clean up the vector store directory if creation failed
+                try:
+                    if os.path.exists(vs_dir):
+                        shutil.rmtree(vs_dir)
+                        logger.info(f"Cleaned up vector store directory after failure: {vs_dir}")
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up after failed vector store creation: {str(cleanup_error)}")
+                
+                return None
+            
+            # Create and save metadata
+            metadata = {
+                "id": vectorstore_id,
+                "name": name,
+                "description": description,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "document_count": len(documents),
+                "embedding_model": embedding_model_name,
+                "chunking_method": chunking_method,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "max_paragraph_length": max_paragraph_length,
+                "min_paragraph_length": min_paragraph_length,
+                "files": file_infos
+            }
+            
+            # Save metadata
+            try:
+                logger.info(f"Saving metadata for vector store {vectorstore_id}")
+                metadata_path = os.path.join(vs_dir, "metadata.json")
+                with open(metadata_path, "w") as f:
+                    json.dump(metadata, f, indent=2)
+                logger.info(f"Metadata saved successfully for vector store {vectorstore_id}")
+            except Exception as e:
+                logger.error(f"Error saving metadata for vector store {vectorstore_id}: {str(e)}")
+                return None
+            
+            logger.info(f"Vector store created successfully: {vectorstore_id}")
+            return vectorstore_id
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error creating vector store: {str(e)}")
+            logger.error(f"Error details: {traceback.format_exc()}")
+            return None
     
     def update_vectorstore(
         self, 
         vectorstore_id, 
         documents, 
         embedding_model, 
-        new_file_infos
+        file_infos=None, 
+        name=None, 
+        description=None,
+        batch_size=1000,
+        job_id=None
     ):
-        """Update an existing vector store with new documents."""
-        from langchain.vectorstores import FAISS
+        """Update an existing vector store with new documents.
         
+        Args:
+            vectorstore_id: ID of the vector store to update
+            documents: List of new documents to add
+            embedding_model: Embedding model to use
+            file_infos: List of file information dictionaries for new files
+            name: New name for the vector store (optional)
+            description: New description for the vector store (optional)
+            batch_size: Number of documents to process in each batch
+            job_id: Job ID for tracking progress
+        
+        Returns:
+            bool: True if the update was successful, False otherwise
+        """
         vs_dir = self.base_dir / vectorstore_id
         
+        # Check if vector store directory exists
         if not vs_dir.exists() or not vs_dir.is_dir():
+            logger.error(f"Vector store directory not found: {vs_dir}")
             return False
         
+        # Check for metadata file
         metadata_file = vs_dir / "metadata.json"
-        
         if not metadata_file.exists():
+            logger.error(f"Metadata file not found for vector store {vectorstore_id}")
             return False
         
         try:
-            # Load the existing metadata
+            # Load existing metadata
             metadata = load_metadata(metadata_file)
-            
             if not metadata:
+                logger.error(f"Failed to load metadata for vector store {vectorstore_id}")
                 return False
             
-            # Load the existing vector store from the vectorstore directory
-            vectorstore = FAISS.load_local(
-                str(vs_dir),
-                embedding_model
-            )
+            # Update name and description if provided
+            if name is not None:
+                metadata["name"] = name
             
-            # Add the new documents
-            vectorstore.add_documents(documents)
+            if description is not None:
+                metadata["description"] = description
             
-            # Save the updated vector store back to the vectorstore directory
+            # Check if vector store directory exists
+            if not vs_dir.exists():
+                logger.error(f"Vector store directory not found: {vs_dir}")
+                return False
+            
+            # Log contents of the directory to help with debugging
+            try:
+                index_files = list(vs_dir.glob("*"))
+                logger.info(f"Vector store directory contents: {[str(f.name) for f in index_files]}")
+            except Exception as e:
+                logger.warning(f"Could not list directory contents: {str(e)}")
+                
+            # Verify that the embedding model is initialized properly
+            logger.info(f"Using embedding model: {getattr(embedding_model, 'model', str(embedding_model))}")
+            
+            # Load existing vector store
+            try:
+                # Make sure embedding model is initialized
+                if not embedding_model:
+                    logger.error("Embedding model is None")
+                    return False
+                
+                # Create a backup of the vector store first
+                backup_dir = vs_dir.parent / f"{vectorstore_id}_backup_{int(time.time())}"
+                try:
+                    shutil.copytree(vs_dir, backup_dir)
+                    logger.info(f"Created backup of vector store at {backup_dir}")
+                except Exception as backup_e:
+                    logger.warning(f"Could not create backup of vector store: {str(backup_e)}")
+                
+                # Load the vector store from the main directory
+                vectorstore = FAISS.load_local(str(vs_dir), embedding_model)
+                logger.info(f"Loaded existing vector store from {vs_dir}")
+                
+                # Verify the vector store was loaded correctly
+                if not vectorstore:
+                    logger.error("Vector store loaded as None")
+                    return False
+                
+                if not hasattr(vectorstore, 'add_documents'):
+                    logger.error(f"Loaded vector store doesn't have add_documents method: {type(vectorstore)}")
+                    return False
+            except Exception as e:
+                logger.error(f"Error loading vector store {vectorstore_id}: {str(e)}")
+                # Try to provide more details about what went wrong
+                import traceback
+                logger.error(f"Error details: {traceback.format_exc()}")
+                return False
+            
+            # Add documents in batches
+            total_documents = len(documents)
+            logger.info(f"Adding {total_documents} documents to vector store in batches of {batch_size}")
+            
+            # If no documents to add, just update metadata and return
+            if total_documents == 0:
+                logger.info("No documents to add, just updating metadata")
+                # Update metadata with new file information
+                if file_infos:
+                    metadata["files"].extend(file_infos)
+                
+                # Update timestamp
+                metadata["updated_at"] = datetime.now().isoformat()
+                
+                # Save updated metadata
+                save_metadata(metadata, metadata_file)
+                logger.info(f"Saved updated metadata to {metadata_file}")
+                
+                if job_id:
+                    update_job_progress(job_id, 0, "Vector store metadata updated (no documents added)")
+                
+                return True
+            
+            # Add documents in batches
+            batches = [documents[i:i + batch_size] for i in range(0, len(documents), batch_size)]
+            
+            for batch_idx, batch in enumerate(batches):
+                logger.info(f"Processing batch {batch_idx + 1}/{len(batches)}: {len(batch)} documents")
+                
+                try:
+                    # Add documents from this batch
+                    vectorstore.add_documents(batch)
+                    logger.info(f"Added batch of {len(batch)} documents to vector store")
+                    
+                    # Update job progress if job_id is provided
+                    if job_id:
+                        # Calculate progress based on processed documents
+                        processed_docs = min((batch_idx + 1) * batch_size, total_documents)
+                        progress_percentage = (processed_docs / total_documents) * 100
+                        update_job_progress(
+                            job_id,
+                            processed_docs,
+                            f"Added {processed_docs}/{total_documents} documents ({progress_percentage:.1f}%)"
+                        )
+                    
+                except Exception as e:
+                    logger.error(f"Error processing batch {batch_idx}: {str(e)}")
+                    # If job_id is provided, update job status with error
+                    if job_id:
+                        update_job_progress(
+                            job_id,
+                            (batch_idx * batch_size),
+                            f"Error during batch processing: {str(e)}"
+                        )
+                    return False
+            
+            # Save the updated vector store
             vectorstore.save_local(str(vs_dir))
+            logger.info(f"Saved updated vector store to {vs_dir}")
             
-            # Update metadata
-            metadata["files"].extend(new_file_infos)
-            update_metadata(metadata, metadata_file)
+            # Update metadata with new file information
+            if file_infos:
+                metadata["files"].extend(file_infos)
+            
+            # Update timestamp
+            metadata["updated_at"] = datetime.now().isoformat()
+            
+            # Save updated metadata
+            save_metadata(metadata, metadata_file)
+            logger.info(f"Saved updated metadata to {metadata_file}")
+            
+            # If job_id is provided, update job status to completed
+            if job_id:
+                update_job_progress(
+                    job_id,
+                    total_documents,
+                    "Vector store update completed"
+                )
             
             return True
-        
+            
         except Exception as e:
             logger.error(f"Error updating vector store {vectorstore_id}: {str(e)}")
+            # If job_id is provided, update job status with error
+            if job_id:
+                fail_job(job_id, str(e))
             return False
     
     def delete_vectorstore(self, vs_id):
@@ -678,12 +1069,71 @@ async def create_vectorstore(
         raise HTTPException(status_code=400, detail="At least one file is required")
     
     try:
-        # Get the embedding model
+        # Register a new job for this operation
+        job_id = register_job(
+            operation_type="create_vectorstore",
+            total_items=len(request.files),
+            details={
+                "name": request.name,
+                "description": request.description,
+                "file_count": len(request.files),
+                "embedding_model": request.embedding_model,
+            }
+        )
+        
+        logger.info(f"Starting job {job_id} to create vector store '{request.name}' with {len(request.files)} files")
+        
+        # Update job status to processing
+        update_job_progress(job_id, 0, "processing")
+        
+        # Start the background task
+        background_tasks.add_task(
+            process_vectorstore_creation,
+            job_id=job_id,
+            request=request,
+            manager=manager
+        )
+        
+        return {
+            "success": True,
+            "message": f"Vector store creation started. Use job ID to track progress.",
+            "job_id": job_id,
+            "skipped_files": []
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting vector store creation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_vectorstore_creation(job_id: str, request: CreateVectorStoreRequest, manager: VectorStoreManager):
+    """Background task for processing vector store creation."""
+    # Initialize start_time for tracking creation duration
+    start_time = time.time()
+    
+    file_mapping = None
+    try:
+        # Initialize the embedding model
+        logger.info(f"Initializing embedding model: {request.embedding_model}")
         embedding_model = get_embedding_model(request.embedding_model)
+        embedding_model_name = request.embedding_model
+        
+        if not embedding_model:
+            fail_job(job_id, f"Failed to initialize embedding model: {request.embedding_model}")
+            return
         
         # Set up directories
         upload_dir = Path(UPLOAD_DIR)
         staging_dir = Path(DOC_STAGING_DIR)
+        
+        if not upload_dir.exists():
+            logger.warning(f"Upload directory does not exist: {upload_dir}")
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created upload directory: {upload_dir}")
+        
+        if not staging_dir.exists():
+            logger.warning(f"Staging directory does not exist: {staging_dir}")
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created staging directory: {staging_dir}")
         
         # Copy files to staging directory
         file_mapping = copy_files_to_staging(
@@ -693,23 +1143,81 @@ async def create_vectorstore(
         )
         
         if not file_mapping:
-            raise HTTPException(status_code=400, detail="No valid files found")
+            fail_job(job_id, "No valid files found")
+            return
         
-        # Load and process documents
-        documents, skipped_files = load_documents(
-            list(file_mapping.values()),
-            use_paragraph_chunking=request.use_paragraph_chunking,
-            max_paragraph_length=request.max_paragraph_length,
-            min_paragraph_length=request.min_paragraph_length,
-            chunk_size=request.chunk_size,
-            chunk_overlap=request.chunk_overlap
-        )
+        # Update job progress
+        update_job_progress(job_id, 10, "processing files")
+        
+        # Get chunking parameters
+        use_paragraph_chunking = request.use_paragraph_chunking
+        chunking_method = "paragraph" if use_paragraph_chunking else "fixed"
+        max_paragraph_length = request.max_paragraph_length
+        min_paragraph_length = request.min_paragraph_length
+        chunk_size = request.chunk_size
+        chunk_overlap = request.chunk_overlap
+        
+        # Log chunking parameters
+        logger.info(f"Chunking parameters: method={chunking_method}, "
+                    f"max_paragraph_length={max_paragraph_length}, min_paragraph_length={min_paragraph_length}, "
+                    f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+        
+        # Verify staging dir exists and has the files
+        try:
+            staged_files = list(staging_dir.glob("*"))
+            logger.info(f"Files in staging directory: {[f.name for f in staged_files]}")
+            
+            # Check that all files in file_mapping exist in staging dir
+            for staged_path in file_mapping.values():
+                staged_file = Path(staged_path)
+                if not staged_file.exists():
+                    logger.warning(f"Staged file not found: {staged_file}")
+        except Exception as e:
+            logger.warning(f"Error checking staging directory: {str(e)}")
+        
+        # Load and process documents with batch processing if enabled
+        try:
+            documents, skipped_files = load_documents(
+                list(file_mapping.values()),
+                use_paragraph_chunking=use_paragraph_chunking,
+                max_paragraph_length=max_paragraph_length,
+                min_paragraph_length=min_paragraph_length,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                batch_size=request.file_batch_size if request.batch_processing else len(file_mapping),
+                job_id=job_id  # Pass job_id for progress tracking
+            )
+            
+            logger.info(f"Document loading completed: {len(documents)} documents extracted, {len(skipped_files)} files skipped")
+            
+            if skipped_files:
+                logger.warning(f"Skipped files: {skipped_files}")
+        except Exception as e:
+            import traceback
+            logger.error(f"Error loading documents: {str(e)}")
+            logger.error(f"Error details: {traceback.format_exc()}")
+            fail_job(job_id, f"Error loading documents: {str(e)}")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
         
         if not documents:
-            raise HTTPException(status_code=400, detail="No valid documents could be processed")
+            fail_job(job_id, "No valid documents could be processed")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
+        
+        # Update job with actual document count for progress tracking
+        job = get_job_status(job_id)
+        if job:
+            job.total_items = len(documents)
+            job.status = "creating vector store"
         
         # Get security classifications
-        security_info = get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+        try:
+            security_info = get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+            logger.info(f"Retrieved security info for {len(security_info)} files for job {job_id}")
+        except Exception as e:
+            logger.warning(f"Error getting security info for job {job_id}: {str(e)}")
+            security_info = {}
         
         # Prepare file info list
         file_infos = []
@@ -724,40 +1232,69 @@ async def create_vectorstore(
             file_infos.append(file_info)
         
         # Create the vector store
-        vectorstore_id = manager.create_vectorstore(
-            name=request.name,
-            description=request.description,
-            documents=documents,
-            embedding_model=embedding_model,
-            model_name=request.embedding_model,
-            file_infos=file_infos,
-            use_paragraph_chunking=request.use_paragraph_chunking,
-            max_paragraph_length=request.max_paragraph_length,
-            min_paragraph_length=request.min_paragraph_length,
-            chunk_size=request.chunk_size,
-            chunk_overlap=request.chunk_overlap
-        )
+        logger.info(f"Starting vector store creation with {len(documents)} documents for job {job_id}")
+        try:
+            vectorstore_id = manager.create_vectorstore(
+                name=request.name,
+                description=request.description,
+                documents=documents,
+                embedding_model=embedding_model,
+                embedding_model_name=embedding_model_name,
+                chunking_method=chunking_method,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                max_paragraph_length=max_paragraph_length,
+                min_paragraph_length=min_paragraph_length,
+                file_infos=file_infos,
+                batch_size=request.doc_batch_size if request.batch_processing else len(documents),
+                job_id=job_id,  # Pass job_id for progress tracking
+            )
+            
+            creation_time = time.time() - start_time
+            logger.info(f"Vector store creation completed for job {job_id}: "
+                        f"ID={vectorstore_id}, creation time: {creation_time:.2f} seconds")
+        except Exception as e:
+            import traceback
+            logger.error(f"Error creating vector store for job {job_id}: {str(e)}")
+            logger.error(f"Error details: {traceback.format_exc()}")
+            fail_job(job_id, f"Error creating vector store: {str(e)}")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
         
         # Clean up staged files
-        staged_files = list(file_mapping.values())
-        success_count, error_count = cleanup_staged_files(staged_files)
-        logger.info(f"Cleaned up {success_count} staged files after creating vectorstore {vectorstore_id}")
+        success_count, error_count = cleanup_staged_files(list(file_mapping.values()))
+        logger.info(f"Cleaned up {success_count} staged files after creating vectorstore {vectorstore_id} for job {job_id}")
+        if error_count > 0:
+            logger.warning(f"Failed to clean up {error_count} staged files for job {job_id}")
         
-        return {
-            "success": True,
-            "message": f"Vector store '{request.name}' created successfully",
+        # Mark job as completed
+        result = {
             "vectorstore_id": vectorstore_id,
+            "name": request.name,
+            "document_count": len(documents),
+            "embedding_model": embedding_model_name,
             "skipped_files": skipped_files
         }
+        complete_job(job_id, result)
+        logger.info(f"Job {job_id} completed successfully: created vector store {vectorstore_id}")
         
     except Exception as e:
-        logger.error(f"Error creating vector store: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        logger.error(f"Error in background processing for job {job_id}: {str(e)}")
+        logger.error(f"Error details: {traceback.format_exc()}")
+        fail_job(job_id, str(e))
+        # Attempt to clean up any staged files
+        try:
+            if file_mapping:
+                cleanup_staged_files(list(file_mapping.values()))
+        except Exception as cleanup_error:
+            logger.error(f"Error cleaning up after failed job {job_id}: {str(cleanup_error)}")
 
 @app.post("/api/embedding/vectorstores/{vectorstore_id}/update", response_model=UpdateVectorStoreResponse)
 async def update_vectorstore(
     vectorstore_id: str,
     request: UpdateVectorStoreRequest,
+    background_tasks: BackgroundTasks,
     manager: VectorStoreManager = Depends(get_vectorstore_manager)
 ):
     """Update an existing vector store with new files."""
@@ -771,9 +1308,65 @@ async def update_vectorstore(
         raise HTTPException(status_code=400, detail="At least one file is required")
     
     try:
-        # Get the embedding model
-        embedding_model = get_embedding_model(vs_info["embedding_model"])
+        # Register a new job for this operation
+        job_id = register_job(
+            operation_type="update_vectorstore",
+            total_items=len(request.files),
+            details={
+                "vectorstore_id": vectorstore_id,
+                "name": vs_info["name"],
+                "new_name": request.name,
+                "description": vs_info["description"],
+                "new_description": request.description,
+                "file_count": len(request.files)
+            }
+        )
         
+        logger.info(f"Starting job {job_id} to update vector store '{vs_info['name']}' with {len(request.files)} files")
+        
+        # Update job status to processing
+        update_job_progress(job_id, 0, "processing")
+        
+        # Start the background task
+        background_tasks.add_task(
+            process_vectorstore_update,
+            job_id=job_id,
+            vectorstore_id=vectorstore_id,
+            request=request,
+            manager=manager,
+            vs_info=vs_info
+        )
+        
+        return {
+            "success": True,
+            "message": f"Vector store update started. Use job ID to track progress.",
+            "job_id": job_id,
+            "skipped_files": []
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting vector store update: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_vectorstore_update(
+    job_id: str,
+    vectorstore_id: str,
+    request: UpdateVectorStoreRequest,
+    manager: VectorStoreManager,
+    vs_info: Dict[str, Any]
+):
+    """Background task for processing vector store updates."""
+    file_mapping = None
+    try:
+        # Get the embedding model
+        embedding_model_name = vs_info["embedding_model"]
+        logger.info(f"Using embedding model: {embedding_model_name}")
+        embedding_model = get_embedding_model(embedding_model_name)
+        
+        if not embedding_model:
+            fail_job(job_id, f"Failed to initialize embedding model: {embedding_model_name}")
+            return
+            
         # Set up directories
         upload_dir = Path(UPLOAD_DIR)
         staging_dir = Path(DOC_STAGING_DIR)
@@ -786,30 +1379,80 @@ async def update_vectorstore(
         )
         
         if not file_mapping:
-            raise HTTPException(status_code=400, detail="No valid files found")
+            fail_job(job_id, "No valid files found")
+            return
         
-        # Determine chunking method from existing metadata
-        use_paragraph_chunking = vs_info.get("chunking_method", "fixed") == "paragraph"
+        # Update job progress
+        update_job_progress(job_id, 0, "processing files")
+        
+        # Get chunking parameters
+        use_paragraph_chunking = vs_info.get("chunking_method", "paragraph") == "paragraph"
         max_paragraph_length = vs_info.get("max_paragraph_length", 1500)
         min_paragraph_length = vs_info.get("min_paragraph_length", 50)
         chunk_size = vs_info.get("chunk_size", 1000)
         chunk_overlap = vs_info.get("chunk_overlap", 100)
         
-        # Load and process documents using the same chunking method as the original vectorstore
-        documents, skipped_files = load_documents(
-            list(file_mapping.values()),
-            use_paragraph_chunking=use_paragraph_chunking,
-            max_paragraph_length=max_paragraph_length,
-            min_paragraph_length=min_paragraph_length,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
-        )
+        # Log chunking parameters
+        logger.info(f"Chunking parameters: method={'paragraph' if use_paragraph_chunking else 'fixed'}, "
+                    f"max_paragraph_length={max_paragraph_length}, min_paragraph_length={min_paragraph_length}, "
+                    f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+        
+        # Verify staging dir exists and has the files
+        try:
+            staged_files = list(staging_dir.glob("*"))
+            logger.info(f"Files in staging directory: {[f.name for f in staged_files]}")
+            
+            # Check that all files in file_mapping exist in staging dir
+            for staged_path in file_mapping.values():
+                staged_file = Path(staged_path)
+                if not staged_file.exists():
+                    logger.warning(f"Staged file not found: {staged_file}")
+        except Exception as e:
+            logger.warning(f"Error checking staging directory: {str(e)}")
+        
+        # Load and process documents with batch processing if enabled
+        try:
+            documents, skipped_files = load_documents(
+                list(file_mapping.values()),
+                use_paragraph_chunking=use_paragraph_chunking,
+                max_paragraph_length=max_paragraph_length,
+                min_paragraph_length=min_paragraph_length,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                batch_size=request.file_batch_size if request.batch_processing else len(file_mapping),
+                job_id=job_id  # Pass job_id for progress tracking
+            )
+            
+            logger.info(f"Document loading completed: {len(documents)} documents extracted, {len(skipped_files)} files skipped")
+            
+            if skipped_files:
+                logger.warning(f"Skipped files: {skipped_files}")
+        except Exception as e:
+            import traceback
+            logger.error(f"Error loading documents: {str(e)}")
+            logger.error(f"Error details: {traceback.format_exc()}")
+            fail_job(job_id, f"Error loading documents: {str(e)}")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
         
         if not documents:
-            raise HTTPException(status_code=400, detail="No valid documents could be processed")
+            fail_job(job_id, "No valid documents could be processed")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
+        
+        # Update job with actual document count for progress tracking
+        job = get_job_status(job_id)
+        if job:
+            job.total_items = len(documents)
+            job.status = "updating vector store"
         
         # Get security classifications
-        security_info = get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+        try:
+            security_info = get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+            logger.info(f"Retrieved security info for {len(security_info)} files")
+        except Exception as e:
+            logger.warning(f"Error getting security info: {str(e)}")
+            security_info = {}
         
         # Prepare file info list
         file_infos = []
@@ -823,31 +1466,56 @@ async def update_vectorstore(
             }
             file_infos.append(file_info)
         
-        # Update the vector store
+        # Update vector store name and description if provided
+        update_params = {}
+        if request.name is not None:
+            update_params["name"] = request.name
+        if request.description is not None:
+            update_params["description"] = request.description
+        
+        # Update the vector store with new documents
+        logger.info(f"Starting vector store update with {len(documents)} documents")
         success = manager.update_vectorstore(
-            vectorstore_id=vectorstore_id,
+            vectorstore_id,
             documents=documents,
             embedding_model=embedding_model,
-            new_file_infos=file_infos
+            file_infos=file_infos,
+            batch_size=request.doc_batch_size if request.batch_processing else len(documents),
+            job_id=job_id,  # Pass job_id for progress tracking
+            **update_params
         )
         
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to update vector store")
+            fail_job(job_id, f"Error updating vector store {vectorstore_id}")
+            cleanup_staged_files(list(file_mapping.values()))
+            return
         
         # Clean up staged files
         staged_files = list(file_mapping.values())
         success_count, error_count = cleanup_staged_files(staged_files)
         logger.info(f"Cleaned up {success_count} staged files after updating vectorstore {vectorstore_id}")
         
-        return {
-            "success": True,
-            "message": f"Vector store {vectorstore_id} updated successfully",
+        # Mark job as completed
+        result = {
+            "vectorstore_id": vectorstore_id,
+            "name": request.name if request.name else vs_info["name"],
+            "document_count": len(documents),
             "skipped_files": skipped_files
         }
+        complete_job(job_id, result)
+        logger.info(f"Job {job_id} completed successfully: updated vector store {vectorstore_id}")
         
     except Exception as e:
-        logger.error(f"Error updating vector store: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        logger.error(f"Error in background processing for job {job_id}: {str(e)}")
+        logger.error(f"Error details: {traceback.format_exc()}")
+        fail_job(job_id, str(e))
+        # Attempt to clean up any staged files
+        try:
+            if 'file_mapping' in locals() and file_mapping:
+                cleanup_staged_files(list(file_mapping.values()))
+        except Exception as cleanup_error:
+            logger.error(f"Error cleaning up after failed job {job_id}: {str(cleanup_error)}")
 
 @app.delete("/api/embedding/vectorstores/{vectorstore_id}")
 async def delete_vectorstore(
@@ -953,6 +1621,177 @@ async def cleanup_staging():
         "files_removed": success_count,
         "errors": error_count
     }
+
+@app.get("/api/embedding/status/{job_id}", response_model=JobStatusResponse)
+async def get_job_status_endpoint(job_id: str):
+    """Get the status of a job by its ID."""
+    job = get_job_status(job_id)
+    
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    # Calculate progress percentage
+    progress_percentage = 0
+    if job.total_items > 0:
+        progress_percentage = (job.processed_items / job.total_items) * 100
+    
+    # Return the job status with progress percentage
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "operation_type": job.operation_type,
+        "total_items": job.total_items,
+        "processed_items": job.processed_items,
+        "progress_percentage": round(progress_percentage, 2),
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "result": job.result,
+        "error": job.error
+    }
+
+def get_text_splitter(
+    use_paragraph_chunking=True,
+    max_paragraph_length=1500,
+    min_paragraph_length=50,
+    chunk_size=1000,
+    chunk_overlap=100
+):
+    """Create the appropriate text splitter based on the chunking method.
+    
+    Args:
+        use_paragraph_chunking: Whether to use paragraph-based chunking
+        max_paragraph_length: Maximum length of paragraphs for paragraph chunking
+        min_paragraph_length: Minimum length of paragraphs for paragraph chunking
+        chunk_size: Size of chunks for traditional chunking
+        chunk_overlap: Overlap between chunks for traditional chunking
+    
+    Returns:
+        TextSplitter: The configured text splitter
+    """
+    if use_paragraph_chunking:
+        text_splitter = ParagraphTextSplitter(
+            max_paragraph_length=max_paragraph_length,
+            min_paragraph_length=min_paragraph_length
+        )
+        logger.info(f"Using paragraph-based chunking with max length: {max_paragraph_length}, min length: {min_paragraph_length}")
+    else:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len
+        )
+        logger.info(f"Using traditional chunking with chunk size: {chunk_size}, overlap: {chunk_overlap}")
+    
+    return text_splitter
+
+class QueryRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    score_threshold: float = 0.5
+
+@app.post("/api/embedding/vectorstores/{vectorstore_id}/query")
+async def query_vectorstore(
+    vectorstore_id: str,
+    query_request: QueryRequest,
+    manager: VectorStoreManager = Depends(get_vectorstore_manager)
+):
+    """Query a vector store to retrieve relevant document chunks."""
+    # Check if vector store exists
+    vs_info = manager.get_vectorstore_info(vectorstore_id)
+    if not vs_info:
+        raise HTTPException(status_code=404, detail=f"Vector store {vectorstore_id} not found")
+    
+    try:
+        # Get the vector store path
+        vs_dir = os.path.join(manager.base_dir, vectorstore_id)
+        
+        # Get the embedding model based on the vector store's metadata
+        embedding_model_name = vs_info.get('embedding_model', 'nomic-embed-text')
+        embedding_model = get_embedding_model(embedding_model_name)
+        
+        # Load the vector store
+        try:
+            vectorstore = FAISS.load_local(vs_dir, embedding_model, allow_dangerous_deserialization=True)
+        except Exception as e:
+            logger.error(f"Error loading vector store {vectorstore_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error loading vector store: {str(e)}")
+        
+        # Perform similarity search
+        results = vectorstore.similarity_search_with_score(
+            query_request.query,
+            k=query_request.top_k
+        )
+        
+        # Format and filter results
+        formatted_results = []
+        for doc, score in results:
+            # Convert score to similarity score (assuming distance is between 0 and 2, with 0 being identical)
+            # This assumes the scoring is cosine distance
+            similarity_score = 1 - (score / 2.0)
+            
+            # Filter by score threshold
+            if similarity_score >= query_request.score_threshold:
+                formatted_results.append({
+                    "text": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": similarity_score
+                })
+        
+        return formatted_results
+        
+    except Exception as e:
+        logger.error(f"Error querying vector store {vectorstore_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error querying vector store: {str(e)}")
+
+def migrate_index_files():
+    """
+    Migrate vector store index files from index subdirectories to main vector store directories.
+    This is a one-time migration to fix the directory structure.
+    """
+    logger.info("Starting migration of vector store index files...")
+    vs_dir = Path(VECTORSTORE_DIR)
+    
+    # Get all vector store directories
+    for vs_path in vs_dir.glob("*"):
+        if not vs_path.is_dir():
+            continue
+        
+        vectorstore_id = vs_path.name
+        index_subdir = vs_path / "index"
+        
+        # Check if the index subdirectory exists
+        if index_subdir.exists() and index_subdir.is_dir():
+            logger.info(f"Found index subdirectory for vector store {vectorstore_id}")
+            
+            # Check for index.faiss and index.pkl files in the subdirectory
+            index_faiss = index_subdir / "index.faiss"
+            index_pkl = index_subdir / "index.pkl"
+            
+            if index_faiss.exists() and index_pkl.exists():
+                logger.info(f"Moving index files from {index_subdir} to {vs_path}")
+                
+                try:
+                    # Copy the files to the main directory
+                    shutil.copy2(index_faiss, vs_path / "index.faiss")
+                    shutil.copy2(index_pkl, vs_path / "index.pkl")
+                    
+                    # Create a backup of the index subdirectory
+                    backup_dir = vs_path / f"index_backup_{int(time.time())}"
+                    shutil.copytree(index_subdir, backup_dir)
+                    
+                    logger.info(f"Successfully migrated index files for vector store {vectorstore_id}")
+                except Exception as e:
+                    logger.error(f"Error migrating index files for vector store {vectorstore_id}: {str(e)}")
+    
+    logger.info("Migration of vector store index files completed")
+
+# Run migration on startup
+@app.on_event("startup")
+async def startup_event():
+    """Run migration tasks when the app starts."""
+    migrate_index_files()
 
 if __name__ == "__main__":
     import uvicorn
