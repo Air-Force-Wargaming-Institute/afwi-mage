@@ -928,9 +928,11 @@ function AgentPortfolio() {
                     onChange={handleAgentChange}
                     disabled={!isEditing}
                   >
-                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
-                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
-                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
+                    {availableModels.map((modelName) => (
+                      <MenuItem key={modelName} value={modelName}>
+                        {modelName}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
                 {renderTooltip(
@@ -1084,9 +1086,11 @@ function AgentPortfolio() {
                     value={duplicatedAgent.llm_model}
                     onChange={handleDuplicateChange}
                   >
-                    <MenuItem value="hermes3:8b">Hermes 3 8B</MenuItem>
-                    <MenuItem value="llama3.1">LLaMA 3.1</MenuItem>
-                    <MenuItem value="hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF">DeepHermes 3 Llama</MenuItem>
+                    {availableModels.map((modelName) => (
+                      <MenuItem key={modelName} value={modelName}>
+                        {modelName}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
                 {renderTooltip(
