@@ -7,6 +7,7 @@ import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.tag import pos_tag
 import pdfplumber
+from PyPDF2 import PdfReader
 from docx import Document
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Body
@@ -222,18 +223,62 @@ def extract_from_pdf(file_path):
     logger.info(f"=== Extracting from PDF: {file_path} ===")
     extracted_content = []
     try:
+        # First attempt: Using PDFPlumber which often preserves layout better
         with pdfplumber.open(file_path) as pdf:
-            logger.info(f"PDF opened successfully. Total pages: {len(pdf.pages)}")
+            logger.info(f"PDF opened successfully with pdfplumber. Total pages: {len(pdf.pages)}")
+            
+            # Extract each page with layout preservation
             for page_num, page in enumerate(pdf.pages, 1):
-                text = page.extract_text()
+                # Extract text with better whitespace handling
+                text = page.extract_text(x_tolerance=3, y_tolerance=3)
+                
                 if text:
+                    # Process page breaks and potential paragraph splits
+                    if extracted_content and not extracted_content[-1].endswith(('.', '!', '?', ':', ';')):
+                        # This might be a continuation from the previous page
+                        # Check if current page starts with lowercase letter or without proper capitalization
+                        if text and (not text[0].isupper() or text[0] in ',:;)]}'):
+                            # Append to the previous content without page break
+                            extracted_content[-1] += " " + text
+                            logger.info(f"Page {page_num}: Joined with previous page content")
+                            continue
+                    
                     logger.info(f"Page {page_num}: Extracted {len(text)} characters")
                     extracted_content.append(text)
                 else:
-                    logger.warning(f"Page {page_num}: No text extracted")
+                    logger.warning(f"Page {page_num}: No text extracted with pdfplumber")
         
-        logger.info(f"PDF extraction complete. Total sections: {len(extracted_content)}")
-        return extracted_content
+        # If pdfplumber couldn't extract anything useful, try PyPDF4 as fallback
+        if not any(content.strip() for content in extracted_content):
+            logger.info("No content extracted with pdfplumber, trying PyPDF4 as fallback")
+            extracted_content = []
+            
+            with open(file_path, 'rb') as file:
+                reader = PdfReader(file)
+                for page in range(len(reader.pages)):
+                    text = reader.pages[page].extract_text()
+                    if text and text.strip():
+                        # Normalize newlines and spaces
+                        text = re.sub(r'\s+', ' ', text)
+                        extracted_content.append(text.strip())
+        
+        # Post-process content to clean up and ensure paragraph detection will work
+        processed_content = []
+        for content in extracted_content:
+            # Replace multiple spaces with single space
+            content = re.sub(r' +', ' ', content)
+            # Add paragraph breaks for bullet points and numbered lists
+            content = re.sub(r'([.!?])\s+([•\-*]|\d+\.|\([a-z]\))', r'\1\n\n\2', content)
+            # Add paragraph breaks for clear paragraph transitions
+            content = re.sub(r'([.!?])\s+([A-Z][a-z]+)', r'\1\n\n\2', content)
+            processed_content.append(content)
+        
+        if not processed_content:
+            logger.warning("No content extracted from PDF with any method")
+            return ["[PDF text extraction failed. This PDF might be scanned or have content that's not easily extractable.]"]
+            
+        logger.info(f"PDF extraction complete. Total sections: {len(processed_content)}")
+        return processed_content
     except Exception as e:
         logger.error(f"Error extracting PDF: {str(e)}")
         logger.exception("Full traceback:")
@@ -242,16 +287,78 @@ def extract_from_pdf(file_path):
 def extract_from_docx(file_path):
     logger.info(f"=== Extracting from DOCX: {file_path} ===")
     extracted_content = []
+    current_section = ""
+    
     try:
         doc = Document(file_path)
         logger.info(f"DOCX opened successfully. Total paragraphs: {len(doc.paragraphs)}")
         
+        # Keep track of heading levels and sections
+        current_heading_level = 0
+        in_list = False
+        list_level = 0
+        
         for i, para in enumerate(doc.paragraphs, 1):
-            if para.text.strip():
-                logger.info(f"Paragraph {i}: Extracted {len(para.text)} characters")
-                extracted_content.append(para.text.strip())
+            text = para.text.strip()
+            
+            # Skip empty paragraphs
+            if not text:
+                # Empty paragraph might indicate section break
+                if current_section:
+                    extracted_content.append(current_section)
+                    current_section = ""
+                continue
+            
+            # Check if this is a heading
+            is_heading = False
+            if para.style.name.startswith('Heading'):
+                is_heading = True
+                try:
+                    level = int(para.style.name.replace('Heading', ''))
+                    current_heading_level = level
+                except ValueError:
+                    current_heading_level = 1  # Default to level 1 if cannot parse
+            
+            # Check if this is a list item
+            is_list_item = False
+            if para.style.name.startswith(('List', 'Bullet', 'Numbered')):
+                is_list_item = True
+                # Try to determine list level
+                if para.paragraph_format.left_indent:
+                    list_level = int(para.paragraph_format.left_indent / 360)  # Approximate
+                else:
+                    list_level = 0
+            
+            # Start a new section if:
+            # 1. This is a heading
+            # 2. This is a bullet point/list item
+            # 3. Previous paragraph ended with sentence-ending punctuation
+            if (is_heading or 
+                is_list_item or 
+                (current_section and current_section.rstrip().endswith(('.', '!', '?')))
+               ):
+                if current_section:
+                    extracted_content.append(current_section)
+                    current_section = ""
+            
+            # Add the paragraph to the current section
+            if current_section:
+                # Add a double newline for headings and list items to help with paragraph detection
+                if is_heading or is_list_item:
+                    current_section += "\n\n" + text
+                else:
+                    current_section += " " + text
             else:
-                logger.debug(f"Paragraph {i}: Empty or whitespace only")
+                current_section = text
+        
+        # Add the last section if there's any content
+        if current_section:
+            extracted_content.append(current_section)
+        
+        # Ensure we've extracted content
+        if not extracted_content:
+            logger.warning("No content extracted from DOCX")
+            extracted_content = ["[DOCX file appears to be empty or has no readable text content]"]
         
         logger.info(f"DOCX extraction complete. Total sections: {len(extracted_content)}")
         return extracted_content
@@ -263,17 +370,172 @@ def extract_from_docx(file_path):
 def extract_from_txt(file_path):
     logger.info(f"=== Extracting from TXT: {file_path} ===")
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-            logger.info(f"TXT file read successfully. Total characters: {len(content)}")
-            return [content]
+        # Attempt to detect encoding
+        encodings = ['utf-8', 'latin-1', 'windows-1252', 'ascii']
+        content = None
+        
+        # Try different encodings
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as file:
+                    content = file.read()
+                logger.info(f"TXT file read successfully with {encoding} encoding. Total characters: {len(content)}")
+                break
+            except UnicodeDecodeError:
+                logger.warning(f"Failed to read with {encoding} encoding, trying next...")
+                continue
+        
+        if not content:
+            logger.error("Could not read text file with any supported encoding")
+            return ["[Error: Could not determine the text encoding of this file]"]
+        
+        # Pre-process text to detect document structure
+        # Replace Windows line endings with Unix line endings
+        content = content.replace('\r\n', '\n')
+        
+        # Look for section separators (common in many text documents)
+        section_separators = ['---', '***', '===', '___', '#####']
+        
+        # Split by section separators if they are present
+        for separator in section_separators:
+            if separator in content:
+                logger.info(f"Found section separator: {separator}")
+                # Replace separator with a form feed character to mark section boundaries
+                content = re.sub(r'\s*' + re.escape(separator) + r'\s*', '\f', content)
+        
+        # Split into sections
+        sections = content.split('\f')
+        
+        # If we only have one section, add more contextual splits based on line breaks
+        if len(sections) == 1:
+            processed_content = content
+            
+            # Add paragraph breaks before lines that look like headers
+            processed_content = re.sub(r'\n([A-Z][A-Z\s]+:?)\n', r'\n\n\1\n', processed_content)
+            
+            # Add paragraph breaks after numbered sections
+            processed_content = re.sub(r'(\d+\..*?)\n', r'\1\n\n', processed_content)
+            
+            # Preserve existing paragraph breaks (multiple newlines)
+            processed_content = re.sub(r'\n{3,}', '\n\n', processed_content)
+            
+            return [processed_content]
+        else:
+            # Process each section
+            processed_sections = []
+            for section in sections:
+                if section.strip():
+                    processed_sections.append(section.strip())
+            
+            logger.info(f"TXT extraction split into {len(processed_sections)} sections")
+            return processed_sections
+            
     except Exception as e:
         logger.error(f"Error extracting TXT: {str(e)}")
         logger.exception("Full traceback:")
         raise
 
 def extract_paragraphs(text):
-    return text.split('\n\n')
+    """
+    Enhanced paragraph extraction that handles various document formats and potential issues.
+    Uses multiple heuristics to identify paragraph boundaries even in poorly formatted documents.
+    """
+    # Check if the text is empty or None
+    if not text or not text.strip():
+        return []
+    
+    # First attempt: Split by double newlines (original method)
+    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+    
+    # If we got reasonable paragraphs, return them
+    if len(paragraphs) > 1 and all(len(p.split()) > 3 for p in paragraphs):
+        return paragraphs
+    
+    # Second attempt: Try single newlines, but be smarter about it
+    # This helps when documents use single line breaks between paragraphs
+    candidate_paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+    
+    # Merge lines that are likely part of the same paragraph
+    merged_paragraphs = []
+    current_paragraph = ""
+    
+    for i, line in enumerate(candidate_paragraphs):
+        # Start a new paragraph if:
+        # 1. This is the first line
+        # 2. Previous line ends with a period, question mark, or exclamation point
+        # 3. Current line starts with a capital letter and previous is non-empty
+        # 4. Line is very short (likely a header)
+        # 5. Line has special formatting (bullet points, numbers, etc.)
+        
+        starts_new_paragraph = (
+            i == 0 or 
+            (i > 0 and candidate_paragraphs[i-1] and 
+             any(candidate_paragraphs[i-1].rstrip().endswith(c) for c in ['.', '!', '?', ':', ';'])) or
+            (i > 0 and line and line[0].isupper() and len(line.split()) > 3) or
+            (len(line.split()) < 3 and len(line) < 25) or
+            line.lstrip().startswith(('•', '-', '*', '1.', '2.', '3.', 'a.', 'b.', 'c.'))
+        )
+        
+        if starts_new_paragraph and current_paragraph:
+            merged_paragraphs.append(current_paragraph)
+            current_paragraph = line
+        else:
+            # Add a space if we're appending to existing content
+            if current_paragraph:
+                current_paragraph += " " + line
+            else:
+                current_paragraph = line
+    
+    # Add the last paragraph
+    if current_paragraph:
+        merged_paragraphs.append(current_paragraph)
+    
+    # If we got reasonable paragraphs, return them
+    if len(merged_paragraphs) > 1:
+        return merged_paragraphs
+    
+    # Third attempt: Use sentence structure for paragraph detection
+    # This is a fallback when document has no clear paragraph formatting
+    sentences = extract_sentences(text)
+    
+    # Group sentences into paragraphs
+    if len(sentences) <= 1:
+        return [text.strip()] if text.strip() else []
+    
+    # Use topic shifts to identify paragraph boundaries
+    # Simplified approach: look for shifts in content or structure
+    paragraphs = []
+    current_paragraph = sentences[0]
+    
+    for i in range(1, len(sentences)):
+        current_sentence = sentences[i]
+        previous_sentence = sentences[i-1]
+        
+        # Check for potential paragraph break indicators
+        new_paragraph = (
+            # Significant change in sentence length (could indicate a style shift)
+            abs(len(current_sentence.split()) - len(previous_sentence.split())) > 10 or
+            
+            # Current sentence starts with transition words or phrases
+            any(current_sentence.lower().startswith(phrase) for phrase in 
+                ["however", "furthermore", "meanwhile", "in conclusion", "finally",
+                 "therefore", "thus", "consequently", "in summary", "in contrast"]) or
+            
+            # Every 3-5 sentences (approximate approach for when no other signals exist)
+            i % 4 == 0
+        )
+        
+        if new_paragraph:
+            paragraphs.append(current_paragraph)
+            current_paragraph = current_sentence
+        else:
+            current_paragraph += " " + current_sentence
+    
+    # Add the last paragraph
+    if current_paragraph:
+        paragraphs.append(current_paragraph)
+    
+    return paragraphs or [text.strip()] if text.strip() else []
 
 def is_meaningful_text(text):
     """
@@ -308,11 +570,81 @@ def is_meaningful_text(text):
             text_ratio > 0.7 and has_subject_predicate)
 
 def clean_text(text):
+    """
+    Advanced text cleaning that removes headers, footers, page numbers, 
+    and other artifacts that might interfere with paragraph detection.
+    """
+    # Remove common header/footer patterns
+    cleaned_text = remove_headers_footers(text)
+    
     # Remove headers, footers, and page numbers
-    cleaned_text = re.sub(r'^.*?Page \d+.*?$', '', text, flags=re.MULTILINE)
-    # Remove extra whitespace
-    cleaned_text = ' '.join(cleaned_text.split())
-    return cleaned_text
+    cleaned_text = re.sub(r'^.*?Page \d+.*?$', '', cleaned_text, flags=re.MULTILINE)
+    cleaned_text = re.sub(r'^.*?\d+/\d+.*?$', '', cleaned_text, flags=re.MULTILINE)  # Page X of Y format
+    
+    # Remove excessive whitespace
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+    
+    # Remove watermark text that might appear
+    common_watermarks = ['confidential', 'draft', 'internal use only', 'do not copy', 'not for distribution']
+    for watermark in common_watermarks:
+        cleaned_text = re.sub(r'(?i)' + watermark, '', cleaned_text)
+    
+    return cleaned_text.strip()
+
+def remove_headers_footers(text):
+    """
+    Detect and remove repeating headers and footers from document text.
+    Uses pattern detection to identify repeated lines at the top or bottom of pages.
+    """
+    # Split text into lines
+    lines = text.split('\n')
+    if len(lines) <= 5:  # Not enough lines to detect patterns
+        return text
+    
+    # Find potential headers (repeated at the beginning of text sections)
+    potential_headers = []
+    sections = text.split('\f')  # Form feed character often separates pages
+    if len(sections) > 1:
+        # Get first line from each section
+        section_starts = [s.split('\n')[0].strip() for s in sections if s.strip()]
+        
+        # Count occurrences of each starting line
+        from collections import Counter
+        start_counter = Counter(section_starts)
+        
+        # Lines that appear as the first line in multiple sections are likely headers
+        potential_headers = [line for line, count in start_counter.items() 
+                            if count > 1 and len(line) > 5]
+    
+    # Find potential footers (repeated at the end of text sections)
+    potential_footers = []
+    if len(sections) > 1:
+        # Get last line from each section
+        section_ends = [s.split('\n')[-1].strip() for s in sections if s.strip()]
+        
+        # Count occurrences of each ending line
+        end_counter = Counter(section_ends)
+        
+        # Lines that appear as the last line in multiple sections are likely footers
+        potential_footers = [line for line, count in end_counter.items() 
+                            if count > 1 and len(line) > 5]
+    
+    # Remove identified headers and footers
+    cleaned_lines = []
+    for line in lines:
+        line_stripped = line.strip()
+        # Skip if line matches a header or footer
+        if any(header == line_stripped for header in potential_headers) or \
+           any(footer == line_stripped for footer in potential_footers):
+            continue
+        # Skip lines that are just page numbers
+        if re.match(r'^\s*\d+\s*$', line_stripped) or \
+           re.match(r'^\s*Page\s+\d+\s*$', line_stripped, re.IGNORECASE) or \
+           re.match(r'^\s*\d+\s+of\s+\d+\s*$', line_stripped, re.IGNORECASE):
+            continue
+        cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines)
 
 def create_csv_metadata(csv_filename: str, original_name: str, source_files: List[str], source_classifications: List[str]):
     """Create metadata file for a CSV file."""

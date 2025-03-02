@@ -239,6 +239,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     marginRight: theme.spacing(2),
+    minWidth: '30%',
   },
   newChatButton: {
     margin: theme.spacing(2),
@@ -349,6 +350,45 @@ const useStyles = makeStyles((theme) => ({
     opacity: 0.8,
     marginTop: theme.spacing(1),
   },
+  fullscreenButton: {
+    color: theme.palette.text.secondary,
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
+  },
+  fullscreen: {
+    position: 'fixed',
+    top: '0px',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1300,
+    width: '100%',
+    maxHeight: 'calc(100vh)',
+    borderRadius: '12px',
+  },
+  buttonBar: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+    position: 'relative',
+  },
+  sessionName: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    color: theme.palette.text.primary,
+    fontWeight: 600,
+    fontSize: '1rem',
+    textAlign: 'center',
+  },
+  buttonBarActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -438,6 +478,7 @@ function MultiAgentHILChat() {
   const { state, dispatch } = useHILChat();
   const messageEndRef = useRef(null);
   const messageAreaRef = useRef(null);
+  const inputRef = useRef(null);
   const shouldUpdatePositions = useRef(false);
 
   // Add original message state
@@ -594,6 +635,12 @@ function MultiAgentHILChat() {
         // If no conversation history, clear messages
         dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
       }
+
+      // Focus on input field after state updates
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+
     } catch (error) {
       console.error('Error fetching session messages:', error);
       dispatch({ 
@@ -619,6 +666,11 @@ function MultiAgentHILChat() {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
       setAvailableTeams(response.data.teams);
       setDialogOpen(true);
+      
+      // Focus on input field after dialog closes and new chat is created
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     } catch (error) {
       console.error('Error fetching teams:', error);
       setTeamError('Failed to load available teams. Please try again.');
@@ -987,6 +1039,10 @@ function MultiAgentHILChat() {
     }
   };
 
+  const toggleFullscreen = () => {
+    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !state.isFullscreen });
+  };
+
   return (
     <Container className={`${classes.root} ${state.isFullscreen ? classes.fullscreen : ''}`}>
       <div className={classes.chatContainer}>
@@ -1043,8 +1099,21 @@ function MultiAgentHILChat() {
           </Paper>
         )}
         
-        <Paper className={classes.chatArea} elevation={3}>
-          {/* Move TypingIndicator outside the messageArea */}
+        <Paper className={`${classes.chatArea} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+          <div className={classes.buttonBar}>
+            <Typography className={classes.sessionName}>
+              {state.isFullscreen && state.chatSessions.find(session => session.id === state.currentSessionId)?.name}
+            </Typography>
+            <div className={classes.buttonBarActions}>
+              <IconButton
+                className={classes.fullscreenButton}
+                onClick={toggleFullscreen}
+                size="small"
+              >
+                {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
+            </div>
+          </div>
           <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
             {state.messages.map((message) => (
               <Message key={message.id} message={message} />
@@ -1052,7 +1121,6 @@ function MultiAgentHILChat() {
             <div ref={messageEndRef} />
           </div>
 
-          {/* Conditionally render TypingIndicator outside messageArea */}
           {state.isLoading && <TypingIndicator />}
 
           <form onSubmit={handleSubmit} className={classes.inputArea}>
@@ -1075,6 +1143,7 @@ function MultiAgentHILChat() {
               minRows={1}
               maxRows={5}
               fullWidth
+              inputRef={inputRef}
             />
             <Button 
               type="submit" 
@@ -1099,7 +1168,7 @@ function MultiAgentHILChat() {
             <TextField
               autoFocus
               margin="dense"
-              label="Session Name"
+              label="Session Name*"
               fullWidth
               value={newSessionName}
               onChange={(e) => setNewSessionName(e.target.value)}
@@ -1107,7 +1176,7 @@ function MultiAgentHILChat() {
               helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
             />
             <FormControl fullWidth>
-              <InputLabel>Select Team</InputLabel>
+              <InputLabel>Select Team*</InputLabel>
               <Select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}

@@ -70,6 +70,7 @@ import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useDropzone } from 'react-dropzone';
 import Slider from '@material-ui/core/Slider';
+import rehypeRaw from 'rehype-raw';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -363,14 +364,29 @@ const useStyles = makeStyles((theme) => ({
     zIndex: 1300,
     width: '100%',
     maxHeight: 'calc(100vh)',
+    borderRadius: '12px',
   },
   buttonBar: {
     display: 'flex',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
+    position: 'relative',
+  },
+  sessionName: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    color: theme.palette.text.primary,
+    fontWeight: 600,
+    fontSize: '1rem',
+    textAlign: 'center',
+  },
+  buttonBarActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
   },
   agentsText: {
     color: theme.palette.text.secondary,
@@ -576,16 +592,18 @@ const useStyles = makeStyles((theme) => ({
     marginTop: '2px',
   },
   typingIndicator: {
-    alignSelf: 'flex-start',
+    position: 'absolute',
+    bottom: theme.spacing(2),
+    left: '50%',
+    transform: 'translateX(-50%)',
     display: 'flex',
     flexDirection: 'column',
     gap: theme.spacing(1),
     padding: theme.spacing(2),
     backgroundColor: theme.palette.grey[100],
     borderRadius: '30px',
-    margin: theme.spacing(1, 0),
     maxWidth: '410px',
-    position: 'relative',
+    zIndex: 1000,
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -921,13 +939,119 @@ const useStyles = makeStyles((theme) => ({
       color: theme.palette.text.secondary,
     },
   },
+  sessionName: {
+    color: theme.palette.text.secondary,
+    fontWeight: 600,
+    fontSize: '1.1rem',
+  },
+  markdown: {
+    '& details': {
+      margin: '1em 0',
+      padding: '0.5em',
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius,
+      boxShadow: theme.shadows[1],
+      
+      '& summary': {
+        cursor: 'pointer',
+        fontWeight: 500,
+        marginBottom: '0.5em',
+        padding: '0.5em',
+        
+        '&:hover': {
+          color: theme.palette.primary.main,
+        },
+      },
+      
+      '& details': {
+        margin: '0.5em 0',
+        padding: '0.5em',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      },
+    },
+  },
+  markdownDetails: {
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    '& summary': {
+      fontWeight: 600,
+      cursor: 'pointer',
+      padding: '0.5em 0',
+      outline: 'none',
+      '&:hover': {
+        color: theme.palette.primary.main,
+      },
+    },
+    '& details[open] summary': {
+      color: theme.palette.primary.main,
+    },
+  },
+  thinkingProcess: {
+    margin: '0 0 12px 0',
+    padding: '8px',
+    backgroundColor: 'rgba(25, 118, 210, 0.05)',
+    borderRadius: theme.shape.borderRadius,
+    border: '1px solid rgba(25, 118, 210, 0.1)',
+    
+    '& > details > summary': {
+      color: theme.palette.primary.main,
+      fontWeight: 600,
+      display: 'flex',
+      alignItems: 'center',
+      
+      '&::before': {
+        content: '""',
+        display: 'inline-block',
+        width: '16px',
+        height: '16px',
+        marginRight: '8px',
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%231976d2\'%3E%3Cpath d=\'M5 12h14M12 5v14\'/%3E%3C/svg%3E")',
+        backgroundSize: 'contain',
+        backgroundRepeat: 'no-repeat',
+        transition: 'transform 0.2s ease',
+      },
+    },
+    
+    '& > details[open] > summary::before': {
+      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%231976d2\'%3E%3Cpath d=\'M5 12h14\'/%3E%3C/svg%3E")',
+    },
+  },
 }));
 
-const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId, onBookmark, isBookmarked }) => {
+const CodeBlock = ({ inline, className, children }) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+  
+  if (!inline && language) {
+    return (
+      <SyntaxHighlighter
+        style={materialDark}
+        language={language}
+        PreTag="div"
+      >
+        {String(children).replace(/\n$/, '')}
+      </SyntaxHighlighter>
+    );
+  }
+  return <code className={className}>{children}</code>;
+};
+
+const MessageContent = ({ 
+  content, 
+  isUser, 
+  timestamp, 
+  sender, 
+  onRetry, 
+  messageId, 
+  onBookmark, 
+  isBookmarked,
+  expandedSections,
+  onToggleExpand 
+}) => {
   const classes = useStyles();
   const [copied, setCopied] = useState(false);
   const isErrorMessage = !isUser && content.includes('Error:');
-  const markdownComponents = useMarkdownComponents();
+  const messageRef = useRef(null);
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -935,8 +1059,71 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Use the parent's toggle function if provided, otherwise use local state
+  const handleToggle = (id) => {
+    if (onToggleExpand) {
+      // Record the current scroll position and element height before toggling
+      onToggleExpand(id, messageRef.current);
+    }
+  };
+
+  const parseContent = () => {
+    if (!content) {
+      return { mainContent: '', thinkSections: [] };
+    }
+
+    try {
+      // First check if it's a JSON string that needs parsing
+      let processedContent = content;
+      if (typeof content === 'string' && content.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(content);
+          processedContent = parsed.response || parsed.message || content;
+        } catch (e) {
+          console.log('Not JSON content');
+        }
+      }
+
+      // Extract <think></think> sections
+      const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+      const thinkMatches = [...processedContent.matchAll(thinkRegex)];
+      const thinkSections = thinkMatches.map((match, index) => ({
+        id: `thinking-${messageId}-${index}`,
+        content: match[1].trim()
+      }));
+      
+      // Remove <think></think> tags and their content from the main content
+      // Using a more direct approach to ensure complete removal
+      let mainContent = processedContent.replace(thinkRegex, '');
+      
+      // Remove any <details><summary>Thinking Process</summary> sections from the main content
+      const thinkingProcessRegex = /<details><summary>Thinking Process<\/summary>[\s\S]*?<\/details>/gi;
+      mainContent = mainContent.replace(thinkingProcessRegex, '');
+      
+      // Clean up any extra whitespace caused by removal
+      // Fix multiple consecutive line breaks
+      mainContent = mainContent.replace(/\n{3,}/g, '\n\n');
+      // Remove whitespace at the beginning
+      mainContent = mainContent.replace(/^\s+/, '');
+      // Remove whitespace at the end
+      mainContent = mainContent.replace(/\s+$/, '');
+      
+      // Fix case where removal creates empty message
+      if (!mainContent.trim()) {
+        mainContent = "The AI provided only thinking content with no direct response.";
+      }
+
+      return { mainContent, thinkSections };
+    } catch (error) {
+      console.error('Error parsing content:', error);
+      return { mainContent: content, thinkSections: [] };
+    }
+  };
+
+  const { mainContent, thinkSections } = parseContent();
+
   return (
-    <div className={classes.messageContainer}>
+    <div className={classes.messageContainer} ref={messageRef}>
       {isBookmarked && (
         <>
           <div className={`${classes.bookmarkRibbon} ${classes.topRibbon}`} />
@@ -965,13 +1152,7 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
         </div>
       )}
 
-      <Box 
-        className={classes.messageContent}
-        sx={{
-          '& > *:first-child': { mt: 0 },
-          '& > *:last-child': { mb: 0 }
-        }}
-      >
+      <Box className={classes.messageContent}>
         {isUser ? (
           <Typography 
             variant="body1" 
@@ -984,17 +1165,76 @@ const MessageContent = ({ content, isUser, timestamp, sender, onRetry, messageId
               width: '100%'
             }}
           >
-            {content}
+            {mainContent}
           </Typography>
         ) : (
-          <ReactMarkdown
-            components={markdownComponents}
-            remarkPlugins={[remarkGfm]}
-            skipHtml={true}
-            unwrapDisallowed={true}
-          >
-            {content.replace(/\n\s*\n/g, '\n\n').trim()}
-          </ReactMarkdown>
+          <>
+            {/* Main content first (the answer) */}
+            <ReactMarkdown
+              rehypePlugins={[rehypeRaw]}
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code: CodeBlock,
+                details: ({ node, children, ...props }) => {
+                  const detailsIndex = node.position ? node.position.start.line : Math.random();
+                  const id = `message-${messageId}-details-${detailsIndex}`;
+
+                  return (
+                    <details
+                      {...props}
+                      open={expandedSections[id] || false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggle(id);
+                      }}
+                      className={classes.markdownDetails}
+                    >
+                      {children}
+                    </details>
+                  );
+                },
+              }}
+              className={classes.markdown}
+            >
+              {mainContent}
+            </ReactMarkdown>
+            
+            {/* Display thinking sections at the bottom as a single collapsible element */}
+            {thinkSections.length > 0 && (
+              <div className={classes.thinkingProcess} style={{ marginTop: '16px' }}>
+                <details 
+                  className={classes.markdownDetails}
+                  open={expandedSections ? expandedSections[`message-${messageId}-think`] : false}
+                  onClick={(e) => {
+                    // Prevent default toggling behavior
+                    if (e.target.tagName.toLowerCase() === 'summary') {
+                      e.preventDefault();
+                      handleToggle(`message-${messageId}-think`);
+                    }
+                  }}
+                >
+                  <summary>AI Thinking Process</summary>
+                  <div style={{ padding: '8px 0' }}>
+                    {thinkSections.map((section, index) => (
+                      <div key={`section-${messageId}-${index}`} style={{ marginBottom: index < thinkSections.length - 1 ? '12px' : 0 }}>
+                        <ReactMarkdown
+                          rehypePlugins={[rehypeRaw]}
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code: CodeBlock
+                          }}
+                          className={classes.markdown}
+                        >
+                          {section.content}
+                        </ReactMarkdown>
+                        {index < thinkSections.length - 1 && <Divider style={{ margin: '8px 0' }} />}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+          </>
         )}
       </Box>
 
@@ -1116,6 +1356,8 @@ const Row = React.memo(({ index, style, data }) => {
             messageId={message.id}
             onBookmark={() => data.handleBookmark(message)}
             isBookmarked={isBookmarked}
+            expandedSections={data.expandedSections}
+            onToggleExpand={data.handleToggleExpand}
           />
         </div>
       </Box>
@@ -1130,26 +1372,154 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
   const [scrollToIndex, setScrollToIndex] = useState(undefined);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({});
+  const sizeMap = useRef({});
+  const scrollPositionRef = useRef(0);
+  const isScrollingRef = useRef(false);
   
-  const getItemSize = useCallback((index) => {
-    const message = messages[index];
-    let height = 80; // Base height
-    const lines = message.text.split('\n').length;
-    height += lines * 20; // Add height for each line
-    if (message.text.includes('```')) {
-      height += 100; // Extra height for code blocks
+  // Preserve scroll position after state updates
+  const saveScrollPosition = useCallback(() => {
+    if (listRef.current && listRef.current._outerRef) {
+      scrollPositionRef.current = listRef.current._outerRef.scrollTop;
     }
+  }, []);
+  
+  const restoreScrollPosition = useCallback(() => {
+    if (listRef.current && listRef.current._outerRef) {
+      listRef.current._outerRef.scrollTop = scrollPositionRef.current;
+    }
+  }, []);
+  
+  // More accurate height estimation
+  const getItemSize = useCallback((index) => {
+    // Return cached height if available
+    if (sizeMap.current[index]) {
+      return sizeMap.current[index];
+    }
+    
+    const message = messages[index];
+    let height = 120; // Base height (increased for better padding)
+    
+    // Calculate based on content
+    const textLength = message.text.length;
+    const lines = message.text.split('\n').length;
+    
+    // Add height for text content
+    height += Math.min(lines * 22, textLength * 0.08); 
+    
+    // Additional height for code blocks
+    const codeBlockCount = (message.text.match(/```/g) || []).length / 2;
+    if (codeBlockCount > 0) {
+      height += codeBlockCount * 150;
+    }
+    
+    // Additional height for thinking sections
+    if (message.text.includes('<think>') && expandedSections[`message-${message.id}-think`]) {
+      const thinkContent = message.text.match(/<think>([\s\S]*?)<\/think>/);
+      if (thinkContent && thinkContent[1]) {
+        const thinkLines = thinkContent[1].split('\n').length;
+        height += thinkLines * 20 + 50; // Additional height for expanded thinking section
+      }
+    }
+    
+    // Store in cache
+    sizeMap.current[index] = height;
     return height;
+  }, [messages, expandedSections]);
+  
+  // Clear size cache when messages change
+  useEffect(() => {
+    sizeMap.current = {};
   }, [messages]);
+  
+  // Track expanded state
+  const handleToggleExpand = useCallback((id, elementRef) => {
+    // Save scroll position before state change
+    saveScrollPosition();
+    
+    // If we have a direct reference to the element, use it for more precise handling
+    const initialHeight = elementRef ? elementRef.offsetHeight : null;
+    const initialScrollTop = scrollPositionRef.current;
+    
+    setExpandedSections(prev => {
+      const newState = {
+        ...prev,
+        [id]: !prev[id]
+      };
+      
+      // Reset size cache when expansion state changes
+      sizeMap.current = {};
+      
+      // Request recalculation after state update
+      setTimeout(() => {
+        if (listRef.current) {
+          listRef.current.resetAfterIndex(0);
+          
+          // After list resets, restore scroll position with compensation if needed
+          requestAnimationFrame(() => {
+            if (elementRef) {
+              // Calculate height change and adjust scroll position if needed
+              const heightDiff = elementRef.offsetHeight - initialHeight;
+              
+              // If expanding and element is above current view, adjust position
+              if (heightDiff > 0 && newState[id]) {
+                const elementTop = elementRef.getBoundingClientRect().top;
+                const containerTop = listRef.current._outerRef.getBoundingClientRect().top;
+                
+                // If element is above viewport, adjust scroll to maintain relative position
+                if (elementTop < containerTop) {
+                  listRef.current._outerRef.scrollTop = initialScrollTop + heightDiff;
+                }
+              }
+            } else {
+              // Fall back to simple position restore if no element reference
+              restoreScrollPosition();
+            }
+          });
+        }
+      }, 0);
+      
+      return newState;
+    });
+  }, [saveScrollPosition, restoreScrollPosition]);
+
+  // Handle scroll events
+  const handleScroll = useCallback((e) => {
+    if (!isScrollingRef.current) {
+      // Save position only during user scrolling
+      scrollPositionRef.current = e.currentTarget.scrollTop;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Add scroll event listener to the outer container
+    if (listRef.current && listRef.current._outerRef) {
+      const outerElement = listRef.current._outerRef;
+      outerElement.addEventListener('scroll', handleScroll);
+      return () => outerElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   const scrollToBottom = useCallback(() => {
     if (listRef.current && messages.length > 0) {
+      isScrollingRef.current = true;
       listRef.current.scrollToItem(messages.length - 1);
+      // Reset the scrolling flag after animation completes
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 300);
     }
   }, [messages.length]);
 
+  // Only auto-scroll when new messages arrive
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll to bottom when a new message is added
+    if (messages.length > 0) {
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [messages.length, scrollToBottom]);
 
   const renderMessage = useCallback(({ index, style }) => {
@@ -1193,11 +1563,13 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
             messageId={message.id}
             onBookmark={() => handleBookmark(message)}
             isBookmarked={isBookmarked}
+            expandedSections={expandedSections}
+            onToggleExpand={handleToggleExpand}
           />
         </Box>
       </ListItem>
     );
-  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages]);
+  }, [classes, handleRetry, handleBookmark, bookmarkedMessages, messages, expandedSections, handleToggleExpand]);
 
   return (
     <Box className={classes.messageArea}>
@@ -1209,13 +1581,14 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
             width={width}
             itemCount={messages.length}
             itemSize={getItemSize}
-            overscanCount={5}
+            overscanCount={10}
             onItemsRendered={({ visibleStartIndex }) => {
               const isAtTop = visibleStartIndex === 0;
               const isAtBottom = visibleStartIndex + 10 >= messages.length;
               setShowScrollTop(!isAtTop);
               setShowScrollBottom(!isAtBottom);
             }}
+            useIsScrolling={false}
           >
             {renderMessage}
           </VariableSizeList>
@@ -1506,6 +1879,7 @@ const DirectChat = () => {
   const theme = useTheme();
   const { state, dispatch } = useDirectChat();
   const messageEndRef = useRef(null);
+  const inputRef = useRef(null);
   
   // Local state management
   const [messages, setMessages] = useState([]);
@@ -1523,6 +1897,38 @@ const DirectChat = () => {
   const [editSessionName, setEditSessionName] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [classificationLevel, setClassificationLevel] = useState(0);
+
+  // Add state for caveats checkboxes
+  const [caveatStates, setCaveatStates] = useState({
+    NOFORN: false,
+    FVEY: false,
+    USA: false,
+    UK: false,
+    AUS: false,
+    NZ: false,
+    CAN: false,
+    NATO: false,
+    HCS: false,
+    SAP: false,
+    TK: false
+  });
+
+  // Function to reset all caveats
+  const resetCaveats = () => {
+    setCaveatStates({
+      NOFORN: false,
+      FVEY: false,
+      USA: false,
+      UK: false,
+      AUS: false,
+      NZ: false,
+      CAN: false,
+      NATO: false,
+      HCS: false,
+      SAP: false,
+      TK: false
+    });
+  };
 
   // Load chat sessions on component mount
   useEffect(() => {
@@ -1607,6 +2013,9 @@ const DirectChat = () => {
       setChatSessions(prev => [newSession, ...prev]);
       setCurrentSessionId(newSession.id);
       setMessages([]); // Clear messages for new session
+      setClassificationLevel(0); // Reset classification to Unclassified
+      resetCaveats(); // Reset all caveats checkboxes
+      setTimeout(() => inputRef.current?.focus(), 100);
     } catch (error) {
       setError('Failed to create new chat');
     }
@@ -1635,6 +2044,9 @@ const DirectChat = () => {
     if (sessionId === currentSessionId) return;
     setCurrentSessionId(sessionId);
     setMessages([]); // Clear messages before loading new ones
+    setClassificationLevel(0); // Reset classification to Unclassified
+    resetCaveats(); // Reset all caveats checkboxes
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleInputChange = (event) => {
@@ -1761,6 +2173,14 @@ const DirectChat = () => {
     setClassificationLevel(newValue);
   };
 
+  // Add handler for checkbox changes
+  const handleCaveatChange = (caveat) => (event) => {
+    setCaveatStates(prev => ({
+      ...prev,
+      [caveat]: event.target.checked
+    }));
+  };
+
   useEffect(() => {
     return () => {
       setMessages([]);
@@ -1844,13 +2264,18 @@ const DirectChat = () => {
             </div>
           )}
           <div className={classes.buttonBar}>
-            <IconButton
-              className={classes.fullscreenButton}
-              onClick={toggleFullscreen}
-              size="small"
-            >
-              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-            </IconButton>
+            <Typography className={classes.sessionName}>
+              {isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
+            </Typography>
+            <div className={classes.buttonBarActions}>
+              <IconButton
+                className={classes.fullscreenButton}
+                onClick={toggleFullscreen}
+                size="small"
+              >
+                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
+            </div>
           </div>
           <MessageArea 
             messages={messages}
@@ -1871,6 +2296,7 @@ const DirectChat = () => {
                 <HelpOutlineIcon />
               </IconButton>
               <TextField
+                inputRef={inputRef}
                 className={classes.input}
                 variant="outlined"
                 placeholder="Type your message here... (Ctrl+Enter to send)"
@@ -1928,47 +2354,113 @@ const DirectChat = () => {
                 </Typography>
                 <div className={classes.checkboxGroup}>
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NOFORN}
+                        onChange={handleCaveatChange('NOFORN')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NOFORN</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.FVEY}
+                        onChange={handleCaveatChange('FVEY')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>FVEY</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.USA}
+                        onChange={handleCaveatChange('USA')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>USA</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.UK}
+                        onChange={handleCaveatChange('UK')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>UK</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.AUS}
+                        onChange={handleCaveatChange('AUS')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>AUS</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NZ}
+                        onChange={handleCaveatChange('NZ')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NZ</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.CAN}
+                        onChange={handleCaveatChange('CAN')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>CAN</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.NATO}
+                        onChange={handleCaveatChange('NATO')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>NATO</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.HCS}
+                        onChange={handleCaveatChange('HCS')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>HCS</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.SAP}
+                        onChange={handleCaveatChange('SAP')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>SAP</Typography>}
                   />
                   <FormControlLabel
-                    control={<Checkbox size="small" />}
+                    control={
+                      <Checkbox 
+                        size="small" 
+                        checked={caveatStates.TK}
+                        onChange={handleCaveatChange('TK')}
+                      />
+                    }
                     label={<Typography className={classes.checkboxLabel}>TK</Typography>}
                   />
                 </div>
