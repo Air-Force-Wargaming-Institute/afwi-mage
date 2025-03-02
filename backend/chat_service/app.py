@@ -40,7 +40,9 @@ class ChatMessage(BaseModel):
     session_id: Optional[str] = None
     user_id: Optional[str] = None
     plan: Optional[str] = None
+    comments: Optional[str] = None
     selected_agents: Optional[List[str]] = None
+    original_message: Optional[str] = None
 
 class SessionCreate(BaseModel):
     """
@@ -214,11 +216,13 @@ def _process_refine_chat(request_data: ChatMessage):
         """
         Structured output for the planning phase of multi-agent interactions.
         selected_agents: a list of agent names that will be tasked with answering the message
-        plan: reasoning for selecting particular agents, and the approach they will take to answering the message
-        modified_message: the new message that the user has approved
+        plan: The approach each agent will take to answering the message, and what they will contribute to the response
+        plan_notes: notes about the plan created for the user
+        modified_message: the new message that the user may approve
         """
         selected_agents: List[str]  # a list of agent names that will be tasked with answering the message
-        plan: str                   # reasoning for selecting particular agents, and the approach they will take to answering the message
+        plan: str                   # The approach each agent will take to answering the message, and what they will contribute to the response
+        plan_notes: str             # notes about the plan created for the user
         modified_message: str      # the new message that the user has approved
     # Initialize SessionManager
     session_manager = SessionManager()
@@ -302,6 +306,8 @@ def _process_refine_chat(request_data: ChatMessage):
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
+            original_message=request_data.original_message,
+            comments=request_data.comments,
             previous_plan=request_data.plan,
             agents_with_instructions=agents_with_instructions
         )
@@ -335,8 +341,9 @@ def _process_refine_chat(request_data: ChatMessage):
     
     # Send the plan to the user for approval
     return {
-        "message": response.plan,
+        "plan": response.plan,
         "modified_message": response.modified_message,
+        "plan_notes": response.plan_notes,
         "selected_agents": response.selected_agents,
     }
 

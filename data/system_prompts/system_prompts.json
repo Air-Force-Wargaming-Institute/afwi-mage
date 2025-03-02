@@ -7,7 +7,7 @@
     "variables": [
       "current_datetime"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "synthesis_agent_prompt": {
     "name": "Synthesis Agent Prompt",
@@ -18,7 +18,7 @@
       "question",
       "analyses"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "moderator_guidance": {
     "name": "moderator_guidance",
@@ -29,15 +29,17 @@
       "question",
       "expert"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "plan_prompt_with_previous_plan": {
     "name": "plan_prompt_with_previous_plan",
     "description": "The planner is used to refine the user's question before anything is sent to the chat agents",
-    "content": "{high_level_system_prompt} You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: \n        1. Use the previous plan as the foundation for your new plan\n        2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as \"the query topic\", \"the query\", \"the topic at hand\", etc.\n        3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.\n        4. Explain clearly and in detail what and how each agent will contribute to the response\n        5. Format this plan in a way that is easy to understand for the user\n    \n        Message: {message}\n        Previous Plan: {previous_plan}\n        Team of Experts: {agents_with_instructions}\n\n        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.",
+    "content": "{high_level_system_prompt} You are a planning coordinator planning coordinator for a multi-expert team. Given the following team of experts and their domain, the original message from the user, the previous plan suggested to the user, and the comments the user has sent you explaining what they would like to change in the plan, you will do the following: \n        1. Use the previous plan as the foundation for your new plan\n        2. Review the user's comments to modify the plan in the ways they request. Be sure not to lose sight of the user's message's original intent, however. Do not use general language such as \"the query topic\", \"the query\", \"the topic at hand\", etc.\n        3. Determine which agents are qualified and necessary to work in the new plan\n        4. Explain clearly and in detail what and how each agent will contribute to the response\n        5. Format this plan in a way that is easy to understand for the user\n    \n        Message: {message}\n        Original Message: {original_message}\n        Previous Plan: {previous_plan}\n        Comments: {comments}\n        Team of Experts: {agents_with_instructions}\n\n        While writing your plan, ensure that facets of the user's message and/or your modified message are included in the details for each selected agent. In your plan notes, make sure you explain why you are choosing each agent and how they will contribute to the response. Be sure to incorporate the user's comments into the plan you provide. If the user requests certain agents, make sure they are included in the plan. If they users makes specific content requests or exclusions make sure your plan includes the content requested or excludes the content requested.",
     "template_type": "system",
     "variables": [
       "message",
+      "original_message",
+      "comments",
       "previous_plan",
       "agents_with_instructions",
       "high_level_system_prompt"
@@ -47,7 +49,7 @@
   "plan_prompt_with_conversation_history": {
     "name": "plan_prompt_with_conversation_history",
     "description": "The planner is used to refine the user's question before anything is sent to the chat agents",
-    "content": "{high_level_system_prompt}You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: \n        1. Review the previous conversation to incorporate any relevant information regarding the user's message\n        2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as \"the query topic\", \"the query\", \"the topic at hand\", etc.\n        3. Determine which agents are qualified and necessary to respond to the new message you created\n        4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.\n        5. Format this plan in a way that is easy to understand for the user\n    \n        Message: {message}\n        Previous Conversation: {conversation_history}\n        Team of Experts: {agents_with_instructions}\n\n        While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.",
+    "content": "{high_level_system_prompt}You are a planning coordinator for a multi-expert team. Given the following team of experts and their domains, the previous messages in the conversation (if any), and the message the user has sent you, evaluate the user's question and determine if the question is relevant to the domains of expertise that are articulated in either the experts names or with the expert's descriptions. If the question is irrelevant, do not select any agents, let the user know in the plan that their question is not relevant, and suggest a modified question that the user may ask that would be relevant to the team of experts. Here are some examples of irrelevant messages: \"Hello!\", \"What is the meaning of life?\", \"My name is John.\", \"What day is it?\", \"Test\", \"What is the weather in Tokyo?\", \"Guess my favorite color.\"  If the question is relevant to the team of experts, proceed with the following instructions:\n        1. Review the previous conversation to incorporate any relevant information regarding the user's message\n        2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as \"the query topic\", \"the query\", \"the topic at hand\", etc.\n        3. Determine which agents are qualified and necessary to respond to the message (the user's message, or your modified message if applicable)\n        4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.\n        5. Format this plan in a way that is easy to understand for the user\n    \n        Message: {message}\n        Previous Conversation: {conversation_history}\n        Team of Experts: {agents_with_instructions}\n\n        While writing your plan, ensure that facets of the user's message and/or your modified message are included in the details for each selected agent. In your plan notes, make sure you explain why you are choosing each agent and how they will contribute to the response. If you rewrite the user's message, make sure you are either writing a command for the team to follow or a question that the team can answer. In the modified message do not state why the message was modified. Only provide a command for the team to follow or a question that the team can answer.",
     "template_type": "system",
     "variables": [
       "message",
@@ -67,7 +69,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "collaborator_prompt": {
     "name": "collaborator_prompt",
@@ -91,7 +93,7 @@
       "agent_request",
       "requester"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "expert_final_report_no_collab": {
     "name": "Expert_Final_Report_no_collab",
@@ -107,7 +109,7 @@
       "whoami",
       "agent_instructions"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   },
   "expert_final_report": {
     "name": "Expert_Final_Report",
@@ -124,6 +126,6 @@
       "agent_instructions",
       "collab_report"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "huihui_ai/Hermes-3-Llama-3.2-abliterated:latest"
   }
 }
