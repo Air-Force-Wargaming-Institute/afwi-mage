@@ -759,7 +759,7 @@ function ManageVectorStores() {
               color="primary"
               startIcon={<AddIcon />}
               style={{ marginTop: 16 }}
-              onClick={() => window.location.href = '/build-databases'}
+              onClick={() => window.location.href = '/retrieval/build-databases'}
             >
               Create Vector Store
             </Button>
@@ -858,7 +858,7 @@ function ManageVectorStores() {
             color="primary"
             startIcon={<AddIcon />}
             style={{ marginTop: 16 }}
-            onClick={() => window.location.href = '/build-databases'}
+            onClick={() => window.location.href = '/retrieval/build-databases'}
           >
             Create Vector Store
           </Button>
@@ -963,7 +963,7 @@ function ManageVectorStores() {
             color="primary"
             startIcon={<AddIcon />}
             className={classes.actionButton}
-            onClick={() => window.location.href = '/build-databases'}
+            onClick={() => window.location.href = '/retrieval/build-databases'}
           >
             Create New
           </Button>
