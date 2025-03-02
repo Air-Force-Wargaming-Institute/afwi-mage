@@ -80,7 +80,7 @@ def init_directories():
         logger.info(f"Ensured conversation logs directory exists at: {config['CONVERSATION_PATH']}")
         
         # Ensure vectorstore directory exists
-        vectorstore_dir = Path('/app/data/vectorstore')
+        vectorstore_dir = Path('/app/data/vectorstores')
         vectorstore_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Ensured vectorstore directory exists at: {vectorstore_dir}")
         

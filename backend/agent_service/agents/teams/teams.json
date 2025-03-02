@@ -157,5 +157,35 @@
         "vectorstore": [
             "vectorstore2"
         ]
+    },
+    {
+        "name": "VStore Test",
+        "unique_id": "7871ea59-aea1-4aea-bd9c-cab5968786e6",
+        "description": "VStore Test",
+        "agents": [
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "bcdef123-4567-8901-2345-6789abcdef01"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-03-02T02:02:37.049326Z",
+        "last_modified": "2025-03-02T02:15:08.021544Z",
+        "vectorstore": [
+            "4810fa3b-b4db-4023-a8f4-516115e92bf1"
+        ]
+    },
+    {
+        "name": "Copy of VStore Test",
+        "unique_id": "a6834f19-9023-439d-b685-d72640b30af1",
+        "description": "VStore Test",
+        "agents": [
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "bcdef123-4567-8901-2345-6789abcdef01"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-03-02T02:15:17.920744Z",
+        "last_modified": "2025-03-02T02:15:17.920757Z",
+        "vectorstore": [
+            "4810fa3b-b4db-4023-a8f4-516115e92bf1"
+        ]
     }
 ]

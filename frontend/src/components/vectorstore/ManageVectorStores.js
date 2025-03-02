@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Typography,
   makeStyles,
@@ -30,9 +30,13 @@ import {
   TableHead,
   TableRow,
   Container,
-  Badge
+  Badge,
+  LinearProgress,
+  FormControlLabel,
+  Switch
 } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
+import AlertTitle from '@material-ui/lab/AlertTitle';
 import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
 import SearchIcon from '@material-ui/icons/Search';
@@ -48,6 +52,8 @@ import ToggleButton from '@material-ui/lab/ToggleButton';
 import { Skeleton } from '@material-ui/lab';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import WarningIcon from '@material-ui/icons/Warning';
+import DocumentSelector from './DocumentSelector';
+import DeleteSweepIcon from '@material-ui/icons/DeleteSweep';
 
 // Import the vector store service for API integration
 import { 
@@ -55,11 +61,16 @@ import {
   getVectorStoreById, 
   updateVectorStore, 
   deleteVectorStore,
-  testVectorStoreQuery
+  testVectorStoreQuery,
+  addDocumentsToVectorStore,
+  removeDocumentsFromVectorStore,
+  getJobStatus,
+  batchUpdateVectorStore,
+  cleanupVectorStoreBackups
 } from '../../services/vectorStoreService';
 
 // Import components
-import QueryTester from './QueryTester';
+import VectorStoreDetails from './VectorStoreDetails';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -171,295 +182,12 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 150,
     marginLeft: theme.spacing(1),
   },
+  backupChip: {
+    margin: theme.spacing(0.5),
+    backgroundColor: theme.palette.secondary.light,
+    color: theme.palette.secondary.contrastText,
+  },
 }));
-
-// VectorStoreDetails component for the Details Dialog
-const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete }) => {
-  const classes = useStyles();
-  const [tabValue, setTabValue] = useState(0);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState('');
-  const [editedDescription, setEditedDescription] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Initialize edit form when entering edit mode
-  const handleStartEditing = () => {
-    setEditedName(vectorStore.name);
-    setEditedDescription(vectorStore.description || '');
-    setIsEditing(true);
-  };
-
-  // Cancel editing and return to view mode
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-  };
-
-  // Save changes and return to view mode
-  const handleSaveChanges = async () => {
-    setIsSaving(true);
-    try {
-      await onSave({
-        ...vectorStore,
-        name: editedName,
-        description: editedDescription
-      });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Error saving changes:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  // Map API data to component's expected structure with proper defaults
-  const mappedData = {
-    ...vectorStore,
-    documents: vectorStore.files || [],
-    documentCount: vectorStore.files?.length || 0,
-    created: vectorStore.created_at || vectorStore.created,
-    lastUpdated: vectorStore.updated_at || vectorStore.lastUpdated,
-    embeddingModel: vectorStore.embedding_model || vectorStore.embeddingModel,
-    // Handle chunking method with defaults based on available data
-    useParagraphChunking: vectorStore.chunking_method ? 
-                          vectorStore.chunking_method === 'paragraph' : 
-                          false, // Default to fixed size if not specified
-    // Handle paragraph chunking parameters with defaults
-    maxParagraphLength: vectorStore.max_paragraph_length || 1500,
-    minParagraphLength: vectorStore.min_paragraph_length || 50,
-    // These should be available from the backend
-    chunkSize: vectorStore.chunk_size || 1000,
-    chunkOverlap: vectorStore.chunk_overlap || 100
-  };
-
-  // Handle delete with correct document count
-  const handleDelete = () => {
-    // Pass the store with the correct document count
-    onDelete({
-      ...vectorStore,
-      documentCount: mappedData.documentCount,
-      file_count: mappedData.documentCount
-    });
-  };
-
-  console.log("Vector store data received:", vectorStore);
-  console.log("Mapped data for display:", mappedData);
-
-  return (
-    <>
-      <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ flex: 1 }}>
-          {isEditing ? (
-            <TextField
-              label="Name"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-              fullWidth
-              variant="outlined"
-              size="small"
-              required
-            />
-          ) : (
-            vectorStore.name
-          )}
-        </div>
-        <div>
-          <IconButton aria-label="close" onClick={onClose}>
-            <Tooltip title="Close">
-              <InfoIcon />
-            </Tooltip>
-          </IconButton>
-        </div>
-      </DialogTitle>
-      <DialogContent className={classes.dialogContent}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="fullWidth"
-        >
-          <Tab label="Overview" />
-          <Tab label="Documents" />
-          <Tab label="Query Test" />
-        </Tabs>
-
-        {/* Overview Tab */}
-        <div role="tabpanel" className={classes.tabPanel} hidden={tabValue !== 0}>
-          {tabValue === 0 && (
-            <>
-              <Typography variant="subtitle1" gutterBottom style={{ marginTop: 16 }}>Description</Typography>
-              {isEditing ? (
-                <TextField
-                  value={editedDescription}
-                  onChange={(e) => setEditedDescription(e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  multiline
-                  rows={3}
-                  placeholder="Enter vector store description"
-                  style={{ marginBottom: 16 }}
-                />
-              ) : (
-                <Typography variant="body2" paragraph>{mappedData.description || "No description provided"}</Typography>
-              )}
-              
-              <div className={classes.detailItem}>
-                <Typography variant="body2">Total Documents</Typography>
-                <Typography variant="body2"><strong>{mappedData.documentCount}</strong></Typography>
-              </div>
-              
-              <div className={classes.detailItem}>
-                <Typography variant="body2">Created On</Typography>
-                <Typography variant="body2">
-                  <strong>{mappedData.created ? new Date(mappedData.created).toLocaleString() : 'Unknown'}</strong>
-                </Typography>
-              </div>
-              
-              <div className={classes.detailItem}>
-                <Typography variant="body2">Last Updated</Typography>
-                <Typography variant="body2">
-                  <strong>{mappedData.lastUpdated ? new Date(mappedData.lastUpdated).toLocaleString() : 'Not updated'}</strong>
-                </Typography>
-              </div>
-              
-              <div className={classes.detailItem}>
-                <Typography variant="body2">Embedding Model</Typography>
-                <Typography variant="body2">
-                  <strong>{mappedData.embeddingModel || 'Unknown'}</strong>
-                </Typography>
-              </div>
-              
-              <Typography variant="subtitle1" style={{ marginTop: 16 }} gutterBottom>Chunking Configuration</Typography>
-              
-              <div className={classes.detailItem}>
-                <Typography variant="body2">Chunking Method</Typography>
-                <Typography variant="body2">
-                  <strong>{mappedData.useParagraphChunking ? 'Paragraph-based' : 'Fixed-size'}</strong>
-                </Typography>
-              </div>
-              
-              {mappedData.useParagraphChunking ? (
-                <>
-                  <div className={classes.detailItem}>
-                    <Typography variant="body2">Max Paragraph Length</Typography>
-                    <Typography variant="body2"><strong>{mappedData.maxParagraphLength}</strong></Typography>
-                  </div>
-                  <div className={classes.detailItem}>
-                    <Typography variant="body2">Min Paragraph Length</Typography>
-                    <Typography variant="body2"><strong>{mappedData.minParagraphLength}</strong></Typography>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={classes.detailItem}>
-                    <Typography variant="body2">Chunk Size</Typography>
-                    <Typography variant="body2"><strong>{mappedData.chunkSize}</strong></Typography>
-                  </div>
-                  <div className={classes.detailItem}>
-                    <Typography variant="body2">Chunk Overlap</Typography>
-                    <Typography variant="body2"><strong>{mappedData.chunkOverlap}</strong></Typography>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Documents Tab */}
-        <div role="tabpanel" className={classes.tabPanel} hidden={tabValue !== 1}>
-          {tabValue === 1 && (
-            <>
-              <Typography variant="subtitle1" gutterBottom>
-                Documents in Vector Store ({mappedData.documents?.length || 0})
-              </Typography>
-              
-              {mappedData.documents?.length > 0 ? (
-                <TableContainer component={Paper} className={classes.documentList}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>File Name</TableCell>
-                        <TableCell>Security Classification</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {mappedData.documents.map((doc, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{doc.filename}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              size="small" 
-                              label={doc.security_classification || "UNCLASSIFIED"} 
-                              color={doc.security_classification === "Secret" ? "secondary" : "default"}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Typography variant="body2" color="textSecondary" align="center">
-                  No documents information available
-                </Typography>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Query Test Tab */}
-        <div role="tabpanel" className={classes.tabPanel} hidden={tabValue !== 2}>
-          {tabValue === 2 && (
-            <QueryTester vectorStore={vectorStore} />
-          )}
-        </div>
-      </DialogContent>
-      <DialogActions>
-        {isEditing ? (
-          <>
-            <Button onClick={handleCancelEdit} color="default">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveChanges} 
-              color="primary" 
-              variant="contained"
-              disabled={isSaving || !editedName.trim()}
-              startIcon={isSaving && <CircularProgress size={20} />}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button 
-              onClick={handleDelete}
-              color="secondary"
-              startIcon={<DeleteIcon />}
-            >
-              Delete
-            </Button>
-            <Button 
-              onClick={handleStartEditing}
-              color="primary"
-              startIcon={<EditIcon />}
-            >
-              Edit
-            </Button>
-            <Button onClick={onClose} color="default">
-              Close
-            </Button>
-          </>
-        )}
-      </DialogActions>
-    </>
-  );
-};
 
 function ManageVectorStores() {
   const classes = useStyles();
@@ -480,6 +208,8 @@ function ManageVectorStores() {
     severity: 'info'
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isCleaningBackups, setIsCleaningBackups] = useState(false);
+  const [showBackups, setShowBackups] = useState(true);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -534,21 +264,31 @@ function ManageVectorStores() {
     fetchVectorStores();
   }, [refreshTrigger]);
 
-  // Filter vector stores based on search term
+  // Update filtered stores when vectorStores, searchTerm, or showBackups changes
   useEffect(() => {
-    if (!searchTerm.trim()) {
+    if (!searchTerm.trim() && showBackups) {
       setFilteredStores(vectorStores);
       return;
     }
     
-    const lowercasedTerm = searchTerm.toLowerCase();
-    const filtered = vectorStores.filter(store => 
-      store.name.toLowerCase().includes(lowercasedTerm) || 
-      store.description.toLowerCase().includes(lowercasedTerm)
-    );
+    let filtered = vectorStores;
+    
+    // First apply backup filter if needed
+    if (!showBackups) {
+      filtered = filtered.filter(store => !getBackupInfo(store).isBackup);
+    }
+    
+    // Then apply search term filter if needed
+    if (searchTerm.trim()) {
+      const lowercasedTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(store => 
+        store.name.toLowerCase().includes(lowercasedTerm) || 
+        store.description.toLowerCase().includes(lowercasedTerm)
+      );
+    }
     
     setFilteredStores(filtered);
-  }, [searchTerm, vectorStores]);
+  }, [searchTerm, vectorStores, showBackups]);
 
   const handleViewModeChange = (event, newMode) => {
     if (newMode) setViewMode(newMode);
@@ -736,6 +476,68 @@ function ManageVectorStores() {
     ));
   };
 
+  // Helper function to determine if a store is a backup and get backup info
+  const getBackupInfo = (store) => {
+    // First try the metadata-based approach
+    if (store.is_backup === true) {
+      return {
+        isBackup: true,
+        originalId: store.original_id,
+        timestamp: store.backup_timestamp,
+        formattedDate: store.backup_date ? new Date(store.backup_date).toLocaleString() : 'Unknown date',
+        displayName: store.display_name || `BACKUP OF: ${store.name}`,
+        reason: store.backup_reason || 'Backup'
+      };
+    }
+    
+    // Check for backup ID format (newly added approach)
+    if (store.id && store.id.includes("_backup_")) {
+      try {
+        const parts = store.id.split("_backup_");
+        const originalId = parts[0];
+        const timestamp = parts[1];
+        const backupDate = timestamp ? new Date(parseInt(timestamp) * 1000) : new Date();
+        
+        return {
+          isBackup: true,
+          originalId,
+          timestamp,
+          formattedDate: backupDate.toLocaleString(),
+          displayName: `BACKUP OF: ${store.name}`,
+          reason: 'ID-based backup'
+        };
+      } catch (e) {
+        console.warn("Error parsing backup info from ID:", store.id);
+      }
+    }
+    
+    // Fall back to directory-based detection for legacy backups
+    if (store.directory && store.directory.includes("_backup_")) {
+      try {
+        const parts = store.directory.split("_backup_");
+        const originalId = parts[0];
+        const timestamp = parts[1];
+        const backupDate = timestamp ? new Date(parseInt(timestamp) * 1000) : new Date();
+        
+        return {
+          isBackup: true,
+          originalId,
+          timestamp,
+          formattedDate: backupDate.toLocaleString(),
+          displayName: `BACKUP OF: ${store.name}`,
+          reason: 'Directory-based backup'
+        };
+      } catch (e) {
+        console.warn("Error parsing backup info from directory:", store.directory);
+      }
+    }
+    
+    // Not a backup
+    return {
+      isBackup: false
+    };
+  };
+
   // Grid view of vector stores
   const renderGridView = () => {
     if (filteredStores.length === 0 && !loading) {
@@ -771,66 +573,96 @@ function ManageVectorStores() {
     return (
       <>
         {loading ? renderSkeletons() : (
-          filteredStores.map((store) => (
-            <Grid item xs={12} sm={6} md={4} key={store.id}>
-              <Card 
-                className={classes.card} 
-                onClick={() => handleOpenDetails(store)}
-                style={{ cursor: 'pointer' }}
-              >
-                <span className={classes.creationDate}>
-                  Created: {formatDate(store.created)}
-                </span>
-                <CardContent className={classes.cardContent}>
-                  <Typography variant="h6" gutterBottom>
-                    {store.name}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" gutterBottom noWrap>
-                    {store.description}
-                  </Typography>
-                  <Box display="flex" alignItems="center" mt={1}>
-                    <DescriptionIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
-                      {store.documentCount || 0} document{(store.documentCount || 0) !== 1 ? 's' : ''}
+          filteredStores.map((store) => {
+            // Get backup info
+            const backupInfo = getBackupInfo(store);
+            
+            return (
+              <Grid item xs={12} sm={6} md={4} key={store.id}>
+                <Card 
+                  className={classes.card} 
+                  onClick={() => handleOpenDetails(store)}
+                  style={{ 
+                    cursor: 'pointer',
+                    // Add a subtle background tint for backup stores
+                    backgroundColor: backupInfo.isBackup ? 'rgba(220, 220, 255, 0.2)' : undefined,
+                    // Add a border for backup stores
+                    border: backupInfo.isBackup ? '1px solid #9c27b0' : undefined
+                  }}
+                >
+                  <span className={classes.creationDate}>
+                    Created: {formatDate(store.created)}
+                  </span>
+                  
+                  {/* Add a backup indicator badge */}
+                  {backupInfo.isBackup && (
+                    <Box position="absolute" top={10} left={10}>
+                      <Chip
+                        size="small"
+                        label="BACKUP"
+                        color="secondary"
+                        className={classes.backupChip}
+                        title={`${backupInfo.reason}. Created on ${backupInfo.formattedDate}`}
+                      />
+                    </Box>
+                  )}
+                  
+                  <CardContent className={classes.cardContent}>
+                    <Typography variant="h6" gutterBottom>
+                      {backupInfo.isBackup ? backupInfo.displayName : store.name}
+                      {backupInfo.isBackup && (
+                        <Typography variant="caption" component="span" style={{ marginLeft: 8, color: '#9c27b0' }}>
+                          (Backup from {backupInfo.formattedDate})
+                        </Typography>
+                      )}
                     </Typography>
-                  </Box>
-                  <Box display="flex" alignItems="center" mt={0.5}>
-                    <InfoIcon fontSize="small" color="action" />
-                    <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
-                      Updated: {formatDate(store.lastUpdated)}
+                    <Typography variant="body2" color="textSecondary" gutterBottom noWrap>
+                      {store.description}
                     </Typography>
-                  </Box>
-                  <Chip 
-                    label={store.embeddingModel || 'Unknown Model'} 
-                    size="small" 
-                    className={classes.modelChip}
-                  />
-                </CardContent>
-                <CardActions className={classes.cardActions}>
-                  <Button
-                    size="small"
-                    color="primary"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent card click from triggering
-                      handleOpenDetails(store);
-                    }}
-                  >
-                    DETAILS
-                  </Button>
-                  <IconButton 
-                    size="small" 
-                    color="secondary" 
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent card click from triggering
-                      handleOpenDelete(store);
-                    }}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))
+                    <Box display="flex" alignItems="center" mt={1}>
+                      <DescriptionIcon fontSize="small" color="action" />
+                      <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
+                        {store.documentCount || 0} document{(store.documentCount || 0) !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" alignItems="center" mt={0.5}>
+                      <InfoIcon fontSize="small" color="action" />
+                      <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
+                        Updated: {formatDate(store.lastUpdated)}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      label={store.embeddingModel || 'Unknown Model'} 
+                      size="small" 
+                      className={classes.modelChip}
+                    />
+                  </CardContent>
+                  <CardActions className={classes.cardActions}>
+                    <Button
+                      size="small"
+                      color="primary"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent card click from triggering
+                        handleOpenDetails(store);
+                      }}
+                    >
+                      DETAILS
+                    </Button>
+                    <IconButton 
+                      size="small" 
+                      color="secondary" 
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent card click from triggering
+                        handleOpenDelete(store);
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </CardActions>
+                </Card>
+              </Grid>
+            );
+          })
         )}
       </>
     );
@@ -876,6 +708,7 @@ function ManageVectorStores() {
               <TableCell>Documents</TableCell>
               <TableCell>Model</TableCell>
               <TableCell>Last Updated</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -889,52 +722,88 @@ function ManageVectorStores() {
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
                   <TableCell><Skeleton /></TableCell>
+                  <TableCell><Skeleton /></TableCell>
                 </TableRow>
               ))
             ) : (
-              filteredStores.map((store) => (
-                <TableRow 
-                  key={store.id} 
-                  hover 
-                  onClick={() => handleOpenDetails(store)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <TableCell>{store.name}</TableCell>
-                  <TableCell>{store.description}</TableCell>
-                  <TableCell>{store.documentCount || 0}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={store.embeddingModel || 'Unknown'} 
-                      size="small" 
-                      color="primary" 
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>{formatDate(store.lastUpdated)}</TableCell>
-                  <TableCell>
-                    <IconButton 
-                      size="small" 
-                      color="primary" 
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click
-                        handleOpenDetails(store);
-                      }}
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      color="secondary" 
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click
-                        handleOpenDelete(store);
-                      }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredStores.map((store) => {
+                // Get backup info
+                const backupInfo = getBackupInfo(store);
+                
+                return (
+                  <TableRow 
+                    key={store.id} 
+                    hover 
+                    onClick={() => handleOpenDetails(store)}
+                    style={{ 
+                      cursor: 'pointer',
+                      backgroundColor: backupInfo.isBackup ? 'rgba(220, 220, 255, 0.15)' : undefined
+                    }}
+                  >
+                    <TableCell>
+                      {backupInfo.isBackup ? backupInfo.displayName : store.name}
+                      {backupInfo.isBackup && (
+                        <Box display="flex" alignItems="center" mt={0.5}>
+                          <Chip
+                            size="small"
+                            label="BACKUP"
+                            color="secondary"
+                            className={classes.backupChip}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Typography variant="caption" style={{ color: '#9c27b0' }}>
+                            {backupInfo.formattedDate}
+                          </Typography>
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell>{store.description}</TableCell>
+                    <TableCell>{store.documentCount || 0}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={store.embeddingModel || 'Unknown'} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{formatDate(store.lastUpdated)}</TableCell>
+                    <TableCell>
+                      {backupInfo.isBackup && (
+                        <Chip 
+                          label={backupInfo.reason} 
+                          size="small" 
+                          color="secondary"
+                          variant="outlined"
+                          style={{ fontWeight: 'bold' }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton 
+                        size="small" 
+                        color="primary" 
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent row click
+                          handleOpenDetails(store);
+                        }}
+                      >
+                        <InfoIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        color="secondary" 
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent row click
+                          handleOpenDelete(store);
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -942,11 +811,104 @@ function ManageVectorStores() {
     );
   };
 
+  const handleRefreshVectorStore = async () => {
+    if (!selectedStore) return;
+    
+    try {
+      const refreshedStore = await getVectorStoreById(selectedStore.id);
+      
+      if (refreshedStore) {
+        // Update selected store with refreshed information
+        setSelectedStore(refreshedStore);
+        
+        // Also update the store in the main list
+        setVectorStores(prevStores => 
+          prevStores.map(store => 
+            store.id === refreshedStore.id ? {
+              ...store,
+              file_count: refreshedStore.files?.length || 0,
+              documentCount: refreshedStore.files?.length || 0,
+              lastUpdated: refreshedStore.updated_at,
+              updated_at: refreshedStore.updated_at
+            } : store
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`Error refreshing vector store ${selectedStore.id}:`, error);
+      setSnackbar({
+        open: true,
+        message: `Error refreshing vector store: ${error.message || 'Unknown error'}`,
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCleanupBackups = async () => {
+    if (isCleaningBackups) return;
+    
+    setIsCleaningBackups(true);
+    try {
+      const result = await cleanupVectorStoreBackups();
+      setSnackbar({
+        open: true,
+        message: `${result.message} ${result.details}`,
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error cleaning up backups:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to clean up backups: ' + (error.response?.data?.detail || error.message),
+        severity: 'error'
+      });
+    } finally {
+      setIsCleaningBackups(false);
+    }
+  };
+
+  // Calculate total backup count using the helper function
+  const backupCount = useMemo(() => {
+    return vectorStores.filter(store => getBackupInfo(store).isBackup).length;
+  }, [vectorStores]);
+
+  // Clean Up Backups Button
+  const renderCleanupButton = () => {
+    return (
+      <Box mt={3} display="flex" justifyContent="flex-end">
+        <Button
+          variant={backupCount > 0 ? "contained" : "outlined"}
+          color="secondary"
+          onClick={handleCleanupBackups}
+          disabled={isCleaningBackups || backupCount === 0}
+          startIcon={isCleaningBackups ? <CircularProgress size={20} /> : <DeleteSweepIcon />}
+          style={{ 
+            marginTop: 16,
+            fontWeight: backupCount > 0 ? 'bold' : 'normal', 
+          }}
+        >
+          {backupCount > 0 
+            ? `Clean Up ${backupCount} Vector Store Backup${backupCount !== 1 ? 's' : ''}`
+            : "No Backups to Clean Up"
+          }
+        </Button>
+        {backupCount > 0 && (
+          <Badge 
+            color="error" 
+            badgeContent={backupCount} 
+            overlap="circular"
+            style={{ marginLeft: -45, marginTop: 10 }}
+          />
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Container maxWidth="xl" className="main-content">
       <div className={classes.header}>
         <Typography variant="h4" className="section-title" gutterBottom>
-          Manage Vector Stores
+          Manage Retrieval Databases
         </Typography>
         <div>
           <Button
@@ -975,7 +937,7 @@ function ManageVectorStores() {
         <Grid item xs={12} md={4}>
           <Paper className={classes.statsCard} elevation={3}>
             <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-              Total Vector Stores
+              Total Retrieval Databases
             </Typography>
             <Typography className={classes.statsValue}>
               {loading ? <Skeleton width={80} /> : stats.totalStores}
@@ -1012,6 +974,30 @@ function ManageVectorStores() {
         </Grid>
       </Grid>
 
+      {/* Backup information alert */}
+      {backupCount > 0 && (
+        <Alert 
+          severity="info" 
+          style={{ marginBottom: 16 }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={handleCleanupBackups}
+              disabled={isCleaningBackups}
+              startIcon={isCleaningBackups ? <CircularProgress size={16} /> : <DeleteSweepIcon />}
+            >
+              CLEAN UP
+            </Button>
+          }
+        >
+          <AlertTitle>Vector Store Backups</AlertTitle>
+          {backupCount} backup{backupCount !== 1 ? 's' : ''} detected. Backups are automatically created when you add or remove documents from a vector store.
+          They serve as a safety measure in case anything goes wrong during the update process.
+          Once you've verified your vector store is working correctly, you can safely clean up old backups.
+        </Alert>
+      )}
+
       {/* Search and Filters */}
       <div className={classes.filterControls}>
         <div className={classes.searchBar}>
@@ -1019,7 +1005,7 @@ function ManageVectorStores() {
             className={classes.searchInput}
             variant="outlined"
             size="small"
-            placeholder="Search vector stores..."
+            placeholder="Search for a database..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -1036,20 +1022,46 @@ function ManageVectorStores() {
             </Button>
           )}
         </div>
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={handleViewModeChange}
-          className={classes.viewToggle}
-          size="small"
-        >
-          <ToggleButton value="grid" aria-label="grid view">
-            <ViewModuleIcon />
-          </ToggleButton>
-          <ToggleButton value="list" aria-label="list view">
-            <ViewListIcon />
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showBackups}
+                onChange={(e) => setShowBackups(e.target.checked)}
+                name="showBackups"
+                color="secondary"
+              />
+            }
+            label={
+              <Box display="flex" alignItems="center">
+                <Typography variant="body2" style={{ marginRight: 8 }}>
+                  Show Backups
+                </Typography>
+                {backupCount > 0 && (
+                  <Badge 
+                    color="secondary" 
+                    badgeContent={backupCount} 
+                    overlap="circular"
+                  />
+                )}
+              </Box>
+            }
+          />
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleViewModeChange}
+            className={classes.viewToggle}
+            size="small"
+          >
+            <ToggleButton value="grid" aria-label="grid view">
+              <ViewModuleIcon />
+            </ToggleButton>
+            <ToggleButton value="list" aria-label="list view">
+              <ViewListIcon />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </div>
       </div>
 
       {/* Vector Store List */}
@@ -1071,10 +1083,16 @@ function ManageVectorStores() {
       <Dialog
         open={detailsDialogOpen}
         onClose={handleCloseDetails}
-        maxWidth="md"
+        maxWidth="xl"
         fullWidth
       >
-        {selectedStore && <VectorStoreDetails vectorStore={selectedStore} onClose={handleCloseDetails} onSave={handleSaveEdit} onDelete={handleOpenDelete} />}
+        {selectedStore && <VectorStoreDetails 
+          vectorStore={selectedStore} 
+          onClose={handleCloseDetails} 
+          onSave={handleSaveEdit}
+          onDelete={handleOpenDelete}
+          onRefresh={handleRefreshVectorStore}
+        />}
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
@@ -1124,6 +1142,9 @@ function ManageVectorStores() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Clean Up Backups Button */}
+      {renderCleanupButton()}
     </Container>
   );
 }

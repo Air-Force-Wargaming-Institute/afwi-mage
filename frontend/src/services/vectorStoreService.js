@@ -75,9 +75,51 @@ export const testVectorStoreQuery = async (id, query, options = {}) => {
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/query`), 
       { query, ...options }
     );
-    return response.data;
+    
+    // Extract the results array from the response data
+    // This handles both formats: { results: [...] } and direct array
+    return response.data.results || response.data;
   } catch (error) {
     console.error(`Error querying vector store ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Analyze a vector store's content using an LLM
+ * @param {string} id - Vector store ID
+ * @param {Object} options - Analysis options like sample_size and summary_length
+ * @returns {Promise} - Response with analysis results
+ */
+export const analyzeVectorStore = async (id, options = {}) => {
+  try {
+    const response = await axios.post(
+      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/analyze`),
+      options
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error analyzing vector store ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Query a vector store and get an LLM-generated response
+ * @param {string} id - Vector store ID
+ * @param {string} query - Query text
+ * @param {Object} options - Additional options like top_k, include_sources
+ * @returns {Promise} - Response with LLM answer and optionally sources
+ */
+export const llmQueryVectorStore = async (id, query, options = {}) => {
+  try {
+    const response = await axios.post(
+      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/llm-query`),
+      { query, ...options }
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error performing LLM query on vector store ${id}:`, error);
     throw error;
   }
 };
@@ -120,12 +162,31 @@ export const getEmbeddingModels = async () => {
 export const addDocumentsToVectorStore = async (id, files) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/documents`),
-      { files }
+      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/update`),
+      { vectorstore_id: id, files }
     );
     return response.data;
   } catch (error) {
     console.error(`Error adding documents to vector store ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Perform a batch update on a vector store - adding and/or removing documents in one operation
+ * @param {string} id - Vector store ID
+ * @param {Object} operations - Object containing add (file paths) and remove (document IDs) arrays
+ * @returns {Promise} - Response with job details
+ */
+export const batchUpdateVectorStore = async (id, operations) => {
+  try {
+    const response = await axios.post(
+      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/batch_update`),
+      operations
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error performing batch update on vector store ${id}:`, error);
     throw error;
   }
 };
@@ -145,6 +206,21 @@ export const removeDocumentsFromVectorStore = async (id, documentIds) => {
     return response.data;
   } catch (error) {
     console.error(`Error removing documents from vector store ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Clean up old vector store backups, keeping only the most recent ones.
+ * @param {number} maxPerStore - Maximum number of backups to keep per vector store (optional)
+ * @returns {Promise<Object>} - Response indicating success and number of backups removed
+ */
+export const cleanupVectorStoreBackups = async (maxPerStore = 3) => {
+  try {
+    const response = await axios.post(getApiUrl('EMBEDDING', '/api/embedding/cleanup-backups'), { max_per_store: maxPerStore });
+    return response.data;
+  } catch (error) {
+    console.error('Error cleaning up vector store backups:', error);
     throw error;
   }
 }; 

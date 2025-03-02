@@ -31,6 +31,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  LinearProgress,
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import DeleteIcon from '@material-ui/icons/Delete';
@@ -42,10 +43,15 @@ import InfoIcon from '@material-ui/icons/Info';
 import FolderIcon from '@material-ui/icons/Folder';
 import InsertDriveFileIcon from '@material-ui/icons/InsertDriveFile';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import LinkIcon from '@material-ui/icons/Link';
+import RefreshIcon from '@material-ui/icons/Refresh';
 import FileList from './FileList';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 import '../App.css'; // Import the App.css styles
+import { Link as RouterLink } from 'react-router-dom';
+import BuildIcon from '@material-ui/icons/Build';
+import StarIcon from '@material-ui/icons/Star';
 
 // Keep minimal component-specific styles that aren't in App.css
 const useStyles = makeStyles((theme) => ({
@@ -98,6 +104,37 @@ const useStyles = makeStyles((theme) => ({
   tipItem: {
     marginBottom: theme.spacing(1),
   },
+  progressWrapper: {
+    marginTop: '16px',
+    padding: '16px',
+    borderRadius: '4px',
+    border: '1px solid #e0e0e0',
+    backgroundColor: 'rgba(237, 247, 255, 0.8)',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+  },
+  jobIdText: {
+    fontFamily: 'monospace',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    margin: '0 4px',
+  },
+  progressBar: {
+    height: '8px',
+    borderRadius: '4px',
+    marginTop: '12px',
+    marginBottom: '12px',
+  },
+  nextStepsBox: {
+    marginTop: '12px',
+    padding: '12px',
+    borderLeft: '4px solid #1976d2',
+    backgroundColor: 'rgba(25, 118, 210, 0.04)',
+  },
+  linkButton: {
+    marginTop: '12px',
+    textTransform: 'none',
+  },
 }));
 
 function BuildRetrievalDatabases() {
@@ -120,7 +157,7 @@ function BuildRetrievalDatabases() {
   
   // Parameters for paragraph chunking
   const [maxParagraphLength, setMaxParagraphLength] = useState(1500);
-  const [minParagraphLength, setMinParagraphLength] = useState(50);
+  const [minParagraphLength, setMinParagraphLength] = useState(200);
   
   // Parameters for fixed-size chunking
   const [chunkSize, setChunkSize] = useState(1000);
@@ -129,6 +166,7 @@ function BuildRetrievalDatabases() {
   const [isCreating, setIsCreating] = useState(false);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const [jobId, setJobId] = useState('');
 
   // Available embedding models
   const [embeddingModels, setEmbeddingModels] = useState([
@@ -239,8 +277,16 @@ function BuildRetrievalDatabases() {
         chunk_overlap: parseInt(chunkOverlap),
       });
       
-      setIsCreating(false);
-      setMessage(response.data.message || `Vector store "${vectorStoreName}" successfully created!`);
+      // Keep isCreating true if we got a job ID (async processing)
+      if (response.data.success && response.data.job_id) {
+        setMessage(`Vector store creation started. Job ID: ${response.data.job_id}`);
+        setJobId(response.data.job_id);
+        // Don't set isCreating to false here - keep it true while the job runs
+      } else {
+        // Only set isCreating to false if there's no job ID (immediate completion)
+        setIsCreating(false);
+        setMessage(response.data.message || `Vector store "${vectorStoreName}" creation initiated!`);
+      }
       setSuccess(true);
       
       // Reset form after successful creation
@@ -351,11 +397,117 @@ function BuildRetrievalDatabases() {
     return [...folders, ...nonFolders];
   }, [files]);
 
+  // Add a function to reset the form
+  const handleResetForm = () => {
+    setVectorStoreName('');
+    setVectorStoreDescription('');
+    setSelectedFiles([]);
+    setMessage('');
+    setSuccess(false);
+    setJobId('');
+    setIsCreating(false);
+  };
+
   return (
     <Container maxWidth="xl" className="main-content">
       <Typography variant="h4" className="section-title" gutterBottom>
         Build Retrieval Database
       </Typography>
+      
+      <Box mb={3}>
+
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={4}>
+            <Paper elevation={2} style={{ 
+              height: '100%', 
+              padding: 16, 
+              display: 'flex', 
+              flexDirection: 'column',
+              borderTop: '4px solid #3f51b5', 
+              borderRadius: '4px'
+            }}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <Box 
+                  mr={1} 
+                  bgcolor="#e8eaf6" 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  width={36} 
+                  height={36} 
+                  borderRadius="50%"
+                >
+                  <InfoIcon style={{ color: '#3f51b5', fontSize: 20 }} />
+                </Box>
+                <Typography variant="subtitle2">What is a Vector Store?</Typography>
+              </Box>
+              <Typography variant="body2">
+                A specialized database that stores document content as numerical vectors called "embeddings". These mathematical representations of text capture their semantic meaning, allowing LLMs to understand concepts and relationships beyond simple keyword matching.
+              </Typography>
+            </Paper>
+          </Grid>
+          
+          <Grid item xs={12} sm={4}>
+            <Paper elevation={2} style={{ 
+              height: '100%', 
+              padding: 16, 
+              display: 'flex', 
+              flexDirection: 'column',
+              borderTop: '4px solid #00897b', 
+              borderRadius: '4px' 
+            }}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <Box 
+                  mr={1} 
+                  bgcolor="#e0f2f1" 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  width={36} 
+                  height={36} 
+                  borderRadius="50%"
+                >
+                  <BuildIcon style={{ color: '#00897b', fontSize: 20 }} />
+                </Box>
+                <Typography variant="subtitle2">How It Works</Typography>
+              </Box>
+              <Typography variant="body2">
+                During indexing (the process of creating the vector store), an embedding model transforms your documents into high-dimensional vectors. When querying, the text of your question undergoes the same transformation, enabling "semantic search" allowing the LLM to find contextually similar content rather than just exact phrase matches.
+              </Typography>
+            </Paper>
+          </Grid>
+          
+          <Grid item xs={12} sm={4}>
+            <Paper elevation={2} style={{ 
+              height: '100%', 
+              padding: 16, 
+              display: 'flex', 
+              flexDirection: 'column',
+              borderTop: '4px solid #f57c00', 
+              borderRadius: '4px'
+            }}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <Box 
+                  mr={1} 
+                  bgcolor="#fff3e0" 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  width={36} 
+                  height={36} 
+                  borderRadius="50%"
+                >
+                  <StarIcon style={{ color: '#f57c00', fontSize: 20 }} />
+                </Box>
+                <Typography variant="subtitle2">Benefits</Typography>
+              </Box>
+              <Typography variant="body2">
+                Vector stores enable LLMs to provide more relevant answers grounded in your specific documents, especially if the information in your docs was not in the LLM's training data. This significantly reduces hallucinations (fabricated information), and supports citation of sources by providing the LLM with improved context awareness and knowledge retrieval.
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
       
       <Grid container spacing={3}>
         {/* Step 1: Select Files */}
@@ -743,12 +895,12 @@ function BuildRetrievalDatabases() {
                     </ul>
                     
                     <Typography variant="body2" className={classes.tipItem}>
-                      <strong>Min Paragraph Length (50 default):</strong> Minimum characters before paragraphs are merged.
+                      <strong>Min Paragraph Length (200 default):</strong> Minimum characters before paragraphs are merged.
                     </Typography>
                     <ul>
                       <li><Typography variant="body2">Lower values (20-50): Preserves short paragraphs like bullet points and section headers.</Typography></li>
                       <li><Typography variant="body2">Higher values (100-200): Combines short paragraphs for more substantial chunks.</Typography></li>
-                      <li><Typography variant="body2">Recommendation: 50 works well for most documents with normal formatting.</Typography></li>
+                      <li><Typography variant="body2">Recommendation: 200 works well for most documents with normal formatting.</Typography></li>
                     </ul>
                   </Box>
                   
@@ -880,10 +1032,70 @@ function BuildRetrievalDatabases() {
                 className="upload-button"
                 style={{ marginTop: '16px' }}
               >
-                {isCreating ? 'Creating Vector Store...' : 'Create Vector Store'}
+                {isCreating && jobId 
+                  ? 'Vector Store Creation In Progress...' 
+                  : isCreating 
+                    ? 'Creating Vector Store...' 
+                    : 'Create Vector Store'}
               </Button>
               
-              {message && (
+              {message && success && jobId && (
+                <Paper elevation={1} className={classes.progressWrapper}>
+                  <Typography variant="subtitle1" style={{ fontWeight: 500, display: 'flex', alignItems: 'center' }}>
+                    <CheckCircleIcon fontSize="small" style={{ marginRight: 8, color: '#4caf50' }} />
+                    Vector Store Creation Started
+                  </Typography>
+                  
+                  <Typography variant="body2" style={{ marginTop: 8 }}>
+                    Your vector store <strong>{vectorStoreName}</strong> is being created. This process may take several minutes depending on the number and size of files.
+                  </Typography>
+                  
+                  <Typography variant="body2" style={{ marginTop: 8, display: 'flex', alignItems: 'center' }}>
+                    Job ID: <span className={classes.jobIdText}>{jobId}</span>
+                  </Typography>
+                  
+                  <LinearProgress variant="indeterminate" className={classes.progressBar} />
+                  
+                  <Box className={classes.nextStepsBox}>
+                    <Typography variant="subtitle2">
+                      Next Steps:
+                    </Typography>
+                    <Typography variant="body2" style={{ marginTop: 4 }}>
+                      • Your vector store will be available in the Manage Retrieval Databases page when ready.
+                    </Typography>
+                    <Typography variant="body2">
+                      • You can use the Manage Retrieval Databases page to view, query, and manage your vector stores.
+                    </Typography>
+                    
+                    <Button
+                      component={RouterLink}
+                      to="/retrieval/manage-databases"
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      className={classes.linkButton}
+                      startIcon={<LinkIcon />}
+                    >
+                      Go to Vector Store Management
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      className={classes.linkButton}
+                      startIcon={<RefreshIcon />}
+                      onClick={handleResetForm}
+                      style={{ marginLeft: '8px' }}
+                      disabled={isCreating}
+                    >
+                      Create Another Vector Store
+                    </Button>
+                  </Box>
+                </Paper>
+              )}
+              
+              {message && (success && !jobId || !success) && (
                 <Box className={`info-box ${success ? 'success-message' : 'warning-text'}`} style={{ marginTop: '16px', padding: '12px' }}>
                   <Typography 
                     variant="body2" 

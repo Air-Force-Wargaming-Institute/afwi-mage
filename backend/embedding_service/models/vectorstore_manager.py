@@ -196,7 +196,7 @@ class VectorStoreManager:
         
         try:
             # Load the existing vector store
-            vectorstore = FAISS.load_local(str(vs_dir), embedding_model)
+            vectorstore = FAISS.load_local(str(vs_dir), embedding_model, allow_dangerous_deserialization=True)
             
             # Add new documents
             if documents:

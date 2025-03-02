@@ -171,10 +171,18 @@ services:
       - CORE_SERVICE_URL=http://core:8000
       - API_KEY='None'
       - BASE_URL='None'
+      - CUDA_VISIBLE_DEVICES=0
     depends_on:
       - init-data
     networks:
       - app-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 #  auth:
 #    build: ./auth_service

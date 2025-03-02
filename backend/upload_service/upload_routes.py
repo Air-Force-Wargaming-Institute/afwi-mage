@@ -17,6 +17,7 @@ import io
 from docx import Document
 from PyPDF2 import PdfReader, PdfWriter
 from docx_converter import DocxConverter
+import uuid  # Add import for UUID generation
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -193,7 +194,11 @@ async def upload_files(file: UploadFile = File(...), folder: Optional[str] = "")
         with file_path.open("wb") as buffer:
             buffer.write(content)
 
+        # Generate a unique document ID
+        document_id = str(uuid.uuid4())
+        
         metadata = {
+            "document_id": document_id,
             "security_classification": "SELECT A CLASSIFICATION",
             "upload_date": datetime.now().isoformat(),
             "original_file": file.filename,
@@ -226,6 +231,7 @@ async def upload_files(file: UploadFile = File(...), folder: Optional[str] = "")
         return JSONResponse(
             content={
                 "filename": file.filename, 
+                "document_id": document_id,
                 "status": "File uploaded successfully",
                 "security_classification": "SELECT A CLASSIFICATION",
                 "converted_pdf": metadata["converted_pdf"]
