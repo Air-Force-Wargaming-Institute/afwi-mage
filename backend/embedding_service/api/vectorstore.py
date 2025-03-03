@@ -11,11 +11,12 @@ This module provides API endpoints for:
 import os
 import logging
 import json
-from typing import List, Dict, Any, Optional
-from pathlib import Path
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
 import uuid
+from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, Request
+from pydantic import BaseModel
+import numpy as np
 from datetime import datetime
 
 # Import job management functions
@@ -63,6 +64,8 @@ try:
 except ImportError:
     # Fall back to absolute import (for Docker)
     from core.vectorstore import VectorStoreManager
+
+from core.job import JobStatus
 
 # Set up logging
 logger = logging.getLogger("embedding_service")
@@ -630,14 +633,112 @@ async def remove_documents_from_vectorstore(
     if not request.document_ids:
         raise HTTPException(status_code=400, detail="At least one document ID is required")
     
-    # This is a placeholder - the actual implementation would need to be added
-    # when we implement document removal functionality in the core module
+    # Create a job for document removal
+    from core.job import register_job
+    job_id = register_job("remove_documents", details={"vectorstore_id": vectorstore_id})
+    
+    # Start the document removal process in the background
+    background_tasks.add_task(
+        process_document_removal,
+        job_id=job_id,
+        vectorstore_id=vectorstore_id,
+        document_ids=request.document_ids,
+        manager=manager
+    )
     
     return {
-        "success": False,
-        "message": "Document removal is not yet implemented",
+        "success": True,
+        "message": f"Document removal started. Job ID: {job_id}",
+        "job_id": job_id,
         "removed_count": 0
     }
+
+
+async def process_document_removal(
+    job_id: str,
+    vectorstore_id: str,
+    document_ids: List[str],
+    manager: VectorStoreManager
+):
+    """
+    Process document removal from a vector store.
+    
+    Args:
+        job_id: ID of the job
+        vectorstore_id: ID of the vector store
+        document_ids: List of document IDs to remove
+        manager: Vector store manager instance
+    """
+    from core.job import update_job_progress, complete_job, fail_job, JobStatus
+    from core.vectorstore import load_metadata, save_metadata
+    
+    try:
+        # Update job progress
+        update_job_progress(job_id, 0, status=JobStatus.PROCESSING)
+        
+        # Get metadata file path
+        metadata_file = Path(os.path.join(manager.base_dir, vectorstore_id, "metadata.json"))
+        if not metadata_file.exists():
+            raise Exception(f"Metadata file not found for vector store {vectorstore_id}")
+        
+        # Load metadata
+        metadata = load_metadata(metadata_file)
+        if not metadata:
+            raise Exception(f"Failed to load metadata for vector store {vectorstore_id}")
+        
+        # Update job progress
+        update_job_progress(
+            job_id, 
+            25, 
+            status=JobStatus.PROCESSING,
+            current_operation="Removing documents from metadata"
+        )
+        
+        # Filter out removed documents from metadata
+        removed_count = 0
+        if "files" in metadata:
+            original_file_count = len(metadata["files"])
+            metadata["files"] = [
+                file_info for file_info in metadata["files"] 
+                if file_info.get("document_id") not in document_ids
+            ]
+            removed_count = original_file_count - len(metadata["files"])
+            
+            # Update metadata
+            metadata["updated_at"] = datetime.now().isoformat()
+            
+            # Save updated metadata
+            save_metadata(metadata, metadata_file)
+            logger.info(f"Removed {removed_count} documents from metadata")
+        
+        # Update job progress
+        update_job_progress(
+            job_id, 
+            90, 
+            status=JobStatus.PROCESSING,
+            current_operation="Finalizing changes"
+        )
+        
+        # Complete the job
+        complete_job(
+            job_id,
+            {
+                "vectorstore_id": vectorstore_id,
+                "removed_count": removed_count
+            }
+        )
+        
+        logger.info(f"Document removal completed: {removed_count} documents removed")
+        
+    except Exception as e:
+        logger.error(f"Error in document removal: {str(e)}")
+        import traceback
+        logger.error(f"Error details: {traceback.format_exc()}")
+        
+        try:
+            fail_job(job_id, str(e))
+        except:
+            logger.error(f"Failed to mark job {job_id} as failed")
 
 
 @router.post("/{vectorstore_id}/batch_update", response_model=BatchUpdateResponse)
@@ -668,14 +769,249 @@ async def batch_update_vectorstore(
     if not request.add and not request.remove and not request.name and not request.description:
         raise HTTPException(status_code=400, detail="No update operations specified")
     
-    # This is a placeholder - the actual implementation would need to be added
-    # when we implement batch update functionality in the core module
+    # Create a job for the batch update
+    from core.job import register_job
+    job_id = register_job("batch_update", details={"vectorstore_id": vectorstore_id})
+    
+    # Start the batch update process in the background
+    background_tasks.add_task(
+        process_batch_update,
+        job_id=job_id,
+        vectorstore_id=vectorstore_id,
+        request=request,
+        manager=manager,
+        vs_info=vs_info
+    )
     
     return {
-        "success": False,
-        "message": "Batch update is not yet implemented",
+        "success": True,
+        "message": f"Batch update started. Job ID: {job_id}",
+        "job_id": job_id,
         "skipped_files": []
     }
+
+
+async def process_batch_update(
+    job_id: str,
+    vectorstore_id: str,
+    request: BatchUpdateRequest,
+    manager: VectorStoreManager,
+    vs_info: Dict[str, Any]
+):
+    """
+    Process a batch update for a vector store.
+    
+    Args:
+        job_id: ID of the job
+        vectorstore_id: ID of the vector store
+        request: Batch update request
+        manager: Vector store manager instance
+        vs_info: Vector store info
+    """
+    from core.job import update_job_progress, complete_job, fail_job
+    from core.vectorstore import load_metadata, save_metadata
+
+    try:
+        # Update job progress
+        update_job_progress(job_id, 0, status=JobStatus.PROCESSING)
+        
+        # Update metadata first if needed
+        metadata_updated = False
+        if request.name or request.description:
+            metadata_file = Path(os.path.join(manager.base_dir, vectorstore_id, "metadata.json"))
+            if metadata_file.exists():
+                try:
+                    metadata = load_metadata(metadata_file)
+                    
+                    if request.name:
+                        metadata["name"] = request.name
+                    
+                    if request.description:
+                        metadata["description"] = request.description
+                    
+                    metadata["updated_at"] = datetime.now().isoformat()
+                    
+                    # Save updated metadata
+                    save_metadata(metadata, metadata_file)
+                    metadata_updated = True
+                    
+                    update_job_progress(
+                        job_id, 
+                        5, 
+                        status=JobStatus.PROCESSING,
+                        current_operation="Updating metadata"
+                    )
+                except Exception as e:
+                    logger.error(f"Error updating metadata: {str(e)}")
+        
+        # Initialize counts
+        documents_added = 0
+        documents_removed = 0
+        skipped_files = []
+        
+        # Process document additions if any
+        if request.add and len(request.add) > 0:
+            # Get upload directory
+            upload_dir = Path(os.environ.get("UPLOAD_DIR", "data/uploads"))
+            
+            # Get staging directory
+            staging_dir = Path(os.environ.get("STAGING_DIR", "doc_staging"))
+            staging_dir.mkdir(exist_ok=True)
+            
+            # Copy files to staging
+            update_job_progress(
+                job_id, 
+                10, 
+                status=JobStatus.PROCESSING,
+                current_operation="Copying files"
+            )
+            
+            # Ensure upload directory exists
+            if not upload_dir.exists():
+                logger.error(f"Upload directory {upload_dir} does not exist")
+                raise Exception(f"Upload directory {upload_dir} does not exist")
+            
+            # Copy files to staging
+            from core.document import copy_files_to_staging
+            staged_files = copy_files_to_staging(request.add, upload_dir, staging_dir)
+            
+            # Get staging file paths
+            staging_file_paths = list(staged_files.values())
+            logger.info(f"Copied {len(staging_file_paths)} files to staging")
+            
+            # Load documents
+            update_job_progress(
+                job_id, 
+                20, 
+                status=JobStatus.PROCESSING,
+                current_operation="Loading documents"
+            )
+            
+            from core.document import load_documents
+            from core.embedding import get_embedding_model
+            
+            # Get chunking parameters from vector store metadata
+            chunk_size = vs_info.get("chunk_size", 1000)
+            chunk_overlap = vs_info.get("chunk_overlap", 100)
+            
+            # Load documents
+            documents, skipped = load_documents(
+                staging_file_paths,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap
+            )
+            
+            if skipped:
+                logger.warning(f"Skipped {len(skipped)} files during document loading")
+                skipped_files.extend(skipped)
+            
+            # Create file infos for successfully processed files
+            file_infos = []
+            for file_path in staging_file_paths:
+                if file_path not in skipped:
+                    file_path_obj = Path(file_path)
+                    file_info = {
+                        "filename": file_path_obj.name,
+                        "original_path": str(file_path),
+                        "staging_path": str(file_path),
+                        "file_type": file_path_obj.suffix[1:],  # Remove the dot
+                        "document_id": str(uuid.uuid4()),
+                        "size_bytes": file_path_obj.stat().st_size,
+                        "added_at": datetime.now().isoformat()
+                    }
+                    file_infos.append(file_info)
+            
+            # Update job progress
+            update_job_progress(
+                job_id, 
+                40, 
+                status=JobStatus.PROCESSING,
+                current_operation="Updating vector store"
+            )
+            
+            # Get embedding model
+            embedding_model = get_embedding_model(vs_info.get("embedding_model", "nomic-embed-text"))
+            
+            # Update vector store
+            if documents and embedding_model:
+                result = manager.update_vectorstore(
+                    vectorstore_id=vectorstore_id,
+                    documents=documents,
+                    embedding_model=embedding_model,
+                    file_infos=file_infos,
+                    batch_size=request.doc_batch_size,
+                    job_id=job_id
+                )
+                
+                if result:
+                    documents_added = len(documents)
+                    logger.info(f"Successfully added {documents_added} documents to vector store")
+                else:
+                    logger.error("Failed to update vector store with new documents")
+            else:
+                if not documents:
+                    logger.warning("No documents to add after processing")
+                if not embedding_model:
+                    logger.error(f"Could not get embedding model: {vs_info.get('embedding_model', 'nomic-embed-text')}")
+        
+        # Process document removals if any
+        if request.remove and len(request.remove) > 0:
+            update_job_progress(
+                job_id, 
+                70, 
+                status=JobStatus.PROCESSING,
+                current_operation="Removing documents"
+            )
+            
+            # Currently, we don't have direct document removal functionality in VectorStoreManager
+            # We'll need to implement this or provide a workaround
+            
+            # For now, we'll just update the metadata to mark these documents as removed
+            metadata_file = Path(os.path.join(manager.base_dir, vectorstore_id, "metadata.json"))
+            if metadata_file.exists():
+                try:
+                    metadata = load_metadata(metadata_file)
+                    
+                    # Filter out removed documents
+                    if "files" in metadata:
+                        original_file_count = len(metadata["files"])
+                        metadata["files"] = [
+                            file_info for file_info in metadata["files"] 
+                            if file_info.get("document_id") not in request.remove
+                        ]
+                        documents_removed = original_file_count - len(metadata["files"])
+                        
+                        # Update metadata
+                        metadata["updated_at"] = datetime.now().isoformat()
+                        
+                        # Save updated metadata
+                        save_metadata(metadata, metadata_file)
+                        logger.info(f"Removed {documents_removed} documents from metadata")
+                except Exception as e:
+                    logger.error(f"Error updating metadata for document removal: {str(e)}")
+        
+        # Complete the job
+        complete_job(
+            job_id,
+            {
+                "vectorstore_id": vectorstore_id,
+                "documents_added": documents_added,
+                "documents_removed": documents_removed,
+                "skipped_files": skipped_files
+            }
+        )
+        
+        logger.info(f"Batch update completed: {documents_added} added, {documents_removed} removed")
+        
+    except Exception as e:
+        logger.error(f"Error in batch update: {str(e)}")
+        import traceback
+        logger.error(f"Error details: {traceback.format_exc()}")
+        
+        try:
+            fail_job(job_id, str(e))
+        except:
+            logger.error(f"Failed to mark job {job_id} as failed")
 
 
 @router.put("/{vectorstore_id}", response_model=UpdateVectorStoreMetadataResponse)
@@ -704,14 +1040,63 @@ async def update_vectorstore_metadata(
     if not request.name and not request.description:
         raise HTTPException(status_code=400, detail="No metadata updates specified")
     
-    # This is a placeholder - the actual implementation would need to be added
-    # when we implement metadata update functionality in the core module
+    # Get metadata file path
+    metadata_file = Path(os.path.join(manager.base_dir, vectorstore_id, "metadata.json"))
+    if not metadata_file.exists():
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Metadata file not found for vector store {vectorstore_id}"
+        )
     
-    return {
-        "success": False,
-        "message": "Metadata update is not yet implemented",
-        "vectorstore_id": vectorstore_id
-    }
+    try:
+        # Load metadata
+        metadata = load_metadata(metadata_file)
+        if not metadata:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to load metadata for vector store {vectorstore_id}"
+            )
+        
+        # Update metadata fields
+        updated = False
+        
+        if request.name is not None:
+            metadata["name"] = request.name
+            updated = True
+        
+        if request.description is not None:
+            metadata["description"] = request.description
+            updated = True
+        
+        if updated:
+            # Update timestamp
+            metadata["updated_at"] = datetime.now().isoformat()
+            
+            # Save updated metadata
+            if save_metadata(metadata, metadata_file):
+                return {
+                    "success": True,
+                    "message": "Vector store metadata updated successfully",
+                    "vectorstore_id": vectorstore_id
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save updated metadata"
+                )
+        else:
+            return {
+                "success": True,
+                "message": "No changes made to vector store metadata",
+                "vectorstore_id": vectorstore_id
+            }
+            
+    except Exception as e:
+        logger.error(f"Error updating vector store metadata: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating vector store metadata: {str(e)}"
+        )
 
 
 @router.post("/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
@@ -762,7 +1147,6 @@ async def analyze_vectorstore(
         sample_size = min(request.sample_size, 50)  # Limit sample size for analysis
         
         # Get random embeddings to retrieve diverse chunks
-        import numpy as np
         random_embeddings = [np.random.rand(128).tolist() for _ in range(10)]
         
         # Collect chunks from different random queries
@@ -1273,3 +1657,112 @@ async def process_vectorstore_update(
         import traceback
         logger.error(traceback.format_exc())
         fail_job(job_id, str(e))
+
+
+@router.post("/{vectorstore_id}/llm-query", response_model=VectorStoreLLMQueryResponse)
+async def llm_query_vectorstore(
+    vectorstore_id: str,
+    query_request: VectorStoreLLMQueryRequest,
+    manager: VectorStoreManager = Depends(get_vectorstore_manager)
+):
+    """
+    Query a vector store and get LLM-enhanced responses.
+    
+    Args:
+        vectorstore_id: ID of the vector store to query
+        query_request: Query parameters
+        manager: Vector store manager dependency
+        
+    Returns:
+        LLM-enhanced query results with sources
+    """
+    try:
+        # Get vector store info
+        vs_info = manager.get_vectorstore_info(vectorstore_id)
+        if not vs_info:
+            raise HTTPException(status_code=404, detail=f"Vector store {vectorstore_id} not found")
+        
+        logger.info(f"Processing LLM query for vector store {vectorstore_id}: {query_request.query}")
+        
+        # Query the vector store to get relevant chunks
+        results = manager.query_vector_store(
+            vectorstore_id,
+            query_request.query,
+            top_k=query_request.top_k,
+            score_threshold=query_request.score_threshold
+        )
+        
+        if not results:
+            return VectorStoreLLMQueryResponse(
+                answer="I couldn't find any relevant information to answer your question.",
+                sources=[],
+                raw_chunks=[]
+            )
+        
+        # Prepare chunks for LLM processing
+        chunks = []
+        sources = []
+        
+        for i, result in enumerate(results):
+            # Extract the text and metadata
+            text = result.get("text", "")
+            metadata = result.get("metadata", {})
+            score = result.get("score", 0.0)
+            
+            # Add to chunks list
+            chunks.append(text)
+            
+            # Create source info
+            source_info = {
+                "text": text[:200] + "..." if len(text) > 200 else text,  # Truncate for display
+                "metadata": metadata,
+                "score": score,
+                "index": i
+            }
+            
+            # Add document information if available
+            if "document_id" in metadata:
+                source_info["document_id"] = metadata["document_id"]
+            
+            if "filename" in metadata:
+                source_info["filename"] = metadata["filename"]
+            elif "source" in metadata:
+                source_info["filename"] = metadata["source"]
+            
+            if "page" in metadata:
+                source_info["page"] = metadata["page"]
+                
+            sources.append(source_info)
+        
+        # Generate a response using the LLM
+        if query_request.use_llm:
+            # Import LLM-related functions
+            from .llm import generate_query_prompt, get_llm_response
+            
+            # Generate prompt for the LLM
+            prompt = generate_query_prompt(
+                query_request.query,
+                chunks,
+                [result.get("metadata", {}) for result in results]
+            )
+            
+            # Get LLM response
+            llm_response = get_llm_response(prompt)
+        else:
+            # If LLM is not used, just return a simple response
+            llm_response = "To see answers with AI assistance, enable the LLM option."
+        
+        # Return the response
+        response = VectorStoreLLMQueryResponse(
+            answer=llm_response,
+            sources=sources if query_request.include_sources else None,
+            raw_chunks=results if query_request.include_sources else None
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in LLM query: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error processing LLM query: {str(e)}")
