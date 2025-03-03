@@ -46,5 +46,146 @@
         "color": "#800080",
         "created_at": "2025-02-19T17:39:20.271028Z",
         "last_modified": "2025-02-19T17:39:44.792833Z"
+    },
+    {
+        "name": "asdfasdfa",
+        "unique_id": "e30221a6-88de-4274-997c-f6291f462bbe",
+        "description": "sdfasdfasdfasdfasdfasdfasdfasdf",
+        "agents": [
+            "5e6f7890-abcd-ef12-3456-789012345678",
+            "2b3c4d5e-6f78-90ab-cdef-123456789012",
+            "890abcde-f123-4567-8901-23456789abcd"
+        ],
+        "color": "#32CD32",
+        "created_at": "2025-02-28T20:04:48.895928Z",
+        "last_modified": "2025-02-28T22:02:42.205362Z",
+        "vectorstore": [
+            "vectorstore2"
+        ]
+    },
+    {
+        "name": "Copy of PRC Expert Panel",
+        "unique_id": "883c577a-d673-4892-88dd-4743ca9de204",
+        "description": "Panel of PRC domain experts",
+        "agents": [
+            "def12345-6789-0123-4567-89abcdef0123",
+            "6f7890ab-cdef-1234-5678-90123456789a",
+            "cdef1234-5678-9012-3456-789abcdef012",
+            "bcdef123-4567-8901-2345-6789abcdef01",
+            "abcdef12-3456-7890-1234-56789abcdef0",
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "890abcde-f123-4567-8901-23456789abcd"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-02-28T20:07:48.459398Z",
+        "last_modified": "2025-03-01T18:06:57.829737Z",
+        "vectorstore": [
+            "vectorstore2",
+            "65584544-2ecc-4582-9d81-0e454dc815c2"
+        ]
+    },
+    {
+        "name": "test this team",
+        "unique_id": "c96ca852-6050-45d8-bc0a-b17c9dfc0bef",
+        "description": "aweasdsasx",
+        "agents": [
+            "6f7890ab-cdef-1234-5678-901234567444",
+            "5e6f7890-abcd-ef12-3456-789012345678",
+            "abcdef12-3456-7890-1234-56789abcdef0",
+            "1a2b3c4d-5e6f-7890-abcd-ef1234567890"
+        ],
+        "color": "#FFA500",
+        "created_at": "2025-02-28T21:55:23.582846Z",
+        "last_modified": "2025-02-28T21:55:23.582858Z",
+        "vectorstore": [
+            "vectorstore2"
+        ]
+    },
+    {
+        "name": "Copy of PRC Expert Panel",
+        "unique_id": "7e7f4fa0-a749-4bfa-876b-8e316187c19e",
+        "description": "Panel of PRC domain experts",
+        "agents": [
+            "def12345-6789-0123-4567-89abcdef0123",
+            "6f7890ab-cdef-1234-5678-90123456789a",
+            "cdef1234-5678-9012-3456-789abcdef012",
+            "bcdef123-4567-8901-2345-6789abcdef01",
+            "abcdef12-3456-7890-1234-56789abcdef0",
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "890abcde-f123-4567-8901-23456789abcd"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-02-28T21:56:43.706173Z",
+        "last_modified": "2025-02-28T22:01:52.398063Z",
+        "vectorstore": [
+            "vectorstore2"
+        ]
+    },
+    {
+        "name": "Copy of US Expert Panel",
+        "unique_id": "ed1b6bf0-3f94-4b06-8dff-bd5addd23653",
+        "description": "Panel of United States Experts",
+        "agents": [
+            "7890abcd-ef12-3456-7890-123456789abc",
+            "6f7890ab-cdef-1234-5678-901234567444",
+            "5e6f7890-abcd-ef12-3456-789012345678",
+            "4d5e6f78-90ab-cdef-1234-567890123456",
+            "1a2b3c4d-5e6f-7890-abcd-ef1234567890",
+            "2b3c4d5e-6f78-90ab-cdef-123456789012",
+            "3c4d5e6f-7890-abcd-ef12-345678901234"
+        ],
+        "color": "#0000FF",
+        "created_at": "2025-02-28T21:56:44.653360Z",
+        "last_modified": "2025-02-28T22:01:56.086320Z",
+        "vectorstore": [
+            "vectorstore2"
+        ]
+    },
+    {
+        "name": "Copy of US-NATO Coalition",
+        "unique_id": "38121ac9-bd3b-4c02-bf7d-f60cb15f13ef",
+        "description": "Coalition of US and NATO Experts",
+        "agents": [
+            "ef123456-7890-1234-5678-9abcdef01234",
+            "f1234567-8901-2345-6789-abcdef012345",
+            "5e6f7890-abcd-ef12-3456-789012345678",
+            "2b3c4d5e-6f78-90ab-cdef-123456789012"
+        ],
+        "color": "#800080",
+        "created_at": "2025-02-28T21:56:45.461307Z",
+        "last_modified": "2025-02-28T22:02:06.483753Z",
+        "vectorstore": [
+            "vectorstore2"
+        ]
+    },
+    {
+        "name": "VStore Test",
+        "unique_id": "7871ea59-aea1-4aea-bd9c-cab5968786e6",
+        "description": "VStore Test",
+        "agents": [
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "bcdef123-4567-8901-2345-6789abcdef01"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-03-02T02:02:37.049326Z",
+        "last_modified": "2025-03-02T02:15:08.021544Z",
+        "vectorstore": [
+            "4810fa3b-b4db-4023-a8f4-516115e92bf1"
+        ]
+    },
+    {
+        "name": "Copy of VStore Test",
+        "unique_id": "a6834f19-9023-439d-b685-d72640b30af1",
+        "description": "VStore Test",
+        "agents": [
+            "90abcdef-1234-5678-9012-3456789abcde",
+            "bcdef123-4567-8901-2345-6789abcdef01"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-03-02T02:15:17.920744Z",
+        "last_modified": "2025-03-02T02:15:17.920757Z",
+        "vectorstore": [
+            "4810fa3b-b4db-4023-a8f4-516115e92bf1"
+        ]
     }
 ]

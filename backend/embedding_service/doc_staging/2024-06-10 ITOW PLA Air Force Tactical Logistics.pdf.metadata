@@ -1,0 +1,31 @@
+{
+  "document_id": "a73f74ff-f370-4074-bd8e-4de5023b4a8f",
+  "security_classification": "Unclassified",
+  "upload_date": "2025-03-03T04:26:30.018643",
+  "original_file": "2024-06-10 ITOW PLA Air Force Tactical Logistics.pdf",
+  "converted_pdf": null,
+  "file_info": {
+    "name": "2024-06-10 ITOW PLA Air Force Tactical Logistics.pdf",
+    "type": "PDF",
+    "size": 3680650,
+    "path": "2024-06-10 ITOW PLA Air Force Tactical Logistics.pdf",
+    "extension": ".pdf"
+  },
+  "content_info": {
+    "total_pages": 365,
+    "has_conversion": false,
+    "conversion_info": null,
+    "content_type": "PDF",
+    "encoding": null,
+    "pdf_info": {
+      "version": "%PDF-1.7",
+      "is_encrypted": false,
+      "metadata": {
+        "/Producer": "Microsoft\u00ae Word for Microsoft 365",
+        "/Creator": "Microsoft\u00ae Word for Microsoft 365",
+        "/CreationDate": "D:20231222145233-05'00'",
+        "/ModDate": "D:20231222145233-05'00'"
+      }
+    }
+  }
+}

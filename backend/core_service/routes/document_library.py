@@ -13,6 +13,9 @@ import zipfile
 from io import BytesIO
 import subprocess
 import uuid
+import time
+import mimetypes
+from uuid import uuid4  # Add import for UUID generation
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -444,8 +447,12 @@ async def upload_documents(files: List[UploadFile] = File(...), folder_path: str
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
+            # Generate a unique document ID
+            document_id = str(uuid4())
+            
             # Create metadata
             metadata = {
+                "document_id": document_id,  # Add document ID
                 "security_classification": "Unclassified",
                 "upload_date": datetime.now().isoformat(),
                 "original_file": file.filename,
@@ -479,6 +486,7 @@ async def upload_documents(files: List[UploadFile] = File(...), folder_path: str
                 "original_filename": file.filename,
                 "status": "success",
                 "message": "File uploaded successfully",
+                "document_id": document_id,  # Include document ID in response
                 "converted_pdf": metadata["converted_pdf"],
                 "file_info": {
                     "id": relative_path,

@@ -170,6 +170,12 @@ def ensure_session_directory(session_id: str, user_id: str = DEFAULT_USER) -> Pa
     docs_path = session_path / "UserDocs"
     docs_path.mkdir(exist_ok=True)
     
+    # Create a .gitkeep file in the UserDocs directory to ensure Git tracks it
+    gitkeep_path = docs_path / ".gitkeep"
+    if not gitkeep_path.exists():
+        with open(gitkeep_path, 'w') as f:
+            pass  # Create an empty file
+    
     return session_path
 
 def ensure_session_docs_directory(session_id: str, user_id: str = DEFAULT_USER) -> Path:
@@ -811,10 +817,15 @@ def validate_session_directory(session_id: str, user_id: str = DEFAULT_USER) -> 
     if not session_dir.exists():
         return False, "Session directory does not exist"
     
-    # Check if UserDocs directory exists
+    # Check if UserDocs directory exists, create it if it doesn't
     docs_dir = session_dir / "UserDocs"
     if not docs_dir.exists():
-        return False, "UserDocs directory does not exist"
+        # Create UserDocs directory and add .gitkeep file
+        docs_dir.mkdir(exist_ok=True)
+        gitkeep_path = docs_dir / ".gitkeep"
+        with open(gitkeep_path, 'w') as f:
+            pass  # Create an empty file
+        print(f"Created missing UserDocs directory for session {session_id}")
     
     # Check if metadata file exists
     metadata_path = session_dir / "SessionMessages.metadata"
@@ -892,12 +903,54 @@ async def load_existing_sessions():
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
 
+async def ensure_gitkeep_in_all_userdocs():
+    """Create .gitkeep files in all UserDocs directories to ensure they're tracked by Git"""
+    try:
+        if not SESSIONS_DIR.exists():
+            return
+            
+        count = 0
+        # Scan for user directories
+        for user_dir in SESSIONS_DIR.iterdir():
+            if not user_dir.is_dir():
+                continue
+                
+            user_id = user_dir.name
+            
+            # Scan for session directories
+            for session_dir in user_dir.iterdir():
+                if not session_dir.is_dir():
+                    continue
+                    
+                session_id = session_dir.name
+                
+                # Check for UserDocs directory
+                docs_dir = session_dir / "UserDocs"
+                if not docs_dir.exists():
+                    docs_dir.mkdir(exist_ok=True)
+                
+                # Create .gitkeep file if it doesn't exist
+                gitkeep_path = docs_dir / ".gitkeep"
+                if not gitkeep_path.exists():
+                    with open(gitkeep_path, 'w') as f:
+                        pass  # Create an empty file
+                    count += 1
+        
+        if count > 0:
+            print(f"Created {count} missing .gitkeep files in UserDocs directories")
+            
+    except Exception as e:
+        print(f"Error ensuring .gitkeep files: {str(e)}")
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application on startup"""
     try:
         # Ensure base sessions directory exists
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Ensure .gitkeep files exist in all UserDocs directories
+        await ensure_gitkeep_in_all_userdocs()
         
         # Load existing sessions metadata only
         await load_existing_sessions()

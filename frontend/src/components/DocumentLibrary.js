@@ -49,8 +49,6 @@ import axios from 'axios';
 import { getApiUrl } from '../config';
 import { useDocumentLibrary, ACTIONS } from '../contexts/DocumentLibraryContext';
 
-const API_BASE_URL = 'http://localhost:8000/api';
-
 const SECURITY_CLASSIFICATIONS = [
   "SELECT A CLASSIFICATION",
   "Unclassified",
@@ -161,7 +159,7 @@ function DocumentLibrary() {
 
     try {
       dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: true });
-      const response = await fetch(`${API_BASE_URL}/documents?path=${encodeURIComponent(path || '')}`);
+      const response = await fetch(getApiUrl('UPLOAD', `/api/upload/files/?folder=${encodeURIComponent(path || '')}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -178,6 +176,8 @@ function DocumentLibrary() {
         type: ACTIONS.SET_DOCUMENTS, 
         payload: data.map(doc => ({
           ...doc,
+          isFolder: doc.type === 'folder',
+          id: doc.path, // Ensure unique ID for each item
           securityClassification: doc.security_classification || doc.securityClassification || 'SELECT A CLASSIFICATION'
         }))
       });
@@ -188,7 +188,7 @@ function DocumentLibrary() {
     } finally {
       dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: false });
     }
-  }, []); // Remove all dependencies since this is a stable function
+  }, [state?.isRefreshing, dispatch]);
 
   // Only fetch documents when the path changes
   useEffect(() => {
@@ -271,12 +271,12 @@ function DocumentLibrary() {
   const uploadFiles = async (files) => {
     const formData = new FormData();
     files.forEach(file => {
-      formData.append('files', file);
+      formData.append('file', file);
     });
-    formData.append('folder_path', currentPath);
+    formData.append('folder', currentPath);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/upload/'), {
         method: 'POST',
         body: formData,
       });
@@ -286,24 +286,20 @@ function DocumentLibrary() {
       }
       
       const results = await response.json();
-      console.log('Upload response:', results); // Debug log
+      console.log('Upload response:', results);
       
       // Check for any upload errors
-      const errors = results.filter(result => result.status === 'error');
-      if (errors.length > 0) {
-        console.error('Some files failed to upload:', errors);
-        setError('Some files failed to upload: ' + errors.map(e => e.message).join(', '));
+      if (results.status === 'error') {
+        console.error('Failed to upload:', results.message);
+        setError('Failed to upload: ' + results.message);
+        return;
       }
 
-      // Count successful uploads
-      const successCount = results.filter(result => result.status === 'success').length;
-      if (successCount > 0) {
-        setOperationProgress({
-          status: `Successfully uploaded ${successCount} file${successCount > 1 ? 's' : ''}`,
-          processed_items: undefined,
-          total_items: undefined
-        });
-      }
+      setOperationProgress({
+        status: `Successfully uploaded file: ${results.filename}`,
+        processed_items: undefined,
+        total_items: undefined
+      });
 
       // Refresh the document list from the server to get the latest security classifications
       await fetchDocuments(currentPath);
@@ -327,9 +323,9 @@ function DocumentLibrary() {
         return;
       }
 
-      const endpoint = isFolder ? 
-        `${getApiUrl('UPLOAD', '/api/upload/delete_folder')}/${encodeURIComponent(item.path)}` : 
-        `${getApiUrl('UPLOAD', '/api/upload/files')}/${encodeURIComponent(item.path)}`;
+      const endpoint = isFolder 
+        ? getApiUrl('UPLOAD', `/api/upload/delete_folder/${encodeURIComponent(item.path)}`)
+        : getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(item.path)}`);
 
       await axios.delete(endpoint);
       
@@ -363,7 +359,7 @@ function DocumentLibrary() {
         .map(segment => encodeURIComponent(segment))
         .join('/');
       
-      const response = await fetch(`${API_BASE_URL}/documents/${encodedPath}/download`);
+      const response = await fetch(getApiUrl('UPLOAD', `/api/upload/files/${encodedPath}`));
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -425,7 +421,7 @@ function DocumentLibrary() {
       const filePaths = [...new Set(selectedItems.map(item => item.path))];
       
       // Perform the bulk delete
-      await axios.post(`${getApiUrl('UPLOAD', '/api/upload/bulk-delete')}`, {
+      await axios.post(getApiUrl('UPLOAD', '/api/upload/bulk-delete/'), {
         filenames: filePaths
       });
       
@@ -454,26 +450,19 @@ function DocumentLibrary() {
     
     try {
         setIsLoading(true);
-        const response = await fetch(`${API_BASE_URL}/documents/bulk-download`, {
+        const response = await fetch(getApiUrl('UPLOAD', '/api/upload/bulk-download/'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                documentIds: selectedDocs,
-                include_folders: true,
-                preserve_structure: true
+                filenames: selectedDocs,
+                current_folder: currentPath
             })
         });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Get the operation ID from the response header
-        const operationId = response.headers.get('X-Operation-ID');
-        if (operationId) {
-            pollOperationStatus(operationId);
         }
 
         // Handle the ZIP file download
@@ -495,72 +484,16 @@ function DocumentLibrary() {
     }
   };
 
-  const pollOperationStatus = async (operationId) => {
-    let pollCount = 0;
-    const maxPolls = 30; // Maximum number of polls (30 seconds)
-    
-    const pollInterval = setInterval(async () => {
-        try {
-            pollCount++;
-            const response = await fetch(`${API_BASE_URL}/documents/bulk-operations/${operationId}/status`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const status = await response.json();
-            setOperationProgress(status);
-            
-            if (status.status === 'Completed' || status.status === 'Failed' || pollCount >= maxPolls) {
-                clearInterval(pollInterval);
-                if (status.status === 'Completed') {
-                    console.log('Operation completed, refreshing documents...');
-                    await fetchDocuments(currentPath);
-                } else if (status.status === 'Failed') {
-                    setError('Operation failed: ' + (status.errors?.join(', ') || 'Unknown error'));
-                } else if (pollCount >= maxPolls) {
-                    setError('Operation timed out. Please refresh the page to see the latest status.');
-                }
-                // Reset operation progress after a delay
-                setTimeout(() => {
-                    setOperationProgress({});
-                    setError(null);
-                }, 2000);
-            }
-        } catch (error) {
-            console.error('Error polling operation status:', error);
-            clearInterval(pollInterval);
-            setError('Failed to check operation status. The operation may have completed in the background.');
-            // Refresh documents anyway in case the operation succeeded
-            await fetchDocuments(currentPath);
-        }
-    }, 1000);
-
-    // Clean up interval on component unmount
-    return () => {
-        clearInterval(pollInterval);
-        setOperationProgress({});
-        setError(null);
-    };
-  };
-
   const handleCreateFolder = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/documents/folders`, {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/create_folder/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           name: newFolderName,
-          parent_path: currentPath
+          parent_folder: currentPath
         })
       });
 
@@ -578,7 +511,10 @@ function DocumentLibrary() {
   };
 
   const handleFolderClick = (item) => {
+    if (!item.isFolder) return;
+    
     const folderPath = item.path;
+    console.log('Navigating to folder:', folderPath); // Add debug logging
     setCurrentPath(folderPath);
     updateBreadcrumbs(folderPath);
     // Clear selected files when navigating to a new folder
@@ -617,14 +553,17 @@ function DocumentLibrary() {
       const extension = itemToRename.isFolder ? '' : itemToRename.name.substring(itemToRename.name.lastIndexOf('.'));
       const fullNewName = itemToRename.isFolder ? newName : `${newName}${extension}`;
 
-      const response = await fetch(`${API_BASE_URL}/documents/rename`, {
+      const endpoint = itemToRename.isFolder ? '/api/upload/rename_folder/' : '/api/upload/rename_file/';
+      const response = await fetch(getApiUrl('UPLOAD', endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          old_path: itemToRename.path,
-          new_name: fullNewName
+          old_name: itemToRename.name,
+          new_name: fullNewName,
+          folder: currentPath,
+          update_metadata: true  // Add flag to update metadata content
         })
       });
 
@@ -636,6 +575,13 @@ function DocumentLibrary() {
       setRenameDialogOpen(false);
       setItemToRename(null);
       setNewName("");
+
+      // Show success message
+      setOperationProgress({
+        status: `Successfully renamed ${itemToRename.isFolder ? 'folder' : 'file'} to ${fullNewName}`,
+        processed_items: undefined,
+        total_items: undefined
+      });
     } catch (error) {
       console.error('Error renaming item:', error);
       setError('Failed to rename item: ' + error.message);
@@ -724,7 +670,7 @@ function DocumentLibrary() {
         draggedItem.map(item => item.path) : 
         [draggedItem.path];
 
-      const response = await fetch(`${API_BASE_URL}/documents/move`, {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -765,7 +711,7 @@ function DocumentLibrary() {
       setIsLoading(true);
       const parentPath = currentPath.split('/').slice(0, -1).join('/');
       
-      const response = await fetch(`${API_BASE_URL}/documents/move`, {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -833,7 +779,7 @@ function DocumentLibrary() {
         draggedItem.map(item => item.path) : 
         [draggedItem.path];
 
-      const response = await fetch(`${API_BASE_URL}/documents/move`, {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -868,7 +814,7 @@ function DocumentLibrary() {
 
   const handleClassificationChange = async (item, newClassification) => {
     try {
-      const response = await axios.post(`${getApiUrl('UPLOAD', '/api/upload/update-security')}`, {
+      const response = await axios.post(getApiUrl('UPLOAD', '/api/upload/update-security/'), {
         filename: item.path,
         security_classification: newClassification
       });

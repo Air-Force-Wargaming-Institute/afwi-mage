@@ -127,7 +127,7 @@ async def process_question(question: str, session_id: str = None, team_id: str =
                 raise Exception(f"No valid agents found for team {team.name}")
                 
             logger.info(f"Loaded agents: {', '.join(agent_names)}")
-            
+            logger.info(f"Team vectorstore: {team.vectorstore[0]}")
             # Add to inputs for graph processing
             inputs = {
                 "question": question,
@@ -138,6 +138,7 @@ async def process_question(question: str, session_id: str = None, team_id: str =
                 "expert_instructions": agent_instructions,
                 "expert_models": agent_models,
                 "plan": plan,
+                "vectorstore": team.vectorstore[0],
                 "selected_experts": selected_agents
             }
             

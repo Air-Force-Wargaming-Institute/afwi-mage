@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 from utils.validators import validate_file_extension
 from config import UPLOAD_DIR, ALLOWED_EXTENSIONS
@@ -17,9 +17,10 @@ import io
 from docx import Document
 from PyPDF2 import PdfReader, PdfWriter
 from docx_converter import DocxConverter
+import uuid  # Add import for UUID generation
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = logging.getLogger("upload_service")
 
 router = APIRouter()
 docx_converter = DocxConverter()
@@ -52,6 +53,95 @@ class BulkDownloadRequest(BaseModel):
 class FileMoveRequest(BaseModel):
     file_path: str
     target_folder: str
+
+def create_metadata(
+    file_path: Path,
+    folder: str,
+    document_id: str,
+    security_classification: str = "SELECT A CLASSIFICATION",
+    file_size: Optional[int] = None,
+    converted_pdf: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create a standardized metadata structure for a file.
+    
+    Args:
+        file_path: Path object of the file
+        folder: The folder path relative to UPLOAD_DIR
+        document_id: Unique identifier for the document
+        security_classification: Security classification level
+        file_size: Size of the file in bytes
+        converted_pdf: Name of converted PDF file if applicable
+    
+    Returns:
+        Dict containing the metadata structure
+    """
+    relative_path = str(Path(folder) / file_path.name)
+    file_type = get_file_type(file_path.name)
+    
+    # If file_size wasn't provided, try to get it from the file
+    if file_size is None and file_path.exists():
+        file_size = file_path.stat().st_size
+
+    metadata = {
+        # Original fields for backward compatibility
+        "document_id": document_id,
+        "security_classification": security_classification,
+        "upload_date": datetime.now().isoformat(),
+        "original_file": file_path.name,
+        "converted_pdf": converted_pdf,
+        
+        # Enhanced file information
+        "file_info": {
+            "name": file_path.name,
+            "type": file_type,
+            "size": file_size,
+            "path": relative_path,
+            "extension": file_path.suffix.lower()
+        },
+        
+        # Content information
+        "content_info": {
+            "total_pages": None,
+            "has_conversion": bool(converted_pdf),
+            "conversion_info": None,
+            "content_type": file_type,
+            "encoding": "utf-8" if file_type == "TXT" else None
+        }
+    }
+
+    # Update conversion info if there's a converted PDF
+    if converted_pdf:
+        metadata["content_info"]["conversion_info"] = {
+            "source_format": file_path.suffix.lower().lstrip('.'),
+            "target_format": "pdf",
+            "converted_file": converted_pdf,
+            "conversion_date": datetime.now().isoformat()
+        }
+
+    # Try to extract PDF information
+    pdf_path_to_check = None
+    if file_path.suffix.lower() == '.pdf':
+        pdf_path_to_check = file_path
+    elif converted_pdf:
+        pdf_path_to_check = file_path.parent / converted_pdf
+
+    if pdf_path_to_check and pdf_path_to_check.exists():
+        try:
+            with open(pdf_path_to_check, 'rb') as pdf_file:
+                pdf_reader = PdfReader(pdf_file)
+                metadata["content_info"].update({
+                    "total_pages": len(pdf_reader.pages),
+                    "pdf_info": {
+                        "version": pdf_reader.pdf_header,
+                        "is_encrypted": pdf_reader.is_encrypted,
+                        "metadata": pdf_reader.metadata if pdf_reader.metadata else None
+                    }
+                })
+        except Exception as e:
+            logger.error(f"Error reading PDF information: {str(e)}")
+
+    return metadata
 
 @router.post("/create_folder/")
 async def create_folder(folder_data: FolderCreate):
@@ -94,18 +184,53 @@ async def rename_file(file_rename: FileRename):
         raise HTTPException(status_code=400, detail=f"New file name already exists: {new_path}")
     try:
         if old_path != new_path:
+            # First, read the existing metadata if it exists
+            old_metadata_path = old_path.with_suffix('.metadata')
+            metadata = None
+            if old_metadata_path.exists():
+                try:
+                    with open(old_metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error reading metadata file: {str(e)}")
+            
+            # Rename the actual file
             logger.info(f"Attempting to rename file from {old_path} to {new_path}")
             old_path.rename(new_path)
             logger.info(f"File renamed successfully")
             
-            # Rename metadata file if it exists
-            old_metadata_path = old_path.with_suffix('.metadata')
-            logger.info(f"Checking for metadata file: {old_metadata_path}")
-            if old_metadata_path.exists():
+            # Update and write metadata
+            if metadata:
+                # Update only current file references, preserve original_file
+                # Do NOT update metadata["original_file"] as it should remain the original name
+                metadata["file_info"]["name"] = file_rename.new_name
+                metadata["file_info"]["path"] = str(Path(file_rename.folder) / file_rename.new_name)
+                
+                # If there's a converted PDF, update its reference
+                if metadata.get("converted_pdf"):
+                    old_pdf_name = metadata["converted_pdf"]
+                    new_pdf_name = f"{Path(file_rename.new_name).stem}.pdf"
+                    metadata["converted_pdf"] = new_pdf_name
+                    
+                    # Also rename the actual PDF file if it exists
+                    old_pdf_path = old_path.parent / old_pdf_name
+                    new_pdf_path = new_path.parent / new_pdf_name
+                    if old_pdf_path.exists():
+                        old_pdf_path.rename(new_pdf_path)
+                        logger.info(f"Renamed converted PDF from {old_pdf_path} to {new_pdf_path}")
+                
+                # Write updated metadata to new location
                 new_metadata_path = new_path.with_suffix('.metadata')
-                logger.info(f"Renaming metadata file from {old_metadata_path} to {new_metadata_path}")
-                old_metadata_path.rename(new_metadata_path)
-                logger.info(f"Metadata file renamed successfully")
+                with open(new_metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                logger.info(f"Updated metadata written to {new_metadata_path}")
+                logger.debug(f"Updated metadata content: {json.dumps(metadata, indent=2)}")
+                
+                # Delete old metadata file if it still exists
+                if old_metadata_path.exists():
+                    old_metadata_path.unlink()
+                    logger.info("Old metadata file deleted")
+            
         else:
             logger.info(f"Old and new paths are the same, no renaming needed")
         
@@ -154,14 +279,20 @@ async def list_files(folder: Optional[str] = "", recursive: bool = False):
                         "size": stats.st_size,
                         "uploadDate": datetime.fromtimestamp(stats.st_mtime).isoformat(),
                         "path": str(relative_path),
-                        "securityClassification": security_classification
+                        "securityClassification": security_classification,
+                        "isFolder": False,
+                        "id": str(relative_path)  # Add unique ID
                     })
             elif item.is_dir():
                 items.append({
                     "name": item.name,
                     "type": "folder",
                     "path": str(relative_path),
-                    "securityClassification": "N/A"
+                    "securityClassification": "N/A",
+                    "isFolder": True,
+                    "id": str(relative_path),  # Add unique ID
+                    "size": 0,  # Add size (0 for folders)
+                    "uploadDate": datetime.fromtimestamp(item.stat().st_mtime).isoformat()  # Add upload date for folders
                 })
                 if recursive:
                     items.extend(scan_directory(item, relative_to))
@@ -183,52 +314,84 @@ def get_file_type(file_name: str) -> str:
 @router.post("/upload/")
 async def upload_files(file: UploadFile = File(...), folder: Optional[str] = ""):
     try:
+        logger.info(f"Starting upload process for file: {file.filename} in folder: {folder}")
         folder_path = Path(UPLOAD_DIR) / folder
         folder_path.mkdir(parents=True, exist_ok=True)
         
         file_path = folder_path / file.filename
         content = await file.read()
+        file_size = len(content)
+        
+        logger.info(f"File size: {file_size} bytes")
         
         # Write the file
         with file_path.open("wb") as buffer:
             buffer.write(content)
+        logger.info(f"File written successfully to: {file_path}")
 
-        metadata = {
-            "security_classification": "SELECT A CLASSIFICATION",
-            "upload_date": datetime.now().isoformat(),
-            "original_file": file.filename,
-            "converted_pdf": None
-        }
+        # Generate a unique document ID
+        document_id = str(uuid.uuid4())
+        logger.info(f"Generated document ID: {document_id}")
+        converted_pdf = None
 
-        # If file is DOCX, convert to PDF
+        # Handle DOCX conversion if needed
         if file_path.suffix.lower() == '.docx':
+            logger.info("DOCX file detected, attempting conversion to PDF")
             try:
                 pdf_path, error = docx_converter.convert_to_pdf(str(file_path))
                 if pdf_path:
-                    # Move the converted PDF to the same folder as the DOCX
                     final_pdf_path = folder_path / f"{file_path.stem}.pdf"
                     shutil.move(pdf_path, final_pdf_path)
-                    metadata["converted_pdf"] = final_pdf_path.name
+                    converted_pdf = final_pdf_path.name
                     logger.info(f"Successfully converted {file.filename} to PDF: {final_pdf_path}")
                 else:
                     logger.error(f"Failed to convert {file.filename} to PDF: {error}")
             except Exception as e:
                 logger.error(f"Error during PDF conversion: {str(e)}")
-                # Continue with upload even if conversion fails
-        
-        # Create metadata file
-        metadata_path = file_path.with_suffix('.metadata')
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-            
-        logger.info(f"Created metadata file at {metadata_path}")
 
+        # Create metadata using helper function
+        logger.info("Creating metadata structure")
+        metadata = create_metadata(
+            file_path=file_path,
+            folder=folder,
+            document_id=document_id,
+            file_size=file_size,
+            converted_pdf=converted_pdf
+        )
+        
+        # Save metadata
+        metadata_path = file_path.with_suffix('.metadata')
+        logger.info(f"Writing metadata to: {metadata_path}")
+        try:
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            logger.info("Metadata written successfully")
+            logger.debug(f"Metadata content: {json.dumps(metadata, indent=2)}")
+            
+            # Verify metadata was written correctly
+            with open(metadata_path, 'r') as f:
+                written_metadata = json.load(f)
+                logger.info("Metadata verification - structure contains:")
+                logger.info(f"- file_info: {'file_info' in written_metadata}")
+                logger.info(f"- content_info: {'content_info' in written_metadata}")
+                logger.info(f"- document_id: {written_metadata.get('document_id') == document_id}")
+        except Exception as e:
+            logger.error(f"Error writing or verifying metadata: {str(e)}")
+            raise
+
+        logger.info("Upload process completed successfully")
         return JSONResponse(
             content={
                 "filename": file.filename, 
+                "document_id": document_id,
                 "status": "File uploaded successfully",
-                "security_classification": "SELECT A CLASSIFICATION",
-                "converted_pdf": metadata["converted_pdf"]
+                "security_classification": metadata["security_classification"],
+                "converted_pdf": metadata["converted_pdf"],
+                "file_info": metadata["file_info"],
+                "content_info": {
+                    "total_pages": metadata["content_info"]["total_pages"],
+                    "has_conversion": metadata["content_info"]["has_conversion"]
+                }
             }, 
             status_code=200
         )
@@ -378,8 +541,8 @@ async def bulk_download(request: BulkDownloadRequest):
 
 @router.post("/move-file/")
 async def move_file(request: FileMoveRequest):
-    source_path = Path(UPLOAD_DIR) / request.file_path
-    target_path = Path(UPLOAD_DIR) / request.target_folder.lstrip('/')  # Remove leading slash
+    source_path = Path(UPLOAD_DIR) / request.file_path.lstrip('/')
+    target_path = Path(UPLOAD_DIR) / request.target_folder.lstrip('/')
     
     logger.info(f"Moving file from {source_path} to {target_path}")
     logger.info(f"UPLOAD_DIR: {UPLOAD_DIR}")
@@ -391,10 +554,8 @@ async def move_file(request: FileMoveRequest):
         raise HTTPException(status_code=404, detail=f"Source file not found: {source_path}")
     
     if not target_path.exists():
-        logger.error(f"Target folder not found: {target_path}")
-        # Create the target folder if it doesn't exist
+        logger.info(f"Target folder does not exist, creating: {target_path}")
         target_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created target folder: {target_path}")
     
     new_file_path = target_path / source_path.name
     if new_file_path.exists():
@@ -402,8 +563,39 @@ async def move_file(request: FileMoveRequest):
         raise HTTPException(status_code=400, detail="A file with the same name already exists in the target folder")
     
     try:
+        # Move the main file
         shutil.move(str(source_path), str(new_file_path))
         logger.info(f"File moved successfully to {new_file_path}")
+        
+        # Handle metadata file if it exists
+        metadata_path = source_path.with_suffix('.metadata')
+        if metadata_path.exists():
+            new_metadata_path = new_file_path.with_suffix('.metadata')
+            
+            # Read existing metadata
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # Update file path in metadata
+            if 'file_info' in metadata:
+                metadata['file_info']['path'] = str(Path(request.target_folder) / source_path.name)
+            
+            # Write updated metadata to new location
+            with open(new_metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            # Remove old metadata file
+            metadata_path.unlink()
+            logger.info(f"Metadata file moved and updated successfully")
+            
+            # Handle converted PDF if it exists
+            if metadata.get('converted_pdf'):
+                pdf_path = source_path.parent / metadata['converted_pdf']
+                if pdf_path.exists():
+                    new_pdf_path = target_path / metadata['converted_pdf']
+                    shutil.move(str(pdf_path), str(new_pdf_path))
+                    logger.info(f"Converted PDF moved successfully to {new_pdf_path}")
+        
         return {"message": f"File moved successfully to {request.target_folder}"}
     except Exception as e:
         logger.error(f"Error moving file: {str(e)}")
@@ -422,15 +614,32 @@ async def update_security_classification(request: SecurityUpdateRequest):
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
     
     try:
+        # Read existing metadata
         metadata = {}
         if metadata_path.exists():
             with open(metadata_path, 'r') as f:
                 metadata = json.load(f)
         
-        metadata['security_classification'] = request.security_classification
+        # If metadata exists but is in old format, convert it
+        if metadata and "file_info" not in metadata:
+            # Get the folder path relative to UPLOAD_DIR
+            folder = str(file_path.parent.relative_to(UPLOAD_DIR))
+            
+            # Create new metadata structure while preserving existing document_id
+            metadata = create_metadata(
+                file_path=file_path,
+                folder=folder,
+                document_id=metadata.get("document_id", str(uuid.uuid4())),
+                security_classification=request.security_classification,
+                converted_pdf=metadata.get("converted_pdf")
+            )
+        else:
+            # Just update the security classification
+            metadata["security_classification"] = request.security_classification
         
+        # Save updated metadata
         with open(metadata_path, 'w') as f:
-            json.dump(metadata, f)
+            json.dump(metadata, f, indent=2)
         
         logger.info(f"Security classification updated successfully for {request.filename}")
         return {"message": f"Security classification for {request.filename} updated to {request.security_classification}"}
@@ -494,6 +703,8 @@ async def preview_docx(file_path: str):
 
         # Check metadata for converted PDF
         metadata_path = full_path.with_suffix('.metadata')
+        converted_pdf = None
+        
         if metadata_path.exists():
             try:
                 with open(metadata_path, 'r') as f:
@@ -510,13 +721,17 @@ async def preview_docx(file_path: str):
         pdf_path, error = docx_converter.convert_to_pdf(str(full_path))
         if pdf_path:
             try:
-                # Update metadata with new conversion
-                metadata = {
-                    "security_classification": "SELECT A CLASSIFICATION",
-                    "upload_date": datetime.now().isoformat(),
-                    "original_file": full_path.name,
-                    "converted_pdf": Path(pdf_path).name
-                }
+                # Get the folder path relative to UPLOAD_DIR
+                folder = str(full_path.parent.relative_to(UPLOAD_DIR))
+                
+                # Create or update metadata with new conversion
+                metadata = create_metadata(
+                    file_path=full_path,
+                    folder=folder,
+                    document_id=metadata.get("document_id", str(uuid.uuid4())) if metadata else str(uuid.uuid4()),
+                    converted_pdf=Path(pdf_path).name
+                )
+                
                 with open(metadata_path, 'w') as f:
                     json.dump(metadata, f, indent=2)
 

@@ -1,22 +1,55 @@
-# Web framework and related
-fastapi==0.111.1
-uvicorn[standard]==0.32.0
-python-multipart==0.0.12 #consider using 0.0.12
-pydantic>=2.0
+# FastAPI and web server
+fastapi==0.95.1
+uvicorn==0.22.0
+pydantic==1.10.8
+starlette>=0.26.1,<0.27.0
 
-# LangChain and related
-langchain-openai==0.2.4
-langchain-community==0.3.3
-langchain-core==0.3.13
-langchain==0.3.4
-langgraph==0.2.39
-faiss-cpu==1.9.0 #https://github.com/kyamagu/faiss-wheels for GPU support
+# Data processing and manipulation
+numpy==1.24.3
 
-# PDF processing
-PyPDF4==1.27.0
+# Document processing
+pypdf>=3.15.1
+docx2txt==0.8
+markdown==3.4.3
+python-pptx==0.6.21
+unstructured==0.10.16
+unstructured-inference==0.6.6
+pdfminer.six==20221105
+
+# Document processing and metadata extraction
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+python-magic>=0.4.27  # For better MIME type detection
+python-dateutil>=2.8.2  # For date parsing
+
+# LangChain and vector databases
+langchain>=0.0.285
+langchain-core>=0.1.0
+langchain-community>=0.0.4
+langchain-text-splitters>=0.0.1
+
+# Embedding models - GPU compatible versions
+openai>=1.3.0
+sentence-transformers==2.2.2
+transformers==4.31.0
+torch>=2.1.0+cu118
+huggingface-hub>=0.18.0
+
+# Utilities
+python-multipart==0.0.6
+httpx==0.24.1
+requests==2.31.0
 
 # Environment and configuration
 python-dotenv==1.0.0
-
-# Path handling
 pathlib==1.0.1
+
+# Ollama/LLM integration
+# llama-cpp-python==0.2.11  # Installing this separately in Dockerfile
+
+# Vector store - FAISS is now installed directly in the Dockerfile for the GPU version
+# Do not install faiss-cpu here as it will conflict with faiss-gpu
+
+# GPU Monitoring
+gputil==1.4.0
+psutil==5.9.5

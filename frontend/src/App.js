@@ -14,6 +14,7 @@ import MultiAgentChat from './components/MultiAgentChat';
 import MultiAgentHILChat from './components/MultiAgentHILChat';
 import RetrievalGuide from './components/RetrievalGuide';
 import BuildRetrievalDatabases from './components/BuildRetrievalDatabases';
+import ManageVectorStores from './components/vectorstore/ManageVectorStores';
 import LibrarianAgents from './components/LibrarianAgents';
 import DocumentLibrary from './components/DocumentLibrary';
 import UserGuide from './components/UserGuide';
@@ -58,6 +59,7 @@ const AuthenticatedRoutes = () => {
           <Route path="/fine-tuning/test" component={Test} />
           <Route exact path="/retrieval" component={RetrievalGuide} />
           <Route path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
+          <Route path="/retrieval/manage-databases" component={ManageVectorStores} />
           <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
           <Route exact path="/">
             <Redirect to="/home" />

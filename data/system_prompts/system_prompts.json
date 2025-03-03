@@ -44,7 +44,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "plan_prompt_with_conversation_history": {
     "name": "plan_prompt_with_conversation_history",
@@ -57,7 +57,7 @@
       "agents_with_instructions",
       "high_level_system_prompt"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "relevance_prompt": {
     "name": "relevance_prompt",
@@ -81,7 +81,7 @@
       "analysis",
       "expert_agents"
     ],
-    "llm": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest"
+    "llm": "llama3.1:latest"
   },
   "librarian_summary_prompt": {
     "name": "librarian_summary_prompt",
