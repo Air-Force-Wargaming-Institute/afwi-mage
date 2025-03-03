@@ -16,6 +16,12 @@ unstructured==0.10.16
 unstructured-inference==0.6.6
 pdfminer.six==20221105
 
+# Document processing and metadata extraction
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+python-magic>=0.4.27  # For better MIME type detection
+python-dateutil>=2.8.2  # For date parsing
+
 # LangChain and vector databases
 langchain>=0.0.285
 langchain-core>=0.1.0

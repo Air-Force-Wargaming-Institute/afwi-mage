@@ -35,6 +35,15 @@ import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 
 import { testVectorStoreQuery, analyzeVectorStore, llmQueryVectorStore } from '../../services/vectorStoreService';
+import { MetadataDisplay, SecurityClassification } from './MetadataDisplay';
+
+// Helper function to get color based on relevance score
+const getScoreColor = (score) => {
+  if (score >= 0.8) return '#4caf50'; // High relevance - green
+  if (score >= 0.6) return '#8bc34a'; // Good relevance - light green
+  if (score >= 0.4) return '#ffc107'; // Medium relevance - amber
+  return '#ff9800'; // Low relevance - orange
+};
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -50,10 +59,21 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     marginBottom: theme.spacing(2),
     borderLeft: `4px solid ${theme.palette.primary.main}`,
+    '& .metadata-section': {
+      marginBottom: theme.spacing(2),
+    },
   },
   relevanceScore: {
     fontWeight: 'bold',
-    color: theme.palette.primary.main,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    '& .score-bar': {
+      width: '100%',
+      height: '4px',
+      borderRadius: '2px',
+      marginTop: '2px',
+    },
   },
   source: {
     display: 'flex',
@@ -106,6 +126,14 @@ const useStyles = makeStyles((theme) => ({
     textAlign: 'center',
     padding: theme.spacing(4),
     color: theme.palette.text.secondary,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: theme.shape.borderRadius,
+    border: '1px dashed rgba(0, 0, 0, 0.1)',
+    '& .icon': {
+      fontSize: 48,
+      opacity: 0.5,
+      marginBottom: theme.spacing(2),
+    },
   },
   exampleContainer: {
     marginTop: theme.spacing(2),
@@ -159,12 +187,36 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: 'rgba(250, 250, 250, 0.8)',
     border: '1px solid rgba(0, 0, 0, 0.12)',
     borderRadius: theme.shape.borderRadius,
+    '& .answer-header': {
+      marginBottom: theme.spacing(2),
+      display: 'flex',
+      alignItems: 'center',
+      '& .icon': {
+        marginRight: theme.spacing(1),
+        color: theme.palette.primary.main,
+      },
+    },
   },
   llmAnswer: {
     whiteSpace: 'pre-wrap',
+    '& p': {
+      marginBottom: theme.spacing(1.5),
+    },
+    '& code': {
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+      padding: '2px 4px',
+      borderRadius: '3px',
+      fontSize: '0.9em',
+    },
   },
   sourcesList: {
-    marginTop: theme.spacing(2),
+    marginTop: theme.spacing(3),
+    '& .source-header': {
+      marginBottom: theme.spacing(1),
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
   },
   sourcesHeading: {
     marginBottom: theme.spacing(1),
@@ -245,6 +297,9 @@ const useStyles = makeStyles((theme) => ({
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     position: 'relative',
     width: '100%',
+    '& .metadata-section': {
+      marginBottom: theme.spacing(1.5),
+    },
   },
   expandedDocText: {
     whiteSpace: 'pre-wrap',
@@ -255,6 +310,7 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1.5),
     border: '1px solid rgba(0, 0, 0, 0.1)',
     borderRadius: theme.shape.borderRadius,
+    marginTop: theme.spacing(1.5),
   },
   expandedDocTextLimited: {
     maxHeight: '150px',
@@ -278,8 +334,10 @@ const useStyles = makeStyles((theme) => ({
   },
   documentChip: {
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
     '&:hover': {
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+      transform: 'translateY(-1px)',
     },
   },
 }));
@@ -497,27 +555,12 @@ const QueryTester = ({ vectorStore }) => {
     // Create HTML with highlighted terms
     const highlightedHtml = highlightQueryTerms(result.text);
     
-    // Calculate a color based on relevance score
-    const getScoreColor = (score) => {
-      if (score >= 0.8) return '#4caf50'; // High relevance - green
-      if (score >= 0.6) return '#8bc34a'; // Good relevance - light green
-      if (score >= 0.4) return '#ffc107'; // Medium relevance - amber
-      return '#ff9800'; // Low relevance - orange
-    };
-    
     // Get relevance label based on score
     const getRelevanceLabel = (score) => {
       if (score >= 0.8) return 'Very High';
       if (score >= 0.6) return 'High';
       if (score >= 0.4) return 'Moderate';
       return 'Low';
-    };
-    
-    // Format source for display
-    const formatSource = (metadata) => {
-      if (!metadata?.source) return 'Unknown source';
-      const sourceParts = metadata.source.split('/');
-      return sourceParts[sourceParts.length - 1];
     };
     
     // Get normalized score (should be 0-1)
@@ -528,10 +571,13 @@ const QueryTester = ({ vectorStore }) => {
     
     return (
       <Paper key={index} className={classes.resultItem} elevation={2}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="subtitle1">
-            Match {page * rowsPerPage + index + 1}
-          </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="subtitle1">
+              Match {page * rowsPerPage + index + 1}
+            </Typography>
+            <SecurityClassification classification={result.metadata?.security_classification} />
+          </Box>
           <Box display="flex" alignItems="center">
             <Typography variant="body2" style={{ marginRight: 8 }}>
               Relevance:
@@ -574,36 +620,8 @@ const QueryTester = ({ vectorStore }) => {
           </Box>
         </Box>
         
-        <div className={classes.matchMetadata}>
-          {result.metadata?.source && (
-            <Chip 
-              size="small" 
-              label={`Source: ${formatSource(result.metadata)}`} 
-              className={classes.metadataChip}
-            />
-          )}
-          {result.metadata?.page && (
-            <Chip 
-              size="small" 
-              label={`Page: ${result.metadata.page}`} 
-              className={classes.metadataChip}
-            />
-          )}
-          {result.metadata?.document_id && (
-            <Chip 
-              size="small" 
-              label={`Document ID: ${result.metadata.document_id}`} 
-              className={classes.metadataChip}
-            />
-          )}
-          {result.metadata?.chunk_id && (
-            <Chip 
-              size="small" 
-              label={`Chunk: ${result.metadata.chunk_id}`} 
-              className={classes.metadataChip}
-            />
-          )}
-        </div>
+        {/* Enhanced Metadata Display */}
+        <MetadataDisplay metadata={result.metadata} />
         
         <Divider className={classes.divider} />
         
@@ -615,6 +633,19 @@ const QueryTester = ({ vectorStore }) => {
             ) 
           }} 
         />
+        
+        {/* Add expand/collapse button if text is long */}
+        {result.text.length > 500 && (
+          <Button
+            className={classes.showMoreButton}
+            onClick={() => toggleShowFullText(result.metadata?.document_id || index)}
+            size="small"
+            color="primary"
+            variant="text"
+          >
+            {showFullText[result.metadata?.document_id || index] ? "Show less" : "Show more"}
+          </Button>
+        )}
       </Paper>
     );
   };
@@ -1351,64 +1382,18 @@ const QueryTester = ({ vectorStore }) => {
                     
                     <Box display="flex" flexWrap="wrap" mt={1}>
                       {llmResponse.sources.map((source, index) => {
-                        // Create a more informative source label when source is "Unknown"
-                        let sourceLabel;
-                        if (source.source === "Unknown") {
-                          sourceLabel = source.document_id ? `Doc ID: ${source.document_id.substring(0, 8)}...` : "Unknown Source";
-                        } else {
-                          sourceLabel = `${source.source.split('/').pop()}${source.page !== 'N/A' ? ` (p.${source.page})` : ''}`;
-                        }
-                        
-                        // Enhance tooltip with more information
-                        const tooltipTitle = (
-                          <div>
-                            <Typography variant="body2">
-                              {source.source !== "Unknown" ? `Document: ${source.source}` : "Source: Unknown"}
-                            </Typography>
-                            {source.document_id && (
-                              <Typography variant="body2">
-                                ID: {source.document_id}
-                              </Typography>
-                            )}
-                            <Typography variant="body2">
-                              Relevance: {(source.score * 100).toFixed(0)}%
-                              {source.original_score !== undefined && (
-                                ` (Raw: ${source.original_score.toFixed(2)})`
-                              )}
-                            </Typography>
-                            <Typography variant="body2">
-                              Click to view full document text
-                            </Typography>
-                          </div>
-                        );
-                        
-                        // Get the relevance score and determine color
-                        const relevanceScore = source.score;
-                        const getScoreColor = (score) => {
-                          if (score >= 0.8) return 'rgba(76, 175, 80, 0.2)';  // High - green
-                          if (score >= 0.6) return 'rgba(139, 195, 74, 0.2)'; // Good - light green
-                          if (score >= 0.4) return 'rgba(255, 193, 7, 0.2)';  // Medium - amber
-                          return 'rgba(255, 152, 0, 0.2)';                    // Low - orange
-                        };
-                        
-                        const getBorderColor = (score) => {
-                          if (score >= 0.8) return '#4caf50';  // High - green
-                          if (score >= 0.6) return '#8bc34a'; // Good - light green
-                          if (score >= 0.4) return '#ffc107';  // Medium - amber
-                          return '#ff9800';                    // Low - orange
-                        };
-                        
-                        const sourceId = `source-${index}-${source.document_id || index}`;
+                        // Extract document ID from metadata
+                        const sourceId = `source-${index}-${source.metadata?.document_id || index}`;
                         const isExpanded = expandedDocId === sourceId;
                         
                         return (
                           <React.Fragment key={index}>
-                            <Tooltip title={tooltipTitle}>
+                            <Tooltip title="Click to view full document text">
                               <Chip
                                 size="small"
                                 label={
                                   <Box display="flex" alignItems="center">
-                                    <span>{sourceLabel}</span>
+                                    <span>Source {index + 1}</span>
                                     {isExpanded ? 
                                       <ExpandLessIcon fontSize="small" style={{ marginLeft: 4, width: 16, height: 16 }} /> :
                                       <ExpandMoreIcon fontSize="small" style={{ marginLeft: 4, width: 16, height: 16 }} />
@@ -1419,9 +1404,9 @@ const QueryTester = ({ vectorStore }) => {
                                 onClick={() => handleDocExpand(sourceId)}
                                 style={{ 
                                   margin: '0 4px 4px 0',
-                                  backgroundColor: getScoreColor(relevanceScore),
-                                  border: `1px solid ${getBorderColor(relevanceScore)}`,
-                                  fontWeight: relevanceScore >= 0.7 ? 'bold' : 'normal'
+                                  backgroundColor: `${getScoreColor(source.score)}20`,
+                                  border: `1px solid ${getScoreColor(source.score)}`,
+                                  fontWeight: source.score >= 0.7 ? 'bold' : 'normal'
                                 }}
                               />
                             </Tooltip>
@@ -1430,9 +1415,7 @@ const QueryTester = ({ vectorStore }) => {
                               <div className={classes.expandedDocContainer}>
                                 <div className={classes.expandedDocHeader}>
                                   <Typography variant="subtitle2">
-                                    {source.source !== "Unknown" ? 
-                                      `Document: ${source.source.split('/').pop()}` : 
-                                      "Unknown Source"}
+                                    Source Document {index + 1}
                                   </Typography>
                                   <IconButton 
                                     size="small" 
@@ -1443,31 +1426,8 @@ const QueryTester = ({ vectorStore }) => {
                                   </IconButton>
                                 </div>
                                 
-                                <div className={classes.expandedDocMetadata}>
-                                  {source.document_id && (
-                                    <Chip 
-                                      size="small" 
-                                      label={`ID: ${source.document_id}`} 
-                                      className={classes.metadataChip}
-                                    />
-                                  )}
-                                  {source.page && source.page !== 'N/A' && (
-                                    <Chip 
-                                      size="small" 
-                                      label={`Page: ${source.page}`} 
-                                      className={classes.metadataChip}
-                                    />
-                                  )}
-                                  <Chip 
-                                    size="small" 
-                                    label={`Relevance: ${(source.score * 100).toFixed(0)}%`} 
-                                    className={classes.metadataChip}
-                                    style={{
-                                      backgroundColor: getScoreColor(relevanceScore),
-                                      border: `1px solid ${getBorderColor(relevanceScore)}`
-                                    }}
-                                  />
-                                </div>
+                                {/* Enhanced metadata display for source */}
+                                <MetadataDisplay metadata={source.metadata} />
                                 
                                 <div className={`${classes.expandedDocText} ${!showFullText[sourceId] ? classes.expandedDocTextLimited : ''}`}>
                                   {source.text || source.text_preview || "Full document text not available."}
@@ -1493,7 +1453,7 @@ const QueryTester = ({ vectorStore }) => {
                     
                     <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
                       Sources are ordered by relevance. Darker colors indicate higher relevance to your query.
-                      Click on any source to view its full text.
+                      Click on any source to view its full text and metadata.
                     </Typography>
                   </Paper>
                 </div>

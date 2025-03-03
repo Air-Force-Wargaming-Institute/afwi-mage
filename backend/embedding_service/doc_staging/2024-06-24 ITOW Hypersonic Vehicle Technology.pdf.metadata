@@ -1,0 +1,40 @@
+{
+  "document_id": "7119dc5e-2a43-4f34-98ef-487947033970",
+  "security_classification": "Top Secret//SCI//REL TO USA, FVEY",
+  "upload_date": "2025-03-03T04:25:54.933067",
+  "original_file": "2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+  "converted_pdf": null,
+  "file_info": {
+    "name": "2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+    "type": "PDF",
+    "size": 33214678,
+    "path": "2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+    "extension": ".pdf"
+  },
+  "content_info": {
+    "total_pages": 487,
+    "has_conversion": false,
+    "conversion_info": null,
+    "content_type": "PDF",
+    "encoding": null,
+    "pdf_info": {
+      "version": "%PDF-1.5",
+      "is_encrypted": false,
+      "metadata": {
+        "/Author": "",
+        "/Comments": "",
+        "/Company": "",
+        "/ContentTypeId": "0x01010047E0675787CD3C46B776931B1AAA5D0C",
+        "/CreationDate": "D:20240517105302-04'00'",
+        "/Creator": "Acrobat PDFMaker 11 for Word",
+        "/Keywords": "",
+        "/MediaServiceImageTags": "",
+        "/ModDate": "D:20240517105839-04'00'",
+        "/Producer": "Adobe PDF Library 11.0",
+        "/SourceModified": "D:20240517145046",
+        "/Subject": "",
+        "/Title": ""
+      }
+    }
+  }
+}

@@ -3,7 +3,9 @@ Module for managing vector stores.
 """
 
 import os
+import json
 import shutil
+import logging
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
@@ -17,6 +19,9 @@ from ..utils.metadata import (
     load_metadata,
     update_metadata
 )
+
+# Set up logging
+logger = logging.getLogger("embedding_service")
 
 
 class VectorStoreManager:
@@ -33,6 +38,7 @@ class VectorStoreManager:
         """
         self.vectorstore_dir = vectorstore_dir
         self.vectorstore_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"DEBUGGING: VectorStoreManager initialized with directory: {vectorstore_dir}")
     
     def list_vectorstores(self) -> List[Dict[str, Any]]:
         """
@@ -41,6 +47,7 @@ class VectorStoreManager:
         Returns:
             List of dictionaries with vector store information
         """
+        logger.info(f"DEBUGGING: Listing vectorstores from {self.vectorstore_dir}")
         vectorstores = []
         
         for vs_dir in self.vectorstore_dir.iterdir():
@@ -63,7 +70,9 @@ class VectorStoreManager:
                     "chunk_overlap": metadata.get("chunk_overlap", 100)
                 }
                 vectorstores.append(vs_info)
+                logger.info(f"DEBUGGING: Found vectorstore: {vs_dir.name}, name: {vs_info['name']}")
         
+        logger.info(f"DEBUGGING: Found {len(vectorstores)} vectorstores")
         return vectorstores
     
     def get_vectorstore_info(self, vectorstore_id: str) -> Optional[Dict[str, Any]]:
@@ -76,29 +85,42 @@ class VectorStoreManager:
         Returns:
             Dictionary with vector store information, or None if not found
         """
+        logger.info(f"DEBUGGING: Getting info for vectorstore: {vectorstore_id}")
         vs_dir = self.vectorstore_dir / vectorstore_id
         
         if not vs_dir.exists() or not vs_dir.is_dir():
+            logger.warning(f"DEBUGGING: Vectorstore {vectorstore_id} not found")
             return None
         
         # Try to load metadata
         metadata = load_metadata(vs_dir)
         if not metadata:
+            logger.warning(f"DEBUGGING: Metadata for vectorstore {vectorstore_id} not found")
             return None
         
         # Include file details
         files = metadata.get("files", [])
         file_details = []
         
+        logger.info(f"DEBUGGING: Processing {len(files)} file entries in vectorstore metadata")
+        
         for file_info in files:
-            file_details.append({
+            file_detail = {
                 "filename": file_info.get("filename", ""),
                 "original_path": file_info.get("original_path", ""),
                 "security_classification": file_info.get("security_classification", "UNCLASSIFIED")
-            })
+            }
+            
+            # Include document_id if available
+            if "document_id" in file_info:
+                file_detail["document_id"] = file_info["document_id"]
+                logger.info(f"DEBUGGING: File has document_id: {file_info['document_id']}")
+            
+            file_details.append(file_detail)
+            logger.info(f"DEBUGGING: Added file detail: {json.dumps(file_detail, indent=2)}")
         
         # Extract and return full information
-        return {
+        result = {
             "id": vectorstore_id,
             "name": metadata.get("name", vectorstore_id),
             "description": metadata.get("description", ""),
@@ -112,6 +134,9 @@ class VectorStoreManager:
             "max_paragraph_length": metadata.get("max_paragraph_length", 1500),
             "min_paragraph_length": metadata.get("min_paragraph_length", 50)
         }
+        
+        logger.info(f"DEBUGGING: Returning info for vectorstore {vectorstore_id}")
+        return result
     
     def create_vectorstore(
         self,
@@ -140,24 +165,38 @@ class VectorStoreManager:
         Returns:
             ID of the new vector store
         """
+        logger.info(f"DEBUGGING: Creating vectorstore with name: {name}, documents: {len(documents)}")
+        
+        # Log sample document metadata
+        if documents:
+            logger.info(f"DEBUGGING: Sample document metadata: {json.dumps(documents[0].metadata, indent=2)}")
+        
         # Create a unique ID for the vector store
         import uuid
         import time
         
         vectorstore_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
         vs_dir = self.vectorstore_dir / vectorstore_id
+        logger.info(f"DEBUGGING: Generated vectorstore ID: {vectorstore_id}")
         
         # Create the vector store directory
         vs_dir.mkdir(parents=True, exist_ok=True)
         
         # Create the vector store
+        logger.info(f"DEBUGGING: Creating FAISS vector store with {len(documents)} documents")
         vectorstore = FAISS.from_documents(documents, embedding_model)
         
         # Save the vector store
+        logger.info(f"DEBUGGING: Saving vector store to {vs_dir}")
         vectorstore.save_local(str(vs_dir))
         
+        # Log file info
+        for i, file_info in enumerate(file_infos):
+            logger.info(f"DEBUGGING: File info {i+1}: filename={file_info.get('filename', 'unknown')}, security={file_info.get('security_classification', 'UNCLASSIFIED')}")
+        
         # Create and save metadata
-        metadata = create_vectorstore_metadata(
+        logger.info(f"DEBUGGING: Creating vectorstore metadata")
+        metadata_obj = create_vectorstore_metadata(
             name=name,
             description=description,
             embedding_model=model_name,
@@ -166,8 +205,10 @@ class VectorStoreManager:
             chunk_overlap=chunk_overlap
         )
         
-        save_metadata(vs_dir, metadata)
+        logger.info(f"DEBUGGING: Saving vectorstore metadata to {vs_dir}")
+        save_metadata(vs_dir, metadata_obj)
         
+        logger.info(f"DEBUGGING: Vectorstore {vectorstore_id} created successfully")
         return vectorstore_id
     
     def update_vectorstore(

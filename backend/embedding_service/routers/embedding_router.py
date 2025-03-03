@@ -4,8 +4,10 @@ API router for embedding service.
 
 import os
 import json
+import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import datetime
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -23,6 +25,9 @@ from utils import (
 )
 
 from config import VECTORSTORE_DIR, DATA_DIR, DOC_STAGING_DIR
+
+# Set up logging
+logger = logging.getLogger("embedding_service")
 
 # Define the upload directory
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", str(DATA_DIR / "uploads"))
@@ -124,6 +129,10 @@ async def create_vectorstore(
     manager: VectorStoreManager = Depends(get_vectorstore_manager)
 ):
     """Create a new vector store with the specified files."""
+    # Log the incoming request
+    logger.info(f"DEBUGGING: Create vectorstore request - Name: {request.name}")
+    logger.info(f"DEBUGGING: Files requested: {request.files}")
+    
     # Validate the request
     if not request.name:
         raise HTTPException(status_code=400, detail="Name is required")
@@ -134,12 +143,15 @@ async def create_vectorstore(
     try:
         # Get the embedding model
         embedding_model = get_embedding_model(request.embedding_model)
+        logger.info(f"DEBUGGING: Using embedding model: {request.embedding_model}")
         
         # Set up directories
         upload_dir = Path(UPLOAD_DIR)
         staging_dir = Path(DOC_STAGING_DIR)
+        logger.info(f"DEBUGGING: Upload dir: {upload_dir}, Staging dir: {staging_dir}")
         
         # Copy files to staging directory
+        logger.info(f"DEBUGGING: Copying files to staging: {request.files}")
         file_mapping = document_loader.copy_files_to_staging(
             request.files,
             upload_dir,
@@ -147,34 +159,67 @@ async def create_vectorstore(
         )
         
         if not file_mapping:
+            logger.error("DEBUGGING: No valid files found after staging")
             raise HTTPException(status_code=400, detail="No valid files found")
         
-        # Load and process documents
+        logger.info(f"DEBUGGING: File mapping after staging (keys): {list(file_mapping.keys())}")
+        
+        # Get security classifications and other metadata
+        logger.info(f"DEBUGGING: Getting security info for files: {list(file_mapping.keys())}")
+        security_info = metadata.get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+        
+        # Log security info keys and values
+        logger.info(f"DEBUGGING: Security info keys: {list(security_info.keys())}")
+        for key, value in security_info.items():
+            classification = value.get("security_classification", "UNCLASSIFIED")
+            original_name = value.get("original_filename", "unknown")
+            logger.info(f"DEBUGGING: Security info for {key}: classification={classification}, original_name={original_name}")
+        
+        # Load and process documents with metadata
+        logger.info(f"DEBUGGING: Loading documents from: {list(file_mapping.values())}")
         documents, skipped_files = document_loader.load_documents(
             list(file_mapping.values()),
             request.chunk_size,
-            request.chunk_overlap
+            request.chunk_overlap,
+            file_metadata=security_info
         )
         
         if not documents:
+            logger.error("DEBUGGING: No valid documents could be processed")
             raise HTTPException(status_code=400, detail="No valid documents could be processed")
         
-        # Get security classifications
-        security_info = metadata.get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+        logger.info(f"DEBUGGING: Loaded {len(documents)} documents, skipped {len(skipped_files)} files")
         
-        # Prepare file info list
+        # Log sample document metadata
+        if documents:
+            logger.info(f"DEBUGGING: Sample document metadata: {json.dumps(documents[0].metadata, indent=2)}")
+        
+        # Prepare file info list with complete metadata
+        logger.info(f"DEBUGGING: Preparing file infos for vectorstore")
         file_infos = []
         for orig_path, staged_path in file_mapping.items():
+            # Get metadata for this file
+            file_metadata = security_info.get(orig_path, {})
+            logger.info(f"DEBUGGING: File info for {orig_path}: {json.dumps(file_metadata, indent=2)}")
+            
             file_info = {
-                "filename": os.path.basename(orig_path),
+                "filename": file_metadata.get("original_filename", os.path.basename(orig_path)),
                 "original_path": orig_path,
                 "staged_path": staged_path,
-                "security_classification": security_info.get(orig_path, {}).get("security_classification", "UNCLASSIFIED"),
-                "content_security_classification": security_info.get(orig_path, {}).get("content_security_classification", "UNCLASSIFIED")
+                "security_classification": file_metadata.get("security_classification", "UNCLASSIFIED"),
+                "content_security_classification": file_metadata.get("content_security_classification", "UNCLASSIFIED"),
+                "added_at": datetime.datetime.now().isoformat()
             }
+            
+            # Add document_id if available
+            if "document_id" in file_metadata:
+                file_info["document_id"] = file_metadata["document_id"]
+                
             file_infos.append(file_info)
+            logger.info(f"DEBUGGING: Added file info: {json.dumps(file_info, indent=2)}")
         
         # Create the vector store
+        logger.info(f"DEBUGGING: Creating vectorstore with {len(documents)} documents and {len(file_infos)} file infos")
         vectorstore_id = manager.create_vectorstore(
             name=request.name,
             description=request.description,
@@ -186,6 +231,8 @@ async def create_vectorstore(
             chunk_overlap=request.chunk_overlap
         )
         
+        logger.info(f"DEBUGGING: Vectorstore created with ID: {vectorstore_id}")
+        
         return {
             "success": True,
             "message": f"Vector store '{request.name}' created successfully",
@@ -194,6 +241,8 @@ async def create_vectorstore(
         }
         
     except Exception as e:
+        logger.error(f"DEBUGGING: Error creating vectorstore: {str(e)}")
+        logger.error(f"DEBUGGING: Exception details:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -231,29 +280,39 @@ async def update_vectorstore(
         if not file_mapping:
             raise HTTPException(status_code=400, detail="No valid files found")
         
-        # Load and process documents
+        # Get security classifications and other metadata
+        security_info = metadata.get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
+        
+        # Load and process documents with metadata
         documents, skipped_files = document_loader.load_documents(
             list(file_mapping.values()),
             vs_info["chunk_size"],
-            vs_info["chunk_overlap"]
+            vs_info["chunk_overlap"],
+            file_metadata=security_info
         )
         
         if not documents:
             raise HTTPException(status_code=400, detail="No valid documents could be processed")
         
-        # Get security classifications
-        security_info = metadata.get_file_security_info(list(file_mapping.keys()), Path(UPLOAD_DIR))
-        
-        # Prepare file info list
+        # Prepare file info list with complete metadata
         file_infos = []
         for orig_path, staged_path in file_mapping.items():
+            # Get metadata for this file
+            file_metadata = security_info.get(orig_path, {})
+            
             file_info = {
-                "filename": os.path.basename(orig_path),
+                "filename": file_metadata.get("original_filename", os.path.basename(orig_path)),
                 "original_path": orig_path,
                 "staged_path": staged_path,
-                "security_classification": security_info.get(orig_path, {}).get("security_classification", "UNCLASSIFIED"),
-                "content_security_classification": security_info.get(orig_path, {}).get("content_security_classification", "UNCLASSIFIED")
+                "security_classification": file_metadata.get("security_classification", "UNCLASSIFIED"),
+                "content_security_classification": file_metadata.get("content_security_classification", "UNCLASSIFIED"),
+                "added_at": datetime.datetime.now().isoformat()
             }
+            
+            # Add document_id if available
+            if "document_id" in file_metadata:
+                file_info["document_id"] = file_metadata["document_id"]
+                
             file_infos.append(file_info)
         
         # Update the vector store

@@ -40,8 +40,14 @@ RUN mkdir -p /app/data/vectorstores /app/data/uploads /app/doc_staging
 # Copy application code directly to the app directory
 COPY . .
 
+# Ensure Python recognizes the directory as a package
+RUN touch /app/__init__.py
+RUN touch /app/api/__init__.py
+RUN touch /app/core/__init__.py
+RUN touch /app/utils/__init__.py
+
 # Set environment variables
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 ENV HOST="0.0.0.0"
 ENV PORT=8006
 ENV UPLOAD_DIR="/app/data/uploads"
@@ -49,6 +55,9 @@ ENV VECTORSTORE_DIR="/app/data/vectorstores"
 ENV DOC_STAGING_DIR="/app/doc_staging"
 ENV CUDA_VISIBLE_DEVICES="0"
 
-# Run the application
-CMD ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8006"]
+# Make scripts executable
+RUN chmod +x /app/docker-start.py
+
+# Run the application using our custom starter script
+CMD ["python3", "/app/docker-start.py"]
 

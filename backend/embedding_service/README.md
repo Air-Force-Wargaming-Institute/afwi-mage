@@ -1,50 +1,112 @@
-# Embedding Service Test Script
+# Embedding Service
 
-This directory contains a test script for the embedding service API, specifically for testing vector store creation, update, and job status tracking.
+The Embedding Service is responsible for:
+1. Processing documents and extracting their text content
+2. Generating embeddings for document chunks
+3. Storing document embeddings in vector stores
+4. Querying vector stores for similar documents
+5. Providing LLM-enhanced analysis of vector store content
 
-## Recent Fixes
+## Architecture
 
-### 2025-03-01: Fixed Chunking Method Parameter Issue
+The service has been completely refactored from a monolithic structure to a modular architecture with clean separation of concerns:
 
-The server code in `app.py` had an inconsistency where it was trying to access `request.chunking_method` in the `process_vectorstore_creation` function, but the `CreateVectorStoreRequest` model defined `use_paragraph_chunking` as a boolean parameter instead. 
-
-The fix involved:
-
-1. Modifying the `process_vectorstore_creation` function to correctly use `request.use_paragraph_chunking` instead of trying to access a non-existent `chunking_method` parameter.
-2. Adding code to determine the `chunking_method` string based on the boolean value of `use_paragraph_chunking`.
-3. Updating the test script to use the correct parameters when creating and updating vector stores.
-
-## Running the Test Script
-
-The test script performs the following operations:
-
-1. Checks if the embedding service is healthy
-2. Creates test files for initial vector store creation
-3. Creates a vector store with the initial files
-4. Monitors the job status until completion or timeout
-5. Creates additional test files for vector store update
-6. Updates the vector store with the additional files
-7. Monitors the update job status
-8. Cleans up all test files
-
-To run the test script:
-
-```bash
-python test_job_status.py
+```
+embedding_service/
+├── api/                 # API layer - FastAPI endpoints
+│   ├── embedding.py     # Embedding model endpoints
+│   ├── files.py         # File management endpoints
+│   ├── jobs.py          # Background job endpoints
+│   ├── llm.py           # LLM integration endpoints
+│   ├── maintenance.py   # System maintenance endpoints
+│   └── vectorstore.py   # Vector store endpoints
+├── core/                # Core business logic
+│   ├── document.py      # Document processing
+│   ├── embedding.py     # Embedding generation
+│   ├── job.py           # Background job management
+│   ├── maintenance.py   # System maintenance operations
+│   ├── metadata.py      # Metadata handling
+│   └── vectorstore.py   # Vector store operations
+├── tests/               # Test modules
+│   └── ...              # Various test files
+├── utils/               # Utility functions
+├── config.py            # Configuration management
+├── main.py              # Main application entry point
+├── Dockerfile           # Docker configuration
+└── requirements.txt     # Dependencies
 ```
 
-## API Endpoints
+## Running the Service
 
-The script uses the following API endpoints:
+### Local Development
 
-- Health check: `GET /health`
-- Create vector store: `POST /api/embedding/vectorstores`
-- Update vector store: `POST /api/embedding/vectorstores/{vectorstore_id}/update`
-- Get job status: `GET /api/embedding/status/{job_id}`
+To run the service locally for development:
 
-## Configuration
+```bash
+cd afwi-multi-agent-generative-engine/backend/embedding_service
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8006
+```
 
-The script uses the following configuration:
+### Docker
 
-- API base URL: `http://localhost:8006` (default)
-- Upload directory: `<project_root>/data/uploads` 
+To run using Docker:
+
+```bash
+cd afwi-multi-agent-generative-engine/backend
+docker compose up embedding
+```
+
+## API Documentation
+
+Once the service is running, you can access the Swagger UI documentation at:
+
+```
+http://localhost:8006/docs
+```
+
+## Key Features
+
+### Metadata Preservation
+
+The service ensures that document metadata (especially filenames and security classifications) is properly preserved throughout the entire pipeline, from document processing to query results.
+
+### Vector Store Management
+
+Create, update, query, and manage vector stores with proper handling of document metadata and security classifications.
+
+### Embedding Models
+
+Support for multiple embedding models, including Nomic and others.
+
+### LLM Integration
+
+Integration with LLMs for advanced content analysis and query enhancement.
+
+### Background Jobs
+
+Long-running operations are handled as background jobs with status tracking.
+
+## Testing
+
+To run the tests:
+
+```bash
+python test_metadata_handling.py
+```
+
+Or use the test runner script:
+
+```bash
+./run_metadata_test.sh
+```
+
+## Debugging and Maintenance
+
+The service includes endpoints for system resource monitoring and backup management:
+
+- System resources: `GET /api/embedding/system-resources`
+- Cleanup backups: `POST /api/embedding/cleanup-backups`
+
+## Docker Configuration
+
+The service is containerized using Docker and can be run with Docker Compose. GPU support is enabled when available. 

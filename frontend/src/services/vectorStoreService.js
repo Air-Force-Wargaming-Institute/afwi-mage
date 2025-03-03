@@ -76,9 +76,15 @@ export const testVectorStoreQuery = async (id, query, options = {}) => {
       { query, ...options }
     );
     
-    // Extract the results array from the response data
-    // This handles both formats: { results: [...] } and direct array
-    return response.data.results || response.data;
+    // Process and normalize the results to ensure consistent metadata structure
+    const results = (response.data.results || response.data).map(result => ({
+      ...result,
+      metadata: normalizeMetadata(result.metadata),
+      score: normalizeScore(result.score),
+      original_score: result.original_score || result.score
+    }));
+
+    return results;
   } catch (error) {
     console.error(`Error querying vector store ${id}:`, error);
     throw error;
@@ -117,6 +123,17 @@ export const llmQueryVectorStore = async (id, query, options = {}) => {
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/llm-query`),
       { query, ...options }
     );
+
+    // Process sources if they exist
+    if (response.data.sources) {
+      response.data.sources = response.data.sources.map(source => ({
+        ...source,
+        metadata: normalizeMetadata(source.metadata),
+        score: normalizeScore(source.score),
+        original_score: source.original_score || source.score
+      }));
+    }
+
     return response.data;
   } catch (error) {
     console.error(`Error performing LLM query on vector store ${id}:`, error);
@@ -223,4 +240,187 @@ export const cleanupVectorStoreBackups = async (maxPerStore = 3) => {
     console.error('Error cleaning up vector store backups:', error);
     throw error;
   }
+};
+
+// Helper function to normalize metadata structure
+const normalizeMetadata = (metadata = {}) => {
+  // If metadata is null or undefined, return empty structure
+  if (!metadata) {
+    return createDefaultMetadata();
+  }
+  
+  // Check if this is already in the expected format with all required fields
+  const hasStructuredFormat = 
+    metadata.page_info !== undefined &&
+    metadata.chunk_info !== undefined &&
+    metadata.document_context !== undefined;
+    
+  // If we already have the structured format, use it with minimal normalization
+  if (hasStructuredFormat) {
+    return {
+      // Basic metadata
+      document_id: metadata.document_id || 'unknown',
+      source: metadata.source || 'unknown',
+      file_path: metadata.file_path || '',
+      security_classification: metadata.security_classification || 'UNCLASSIFIED',
+      document_type: metadata.document_type || 'unknown',
+      
+      // Use existing structured metadata, with defaults for missing fields
+      page_info: {
+        ...metadata.page_info,
+        page: metadata.page_info.page || 'N/A',
+        total_pages: metadata.page_info.total_pages || 'N/A'
+      },
+      
+      chunk_info: {
+        ...metadata.chunk_info,
+        index: metadata.chunk_info.index !== undefined ? metadata.chunk_info.index : 0,
+        total_chunks: metadata.chunk_info.total_chunks || 1
+      },
+      
+      document_context: {
+        ...metadata.document_context,
+        content_analysis: {
+          ...metadata.document_context.content_analysis || {},
+          language: metadata.document_context.content_analysis?.language || 'en'
+        }
+      },
+      
+      embedding_info: metadata.embedding_info || {
+        timestamp: '',
+        version: '1.0',
+        model: 'unknown'
+      }
+    };
+  }
+  
+  // Otherwise, handle flat structure by creating the nested format
+  return {
+    // Basic metadata
+    document_id: metadata.document_id || 'unknown',
+    source: metadata.source || 'unknown',
+    file_path: metadata.file_path || '',
+    security_classification: metadata.security_classification || 'UNCLASSIFIED',
+    document_type: metadata.document_type || 'unknown',
+    
+    // Page information
+    page_info: {
+      page: metadata.page || 'N/A',
+      total_pages: metadata.total_pages || 'N/A',
+      is_first_page: metadata.is_first_page || false,
+      is_last_page: metadata.is_last_page || false,
+      page_percentage: metadata.page_percentage || 0,
+      page_word_count: metadata.page_word_count || 0,
+      page_has_images: metadata.page_has_images || false,
+      page_has_tables: metadata.page_has_tables || false
+    },
+    
+    // Chunk information
+    chunk_info: {
+      index: metadata.chunk_index !== undefined ? metadata.chunk_index : 0,
+      total_chunks: metadata.total_chunks || 1,
+      char_count: metadata.char_count || 0,
+      word_count: metadata.word_count || 0,
+      position: {
+        chunk_number: metadata.chunk_number || 1,
+        of_total: metadata.of_total || metadata.total_chunks || 1,
+        percentage: metadata.chunk_percentage || 0
+      }
+    },
+    
+    // Document context
+    document_context: {
+      title: metadata.title || '',
+      author: metadata.author || '',
+      creation_date: metadata.creation_date || '',
+      last_modified: metadata.last_modified || '',
+      content_status: metadata.content_status || '',
+      category: metadata.category || '',
+      content_analysis: {
+        has_images: metadata.has_images || false,
+        has_tables: metadata.has_tables || false,
+        total_words: metadata.total_words || 0,
+        estimated_reading_time: metadata.estimated_reading_time || 0,
+        language: metadata.language || 'en'
+      }
+    },
+    
+    // Embedding information
+    embedding_info: {
+      timestamp: metadata.embedding_timestamp || '',
+      version: metadata.embedding_version || '1.0',
+      model: metadata.embedding_model || 'unknown'
+    }
+  };
+};
+
+// Helper function to create default metadata structure
+const createDefaultMetadata = () => {
+  return {
+    document_id: 'unknown',
+    source: 'unknown',
+    file_path: '',
+    security_classification: 'UNCLASSIFIED',
+    document_type: 'unknown',
+    
+    page_info: {
+      page: 'N/A',
+      total_pages: 'N/A',
+      is_first_page: false,
+      is_last_page: false,
+      page_percentage: 0,
+      page_word_count: 0,
+      page_has_images: false,
+      page_has_tables: false
+    },
+    
+    chunk_info: {
+      index: 0,
+      total_chunks: 1, 
+      char_count: 0,
+      word_count: 0,
+      position: {
+        chunk_number: 1,
+        of_total: 1,
+        percentage: 0
+      }
+    },
+    
+    document_context: {
+      title: '',
+      author: '',
+      creation_date: '',
+      last_modified: '',
+      content_status: '',
+      category: '',
+      content_analysis: {
+        has_images: false,
+        has_tables: false,
+        total_words: 0,
+        estimated_reading_time: 0,
+        language: 'en'
+      }
+    },
+    
+    embedding_info: {
+      timestamp: '',
+      version: '1.0',
+      model: 'unknown'
+    }
+  };
+};
+
+// Helper function to normalize relevance scores
+const normalizeScore = (score) => {
+  if (typeof score !== 'number') {
+    return 0;
+  }
+  
+  // Handle different score ranges
+  if (score <= 2.0) {  // Cosine similarity range (-1 to 1) or distance (0 to 2)
+    return score <= 1 ? (score + 1) / 2 : (2 - score) / 2;
+  }
+  
+  // For larger scores, use logarithmic normalization
+  return Math.min(1.0, 0.8 + (0.2 * Math.min(1.0, Math.log10(score/100))));
 }; 
