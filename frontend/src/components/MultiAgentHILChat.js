@@ -59,7 +59,7 @@ const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    padding: theme.spacing(1),
+    padding: theme.spacing(2),
     height: 'calc(100vh - 215px)',
     maxHeight: 'calc(100vh - 128px)',
     overflow: 'hidden',
