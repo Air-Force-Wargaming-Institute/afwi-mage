@@ -57,10 +57,10 @@ K: 5
 TOP_N_DOCUMENTS: 20
 
 # Maximum number of tokens for the LLM model to use in a reply
-MAX_TOKENS: 8000
+MAX_TOKENS: 500
 
 # Temperature for the LLM
-TEMPERATURE: 0.2
+TEMPERATURE: 0.3
 
 # Paths to agent and team configuration files
 AGENTS_FILE_PATH: 'data/builder/AGENTS/agents.json'

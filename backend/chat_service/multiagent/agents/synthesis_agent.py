@@ -52,7 +52,7 @@ def synthesis_agent(state: GraphState) -> GraphState:
                 if state['expert_final_analysis'].get(expert)  # Only include non-empty analyses
             }
         )
-
+        logger.info(f"Expert Analysis: {state['expert_final_analysis']}")
         # Create and run the chain
         chain = prompt | llm | StrOutputParser()
         response = chain.invoke({

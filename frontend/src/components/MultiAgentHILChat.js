@@ -60,8 +60,12 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2),
-    height: 'calc(80vh - 64px)',
+    height: 'calc(100vh - 215px)',
+    maxHeight: 'calc(100vh - 128px)',
+    overflow: 'hidden',
     marginTop: '10px',
+    width: '100%',
+    maxWidth: '100%',
   },
   chatContainer: {
     display: 'flex',
@@ -69,19 +73,40 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     borderRadius: '10px',
     height: '100%',
+    width: '100%',
+    gap: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+  },
+  sessionsList: {
+    width: '16%',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+    overflow: 'hidden',
+    '& > *:not(:first-child)': {
+      overflow: 'auto',
+    },
   },
   chatArea: {
+    width: '84%',
     flexGrow: 1,
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
+    flexShrink: 0,
+    overflow: 'hidden',
+    backgroundColor: theme.palette.background.default,
     position: 'relative',
+    borderRadius: '12px',
+    transition: 'opacity 0.3s ease',
   },
   messageArea: {
     flexGrow: 1,
     overflowY: 'auto',
     padding: theme.spacing(2),
     marginBottom: theme.spacing(2),
+    paddingRight: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
     gap: theme.spacing(1),
@@ -252,11 +277,17 @@ const useStyles = makeStyles((theme) => ({
   },
   sessionActions: {
     display: 'flex',
-    gap: theme.spacing(1),
+    gap: theme.spacing(0.25),
     opacity: 0.7,
     transition: 'opacity 0.2s',
     '&:hover': {
       opacity: 1,
+    },
+  },
+  sessionActionButton: {
+    padding: 5,
+    '& .MuiSvgIcon-root': {
+      fontSize: '1.5rem',
     },
   },
   promptHelpDialog: {
@@ -363,9 +394,21 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     bottom: 0,
     zIndex: 1300,
-    width: '100%',
-    maxHeight: 'calc(100vh)',
-    borderRadius: '12px',
+    width: '100vw',
+    height: '100vh',
+    maxHeight: '100vh',
+    maxWidth: '100vw',
+    borderRadius: 0,
+    padding: theme.spacing(2),
+  },
+  fullscreenText: {
+    color: theme.palette.text.secondary,
+    cursor: 'pointer',
+    marginRight: theme.spacing(1),
+    fontWeight: 'bold',
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
   },
   buttonBar: {
     display: 'flex',
@@ -408,13 +451,6 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
       {children}
     </code>
   );
-};
-
-// Add API endpoint constants
-const API_ENDPOINTS = {
-  INIT: '/chat/init',    // Initialize chat session
-  REFINE: '/chat/refine', // Get message refinement suggestions
-  PROCESS: '/chat/process' // Process final message
 };
 
 // Memoized Message Component
@@ -1044,234 +1080,238 @@ function MultiAgentHILChat() {
   };
 
   return (
-    <Container className={`${classes.root} ${state.isFullscreen ? classes.fullscreen : ''}`}>
-      <div className={classes.chatContainer}>
-        {!state.isFullscreen && (
-          <Paper className={classes.chatLog} elevation={3}>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              className={classes.newChatButton}
-              onClick={handleNewChat}
-            >
-              Start New Chat Session
-            </Button>
-            <List>
-              {state.chatSessions.map((session) => (
-                <React.Fragment key={session.id}>
-                  <ListItem 
-                    button 
-                    className={classes.chatSessionItem}
-                    selected={session.id === state.currentSessionId}
-                    onClick={() => handleSessionClick(session.id)}
-                  >
-                    <ListItemText primary={session.name} />
-                    <div className={classes.sessionActions}>
-                      <Tooltip title="Edit">
-                        <IconButton 
-                          edge="end" 
-                          aria-label="edit" 
-                          onClick={(e) => handleEditSession(e, session.id)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton 
-                          edge="end" 
-                          aria-label="delete" 
-                          onClick={(e) => handleDeleteSession(e, session.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download">
-                        <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
-                          <GetAppIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </div>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
-          </Paper>
-        )}
-        
-        <Paper className={`${classes.chatArea} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
-          <div className={classes.buttonBar}>
-            <Typography className={classes.sessionName}>
-              {state.isFullscreen && state.chatSessions.find(session => session.id === state.currentSessionId)?.name}
-            </Typography>
-            <div className={classes.buttonBarActions}>
-              <IconButton
-                className={classes.fullscreenButton}
-                onClick={toggleFullscreen}
-                size="small"
-              >
-                {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              </IconButton>
-            </div>
-          </div>
-          <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
-            {state.messages.map((message) => (
-              <Message key={message.id} message={message} />
-            ))}
-            <div ref={messageEndRef} />
-          </div>
-
-          {state.isLoading && <TypingIndicator />}
-
-          <form onSubmit={handleSubmit} className={classes.inputArea}>
-            <IconButton 
-              onClick={handlePromptHelpOpen}
-              size="small"
-              className={classes.inputHelpIcon}
-              title="Prompt Engineering Tips"
-            >
-              <HelpOutlineIcon />
-            </IconButton>
-            <TextField
-              className={classes.input}
-              variant="outlined"
-              placeholder="Type your message here... (Ctrl+Enter to send)"
-              value={state.input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyPress}
-              multiline
-              minRows={1}
-              maxRows={5}
-              fullWidth
-              inputRef={inputRef}
-            />
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary" 
-              endIcon={<SendIcon />}
-            >
-              Send
-            </Button>
-          </form>
-        </Paper>
-      </div>
-
-      {/* Session Dialog */}
-      <Dialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+    <>
+      <Container 
+        className={`${classes.root} ${state.isFullscreen ? classes.fullscreen : ''}`}
+        maxWidth={false}
       >
-        <DialogTitle>Create New Chat Session</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Session Name*"
-              fullWidth
-              value={newSessionName}
-              onChange={(e) => setNewSessionName(e.target.value)}
-              error={teamError && !newSessionName.trim()}
-              helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Select Team*</InputLabel>
-              <Select
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                error={teamError && !selectedTeam}
+        <div className={classes.chatContainer}>
+          {!state.isFullscreen && (
+            <Paper className={classes.sessionsList} elevation={3}>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                className={classes.newChatButton}
+                onClick={handleNewChat}
               >
-                {isLoadingTeams ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} /> Loading teams...
-                  </MenuItem>
-                ) : (
-                  availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.name}>
-                      {team.name}
+                Start New Chat Session
+              </Button>
+              <List>
+                {state.chatSessions.map((session) => (
+                  <React.Fragment key={session.id}>
+                    <ListItem 
+                      button 
+                      className={classes.chatSessionItem}
+                      selected={session.id === state.currentSessionId}
+                      onClick={() => handleSessionClick(session.id)}
+                    >
+                      <ListItemText primary={session.name} />
+                      <div className={classes.sessionActions}>
+                        <Tooltip title="Edit">
+                          <IconButton 
+                            edge="end" 
+                            aria-label="edit" 
+                            onClick={(e) => handleEditSession(e, session.id)}
+                            className={classes.sessionActionButton}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            edge="end" 
+                            aria-label="delete" 
+                            onClick={(e) => handleDeleteSession(e, session.id)}
+                            className={classes.sessionActionButton}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Download">
+                          <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)} className={classes.sessionActionButton}>
+                            <GetAppIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
+                    </ListItem>
+                    <Divider />
+                  </React.Fragment>
+                ))}
+              </List>
+            </Paper>
+          )}
+          
+          <Paper className={`${classes.chatArea} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+            <div className={classes.buttonBar}>
+              <Typography className={classes.sessionName}>
+                {state.isFullscreen && state.chatSessions.find(session => session.id === state.currentSessionId)?.name}
+              </Typography>
+              <div className={classes.buttonBarActions}>
+                <Typography 
+                  className={classes.fullscreenText}
+                  onClick={toggleFullscreen}
+                  variant="body2"
+                >
+                  FULLSCREEN
+                </Typography>
+                <IconButton
+                  className={classes.fullscreenButton}
+                  onClick={toggleFullscreen}
+                  size="small"
+                >
+                  {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                </IconButton>
+              </div>
+            </div>
+            <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
+              {state.messages.map((message) => (
+                <Message key={message.id} message={message} />
+              ))}
+              <div ref={messageEndRef} />
+            </div>
+
+            {state.isLoading && <TypingIndicator />}
+
+            <form onSubmit={handleSubmit} className={classes.inputArea}>
+              <IconButton 
+                onClick={handlePromptHelpOpen}
+                size="small"
+                className={classes.inputHelpIcon}
+                title="Prompt Engineering Tips"
+              >
+                <HelpOutlineIcon />
+              </IconButton>
+              <TextField
+                  inputRef={inputRef}
+                  className={classes.input}
+                  variant="outlined"
+                  placeholder="Type your message here... (Ctrl+Enter to send)"
+                  value={state.input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyPress}
+                  multiline
+                  minRows={1}
+                  maxRows={15}
+                  fullWidth
+                  InputProps={{
+                    style: { 
+                      maxHeight: '300px',
+                      overflow: 'hidden' // Hide overflow on the Input component wrapper
+                    }
+                  }}
+              />
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary" 
+                endIcon={<SendIcon />}
+              >
+                Send
+              </Button>
+            </form>
+          </Paper>
+        </div>
+
+        {/* Session Dialog */}
+        <Dialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+        >
+          <DialogTitle>Create New Chat Session</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Session Name*"
+                fullWidth
+                value={newSessionName}
+                onChange={(e) => setNewSessionName(e.target.value)}
+                error={teamError && !newSessionName.trim()}
+                helperText={teamError && !newSessionName.trim() ? 'Session name is required' : ''}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Select Team*</InputLabel>
+                <Select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  error={teamError && !selectedTeam}
+                >
+                  {isLoadingTeams ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} /> Loading teams...
                     </MenuItem>
-                  ))
+                  ) : (
+                    availableTeams.map(team => (
+                      <MenuItem key={team.id} value={team.name}>
+                        {team.name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+                {teamError && !selectedTeam && (
+                  <Typography color="error" variant="caption">
+                    Please select a team
+                  </Typography>
                 )}
-              </Select>
-              {teamError && !selectedTeam && (
-                <Typography color="error" variant="caption">
-                  Please select a team
+              </FormControl>
+              {teamError && (
+                <Typography color="error" variant="body2">
+                  {teamError}
                 </Typography>
               )}
-            </FormControl>
-            {teamError && (
-              <Typography color="error" variant="body2">
-                {teamError}
-              </Typography>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setDialogOpen(false);
-            setTeamError('');
-            setNewSessionName('');
-            setSelectedTeam('');
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleCreateNewChat}
-            color="primary"
-            variant="contained"
-            disabled={isLoadingTeams}
-          >
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Plan Dialog */}
-      <Dialog
-        open={planDialogOpen}
-        onClose={() => {}}
-        maxWidth="md"
-        fullWidth
-        disableEscapeKeyDown
-      >
-        <DialogTitle>Review Plan</DialogTitle>
-        <DialogContent>
-          {selectedAgents.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Selected Agents</Typography>
-              <Paper elevation={1} className={classes.agentsBox}>
-                <List dense>
-                  {selectedAgents.map((agent, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <PersonIcon className={classes.agentIcon} />
-                      </ListItemIcon>
-                      <ListItemText primary={agent} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
             </Box>
-          )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setDialogOpen(false);
+              setTeamError('');
+              setNewSessionName('');
+              setSelectedTeam('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateNewChat}
+              color="primary"
+              variant="contained"
+              disabled={isLoadingTeams}
+            >
+              Create
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-          <Box mb={3}>
-            <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
-            <Paper elevation={1} className={classes.planBox}>
-              <ReactMarkdown
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  code: CodeBlock
-                }}
-              >
-                {planContent}
-              </ReactMarkdown>
-            </Paper>
-          </Box>
-          
-          {planNotes && (
+        {/* Plan Dialog */}
+        <Dialog
+          open={planDialogOpen}
+          onClose={() => {}}
+          maxWidth="md"
+          fullWidth
+          disableEscapeKeyDown
+        >
+          <DialogTitle>Review Plan</DialogTitle>
+          <DialogContent>
+            {selectedAgents.length > 0 && (
+              <Box mb={3}>
+                <Typography variant="h6" gutterBottom>Selected Agents</Typography>
+                <Paper elevation={1} className={classes.agentsBox}>
+                  <List dense>
+                    {selectedAgents.map((agent, index) => (
+                      <ListItem key={index}>
+                        <ListItemIcon>
+                          <PersonIcon className={classes.agentIcon} />
+                        </ListItemIcon>
+                        <ListItemText primary={agent} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Box>
+            )}
+
             <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Plan Notes</Typography>
+              <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
               <Paper elevation={1} className={classes.planBox}>
                 <ReactMarkdown
                   rehypePlugins={[rehypeRaw]}
@@ -1279,275 +1319,291 @@ function MultiAgentHILChat() {
                     code: CodeBlock
                   }}
                 >
-                  {planNotes}
+                  {planContent}
                 </ReactMarkdown>
               </Paper>
             </Box>
-          )}
-          
-          <Box mb={3}>
-            <Typography variant="h6" gutterBottom>Message Selection</Typography>
-            <Paper elevation={1} className={classes.modifiedQuestionBox}>
-              <Box mb={2}>
-                <FormControlLabel
-                  control={
-                    <Radio
-                      checked={messageChoice === 'original'}
-                      onChange={() => setMessageChoice('original')}
-                      color="primary"
-                    />
-                  }
-                  label="Original Message"
-                />
-                <Typography 
-                  variant="body1" 
-                  style={{ 
-                    padding: '8px',
-                    backgroundColor: messageChoice === 'original' ? '#f0f7ff' : 'transparent',
-                    borderRadius: '4px'
-                  }}
-                >
-                  {originalMessage}
-                </Typography>
+            
+            {planNotes && (
+              <Box mb={3}>
+                <Typography variant="h6" gutterBottom>Plan Notes</Typography>
+                <Paper elevation={1} className={classes.planBox}>
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      code: CodeBlock
+                    }}
+                  >
+                    {planNotes}
+                  </ReactMarkdown>
+                </Paper>
               </Box>
-              
-              {modifiedQuestion && (
-                <Box>
+            )}
+            
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>Message Selection</Typography>
+              <Paper elevation={1} className={classes.modifiedQuestionBox}>
+                <Box mb={2}>
                   <FormControlLabel
                     control={
                       <Radio
-                        checked={messageChoice === 'modified'}
-                        onChange={() => setMessageChoice('modified')}
+                        checked={messageChoice === 'original'}
+                        onChange={() => setMessageChoice('original')}
                         color="primary"
                       />
                     }
-                    label="Modified Message"
+                    label="Original Message"
                   />
                   <Typography 
                     variant="body1" 
                     style={{ 
                       padding: '8px',
-                      backgroundColor: messageChoice === 'modified' ? '#f0f7ff' : 'transparent',
+                      backgroundColor: messageChoice === 'original' ? '#f0f7ff' : 'transparent',
                       borderRadius: '4px'
                     }}
                   >
-                    {modifiedQuestion}
+                    {originalMessage}
                   </Typography>
                 </Box>
-              )}
-            </Paper>
-          </Box>
-
-          <RadioGroup
-            value={planChoice}
-            onChange={(e) => setPlanChoice(e.target.value)}
-          >
-            <FormControlLabel 
-              value="accept" 
-              control={<Radio color="primary" />} 
-              label="Accept this plan" 
-            />
-            <FormControlLabel 
-              value="reject" 
-              control={<Radio color="primary" />} 
-              label="Reject and provide feedback" 
-            />
-          </RadioGroup>
-          <Fade in={planChoice === 'reject'}>
-            <div>
-              {planChoice === 'reject' && (
-                <TextField
-                  className={classes.feedbackField}
-                  multiline
-                  minRows={3}
-                  variant="outlined"
-                  fullWidth
-                  label="Please explain what you would like to improve"
-                  value={rejectionText}
-                  onChange={(e) => setRejectionText(e.target.value)}
-                  error={planChoice === 'reject' && !rejectionText.trim()}
-                  helperText={planChoice === 'reject' && !rejectionText.trim() ? 'Feedback is required when rejecting' : ''}
-                />
-              )}
-            </div>
-          </Fade>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPlanDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handlePlanSubmit}
-            color="primary"
-            variant="contained"
-            disabled={!planChoice || (planChoice === 'reject' && !rejectionText.trim())}
-          >
-            Submit
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Prompt Help Dialog */}
-      <Dialog
-        open={promptHelpOpen}
-        onClose={handlePromptHelpClose}
-        className={classes.promptHelpDialog}
-        aria-labelledby="prompt-help-dialog-title"
-      >
-        <DialogTitle id="prompt-help-dialog-title" className={classes.dialogTitle}>
-          <Typography variant="h6">Effective Prompt Engineering Tips</Typography>
-          <IconButton
-            aria-label="close"
-            className={classes.closeButton}
-            onClick={handlePromptHelpClose}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent className={classes.dialogContent}>
-          <div className={classes.promptTip}>
-            <LightbulbIcon className={classes.tipIcon} />
-            <div>
-              <Typography><strong>Be Specific and Clear</strong></Typography>
-              <Typography>
-                Instead of "How to make a website?", try "What are the key steps to create a responsive website using React and Material-UI for a small business?"
-              </Typography>
-            </div>
-          </div>
-          <div className={classes.promptTip}>
-            <FormatListBulletedIcon className={classes.tipIcon} />
-            <div>
-              <Typography><strong>Break Down Complex Questions</strong></Typography>
-              <Typography>
-                For complex topics, break your query into smaller, focused questions. This helps get more detailed and accurate responses.
-              </Typography>
-            </div>
-          </div>
-          <div className={classes.promptTip}>
-            <SchoolIcon className={classes.tipIcon} />
-            <div>
-              <Typography><strong>Provide Context</strong></Typography>
-              <Typography>
-                Include relevant background information and your level of expertise in the topic for more tailored responses.
-              </Typography>
-            </div>
-          </div>
-          <div className={classes.promptTip}>
-            <TuneIcon className={classes.tipIcon} />
-            <div>
-              <Typography><strong>Iterate and Refine</strong></Typography>
-              <Typography>
-                If the response isn't quite what you need, refine your question or ask for clarification on specific points.
-              </Typography>
-            </div>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={handlePromptHelpClose} 
-            color="primary"
-            variant="contained"
-            style={{ borderRadius: '20px', textTransform: 'none' }}
-          >
-            Got it
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-          setEditSessionId(null);
-          setEditSessionName('');
-          setEditSessionTeam('');
-          setTeamError('');
-        }}
-      >
-        <DialogTitle>Edit Chat Session</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Session Name"
-              fullWidth
-              value={editSessionName}
-              onChange={(e) => setEditSessionName(e.target.value)}
-              error={teamError && !editSessionName.trim()}
-              helperText={teamError && !editSessionName.trim() ? 'Session name is required' : ''}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Select Team</InputLabel>
-              <Select
-                value={editSessionTeam}
-                onChange={(e) => setEditSessionTeam(e.target.value)}
-                error={teamError && !editSessionTeam}
-              >
-                {isLoadingTeams ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} /> Loading teams...
-                  </MenuItem>
-                ) : (
-                  availableTeams.map(team => (
-                    <MenuItem key={team.id} value={team.name}>
-                      {team.name}
-                    </MenuItem>
-                  ))
+                
+                {modifiedQuestion && (
+                  <Box>
+                    <FormControlLabel
+                      control={
+                        <Radio
+                          checked={messageChoice === 'modified'}
+                          onChange={() => setMessageChoice('modified')}
+                          color="primary"
+                        />
+                      }
+                      label="Modified Message"
+                    />
+                    <Typography 
+                      variant="body1" 
+                      style={{ 
+                        padding: '8px',
+                        backgroundColor: messageChoice === 'modified' ? '#f0f7ff' : 'transparent',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      {modifiedQuestion}
+                    </Typography>
+                  </Box>
                 )}
-              </Select>
-              {teamError && !editSessionTeam && (
-                <Typography color="error" variant="caption">
-                  Please select a team
+              </Paper>
+            </Box>
+
+            <RadioGroup
+              value={planChoice}
+              onChange={(e) => setPlanChoice(e.target.value)}
+            >
+              <FormControlLabel 
+                value="accept" 
+                control={<Radio color="primary" />} 
+                label="Accept this plan" 
+              />
+              <FormControlLabel 
+                value="reject" 
+                control={<Radio color="primary" />} 
+                label="Reject and provide feedback" 
+              />
+            </RadioGroup>
+            <Fade in={planChoice === 'reject'}>
+              <div>
+                {planChoice === 'reject' && (
+                  <TextField
+                    className={classes.feedbackField}
+                    multiline
+                    minRows={3}
+                    variant="outlined"
+                    fullWidth
+                    label="Please explain what you would like to improve"
+                    value={rejectionText}
+                    onChange={(e) => setRejectionText(e.target.value)}
+                    error={planChoice === 'reject' && !rejectionText.trim()}
+                    helperText={planChoice === 'reject' && !rejectionText.trim() ? 'Feedback is required when rejecting' : ''}
+                  />
+                )}
+              </div>
+            </Fade>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPlanDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePlanSubmit}
+              color="primary"
+              variant="contained"
+              disabled={!planChoice || (planChoice === 'reject' && !rejectionText.trim())}
+            >
+              Submit
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Prompt Help Dialog */}
+        <Dialog
+          open={promptHelpOpen}
+          onClose={handlePromptHelpClose}
+          className={classes.promptHelpDialog}
+          aria-labelledby="prompt-help-dialog-title"
+        >
+          <DialogTitle id="prompt-help-dialog-title" className={classes.dialogTitle}>
+            <Typography variant="h6">Effective Prompt Engineering Tips</Typography>
+            <IconButton
+              aria-label="close"
+              className={classes.closeButton}
+              onClick={handlePromptHelpClose}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent className={classes.dialogContent}>
+            <div className={classes.promptTip}>
+              <LightbulbIcon className={classes.tipIcon} />
+              <div>
+                <Typography><strong>Be Specific and Clear</strong></Typography>
+                <Typography>
+                  Instead of "How to make a website?", try "What are the key steps to create a responsive website using React and Material-UI for a small business?"
                 </Typography>
-              )}
-            </FormControl>
-            {teamError && (
-              <Typography color="error" variant="body2">
-                {teamError}
-              </Typography>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
+              </div>
+            </div>
+            <div className={classes.promptTip}>
+              <FormatListBulletedIcon className={classes.tipIcon} />
+              <div>
+                <Typography><strong>Break Down Complex Questions</strong></Typography>
+                <Typography>
+                  For complex topics, break your query into smaller, focused questions. This helps get more detailed and accurate responses.
+                </Typography>
+              </div>
+            </div>
+            <div className={classes.promptTip}>
+              <SchoolIcon className={classes.tipIcon} />
+              <div>
+                <Typography><strong>Provide Context</strong></Typography>
+                <Typography>
+                  Include relevant background information and your level of expertise in the topic for more tailored responses.
+                </Typography>
+              </div>
+            </div>
+            <div className={classes.promptTip}>
+              <TuneIcon className={classes.tipIcon} />
+              <div>
+                <Typography><strong>Iterate and Refine</strong></Typography>
+                <Typography>
+                  If the response isn't quite what you need, refine your question or ask for clarification on specific points.
+                </Typography>
+              </div>
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={handlePromptHelpClose} 
+              color="primary"
+              variant="contained"
+              style={{ borderRadius: '20px', textTransform: 'none' }}
+            >
+              Got it
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog
+          open={editDialogOpen}
+          onClose={() => {
             setEditDialogOpen(false);
             setEditSessionId(null);
             setEditSessionName('');
             setEditSessionTeam('');
             setTeamError('');
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleEditSubmit}
-            color="primary"
-            variant="contained"
-            disabled={isLoadingTeams}
-          >
-            Update
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Error Snackbar */}
-      <Snackbar
-        open={Boolean(state.error)}
-        autoHideDuration={6000}
-        onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
-      >
-        <Alert
-          onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
-          severity="error"
-          elevation={6}
-          variant="filled"
+          }}
         >
-          {state.error}
-        </Alert>
-      </Snackbar>
+          <DialogTitle>Edit Chat Session</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Session Name"
+                fullWidth
+                value={editSessionName}
+                onChange={(e) => setEditSessionName(e.target.value)}
+                error={teamError && !editSessionName.trim()}
+                helperText={teamError && !editSessionName.trim() ? 'Session name is required' : ''}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Select Team</InputLabel>
+                <Select
+                  value={editSessionTeam}
+                  onChange={(e) => setEditSessionTeam(e.target.value)}
+                  error={teamError && !editSessionTeam}
+                >
+                  {isLoadingTeams ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} /> Loading teams...
+                    </MenuItem>
+                  ) : (
+                    availableTeams.map(team => (
+                      <MenuItem key={team.id} value={team.name}>
+                        {team.name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+                {teamError && !editSessionTeam && (
+                  <Typography color="error" variant="caption">
+                    Please select a team
+                  </Typography>
+                )}
+              </FormControl>
+              {teamError && (
+                <Typography color="error" variant="body2">
+                  {teamError}
+                </Typography>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setEditDialogOpen(false);
+              setEditSessionId(null);
+              setEditSessionName('');
+              setEditSessionTeam('');
+              setTeamError('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEditSubmit}
+              color="primary"
+              variant="contained"
+              disabled={isLoadingTeams}
+            >
+              Update
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-    </Container>
+        {/* Error Snackbar */}
+        <Snackbar
+          open={Boolean(state.error)}
+          autoHideDuration={6000}
+          onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
+        >
+          <Alert
+            onClose={() => dispatch({ type: ACTIONS.SET_ERROR, payload: null })}
+            severity="error"
+            elevation={6}
+            variant="filled"
+          >
+            {state.error}
+          </Alert>
+        </Snackbar>
+
+      </Container>
+    </>
   );
 }
 
