@@ -63,7 +63,7 @@
         "color": "#FF0000",
         "created_at": "2025-02-03T21:50:48.165636Z",
         "vectorstores": [],
-        "last_modified": "2025-02-26T21:34:56.490456Z"
+        "last_modified": "2025-03-04T16:26:02.303160Z"
     },
     {
         "name": "PRC Military",
@@ -74,7 +74,7 @@
         "color": "#FF0000",
         "created_at": "2025-02-03T21:51:40.182777Z",
         "vectorstores": [],
-        "last_modified": "2025-02-26T21:34:59.774528Z"
+        "last_modified": "2025-03-04T16:25:54.965011Z"
     },
     {
         "name": "PRC Regional Dynamics",
@@ -174,5 +174,16 @@
         "created_at": "2025-02-04T15:41:55.121977Z",
         "vectorstores": [],
         "last_modified": "2025-02-26T21:35:31.112203Z"
+    },
+    {
+        "name": "Escalation Management Sentiment Agent",
+        "unique_id": "086401c7-0a6c-4123-ba7a-142fc9428c05",
+        "description": "Escalation Management Sentiment Agent",
+        "instructions": "Escalation Management Sentiment Agent for wargame game data from participants",
+        "llm_model": "hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest",
+        "color": "#FF0000",
+        "created_at": "2025-03-03T21:50:16.989788Z",
+        "vectorstores": [],
+        "last_modified": "2025-03-03T21:50:16.989801Z"
     }
 ]

@@ -16,8 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
+ENV SERVICE_PORT=8011
+
 # Expose the port the app runs on
-EXPOSE 8011
+EXPOSE ${SERVICE_PORT}
 
 # Update CMD to include connection optimization settings
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8011", "--reload", "--timeout-keep-alive", "75", "--limit-concurrency", "100", "--backlog", "100"]
+CMD uvicorn app:app --host 0.0.0.0 --port ${SERVICE_PORT} --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
