@@ -1,13 +1,5 @@
 [
   {
-    "session_id": "d1a0f55f-3cda-4b76-8623-eb89c1622ea2",
-    "team_id": "4b3dc175-3eda-45ac-9f1f-5d4dd38def3f",
-    "session_name": "test",
-    "created_at": "2025-03-01T21:31:47.446048+00:00",
-    "updated_at": "2025-03-01T21:31:47.446048+00:00",
-    "conversation_history": []
-  },
-  {
     "session_id": "611efb8e-f54a-434a-98e0-22c62038aa84",
     "team_id": "7871ea59-aea1-4aea-bd9c-cab5968786e6",
     "session_name": "VStore Test",
@@ -20,13 +12,5 @@
         "timestamp": "2025-03-02T02:05:57.906205"
       }
     ]
-  },
-  {
-    "session_id": "65652de8-ecfc-40a4-9767-ab22d9c0c273",
-    "team_id": "a6834f19-9023-439d-b685-d72640b30af1",
-    "session_name": "VTEST2",
-    "created_at": "2025-03-02T02:15:32.047946+00:00",
-    "updated_at": "2025-03-02T02:15:32.047946+00:00",
-    "conversation_history": []
   }
 ]

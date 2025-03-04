@@ -323,9 +323,12 @@ const useStyles = makeStyles((theme) => ({
     },
     '& .MuiOutlinedInput-multiline': {
       padding: theme.spacing(0.5),
+      overflow: 'hidden', // Hide overflow on the outer container
     },
     '& textarea': {
-      overflow: 'hidden !important',
+      overflow: 'auto !important',  // Keep scrolling only on the textarea itself
+      paddingTop: '8px !important',    // Add padding to prevent text clipping at top
+      paddingBottom: '8px !important', // Add padding to prevent text clipping at bottom
     },
   },
   newChatButton: {
@@ -406,6 +409,15 @@ const useStyles = makeStyles((theme) => ({
   },
   fullscreenButton: {
     color: theme.palette.text.secondary,
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
+  },
+  fullscreenText: {
+    color: theme.palette.text.secondary,
+    cursor: 'pointer',
+    marginRight: theme.spacing(1),
+    fontWeight: 'bold',
     '&:hover': {
       color: theme.palette.primary.main,
     },
@@ -1535,14 +1547,14 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
   const stableMessageStyles = React.useMemo(() => ({
     userWrapper: {
       display: 'flex',
-      padding: '8px 16px',
+      padding: '12px 16px', // Increased top/bottom padding from 8px to 12px
       width: '100%',
       justifyContent: 'flex-end',
       alignItems: 'flex-start'
     },
     aiWrapper: {
       display: 'flex',
-      padding: '8px 16px',
+      padding: '12px 16px', // Increased top/bottom padding from 8px to 12px
       width: '100%',
       justifyContent: 'flex-start',
       alignItems: 'flex-start'
@@ -1969,7 +1981,7 @@ const DirectChat = () => {
   const [editSessionName, setEditSessionName] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [classificationLevel, setClassificationLevel] = useState(0);
-
+  
   // Add state for caveats checkboxes
   const [caveatStates, setCaveatStates] = useState({
     NOFORN: false,
@@ -2084,6 +2096,7 @@ const DirectChat = () => {
   };
 
   const handleNewChat = async () => {
+    // Restore original implementation that directly creates a new session
     try {
       const newSession = await createChatSession();
       setChatSessions(prev => [newSession, ...prev]);
@@ -2096,7 +2109,7 @@ const DirectChat = () => {
       setError('Failed to create new chat');
     }
   };
-
+  
   const handleDeleteChat = async (sessionId) => {
     try {
       await deleteChatSession(sessionId);
@@ -2348,6 +2361,13 @@ const DirectChat = () => {
               {isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
             </Typography>
             <div className={classes.buttonBarActions}>
+              <Typography 
+                className={classes.fullscreenText}
+                onClick={toggleFullscreen}
+                variant="body2"
+              >
+                FULLSCREEN
+              </Typography>
               <IconButton
                 className={classes.fullscreenButton}
                 onClick={toggleFullscreen}
@@ -2385,8 +2405,14 @@ const DirectChat = () => {
                 onKeyDown={handleKeyPress}
                 multiline
                 minRows={1}
-                maxRows={5}
+                maxRows={15}
                 fullWidth
+                InputProps={{
+                  style: { 
+                    maxHeight: '300px',
+                    overflow: 'hidden' // Hide overflow on the Input component wrapper
+                  }
+                }}
               />
               <Button 
                 type="submit" 

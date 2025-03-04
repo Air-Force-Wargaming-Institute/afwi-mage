@@ -1,0 +1,31 @@
+{
+  "id": "f4cec72b-de69-405c-aa60-e0d2293ac25a",
+  "name": "test",
+  "description": "test",
+  "embedding_model": "nomic-embed-text",
+  "chunk_size": 1000,
+  "chunk_overlap": 100,
+  "file_count": 1,
+  "created_at": "2025-03-03T06:48:58.151214",
+  "updated_at": "2025-03-03T06:57:34.223239",
+  "files": [
+    {
+      "filename": "2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "original_path": "doc_staging/2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "staging_path": "doc_staging/2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "file_type": "pdf",
+      "document_id": "11d26a8d-1637-400e-afa6-49cfa6f4e7ab",
+      "size_bytes": 33214678,
+      "added_at": "2025-03-03T06:55:40.653531"
+    },
+    {
+      "filename": "2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "original_path": "doc_staging/2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "staging_path": "doc_staging/2024-06-24 ITOW Hypersonic Vehicle Technology.pdf",
+      "file_type": "pdf",
+      "document_id": "efd8e092-ec0f-4b80-8cf2-41988a146cea",
+      "size_bytes": 33214678,
+      "added_at": "2025-03-03T06:57:09.313469"
+    }
+  ]
+}
