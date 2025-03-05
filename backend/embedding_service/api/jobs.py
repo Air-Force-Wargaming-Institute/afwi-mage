@@ -83,39 +83,76 @@ class JobStatsResponse(BaseModel):
 @router.get("/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(job_id: str):
     """
-    Get the status of a job by its ID.
+    Get the status of a job.
     
     Args:
-        job_id: The ID of the job to get status for
+        job_id: ID of the job
         
     Returns:
         Job status information
     """
-    job = core_get_job_status(job_id)
+    try:
+        job_status = core_get_job_status(job_id)
+        
+        if not job_status:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        # Calculate progress percentage if not already set
+        if "progress_percentage" not in job_status and job_status.get("total_items", 0) > 0:
+            job_status["progress_percentage"] = (
+                job_status.get("processed_items", 0) / job_status["total_items"]
+            ) * 100
+        elif "progress_percentage" not in job_status:
+            # Default to 0
+            job_status["progress_percentage"] = 0
+            
+        # Convert status to string if it's an enum or similar
+        if not isinstance(job_status.get("status"), str):
+            job_status["status"] = str(job_status["status"])
+            
+        # Ensure none of the required fields are missing
+        for field in ["job_id", "status", "operation_type", "total_items", 
+                     "processed_items", "started_at", "updated_at"]:
+            if field not in job_status:
+                if field in ["total_items", "processed_items"]:
+                    job_status[field] = 0
+                else:
+                    job_status[field] = "unknown"
+        
+        return job_status
     
-    if not job:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting job status: {str(e)}")
+
+
+# Add an alias endpoint at /status/{job_id} for compatibility with the frontend
+@router.get("/status/{job_id}", response_model=JobStatusResponse)
+async def get_job_status_alias(job_id: str):
+    """
+    Alias for get_job_status to maintain compatibility with frontend.
     
-    # Calculate progress percentage
-    progress_percentage = 0
-    if job.get("total_items", 0) > 0:
-        progress_percentage = (job.get("processed_items", 0) / job.get("total_items", 0)) * 100
+    Args:
+        job_id: ID of the job
+        
+    Returns:
+        Job status information
+    """
+    return await get_job_status(job_id)
+
+
+# Add an endpoint to match the exact path the frontend is expecting
+@router.get("/status/{job_id}", response_model=JobStatusResponse)
+async def get_status_endpoint(job_id: str):
+    """
+    Get job status by ID at the path the frontend expects.
     
-    # Return the job status with progress percentage
-    return JobStatusResponse(
-        job_id=job.get("job_id"),
-        status=job.get("status"),
-        operation_type=job.get("operation_type"),
-        total_items=job.get("total_items", 0),
-        processed_items=job.get("processed_items", 0),
-        progress_percentage=round(progress_percentage, 2),
-        started_at=job.get("started_at"),
-        updated_at=job.get("updated_at", job.get("started_at")),
-        completed_at=job.get("completed_at"),
-        result=job.get("result"),
-        error=job.get("error"),
-        details=job.get("details", {})
-    )
+    Args:
+        job_id: ID of the job
+        
+    Returns:
+        Job status information
+    """
+    return await get_job_status(job_id)
 
 
 @router.get("", response_model=JobListResponse)

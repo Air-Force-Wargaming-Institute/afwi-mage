@@ -1,13 +1,5 @@
 [
   {
-    "session_id": "d1a0f55f-3cda-4b76-8623-eb89c1622ea2",
-    "team_id": "4b3dc175-3eda-45ac-9f1f-5d4dd38def3f",
-    "session_name": "test",
-    "created_at": "2025-03-01T21:31:47.446048+00:00",
-    "updated_at": "2025-03-01T21:31:47.446048+00:00",
-    "conversation_history": []
-  },
-  {
     "session_id": "611efb8e-f54a-434a-98e0-22c62038aa84",
     "team_id": "7871ea59-aea1-4aea-bd9c-cab5968786e6",
     "session_name": "VStore Test",
