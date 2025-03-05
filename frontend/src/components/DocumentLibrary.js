@@ -172,14 +172,27 @@ function DocumentLibrary() {
         throw new Error('Invalid response format: expected an array');
       }
       
+      // Transform the data and explicitly sort to ensure folders appear at the top
+      const processedDocuments = data.map(doc => ({
+        ...doc,
+        isFolder: doc.type === 'folder',
+        id: doc.path, // Ensure unique ID for each item
+        securityClassification: doc.security_classification || doc.securityClassification || 'SELECT A CLASSIFICATION'
+      }));
+      
+      // Sort to ensure folders are always at the top
+      const sortedDocuments = processedDocuments.sort((a, b) => {
+        // First sort by type (folders first)
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        
+        // Then sort alphabetically by name within each type
+        return a.name.localeCompare(b.name);
+      });
+      
       dispatch({ 
         type: ACTIONS.SET_DOCUMENTS, 
-        payload: data.map(doc => ({
-          ...doc,
-          isFolder: doc.type === 'folder',
-          id: doc.path, // Ensure unique ID for each item
-          securityClassification: doc.security_classification || doc.securityClassification || 'SELECT A CLASSIFICATION'
-        }))
+        payload: sortedDocuments
       });
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -271,11 +284,17 @@ function DocumentLibrary() {
   const uploadFiles = async (files) => {
     const formData = new FormData();
     files.forEach(file => {
-      formData.append('file', file);
+      formData.append('files', file);  // Changed from 'file' to 'files' to match backend parameter name
     });
     formData.append('folder', currentPath);
 
     try {
+      setOperationProgress({
+        status: `Uploading ${files.length} file(s)...`,
+        processed_items: 0,
+        total_items: files.length
+      });
+
       const response = await fetch(getApiUrl('UPLOAD', '/api/upload/upload/'), {
         method: 'POST',
         body: formData,
@@ -295,10 +314,19 @@ function DocumentLibrary() {
         return;
       }
 
+      // Create a status message based on results
+      let statusMessage;
+      if (results.status === 'success') {
+        statusMessage = `Successfully uploaded ${results.total_uploaded} file(s)`;
+      } else if (results.status === 'partial') {
+        statusMessage = `Partially successful: Uploaded ${results.total_uploaded} file(s), but ${results.total_failed} failed. Check console for details.`;
+        console.log('Failed uploads:', results.errors);
+      }
+
       setOperationProgress({
-        status: `Successfully uploaded file: ${results.filename}`,
-        processed_items: undefined,
-        total_items: undefined
+        status: statusMessage,
+        processed_items: results.total_uploaded,
+        total_items: results.total_uploaded + (results.total_failed || 0)
       });
 
       // Refresh the document list from the server to get the latest security classifications
@@ -682,15 +710,41 @@ function DocumentLibrary() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to extract detailed error information if available
+        try {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.detail.message || 
+            errorData.detail || 
+            `HTTP error! status: ${response.status}`
+          );
+        } catch (jsonError) {
+          // If we can't parse the JSON, just throw the original error
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
+      const result = await response.json();
       await fetchDocuments(currentPath);
-      setOperationProgress({
-        status: `Successfully moved ${sourcePaths.length} item(s) to ${targetFolder.name}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      
+      // Check if there were any partial failures
+      if (result.results && result.results.failed && result.results.failed.length > 0) {
+        const failedCount = result.results.failed.length;
+        const successCount = result.results.successful.length;
+        setOperationProgress({
+          status: `Partially successful: Moved ${successCount} item(s), but ${failedCount} failed. Check console for details.`,
+          processed_items: undefined,
+          total_items: undefined
+        });
+        // Log details of failures for debugging
+        console.log('Failed moves:', result.results.failed);
+      } else {
+        setOperationProgress({
+          status: `Successfully moved ${sourcePaths.length} item(s) to ${targetFolder.name}`,
+          processed_items: undefined,
+          total_items: undefined
+        });
+      }
     } catch (error) {
       console.error('Error moving items:', error);
       setOperationProgress({

@@ -138,29 +138,20 @@ async def get_system_status():
     
     # Check if GPU is available
     try:
-        import torch
+        # CPU-only container - no GPU check needed
         status["gpu"] = {
-            "available": torch.cuda.is_available(),
-            "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() and torch.cuda.device_count() > 0 else None,
-            "current_device": torch.cuda.current_device() if torch.cuda.is_available() else None
+            "available": False,
+            "device_count": 0,
+            "device_name": None,
+            "current_device": None,
+            "mode": "CPU-only container"
         }
-        
-        if torch.cuda.is_available():
-            # Get memory info for each device
-            status["gpu"]["devices"] = []
-            for i in range(torch.cuda.device_count()):
-                torch.cuda.set_device(i)
-                memory_allocated = torch.cuda.memory_allocated(i)
-                memory_reserved = torch.cuda.memory_reserved(i)
-                status["gpu"]["devices"].append({
-                    "id": i,
-                    "name": torch.cuda.get_device_name(i),
-                    "memory_allocated": memory_allocated,
-                    "memory_reserved": memory_reserved
-                })
-    except ImportError:
-        status["gpu"] = {"available": False}
+    except Exception as e:
+        logger.error(f"Error checking GPU availability: {e}")
+        status["gpu"] = {
+            "available": False,
+            "error": str(e)
+        }
     
     # Add configuration info
     status["config"] = {
@@ -219,17 +210,7 @@ async def startup_event():
     logger.info(f"Python version: {platform.python_version()}")
     
     # Check if GPU is available
-    try:
-        import torch
-        if torch.cuda.is_available():
-            device_count = torch.cuda.device_count()
-            logger.info(f"GPU available: {device_count} device(s)")
-            for i in range(device_count):
-                logger.info(f"  Device {i}: {torch.cuda.get_device_name(i)}")
-        else:
-            logger.info("GPU not available")
-    except ImportError:
-        logger.info("PyTorch not installed, GPU availability check skipped")
+    logger.info("Running in CPU-only container mode")
     
     # Check FAISS GPU support
     try:

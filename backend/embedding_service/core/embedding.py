@@ -180,17 +180,10 @@ def get_available_embedding_models() -> List[Dict[str, Any]]:
 def check_gpu_available() -> bool:
     """
     Check if a GPU is available for embedding.
+    In this CPU-only container, always returns False.
     
     Returns:
-        True if GPU is available, False otherwise
+        False (GPU is never available in this container)
     """
-    try:
-        # Try to import torch to check GPU availability
-        import torch
-        return torch.cuda.is_available()
-    except ImportError:
-        logger.warning("PyTorch not installed, cannot check GPU availability")
-        return False
-    except Exception as e:
-        logger.error(f"Error checking GPU availability: {e}")
-        return False
+    logger.info("Running in CPU-only mode, GPU is not available")
+    return False
