@@ -9,7 +9,7 @@ ollama:
   base_url: http://host.docker.internal:11434
   
   # Model identifier for Ollama
-  ollama_model: huihui_ai/Hermes-3-Llama-3.2-abliterated:latest 
+  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest  
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused
@@ -39,6 +39,7 @@ ollama:
   # Sequences where the model should stop generating
   # Useful for maintaining conversation format
   stop: ["Human:", "Assistant:"]
+
 
 api:
   core_service_url: http://core:8000

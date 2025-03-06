@@ -23,6 +23,8 @@ import {
   FormControl,
   FormControlLabel,
   Fade,
+  InputLabel,
+  Link,
 } from '@material-ui/core';
 import { useTheme } from '@material-ui/core/styles';
 import SendIcon from '@material-ui/icons/Send';
@@ -63,9 +65,12 @@ import {
   toggleDocumentState,
   updateSessionName,
   updateDocumentClassification,
+  getVectorstores,
+  setSessionVectorstore,
+  getChatSessionMetadata
 } from '../services/directChatService';
 import { useMarkdownComponents } from '../styles/markdownStyles';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import Slider from '@material-ui/core/Slider';
 import rehypeRaw from 'rehype-raw';
 
@@ -173,63 +178,44 @@ const useStyles = makeStyles((theme) => ({
     }
   },
   dropzone: {
-    flex: 1,
-    minHeight: '75px',
-    maxHeight: '100px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing(2),
-    margin: theme.spacing(2),
     border: `2px dashed ${theme.palette.primary.main}`,
-    borderRadius: '10px',
-    backgroundColor: theme.palette.background.default,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(2),
+    textAlign: 'center',
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    overflow: 'hidden',
+    marginBottom: theme.spacing(2),
+    backgroundColor: theme.palette.action.hover,
+    transition: 'background-color 0.3s',
     '&:hover': {
-      backgroundColor: theme.palette.action.hover,
-      borderColor: theme.palette.primary.dark,
+      backgroundColor: theme.palette.action.selected,
     },
   },
   uploadIcon: {
-    fontSize: '48px',
+    fontSize: '2rem',
     color: theme.palette.primary.main,
-    marginBottom: theme.spacing(2),
+    marginBottom: theme.spacing(1),
   },
   uploadText: {
-    textAlign: 'center',
-    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(0.5),
   },
   fileList: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: theme.spacing(2),
-    marginTop: theme.spacing(1),
+    marginTop: theme.spacing(2),
   },
   fileItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    padding: theme.spacing(1),
-    borderRadius: theme.spacing(1),
     marginBottom: theme.spacing(1),
+    padding: theme.spacing(1),
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
     backgroundColor: theme.palette.background.default,
-    '&:hover': {
-      backgroundColor: theme.palette.action.hover,
-    },
   },
   fileItemRow: {
     display: 'flex',
     alignItems: 'center',
-    width: '100%',
+    marginBottom: theme.spacing(0.5),
   },
   classificationSelect: {
-    marginTop: theme.spacing(1),
-    minWidth: '100%',
-    '& .MuiSelect-select': {
-      padding: theme.spacing(0.5, 1),
-    },
+    marginTop: theme.spacing(0.5),
+    width: '100%',
   },
   messageArea: {
     flex: 1,
@@ -1105,6 +1091,87 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'flex-start',
     marginRight: theme.spacing(1),
   },
+  sessionSelect: {
+    marginTop: theme.spacing(1),
+    minWidth: '100%',
+    '& .MuiSelect-select': {
+      padding: theme.spacing(0.5, 1),
+    },
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  vectorstoreSelect: {
+    minWidth: 150,
+    marginLeft: 16,
+  },
+  docUploadContainer: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.shadows[1],
+    marginTop: theme.spacing(2),
+  },
+  panelHeader: {
+    fontSize: '1.2rem',
+    fontWeight: 600,
+    marginBottom: theme.spacing(1),
+  },
+  vectorstoreSection: {
+    marginBottom: theme.spacing(2),
+  },
+  sectionLabel: {
+    fontSize: '0.8rem',
+    fontWeight: 500,
+    marginBottom: theme.spacing(0.5),
+  },
+  formControl: {
+    marginBottom: theme.spacing(1),
+  },
+  selectEmpty: {
+    marginTop: theme.spacing(1),
+  },
+  menuItem: {
+    // Style for menu items
+  },
+  buildDatabasesLink: {
+    fontSize: '0.8rem',
+    color: theme.palette.primary.main,
+    textDecoration: 'none',
+    display: 'block',
+    marginTop: theme.spacing(0.5),
+    '&:hover': {
+      textDecoration: 'underline',
+    },
+  },
+  docUploadHeader: {
+    fontSize: '1.2rem',
+    fontWeight: 500,
+    marginBottom: theme.spacing(1),
+  },
+  // Add styles for native select
+  nativeSelect: {
+    width: '100%', 
+    padding: '8px',
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor: theme.palette.background.paper,
+    fontFamily: theme.typography.fontFamily,
+    fontSize: '0.9rem',
+    color: theme.palette.text.primary,
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+    '&:focus': {
+      outline: 'none',
+      border: `1px solid ${theme.palette.primary.main}`,
+    },
+    '&:disabled': {
+      opacity: 0.7,
+      backgroundColor: theme.palette.action.disabledBackground,
+    }
+  },
 }));
 
 // CodeBlock component with memoization for better performance
@@ -1711,7 +1778,13 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
   );
 });
 
-const DocumentUploadPane = ({ currentSessionId }) => {
+const DocumentUploadPane = ({ 
+  currentSessionId, 
+  vectorstores = [], 
+  selectedVectorstore = '', 
+  isLoadingVectorstores = false, 
+  onVectorstoreChange
+}) => {
   const classes = useStyles();
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -1768,21 +1841,18 @@ const DocumentUploadPane = ({ currentSessionId }) => {
         try {
           const status = await getDocumentStatus(currentSessionId, docId);
           if (status.status !== 'pending') {
-            updatedPollingIds.delete(docId);
+            // Update the file in the list
             setUploadedFiles(prev => prev.map(file => 
-              file.id === docId 
-                ? { ...file, status: status.status } 
-                : file
+              file.id === docId ? { ...file, status: status.status } : file
             ));
+            updatedPollingIds.delete(docId);
           }
         } catch (error) {
-          console.error(`Error polling document ${docId}:`, error);
+          console.error(`Error polling document status for ${docId}:`, error);
         }
       }
       
-      if (updatedPollingIds.size !== pollingIds.size) {
-        setPollingIds(updatedPollingIds);
-      }
+      setPollingIds(updatedPollingIds);
       
       if (updatedPollingIds.size === 0) {
         clearInterval(pollInterval);
@@ -1791,21 +1861,67 @@ const DocumentUploadPane = ({ currentSessionId }) => {
 
     return () => clearInterval(pollInterval);
   }, [currentSessionId, pollingIds]);
-  
+
+  const onDrop = useCallback(async (acceptedFiles) => {
+    if (!currentSessionId) return;
+    
+    setIsUploading(true);
+    setUploadError(null);
+    
+    for (const file of acceptedFiles) {
+      try {
+        const result = await uploadDocument(currentSessionId, file);
+        setUploadedFiles(prev => [...prev, {
+          id: result.docId,
+          name: file.name,
+          size: file.size,
+          status: 'pending',
+          isChecked: false,
+          classification: CLASSIFICATION_LEVELS.SELECT
+        }]);
+        
+        // Add to polling
+        setPollingIds(prev => new Set([...prev, result.docId]));
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        setUploadError(`Failed to upload ${file.name}`);
+      }
+    }
+    
+    setIsUploading(false);
+  }, [currentSessionId]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+    onDrop,
+    disabled: !currentSessionId || isUploading
+  });
+
+  const handleRemoveFile = async (docId) => {
+    if (!currentSessionId) return;
+    
+    try {
+      await deleteDocument(currentSessionId, docId);
+      setUploadedFiles(prev => prev.filter(file => file.id !== docId));
+      setPollingIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(docId);
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error removing file:', error);
+      setUploadError('Failed to remove file');
+    }
+  };
+
   const handleCheckboxChange = async (docId) => {
     try {
-      // Use the service function instead of direct fetch
-      const result = await toggleDocumentState(currentSessionId, docId);
-
-      // Update local state
+      await toggleDocumentState(currentSessionId, docId);
       setUploadedFiles(prev => prev.map(file => 
-        file.id === docId 
-          ? { ...file, isChecked: result.isChecked }
-          : file
+        file.id === docId ? { ...file, isChecked: !file.isChecked } : file
       ));
     } catch (error) {
-      console.error('Error updating document state:', error);
-      setUploadError('Failed to update document state');
+      console.error('Error toggling document state:', error);
+      setUploadError('Failed to update document selection');
     }
   };
 
@@ -1813,85 +1929,78 @@ const DocumentUploadPane = ({ currentSessionId }) => {
     try {
       await updateDocumentClassification(currentSessionId, docId, newClassification);
       setUploadedFiles(prev => prev.map(file => 
-        file.id === docId 
-          ? { ...file, classification: newClassification }
-          : file
+        file.id === docId ? { ...file, classification: newClassification } : file
       ));
     } catch (error) {
       console.error('Error updating classification:', error);
-      setUploadError('Failed to update document classification');
+      setUploadError('Failed to update classification');
     }
   };
 
-  const handleUpload = useCallback(async (file) => {
-    if (!currentSessionId) {
-      setUploadError('No active session selected');
-      return;
-    }
-    
-    setIsUploading(true);
-    setUploadError(null);
-    try {
-      const response = await uploadDocument(currentSessionId, file);
-      setPollingIds(prev => new Set([...prev, response.docId]));
-      return response;
-    } catch (error) {
-      console.error('Upload failed:', error);
-      setUploadError(`Failed to upload ${file.name}: ${error.message}`);
-      throw error;
-    } finally {
-      setIsUploading(false);
-    }
-  }, [currentSessionId]);
-  
-  const onDrop = useCallback(async (acceptedFiles) => {
-    for (const file of acceptedFiles) {
-      try {
-        const response = await handleUpload(file);
-        setUploadedFiles(prev => [...prev, {
-          id: response.docId,
-          name: file.name,
-          size: file.size,
-          status: response.metadata.status || 'pending'
-        }]);
-      } catch (error) {
-        continue;
-      }
-    }
-  }, [handleUpload]);
-
-  const handleRemoveFile = useCallback(async (fileId) => {
-    try {
-      await deleteDocument(currentSessionId, fileId);
-      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
-      setPollingIds(prev => {
-        const updated = new Set(prev);
-        updated.delete(fileId);
-        return updated;
-      });
-    } catch (error) {
-      console.error('Error removing file:', error);
-      setUploadError(`Failed to remove file: ${error.message}`);
-    }
-  }, [currentSessionId]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: '.pdf,.txt,.doc,.docx, .xlsx, .csv',
-    maxSize: 100 * 1024 * 1024,
-    disabled: !currentSessionId || isUploading
-  });
+  // Add a useEffect to log props updates in DocumentUploadPane
+  // At the beginning of the DocumentUploadPane component
+  useEffect(() => {
+    console.log("DocumentUploadPane rendered with props:", {
+      currentSessionId,
+      vectorstores,
+      selectedVectorstore,
+      isLoadingVectorstores
+    });
+  }, [currentSessionId, vectorstores, selectedVectorstore, isLoadingVectorstores]);
 
   return (
-    <Paper className={`${classes.uploadPane} ${!currentSessionId ? 'disabled' : ''}`} elevation={3}>
-      <Typography variant="h6" gutterBottom>
+    <Paper className={classes.docUploadContainer} elevation={3}>
+      <Typography variant="h6" className={classes.panelHeader}>
+        Knowledge Sources
+      </Typography>
+      
+      {/* Vectorstore Selection */}
+      <div className={classes.vectorstoreSection}>
+        <Typography variant="subtitle2" className={classes.sectionLabel}>
+          MAGE Retrieval Databases
+        </Typography>
+        
+        {/* Replace Material-UI Select with native select */}
+        <select
+          value={selectedVectorstore || ""}
+          onChange={(e) => {
+            console.log("Vectorstore selected:", e.target.value);
+            if (onVectorstoreChange) {
+              onVectorstoreChange(e);
+            }
+          }}
+          disabled={!currentSessionId || isLoadingVectorstores}
+          className={classes.nativeSelect}
+        >
+          <option value="">Select Vectorstore</option>
+          {vectorstores && vectorstores.length > 0 ? (
+            vectorstores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name || store.id}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>Loading vectorstores...</option>
+          )}
+        </select>
+        
+        <Link 
+          href="/retrieval/build-databases" 
+          className={classes.buildDatabasesLink}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Build Retrieval Databases
+        </Link>
+      </div>
+      
+      <Divider className={classes.divider} />
+      
+      {/* Document Upload */}
+      <Typography variant="h6" className={classes.docUploadHeader}>
         Document Upload
       </Typography>
-      {uploadError && (
-        <Typography color="error" variant="body2" style={{ margin: '8px' }}>
-          {uploadError}
-        </Typography>
-      )}
+      
       <div {...getRootProps()} className={classes.dropzone}>
         <input {...getInputProps()} />
         <CloudUploadIcon className={classes.uploadIcon} />
@@ -1981,6 +2090,11 @@ const DirectChat = () => {
   const [editSessionName, setEditSessionName] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [classificationLevel, setClassificationLevel] = useState(0);
+  
+  // Add state for vectorstores
+  const [vectorstores, setVectorstores] = useState([]);
+  const [selectedVectorstore, setSelectedVectorstore] = useState('');
+  const [isLoadingVectorstores, setIsLoadingVectorstores] = useState(false);
   
   // Add state for caveats checkboxes
   const [caveatStates, setCaveatStates] = useState({
@@ -2104,6 +2218,7 @@ const DirectChat = () => {
       setMessages([]); // Clear messages for new session
       setClassificationLevel(0); // Reset classification to Unclassified
       resetCaveats(); // Reset all caveats checkboxes
+      setSelectedVectorstore(''); // Reset vectorstore selection to default
       setTimeout(() => inputRef.current?.focus(), 100);
     } catch (error) {
       setError('Failed to create new chat');
@@ -2135,6 +2250,12 @@ const DirectChat = () => {
     setMessages([]); // Clear messages before loading new ones
     setClassificationLevel(0); // Reset classification to Unclassified
     resetCaveats(); // Reset all caveats checkboxes
+    
+    // Always reset the vectorstore selection when switching sessions
+    // to ensure users explicitly select a vectorstore
+    setSelectedVectorstore('');
+    console.log('Vectorstore selection reset when switching to session:', sessionId);
+    
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -2270,6 +2391,53 @@ const DirectChat = () => {
     }));
   };
 
+  // Load vectorstores
+  useEffect(() => {
+    const loadVectorstores = async () => {
+      if (!isLoadingVectorstores) {
+        setIsLoadingVectorstores(true);
+        try {
+          const stores = await getVectorstores();
+          console.log("Loaded vectorstores:", stores);
+          setVectorstores(stores);
+          
+          // We're intentionally NOT loading the previously selected vectorstore
+          // so that users must explicitly select one each time they switch sessions
+          
+        } catch (error) {
+          console.error('Error loading vectorstores:', error);
+        } finally {
+          setIsLoadingVectorstores(false);
+        }
+      }
+    };
+    
+    loadVectorstores();
+  }, [currentSessionId]); // Remove isLoadingVectorstores to prevent potential loops
+
+  // Handle vectorstore change
+  const handleVectorstoreChange = async (event) => {
+    if (!currentSessionId) {
+      console.log("No current session selected");
+      return;
+    }
+    
+    try {
+      const newVectorstore = event.target.value;
+      console.log("Vectorstore selected:", newVectorstore);
+      
+      // Update UI immediately
+      setSelectedVectorstore(newVectorstore);
+      
+      // Then update backend
+      console.log("Updating backend with vectorstore:", newVectorstore);
+      await setSessionVectorstore(currentSessionId, newVectorstore);
+      console.log("Vectorstore set successfully");
+    } catch (error) {
+      console.error('Error setting vectorstore:', error);
+    }
+  };
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -2281,6 +2449,10 @@ const DirectChat = () => {
       setIsLoading(false);
     };
   }, []);
+
+  // Add debugging logs before return
+  console.log("Current vectorstore value:", selectedVectorstore);
+  console.log("Available vectorstores:", vectorstores);
 
   return (
     <Container className={classes.root} maxWidth="xl">
@@ -2360,6 +2532,9 @@ const DirectChat = () => {
             <Typography className={classes.sessionName}>
               {isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
             </Typography>
+            
+            {/* Removed Vectorstore Dropdown */}
+            
             <div className={classes.buttonBarActions}>
               <Typography 
                 className={classes.fullscreenText}
@@ -2574,7 +2749,13 @@ const DirectChat = () => {
             </div>
           </form>
         </Paper>
-        <DocumentUploadPane currentSessionId={currentSessionId} />
+        <DocumentUploadPane 
+          currentSessionId={currentSessionId}
+          vectorstores={vectorstores}
+          selectedVectorstore={selectedVectorstore}
+          isLoadingVectorstores={isLoadingVectorstores}
+          onVectorstoreChange={handleVectorstoreChange}
+        />
       </div>
       <Dialog
         open={helpDialogOpen}
