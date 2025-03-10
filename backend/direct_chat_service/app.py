@@ -3,12 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Set, Tuple, Any
 from datetime import datetime
-import httpx
 from config import config
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from fastapi import APIRouter
@@ -16,7 +14,6 @@ import uuid
 import os
 from pathlib import Path
 import asyncio
-import subprocess
 import shutil
 import json
 from chat_logger import ChatLogger
@@ -24,10 +21,6 @@ import logging
 
 # Add these imports for vectorstore functionality and fallback loading
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-from langchain.chains import ConversationalRetrievalChain
-import faiss
-import pickle
 
 # Configure logging
 logging.basicConfig(

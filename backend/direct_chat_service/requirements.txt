@@ -4,14 +4,12 @@ python-dotenv
 pydantic
 langchain
 langchain-community
-requests
 python-multipart
 typing-extensions
 httpx
 PyYAML
 aiofiles
 langchain-core
-langchain-openai
 faiss-cpu
 pathlib
 pytest-shutil
