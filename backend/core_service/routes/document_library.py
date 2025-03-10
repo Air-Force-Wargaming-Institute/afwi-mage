@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 import logging
 import asyncio
-from pydantic import BaseModel, Field, validator
+from pydantic.v1 import BaseModel, Field, validator
 import os
 import zipfile
 from io import BytesIO
