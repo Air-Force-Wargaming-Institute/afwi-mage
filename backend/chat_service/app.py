@@ -98,7 +98,7 @@ app.add_middleware(
     allow_origins=["http://localhost:3000", "*"],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Initialize required directories
