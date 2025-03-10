@@ -51,7 +51,7 @@ class BulkDownloadRequest(BaseModel):
     current_folder: str = ""
 
 class FileMoveRequest(BaseModel):
-    file_path: str
+    source_paths: List[str]
     target_folder: str
 
 def create_metadata(
@@ -312,94 +312,96 @@ def get_file_type(file_name: str) -> str:
         return 'Unknown'
 
 @router.post("/upload/")
-async def upload_files(file: UploadFile = File(...), folder: Optional[str] = ""):
-    try:
-        logger.info(f"Starting upload process for file: {file.filename} in folder: {folder}")
-        folder_path = Path(UPLOAD_DIR) / folder
-        folder_path.mkdir(parents=True, exist_ok=True)
-        
-        file_path = folder_path / file.filename
-        content = await file.read()
-        file_size = len(content)
-        
-        logger.info(f"File size: {file_size} bytes")
-        
-        # Write the file
-        with file_path.open("wb") as buffer:
-            buffer.write(content)
-        logger.info(f"File written successfully to: {file_path}")
-
-        # Generate a unique document ID
-        document_id = str(uuid.uuid4())
-        logger.info(f"Generated document ID: {document_id}")
-        converted_pdf = None
-
-        # Handle DOCX conversion if needed
-        if file_path.suffix.lower() == '.docx':
-            logger.info("DOCX file detected, attempting conversion to PDF")
-            try:
-                pdf_path, error = docx_converter.convert_to_pdf(str(file_path))
-                if pdf_path:
-                    final_pdf_path = folder_path / f"{file_path.stem}.pdf"
-                    shutil.move(pdf_path, final_pdf_path)
-                    converted_pdf = final_pdf_path.name
-                    logger.info(f"Successfully converted {file.filename} to PDF: {final_pdf_path}")
-                else:
-                    logger.error(f"Failed to convert {file.filename} to PDF: {error}")
-            except Exception as e:
-                logger.error(f"Error during PDF conversion: {str(e)}")
-
-        # Create metadata using helper function
-        logger.info("Creating metadata structure")
-        metadata = create_metadata(
-            file_path=file_path,
-            folder=folder,
-            document_id=document_id,
-            file_size=file_size,
-            converted_pdf=converted_pdf
-        )
-        
-        # Save metadata
-        metadata_path = file_path.with_suffix('.metadata')
-        logger.info(f"Writing metadata to: {metadata_path}")
+async def upload_files(files: List[UploadFile] = File(...), folder: Optional[str] = ""):
+    uploaded_files = []
+    errors = []
+    
+    for file in files:
         try:
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
-            logger.info("Metadata written successfully")
-            logger.debug(f"Metadata content: {json.dumps(metadata, indent=2)}")
+            logger.info(f"Starting upload process for file: {file.filename} in folder: {folder}")
+            folder_path = Path(UPLOAD_DIR) / folder
+            folder_path.mkdir(parents=True, exist_ok=True)
             
-            # Verify metadata was written correctly
-            with open(metadata_path, 'r') as f:
-                written_metadata = json.load(f)
-                logger.info("Metadata verification - structure contains:")
-                logger.info(f"- file_info: {'file_info' in written_metadata}")
-                logger.info(f"- content_info: {'content_info' in written_metadata}")
-                logger.info(f"- document_id: {written_metadata.get('document_id') == document_id}")
-        except Exception as e:
-            logger.error(f"Error writing or verifying metadata: {str(e)}")
-            raise
+            file_path = folder_path / file.filename
+            content = await file.read()
+            file_size = len(content)
+            
+            logger.info(f"File size: {file_size} bytes")
+            
+            # Write the file
+            with file_path.open("wb") as buffer:
+                buffer.write(content)
+            logger.info(f"File written successfully to: {file_path}")
 
-        logger.info("Upload process completed successfully")
-        return JSONResponse(
-            content={
-                "filename": file.filename, 
+            # Generate a unique document ID
+            document_id = str(uuid.uuid4())
+            logger.info(f"Generated document ID: {document_id}")
+            converted_pdf = None
+
+            # Handle DOCX conversion if needed
+            if file_path.suffix.lower() == '.docx':
+                logger.info("DOCX file detected, attempting conversion to PDF")
+                try:
+                    pdf_path, error = docx_converter.convert_to_pdf(str(file_path))
+                    if pdf_path:
+                        final_pdf_path = folder_path / f"{file_path.stem}.pdf"
+                        shutil.move(pdf_path, final_pdf_path)
+                        converted_pdf = final_pdf_path.name
+                        logger.info(f"Successfully converted {file.filename} to PDF: {final_pdf_path}")
+                    else:
+                        logger.error(f"Failed to convert {file.filename} to PDF: {error}")
+                except Exception as e:
+                    logger.error(f"Error during PDF conversion: {str(e)}")
+
+            # Create metadata using helper function
+            logger.info("Creating metadata structure")
+            metadata = create_metadata(
+                file_path=file_path,
+                folder=folder,
+                document_id=document_id,
+                file_size=file_size,
+                converted_pdf=converted_pdf
+            )
+            
+            # Save the metadata
+            metadata_file = file_path.with_suffix('.metadata')
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            logger.info(f"Metadata saved to {metadata_file}")
+            
+            # Add to successful uploads
+            uploaded_files.append({
+                "filename": file.filename,
+                "path": str(Path(folder) / file.filename),
                 "document_id": document_id,
-                "status": "File uploaded successfully",
-                "security_classification": metadata["security_classification"],
-                "converted_pdf": metadata["converted_pdf"],
-                "file_info": metadata["file_info"],
-                "content_info": {
-                    "total_pages": metadata["content_info"]["total_pages"],
-                    "has_conversion": metadata["content_info"]["has_conversion"]
-                }
-            }, 
-            status_code=200
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error during file upload: {str(e)}")
+                "file_type": get_file_type(file.filename),
+                "security_classification": "SELECT A CLASSIFICATION"
+            })
+
+        except Exception as e:
+            logger.error(f"Error processing file {file.filename}: {str(e)}")
+            errors.append({
+                "filename": file.filename,
+                "error": str(e)
+            })
+    
+    # Return response with info about all uploaded files
+    if uploaded_files:
+        return {
+            "status": "success" if not errors else "partial",
+            "uploaded_files": uploaded_files,
+            "errors": errors,
+            "total_uploaded": len(uploaded_files),
+            "total_failed": len(errors)
+        }
+    else:
         return JSONResponse(
-            content={"detail": f"An unexpected error occurred: {str(e)}"}, 
-            status_code=500
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "No files were uploaded successfully",
+                "errors": errors
+            }
         )
 
 @router.delete("/files/{filename:path}")
@@ -541,65 +543,99 @@ async def bulk_download(request: BulkDownloadRequest):
 
 @router.post("/move-file/")
 async def move_file(request: FileMoveRequest):
-    source_path = Path(UPLOAD_DIR) / request.file_path.lstrip('/')
     target_path = Path(UPLOAD_DIR) / request.target_folder.lstrip('/')
     
-    logger.info(f"Moving file from {source_path} to {target_path}")
+    logger.info(f"Moving files to {target_path}")
     logger.info(f"UPLOAD_DIR: {UPLOAD_DIR}")
-    logger.info(f"Request file_path: {request.file_path}")
+    logger.info(f"Request source_paths: {request.source_paths}")
     logger.info(f"Request target_folder: {request.target_folder}")
     
-    if not source_path.exists():
-        logger.error(f"Source file not found: {source_path}")
-        raise HTTPException(status_code=404, detail=f"Source file not found: {source_path}")
-    
+    # Create target folder if it doesn't exist
     if not target_path.exists():
         logger.info(f"Target folder does not exist, creating: {target_path}")
         target_path.mkdir(parents=True, exist_ok=True)
     
-    new_file_path = target_path / source_path.name
-    if new_file_path.exists():
-        logger.error(f"File already exists in target folder: {new_file_path}")
-        raise HTTPException(status_code=400, detail="A file with the same name already exists in the target folder")
+    # Track results for response
+    results = {
+        "successful": [],
+        "failed": []
+    }
     
-    try:
-        # Move the main file
-        shutil.move(str(source_path), str(new_file_path))
-        logger.info(f"File moved successfully to {new_file_path}")
+    # Process each source path
+    for file_path in request.source_paths:
+        source_path = Path(UPLOAD_DIR) / file_path.lstrip('/')
         
-        # Handle metadata file if it exists
-        metadata_path = source_path.with_suffix('.metadata')
-        if metadata_path.exists():
-            new_metadata_path = new_file_path.with_suffix('.metadata')
+        try:
+            if not source_path.exists():
+                logger.error(f"Source file not found: {source_path}")
+                results["failed"].append({
+                    "path": file_path,
+                    "reason": f"Source file not found: {source_path}"
+                })
+                continue
             
-            # Read existing metadata
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
+            new_file_path = target_path / source_path.name
+            if new_file_path.exists():
+                logger.error(f"File already exists in target folder: {new_file_path}")
+                results["failed"].append({
+                    "path": file_path,
+                    "reason": "A file with the same name already exists in the target folder"
+                })
+                continue
             
-            # Update file path in metadata
-            if 'file_info' in metadata:
-                metadata['file_info']['path'] = str(Path(request.target_folder) / source_path.name)
+            # Move the main file
+            shutil.move(str(source_path), str(new_file_path))
+            logger.info(f"File moved successfully to {new_file_path}")
             
-            # Write updated metadata to new location
-            with open(new_metadata_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
+            # Handle metadata file if it exists
+            metadata_path = source_path.with_suffix('.metadata')
+            if metadata_path.exists():
+                new_metadata_path = new_file_path.with_suffix('.metadata')
+                
+                # Read existing metadata
+                with open(metadata_path, 'r') as f:
+                    metadata = json.load(f)
+                
+                # Update file path in metadata
+                if 'file_info' in metadata:
+                    metadata['file_info']['path'] = str(Path(request.target_folder) / source_path.name)
+                
+                # Write updated metadata to new location
+                with open(new_metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                
+                # Remove old metadata file
+                metadata_path.unlink()
+                logger.info(f"Metadata file moved and updated successfully")
+                
+                # Handle converted PDF if it exists
+                if metadata.get('converted_pdf'):
+                    pdf_path = source_path.parent / metadata['converted_pdf']
+                    if pdf_path.exists():
+                        new_pdf_path = target_path / metadata['converted_pdf']
+                        shutil.move(str(pdf_path), str(new_pdf_path))
+                        logger.info(f"Converted PDF moved successfully to {new_pdf_path}")
             
-            # Remove old metadata file
-            metadata_path.unlink()
-            logger.info(f"Metadata file moved and updated successfully")
-            
-            # Handle converted PDF if it exists
-            if metadata.get('converted_pdf'):
-                pdf_path = source_path.parent / metadata['converted_pdf']
-                if pdf_path.exists():
-                    new_pdf_path = target_path / metadata['converted_pdf']
-                    shutil.move(str(pdf_path), str(new_pdf_path))
-                    logger.info(f"Converted PDF moved successfully to {new_pdf_path}")
+            results["successful"].append(file_path)
         
-        return {"message": f"File moved successfully to {request.target_folder}"}
-    except Exception as e:
-        logger.error(f"Error moving file: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"An error occurred while moving the file: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error moving file {file_path}: {str(e)}")
+            results["failed"].append({
+                "path": file_path,
+                "reason": str(e)
+            })
+    
+    # Return success if at least one file was moved successfully
+    if results["successful"]:
+        return {
+            "message": f"Files moved successfully to {request.target_folder}",
+            "results": results
+        }
+    else:
+        raise HTTPException(status_code=500, detail={
+            "message": "Failed to move any files",
+            "results": results
+        })
 
 @router.post("/update-security/")
 async def update_security_classification(request: SecurityUpdateRequest):

@@ -5,7 +5,8 @@ from typing import List, Optional, Dict, Set, Tuple, Any
 from datetime import datetime
 import httpx
 from config import config
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
+from langchain_ollama import OllamaEmbeddings
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -19,7 +20,27 @@ import subprocess
 import shutil
 import json
 from chat_logger import ChatLogger
+import logging
 
+# Add these imports for vectorstore functionality and fallback loading
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+from langchain.chains import ConversationalRetrievalChain
+import faiss
+import pickle
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger("direct_chat_service")
+
+# Define constants for paths
+SESSIONS_DIR = Path("sessions")
+VECTORSTORES_DIR = Path("data/vectorstores")
+
+# Setup FastAPI
 app = FastAPI(
     title="Direct Chat Service",
     description="Service for direct chat interactions using Ollama and LangChain",
@@ -41,13 +62,26 @@ app.add_middleware(
 )
 
 # Add after the imports, before app initialization
-SESSIONS_DIR = Path("sessions")
-
-# Add after SESSIONS_DIR constant
 DEFAULT_USER = "admin"
 
 # Initialize ChatLogger
 chat_logger = ChatLogger(SESSIONS_DIR)
+
+# Function to log messages to the chat history
+def append_message_to_log(session_id, message_data, user_id=DEFAULT_USER):
+    """
+    Append a message to the chat log for the given session.
+    
+    Args:
+        session_id (str): The session identifier
+        message_data (dict): The message data to log
+        user_id (str): The user identifier
+    """
+    try:
+        # Use asyncio.create_task to run the async function in the background
+        asyncio.create_task(chat_logger.log_message(user_id, session_id, message_data))
+    except Exception as e:
+        logging.error(f"Error logging message: {str(e)}")
 
 # Pydantic models
 class Message(BaseModel):
@@ -85,6 +119,12 @@ class ChatSession(BaseModel):
     updated_at: datetime
     documentStates: Dict[str, DocumentState] = Field(default_factory=dict)
 
+class UpdateDocumentClassificationRequest(BaseModel):
+    classification: str
+
+class SetVectorstoreRequest(BaseModel):
+    vectorstore: str
+
 # Store active chat sessions
 chat_sessions: Dict[str, ChatSession] = {}
 
@@ -108,7 +148,7 @@ llm = ChatOllama(
 
 # Create chat prompt template
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful and professional assistant that does not embellish, is not verbose, and does not use emojis. Write all of your responses in markdown format. You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem."),
+    ("system", "At the beginning of your response, you should open with MY CONTEXT and tell the user a little about the documents you were provided as context to answer the user's question. If the documents that are provided to you do not contain information that clearly informs your answer to the user's question, then you should say so explicitly. If you do have any information from the documents that informs your answer to the user's question, then you should say so explicitly. This is to let the user know that you are not just guessing or making up an answer. This helps the user to understand the context you are working with. You are a helpful and professional assistant that does not embellish, is not verbose, and does not use emojis. Write all of your responses in markdown format. You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem."),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])
@@ -452,11 +492,26 @@ def save_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> None:
         session_dir = SESSIONS_DIR / user_id / session_id
         metadata_path = session_dir / "SessionMessages.metadata"
         
+        logger.info(f"Saving metadata for session {session_id} to {metadata_path}")
+        
         # Get session data
         session = chat_sessions.get(session_id)
         if not session:
+            logger.warning(f"Session {session_id} not found in chat_sessions, skipping metadata save")
             return
             
+        # Load existing metadata to get vectorstore setting
+        existing_metadata = {}
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    existing_metadata = json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not load existing metadata for session {session_id}: {str(e)}")
+        
+        # Get the vectorstore from existing metadata
+        vectorstore = existing_metadata.get("vectorstore", None)
+        
         # Prepare metadata
         metadata = {
             "session_info": {
@@ -488,11 +543,22 @@ def save_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> None:
             }
         }
         
+        # Preserve the vectorstore setting if it exists
+        if vectorstore is not None:
+            # Include at top level for backward compatibility
+            metadata["vectorstore"] = vectorstore
+            # Also include in session_info for future consistency
+            metadata["session_info"]["vectorstore"] = vectorstore
+            logger.info(f"Session {session_id} saving with vectorstore: {vectorstore} (in both locations)")
+        
         # Save to file
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
             
+        logger.info(f"Metadata saved successfully for session {session_id}")
+            
     except Exception as e:
+        logger.error(f"Error saving session metadata for session {session_id}: {str(e)}")
         print(f"Error saving session metadata: {str(e)}")
 
 def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[str, Any]:
@@ -501,14 +567,33 @@ def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[
         session_dir = SESSIONS_DIR / user_id / session_id
         metadata_path = session_dir / "SessionMessages.metadata"
         
+        logger.info(f"Loading metadata for session {session_id} from {metadata_path}")
+        
         if not metadata_path.exists():
+            logger.warning(f"Metadata file {metadata_path} does not exist for session {session_id}")
             return {}
             
         with open(metadata_path, 'r') as f:
             metadata = json.load(f)
             
+        # Check for vectorstore in both top-level and session_info
+        vectorstore = None
+        if "vectorstore" in metadata:
+            vectorstore = metadata["vectorstore"]
+            logger.info(f"Loaded session {session_id} with top-level vectorstore: {vectorstore}")
+        elif "session_info" in metadata and isinstance(metadata["session_info"], dict) and "vectorstore" in metadata["session_info"]:
+            vectorstore = metadata["session_info"]["vectorstore"]
+            # Copy to top level for consistency
+            metadata["vectorstore"] = vectorstore
+            logger.info(f"Loaded session {session_id} with nested vectorstore: {vectorstore}")
+        else:
+            logger.info(f"Loaded session {session_id} has no vectorstore configured")
+            
         # Convert document states to proper DocumentState objects
         if "document_states" in metadata:
+            doc_count = len(metadata["document_states"])
+            logger.info(f"Loaded {doc_count} document states for session {session_id}")
+            
             converted_states = {}
             for doc_id, state in metadata["document_states"].items():
                 # Convert datetime string back to datetime object
@@ -522,6 +607,9 @@ def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[
             
         # Convert document metadata to proper DocumentMetadata objects
         if "document_metadata" in metadata:
+            meta_count = len(metadata["document_metadata"])
+            logger.info(f"Loaded {meta_count} document metadata entries for session {session_id}")
+            
             converted_metadata = {}
             for doc_id, meta in metadata["document_metadata"].items():
                 # Convert datetime string back to datetime object
@@ -530,9 +618,11 @@ def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[
                 converted_metadata[doc_id] = DocumentMetadata(**meta)
             metadata["document_metadata"] = converted_metadata
             
+        logger.info(f"Metadata loaded successfully for session {session_id}")
         return metadata
             
     except Exception as e:
+        logger.error(f"Error loading session metadata for session {session_id}: {str(e)}")
         print(f"Error loading session metadata: {str(e)}")
         return {}
 
@@ -645,29 +735,153 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
             }
         }
 
-        # Log user message (don't await yet to avoid delaying the response)
-        log_task = asyncio.create_task(
-            chat_logger.log_message(user_id, request.session_id, user_message_data)
-        )
+        # Log user message
+        append_message_to_log(request.session_id, user_message_data, user_id)
 
-        # Get response using the runnable
-        response = chat_with_history.invoke(
-            {"input": request.message},
-            {"configurable": {"session_id": request.session_id}}
-        )
+        # Load session metadata to check for vectorstore
+        metadata = load_session_metadata(request.session_id, user_id)
+        logger.info(f"Session {request.session_id} metadata keys: {', '.join(metadata.keys())}")
+        
+        # Check for vectorstore in metadata (either top-level or in session_info)
+        vectorstore_id = metadata.get("vectorstore")
+        if vectorstore_id is None and "session_info" in metadata:
+            vectorstore_id = metadata["session_info"].get("vectorstore")
+            
+        # Check if we should use retrieval
+        if vectorstore_id:
+            logger.info(f"Session {request.session_id}: Vectorstore '{vectorstore_id}' selected for retrieval")
+            
+            try:
+                # Load the vectorstore
+                vectorstore_path = Path(VECTORSTORES_DIR) / vectorstore_id
+                logger.info(f"Session {request.session_id}: Attempting to load vectorstore from path: {vectorstore_path}")
+                logger.info(f"Session {request.session_id}: Path exists: {vectorstore_path.exists()}")
+                
+                # Initialize embeddings using Ollama's API instead of a separate embedding service
+                # This approach is similar to what chat_service uses
+                logger.info(f"Session {request.session_id}: Initializing embeddings with Ollama at: {config.ollama.base_url}")
+                embeddings = OllamaEmbeddings(
+                    base_url=config.ollama.base_url,
+                    model="nomic-embed-text"  # Use specific embedding model that's available
+                )
+                
+                # Load the FAISS vectorstore using the correct method for these versions
+                logger.info(f"Session {request.session_id}: Loading FAISS vectorstore from {vectorstore_path}")
+                
+                # Try to load the vectorstore, with multiple fallback approaches
+                try:
+                    vectorstore = FAISS.load_local(
+                        folder_path=str(vectorstore_path),
+                        embeddings=embeddings,
+                        allow_dangerous_deserialization=True
+                    )
+                    logger.info(f"Session {request.session_id}: Successfully loaded vectorstore")
+                except Exception as inner_error:
+                    logger.warning(f"Session {request.session_id}: Error loading vectorstore with standard approach: {str(inner_error)}")
+                    logger.info(f"Session {request.session_id}: Attempting to load with alternative approach")
+                    
+                    # Fall back to a more direct approach if needed
+                    try:
+                        import faiss
+                        import pickle
+                        
+                        # Load the FAISS index
+                        index_path = str(Path(vectorstore_path) / "index.faiss")
+                        docstore_path = str(Path(vectorstore_path) / "docstore.pkl")
+                        
+                        logger.info(f"Session {request.session_id}: Loading FAISS index from {index_path}")
+                        logger.info(f"Session {request.session_id}: Checking if index file exists: {os.path.exists(index_path)}")
+                        
+                        index = faiss.read_index(index_path)
+                        logger.info(f"Session {request.session_id}: Successfully loaded FAISS index")
+                        
+                        # Load the docstore
+                        logger.info(f"Session {request.session_id}: Loading docstore from {docstore_path}")
+                        logger.info(f"Session {request.session_id}: Checking if docstore file exists: {os.path.exists(docstore_path)}")
+                        
+                        with open(docstore_path, "rb") as f:
+                            docstore = pickle.load(f)
+                        logger.info(f"Session {request.session_id}: Successfully loaded docstore")
+                            
+                        # Create FAISS instance directly
+                        vectorstore = FAISS(embeddings, index, docstore, {})
+                        logger.info(f"Session {request.session_id}: Successfully loaded vectorstore using fallback method")
+                    except Exception as fallback_error:
+                        logger.error(f"Session {request.session_id}: Fallback loading also failed: {str(fallback_error)}")
+                        raise fallback_error
+                
+                # Perform retrieval for the user's question
+                logger.info(f"Session {request.session_id}: Performing retrieval for question: '{request.message}'")
+                
+                try:
+                    k = 20
+                    search_type = "mmr"
+                    retriever = vectorstore.as_retriever(search_type=search_type, search_kwargs={"k": k})
+                    docs = retriever.invoke(request.message)
+                        
+                    logger.info(f"Session {request.session_id}: Successfully retrieved {len(docs)} documents")
+                    
+                    # Print document contents for debugging
+                    for i, doc in enumerate(docs):
+                        logger.info(f"Session {request.session_id}: Document {i} content: {doc.page_content[:]}...")
+                        
+                    # Process with relevant context
+                    context = "\n\n".join([doc.page_content for doc in docs])
+                    
+                except Exception as retrieve_error:
+                    logger.error(f"Session {request.session_id}: Error retrieving documents: {str(retrieve_error)}")
+                    logger.error(f"Session {request.session_id}: Error type: {type(retrieve_error).__name__}")
+                    import traceback
+                    logger.error(f"Session {request.session_id}: Error traceback: {traceback.format_exc()}")
+                    raise Exception(f"Error using vectorstore: {str(retrieve_error)}")
+                
+                # Enhance the prompt with retrieved documents
+                enhanced_prompt = f"""Answer the question based on the context below. If the documents do not contain information that clearly informs your answer to the user's question, then you should say so. If you do have any information from the documents that informs your answer to the user's question, then you should say so. This is to let the user know that you are not just guessing or making up an answer. This helps the user to understand the context you are working with.
 
-        # Process the response to ensure proper formatting
-        response_content = response.content
-        if "<details><summary>Thinking Process</summary>" not in response_content:
-            # If the model didn't use the proper format, try to structure it
-            main_response = response_content
-            response_content = f"{main_response}\n\n<details><summary>Thinking Process</summary>\n\n<details><summary>Direct Response</summary>\nProvided direct answer based on knowledge and context.\n</details>\n\n</details>"
+Context:
+{context}
 
-        # Create AI response data for logging
+Question: {request.message}
+
+Answer:"""
+                
+                # Use enhanced prompt for the LLM with chat history
+                logger.info(f"Session {request.session_id}: Using enhanced prompt with retrieved context")
+                response = chat_with_history.invoke(
+                    {"input": enhanced_prompt},
+                    {"configurable": {"session_id": request.session_id}}
+                )
+                
+            except Exception as e:
+                logger.error(f"Session {request.session_id}: Error using vectorstore: {str(e)}")
+                logger.info(f"Session {request.session_id}: Falling back to regular chat due to vectorstore error")
+                # Fall back to regular chat
+                response = chat_with_history.invoke(
+                    {"input": request.message},
+                    {"configurable": {"session_id": request.session_id}}
+                )
+        else:
+            # Regular chat without retrieval
+            logger.info(f"Session {request.session_id}: No vectorstore configured, using regular chat")
+            response = chat_with_history.invoke(
+                {"input": request.message},
+                {"configurable": {"session_id": request.session_id}}
+            )
+
+        # Create timestamp
+        timestamp = datetime.now()
+
+        # Extract content from response if it's a complex object
+        if hasattr(response, 'content'):
+            response_content = response.content
+        else:
+            response_content = str(response)
+
+        # Create message data for logging
         ai_message_data = {
             "message_id": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "sender": "ai",
+            "timestamp": timestamp.isoformat(),
+            "sender": "assistant",
             "content": response_content,
             "metadata": {
                 "session_id": request.session_id,
@@ -675,23 +889,14 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
             }
         }
 
-        # Log AI response
-        await log_task  # Ensure user message is logged first
-        await chat_logger.log_message(user_id, request.session_id, ai_message_data)
+        # Log AI message
+        append_message_to_log(request.session_id, ai_message_data, user_id)
 
-        return ChatResponse(
-            message=response_content,
-            timestamp=datetime.now()
-        )
+        # Return response
+        return ChatResponse(message=response_content, timestamp=timestamp)
     except Exception as e:
-        # Log error if logging task exists and hasn't completed
-        try:
-            if 'log_task' in locals() and not log_task.done():
-                await log_task
-        except Exception:
-            pass
-        print(f"Error in chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error in chat: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing chat request: {str(e)}")
 
 @router.get("/chat/history/{session_id}")
 async def get_chat_history(session_id: str, user_id: str = DEFAULT_USER):
@@ -990,10 +1195,6 @@ async def update_session_name(
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Add this Pydantic model for the request body
-class UpdateDocumentClassificationRequest(BaseModel):
-    classification: str
-
 @router.put("/chat/session/{session_id}/documents/{doc_id}/classification")
 async def update_document_classification(
     session_id: str,
@@ -1001,108 +1202,171 @@ async def update_document_classification(
     request: UpdateDocumentClassificationRequest,
     user_id: str = DEFAULT_USER
 ):
-    """Update the classification level of a document"""
     try:
-        if session_id not in chat_sessions:
-            raise HTTPException(status_code=404, detail="Session not found")
+        # Get the session directory
+        session_dir = ensure_session_directory(session_id, user_id)
         
-        session = chat_sessions[session_id]
+        # Load session metadata
+        session_metadata = load_session_metadata(session_id, user_id)
         
-        if doc_id not in session.documentStates:
+        # Update classification in document states
+        if "documentStates" in session_metadata and doc_id in session_metadata["documentStates"]:
+            session_metadata["documentStates"][doc_id]["classification"] = request.classification
+            
+            # Save session metadata
+            save_session_metadata(session_id, user_id)
+            
+            return {"success": True, "message": "Document classification updated"}
+        else:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Update the classification
-        doc_state = session.documentStates[doc_id]
-        doc_state.classification = request.classification
-        doc_state.lastModified = datetime.now()
-        
-        # Save the updated metadata
-        save_session_metadata(session_id, user_id)
-        
-        return {"docId": doc_id, "classification": doc_state.classification}
-        
     except Exception as e:
-        print(f"Error in update_document_classification: {str(e)}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/test/thinking-format")
 async def test_thinking_format():
-    """Test endpoint that returns a message with the thinking format"""
     return {
-        "message": """<think>
-Let me think about how to solve this problem step by step.
-
-First, I need to understand what the user is asking. They want to know how to optimize a React application. This is a broad topic, so I should break it down into key components:
-
-1. Performance optimization
-2. Bundle size reduction
-3. Rendering optimization
-4. State management
-5. Code splitting
-
-For performance optimization, the main techniques include:
-- Using React.memo for functional components
-- Implementing shouldComponentUpdate for class components
-- Using the useCallback hook for functions
-- Using the useMemo hook for computed values
-- Avoiding unnecessary re-renders
-
-These are the fundamental techniques that can significantly improve React performance.
-
-For bundle size reduction, I should mention:
-- Code splitting to load only necessary code
-- Tree shaking to eliminate dead code
-- Using smaller libraries or alternatives
-- Lazy loading components and routes
-
-For rendering optimization:
-- Virtualization for long lists
-- Avoiding expensive calculations during render
-- Proper use of useEffect dependencies
-
-Let me also consider state management approaches:
-- Local state for component-specific data
-- Context API for shared state that changes infrequently
-- Redux for complex global state management
-- Optimizing selectors and reducers
-
-I believe these key points will provide a comprehensive answer about React optimization.
-</think>
-
-# Optimizing React Applications
-
-Here are the most effective ways to optimize your React application:
-
-## Performance Optimization
-- Implement memoization with `React.memo`, `useCallback`, and `useMemo`
-- Avoid unnecessary re-renders by controlling component updates
-- Use virtualization for long lists with react-window or react-virtualized
-
-## Bundle Size Reduction
-- Code splitting with dynamic imports
-- Tree shaking with proper import/export
-- Optimizing dependencies and removing unused ones
-
-## Rendering Optimization
-- Implement lazy loading for components and routes
-- Use windowing techniques for long lists
-- Consider using Web Workers for heavy computations
-
-## State Management
-- Keep state as local as possible
-- Consider using Context API for global state that changes infrequently
-- Use Redux only when necessary and with proper selectors
-
-## Additional Tips
-- Enable production mode
-- Implement progressive loading strategies
-- Use performance profiling tools regularly
-
-Would you like me to elaborate on any specific optimization technique?""",
-        "timestamp": datetime.now()
+        "response": "Here is a sample response with thinking process.\n\n<details><summary>Thinking Process</summary>\n\nThis is where the thinking process would go.\n\n</details>"
     }
 
-# Include router in app
+@router.get("/vectorstores")
+async def list_vectorstores():
+    """List all available vectorstores in the data/vectorstores directory with their names"""
+    try:
+        logger.info("Listing all available vectorstores")
+        
+        # Look for vectorstores in the data directory
+        vectorstore_path = Path("/app/data/vectorstores")
+        if not vectorstore_path.exists():
+            # For local development/testing
+            vectorstore_path = Path("../data/vectorstores")
+            if not vectorstore_path.exists():
+                vectorstore_path = Path("data/vectorstores")
+        
+        logger.info(f"Checking vectorstore path: {vectorstore_path}")
+        logger.info(f"Path exists: {vectorstore_path.exists()}")
+        
+        if not vectorstore_path.exists():
+            logger.warning(f"Vectorstore path {vectorstore_path} does not exist, returning empty list")
+            return {"vectorstores": []}
+            
+        # Get all directories in the vectorstore path
+        vectorstore_dirs = [d for d in vectorstore_path.iterdir() if d.is_dir()]
+        logger.info(f"Found {len(vectorstore_dirs)} vectorstore directories")
+        
+        # Build vectorstore info with metadata if available
+        vectorstore_info = []
+        for vs_dir in vectorstore_dirs:
+            vs_id = vs_dir.name
+            vs_name = vs_id  # Default to ID if no metadata
+            
+            # Try to read metadata.json if it exists
+            metadata_path = vs_dir / "metadata.json"
+            has_metadata = metadata_path.exists()
+            logger.info(f"Vectorstore {vs_id} - Metadata file exists: {has_metadata}")
+            
+            if has_metadata:
+                try:
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                        vs_name = metadata.get("name", vs_id)
+                        logger.info(f"Vectorstore {vs_id} - Name from metadata: {vs_name}")
+                except Exception as e:
+                    logger.error(f"Error reading metadata for {vs_id}: {str(e)}")
+                    print(f"Error reading metadata for {vs_id}: {str(e)}")
+            
+            vectorstore_info.append({
+                "id": vs_id,
+                "name": vs_name
+            })
+            
+        logger.info(f"Returning list of {len(vectorstore_info)} vectorstores")
+        return {"vectorstores": vectorstore_info}
+    except Exception as e:
+        logger.error(f"Error listing vectorstores: {str(e)}")
+        print(f"Error listing vectorstores: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add this Pydantic model for the request body
+class SetVectorstoreRequest(BaseModel):
+    vectorstore: str
+
+@router.put("/chat/session/{session_id}/vectorstore")
+async def set_session_vectorstore(
+    session_id: str,
+    request: SetVectorstoreRequest,
+    user_id: str = DEFAULT_USER
+):
+    """Set the vectorstore to use for retrieval in a chat session"""
+    try:
+        logger.info(f"Setting vectorstore for session {session_id} to '{request.vectorstore}'")
+        
+        # Get the session directory
+        session_dir = ensure_session_directory(session_id, user_id)
+        logger.info(f"Session directory: {session_dir}")
+        
+        # Load session metadata
+        session_metadata = load_session_metadata(session_id, user_id)
+        
+        # Update vectorstore in session metadata
+        previous_vectorstore = session_metadata.get("vectorstore", "None")
+        session_metadata["vectorstore"] = request.vectorstore
+        logger.info(f"Updated session {session_id} vectorstore from '{previous_vectorstore}' to '{request.vectorstore}'")
+        
+        # Directly update the metadata file to ensure vectorstore is saved
+        metadata_path = session_dir / "SessionMessages.metadata"
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, 'r') as f:
+                    existing_metadata = json.load(f)
+                
+                # Update the vectorstore setting
+                existing_metadata["vectorstore"] = request.vectorstore
+                
+                # Write the updated metadata back to the file
+                with open(metadata_path, 'w') as f:
+                    json.dump(existing_metadata, f, indent=2)
+                
+                logger.info(f"Directly updated vectorstore in metadata file for session {session_id}")
+            except Exception as e:
+                logger.warning(f"Could not directly update metadata file, falling back to save_session_metadata: {str(e)}")
+                # Fall back to save_session_metadata
+                save_session_metadata(session_id, user_id)
+        else:
+            # If metadata file doesn't exist yet, use save_session_metadata
+            save_session_metadata(session_id, user_id)
+            
+        logger.info(f"Saved session metadata for session {session_id}")
+        
+        return {"success": True, "message": f"Session vectorstore set to {request.vectorstore}"}
+    except Exception as e:
+        logger.error(f"Error setting vectorstore for session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/chat/session/{session_id}/metadata")
+async def get_session_metadata(
+    session_id: str,
+    user_id: str = DEFAULT_USER
+):
+    """Get the metadata for a chat session"""
+    try:
+        logger.info(f"Getting metadata for session {session_id}")
+        
+        # Load session metadata
+        session_metadata = load_session_metadata(session_id, user_id)
+        
+        # Log relevant information about the metadata
+        vectorstore = session_metadata.get("vectorstore", "None")
+        logger.info(f"Session {session_id} has vectorstore: {vectorstore}")
+        
+        # Log document states if available
+        if "document_states" in session_metadata:
+            doc_count = len(session_metadata["document_states"])
+            logger.info(f"Session {session_id} has {doc_count} document states")
+        
+        return session_metadata
+    except Exception as e:
+        logger.error(f"Error getting metadata for session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Register the router with the app AFTER all endpoints are defined
 app.include_router(router)

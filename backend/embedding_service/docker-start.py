@@ -12,9 +12,8 @@ import uvicorn
 
 # Print current environment for debugging
 print("\n==========")
-print("== CUDA ==")
+print("== ENVIRONMENT ==")
 print("==========\n")
-os.system("nvcc --version || echo 'NVCC not found'")
 
 # Add all possible paths to ensure imports work correctly
 print("\n==========")

@@ -175,4 +175,44 @@ export const updateDocumentClassification = async (sessionId, docId, classificat
     console.error('Error updating document classification:', error);
     throw error;
   }
+};
+
+// Get available vectorstores
+export const getVectorstores = async () => {
+  try {
+    const response = await axios.get(
+      getApiUrl('DIRECT_CHAT', '/vectorstores')
+    );
+    return response.data.vectorstores;
+  } catch (error) {
+    console.error('Error fetching vectorstores:', error);
+    throw error;
+  }
+};
+
+// Get session metadata
+export const getChatSessionMetadata = async (sessionId) => {
+  try {
+    const response = await axios.get(
+      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/metadata`)
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching session metadata:', error);
+    throw error;
+  }
+};
+
+// Set the vectorstore for a session
+export const setSessionVectorstore = async (sessionId, vectorstore) => {
+  try {
+    const response = await axios.put(
+      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/vectorstore`),
+      { vectorstore }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error setting session vectorstore:', error);
+    throw error;
+  }
 }; 
