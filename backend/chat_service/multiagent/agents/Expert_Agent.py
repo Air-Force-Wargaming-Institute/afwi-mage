@@ -4,6 +4,9 @@ from multiagent.graphState import ExpertState, CollabState
 from multiagent.agents.helpers import determine_collaboration, create_banner
 from utils.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_librarian_request(whoami: str, question: str, agent_instructions: str, context: str = "") -> str:
     """Generate a librarian request with optional context."""
@@ -103,7 +106,9 @@ def expert_subgraph_report(state: ExpertState):
     if collab_report:
         analysis_inputs["collab_report"] = collab_report
     
+    logger.info(f"Expert {whoami} model: {state['expert_models'][whoami]}")
     analysis = create_chain(prompt,model=state['expert_models'][whoami], **analysis_inputs)
+    logger.info(f"Expert {whoami} final analysis: {analysis}")
     
     return {'expert_final_analysis': {whoami: analysis}}
 
