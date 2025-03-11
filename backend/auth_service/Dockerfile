@@ -1,18 +1,13 @@
-FROM python:3.11-slim
+FROM mage-base:latest
 
-WORKDIR /app
+# No need to install dependencies as they're in the base image
 
-# Install system dependencies including PostgreSQL client
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+# Copy service-specific files
 COPY . .
+
+# Convert line endings to Unix format (LF)
+RUN tr -d '\r' < /app/entrypoint.sh > /app/entrypoint_unix.sh && \
+    mv /app/entrypoint_unix.sh /app/entrypoint.sh
 
 # Make the script executable
 RUN chmod +x /app/entrypoint.sh
