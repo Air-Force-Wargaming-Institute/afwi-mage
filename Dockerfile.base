@@ -27,7 +27,7 @@ RUN mkdir -p /root/.config/libreoffice/4/user && \
 ENV PATH="/usr/lib/libreoffice/program:${PATH}"
 ENV URE_BOOTSTRAP="file:///usr/lib/libreoffice/program/fundamentalrc"
 ENV UNO_PATH="/usr/lib/libreoffice/program"
-ENV PYTHONPATH="${PYTHONPATH}:/usr/lib/python3/dist-packages"
+ENV PYTHONPATH="/usr/lib/python3/dist-packages"
 
 # Create common directories
 RUN mkdir -p /app/data/uploads \
@@ -49,14 +49,16 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Install additional Python packages that were installed separately in some services
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps \
-    && pip install --no-cache-dir "pytesseract>=0.3" \
-    && pip install --no-cache-dir "layoutparser[tesseract]>=0.3" \
-    && pip install --no-cache-dir llama-cpp-python==0.2.11
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir unstructured==0.10.16
+RUN pip install --no-cache-dir unstructured-inference==0.6.6 --no-deps
+RUN pip install --no-cache-dir "pytesseract>=0.3"
+RUN pip install --no-cache-dir "layoutparser[tesseract]>=0.3"
+RUN pip install --no-cache-dir llama-cpp-python==0.2.11
 
 # Download NLTK data
 RUN python -m nltk.downloader -d /app/nltk_data punkt averaged_perceptron_tagger
