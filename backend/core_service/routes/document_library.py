@@ -7,14 +7,11 @@ import json
 from datetime import datetime
 import logging
 import asyncio
-from pydantic.v1 import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 import os
 import zipfile
 from io import BytesIO
 import subprocess
-import uuid
-import time
-import mimetypes
 from uuid import uuid4  # Add import for UUID generation
 
 # Setup logging
@@ -47,8 +44,10 @@ except Exception as e:
 class FolderRequest(BaseModel):
     name: str
     parent_path: Optional[str] = ""
+    
+    model_config = ConfigDict(populate_by_name=True)
 
-    @validator('name')
+    @field_validator('name', mode='before')
     def validate_folder_name(cls, v):
         if not v or v.isspace():
             raise ValueError("Folder name cannot be empty")
@@ -67,8 +66,8 @@ class DocumentResponse(BaseModel):
     parentPath: str = Field("", description="Parent folder path")
     securityClassification: str = Field("Unclassified", description="Security classification of the document")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "documents/report.pdf",
                 "name": "report.pdf",
@@ -80,7 +79,9 @@ class DocumentResponse(BaseModel):
                 "parentPath": "documents",
                 "securityClassification": "Unclassified"
             }
-        }
+        },
+        populate_by_name=True
+    )
 
 # Progress tracking
 operation_progress = {}
@@ -92,11 +93,15 @@ class BulkOperationStatus(BaseModel):
     status: str
     errors: List[str] = []
     completed: bool = False
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class BulkDeleteRequest(BaseModel):
     documentIds: List[str]
     
-    @validator('documentIds')
+    model_config = ConfigDict(populate_by_name=True)
+    
+    @field_validator('documentIds', mode='before')
     def validate_document_ids(cls, v):
         if not v:
             raise ValueError("Document IDs list cannot be empty")
@@ -109,7 +114,9 @@ class BulkDownloadRequest(BaseModel):
     include_folders: bool = False
     preserve_structure: bool = True
     
-    @validator('documentIds')
+    model_config = ConfigDict(populate_by_name=True)
+    
+    @field_validator('documentIds', mode='before')
     def validate_document_ids(cls, v):
         if not v:
             raise ValueError("Document IDs list cannot be empty")
@@ -687,8 +694,10 @@ async def download_document(document_id: str):
 class RenameRequest(BaseModel):
     old_path: str
     new_name: str
+    
+    model_config = ConfigDict(populate_by_name=True)
 
-    @validator('new_name')
+    @field_validator('new_name', mode='before')
     def validate_new_name(cls, v):
         if not v or v.isspace():
             raise ValueError("New name cannot be empty")

@@ -1,20 +1,11 @@
 # Web framework and related
-fastapi==0.111.1 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
-uvicorn[standard]==0.32.0 #consider using 0.32.0
-python-multipart==0.0.12 #consider using 0.0.12
-pydantic>=2.0
+fastapi>=0.115.11 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]>=0.34.0 #consider using 0.32.0
+python-multipart>=0.0.20 #consider using 0.0.12
+pydantic>=2.0,<3.0
 
 # AI and LLM
 ollama==0.3.3
-langchain-openai==0.2.4
-langchain-community==0.3.3
-langchain-core==0.3.13
-langchain==0.3.4
-langgraph==0.2.39
-faiss-cpu==1.9.0 #https://github.com/kyamagu/faiss-wheels for GPU support
-
-# Path handling
-pathlib==1.0.1
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv>=1.0.1

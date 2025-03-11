@@ -139,25 +139,25 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-#  db:
-#    image: postgres:13
-#    environment:
-#      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-#      POSTGRES_MULTIPLE_DATABASES: dbname,authdb
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
-#    networks:
-#      - app-network
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U postgres"]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 5
-#      start_period: 10s
-#    ports:
-#      - "5432:5432"
+  # db:
+  #  image: postgres:13
+  #  environment:
+  #    POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+  #    POSTGRES_MULTIPLE_DATABASES: dbname,authdb
+  #  volumes:
+  #    - postgres_data:/var/lib/postgresql/data
+  #    - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+  #  networks:
+  #    - app-network
+  #  healthcheck:
+  #    test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #    interval: 5s
+  #    timeout: 5s
+  #    retries: 5
+  #    start_period: 10s
+  #  ports:
+  #    - "5432:5432"
 
   embedding:
     build: ./embedding_service
@@ -176,33 +176,33 @@ services:
     networks:
       - app-network
 
-#  auth:
-#    build: ./auth_service
-#    volumes:
-#      - ./auth_service:/app
-#    depends_on:
-#      db:
-#        condition: service_healthy
-#    environment:
-#      - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
-#      - SECRET_KEY=your-secret-key-here-change-in-production
-#      - DISABLE_AUTH=false
-#      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-#      - ACCESS_TOKEN_EXPIRE_MINUTES=60
-#      - PORT=8010
-#      - HOST=0.0.0.0
-#      - PYTHONUNBUFFERED=1
-#    ports:
-#      - "8010:8010"
-#    restart: always
-#    networks:
-#      - app-network
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#      start_period: 10s
+  # auth:
+  #  build: ./auth_service
+  #  volumes:
+  #    - ./auth_service:/app
+  #  depends_on:
+  #    db:
+  #      condition: service_healthy
+  #  environment:
+  #    - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+  #    - SECRET_KEY=your-secret-key-here-change-in-production
+  #    - DISABLE_AUTH=false
+  #    - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+  #    - ACCESS_TOKEN_EXPIRE_MINUTES=60
+  #    - PORT=8010
+  #    - HOST=0.0.0.0
+  #    - PYTHONUNBUFFERED=1
+  #  ports:
+  #    - "8010:8010"
+  #  restart: always
+  #  networks:
+  #    - app-network
+  #  healthcheck:
+  #    test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
+  #    interval: 10s
+  #    timeout: 5s
+  #    retries: 5
+  #    start_period: 10s
 
   direct_chat_service1:
     build: ./direct_chat_service
@@ -229,180 +229,180 @@ services:
     #   retries: 5
     #   start_period: 10s
 
-  direct_chat_service2: 
-    build: ./direct_chat_service
-    ports:
-      - "8012:8012"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8012
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8012 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8012/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service2: 
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8012:8012"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8012
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8012 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8012/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service3:
-    build: ./direct_chat_service
-    ports:
-      - "8013:8013"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8013
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8013 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8013/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service3:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8013:8013"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8013
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8013 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8013/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service4:
-    build: ./direct_chat_service
-    ports:
-      - "8014:8014"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8014
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8014 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8014/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service4:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8014:8014"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8014
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8014 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8014/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service5:
-    build: ./direct_chat_service
-    ports:
-      - "8015:8015"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8015
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8015 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8015/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service5:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8015:8015"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8015
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8015 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8015/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service6:
-    build: ./direct_chat_service
-    ports:
-      - "8016:8016"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8016
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8016 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8016/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service6:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8016:8016"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8016
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8016 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8016/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service7:
-    build: ./direct_chat_service
-    ports:
-      - "8017:8017"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8017
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8017 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8017/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service7:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8017:8017"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8017
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8017 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8017/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
-  direct_chat_service8:
-    build: ./direct_chat_service
-    ports:
-      - "8018:8018"
-    volumes:
-      - ../data:/app/data
-      - ./direct_chat_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - PYTHONPATH=/app
-      - SERVICE_PORT=8018
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8018 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8018/api/v1/health"]
-    #   interval: 120s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 10s
+  # direct_chat_service8:
+  #   build: ./direct_chat_service
+  #   ports:
+  #     - "8018:8018"
+  #   volumes:
+  #     - ../data:/app/data
+  #     - ./direct_chat_service:/app
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - PYTHONPATH=/app
+  #     - SERVICE_PORT=8018
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - init-data
+  #   networks:
+  #     - app-network
+  #   command: uvicorn app:app --host 0.0.0.0 --port 8018 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+  #   # healthcheck:
+  #   #   test: ["CMD", "curl", "-f", "http://localhost:8018/api/v1/health"]
+  #   #   interval: 120s
+  #   #   timeout: 5s
+  #   #   retries: 5
+  #   #   start_period: 10s
 
 volumes:
   postgres_data:
