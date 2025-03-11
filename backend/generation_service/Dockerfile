@@ -1,15 +1,10 @@
-FROM python:3.11-slim
+FROM mage-base:latest
 
-WORKDIR /app
+# No need to install dependencies as they're in the base image
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+# Copy service-specific files
 COPY . .
+
+EXPOSE 8003
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8003"]
