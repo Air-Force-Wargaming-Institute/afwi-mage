@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
+from typing import Optional, List, Dict, Any
 
 class UserPermission(str, Enum):
     ADMIN = "admin"
@@ -14,15 +15,15 @@ class UserCreate(UserBase):
     permission: UserPermission
 
 class UserUpdate(UserBase):
-    password: str = None
-    permission: UserPermission = None
+    password: Optional[str] = None
+    permission: Optional[UserPermission] = None
 
 class UserOut(UserBase):
     id: int
     permission: UserPermission
 
-    class Config:
-        orm_mode = True
+    # Replace Config class with model_config
+    model_config = ConfigDict(from_attributes=True)  # replaces orm_mode=True
 
 class Token(BaseModel):
     access_token: str

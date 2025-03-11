@@ -1,12 +1,9 @@
 # Web framework and related
-fastapi==0.111.1 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
-uvicorn[standard]==0.32.0 #consider using 0.32.0
-python-multipart==0.0.12 #consider using 0.0.12
-pydantic==1.10.13
-
-# Path handling
-pathlib==1.0.1
+fastapi>=0.115.11 
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.20 
+pydantic>=2.0,<3.0
 
 # Note: python-dotenv might be needed if you plan to use environment variables,
 # though it's not explicitly shown in the current code
-python-dotenv==1.0.0
+python-dotenv>=1.0.1

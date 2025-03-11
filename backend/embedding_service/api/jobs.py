@@ -10,7 +10,7 @@ This module provides API endpoints for:
 
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Import from the core module
 try:
@@ -47,11 +47,31 @@ class JobStatusResponse(BaseModel):
     error: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
 
+    model_config = {
+        "extra": "ignore",
+        "json_schema_extra": {
+            "example": {
+                "job_id": "123e4567-e89b-12d3-a456-426614174000",
+                "status": "processing",
+                "operation_type": "vectorstore_creation",
+                "total_items": 100,
+                "processed_items": 45,
+                "progress_percentage": 45.0,
+                "started_at": "2025-01-01T12:00:00Z",
+                "updated_at": "2025-01-01T12:05:00Z"
+            }
+        }
+    }
+
 
 class JobActionResponse(BaseModel):
     """Response from a job action (cancel, pause, resume)."""
     success: bool
     message: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class JobListQuery(BaseModel):
@@ -60,6 +80,10 @@ class JobListQuery(BaseModel):
     operation_type: Optional[str] = None
     limit: int = 10
     offset: int = 0
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class JobListResponse(BaseModel):
@@ -68,6 +92,10 @@ class JobListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class JobStatsResponse(BaseModel):
@@ -78,6 +106,10 @@ class JobStatsResponse(BaseModel):
     completed: int
     failed: int
     cancelled: int
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)

@@ -1,15 +1,14 @@
 # Web framework and related
-fastapi==0.111.1 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
-uvicorn[standard]==0.32.0 #consider using 0.32.0
-python-multipart==0.0.12 #consider using 0.0.12
-pydantic==1.10.13
+fastapi>=0.115.11 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]==0.34.0 #consider using 0.32.0
+python-multipart==0.0.20 #consider using 0.0.12
+pydantic>=2.0,<3.0
 
 # PDF and document processing
 PyPDF2>=3.0.0
-python-docx==1.0.1
-
+python-docx==1.1.2
 # System and file operations
-aiofiles==23.2.1
+aiofiles>=24.1.0
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv==1.0.1
