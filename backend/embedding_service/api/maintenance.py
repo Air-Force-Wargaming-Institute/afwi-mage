@@ -9,7 +9,7 @@ This module provides endpoints for:
 
 import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
 # Import from core modules - handle both environments
@@ -32,6 +32,15 @@ router = APIRouter(tags=["Maintenance"])
 class CleanupBackupsRequest(BaseModel):
     """Request to clean up vector store backups."""
     max_per_store: int = 3
+    
+    model_config = {
+        "extra": "ignore",
+        "json_schema_extra": {
+            "example": {
+                "max_per_store": 3
+            }
+        }
+    }
 
 
 class CleanupBackupsResponse(BaseModel):
@@ -41,12 +50,20 @@ class CleanupBackupsResponse(BaseModel):
     removed_count: Optional[int] = None
     orphaned_count: Optional[int] = None
     errors: Optional[int] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class SystemResourcesResponse(BaseModel):
     """Response containing system resource information."""
     process: Dict[str, Any]
     system: Dict[str, Any]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 @router.post("/cleanup-backups", response_model=CleanupBackupsResponse)

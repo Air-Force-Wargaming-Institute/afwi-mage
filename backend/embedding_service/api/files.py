@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Import from configuration with better error handling
 UPLOAD_DIR = None
@@ -42,11 +42,19 @@ class FileInfo(BaseModel):
     last_modified: float
     type: str
     security_classification: Optional[str] = "UNCLASSIFIED"
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class FileListResponse(BaseModel):
     """Response containing a list of files."""
     files: List[FileInfo]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class FileUploadResponse(BaseModel):
@@ -54,18 +62,30 @@ class FileUploadResponse(BaseModel):
     success: bool
     message: str
     file_info: Optional[FileInfo] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class FileDetailResponse(BaseModel):
     """Detailed information about a file."""
     file_info: FileInfo
     metadata: Dict[str, Any]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class FileDeleteResponse(BaseModel):
     """Response from a file deletion operation."""
     success: bool
     message: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 @router.get("", response_model=FileListResponse)

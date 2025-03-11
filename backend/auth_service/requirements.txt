@@ -3,9 +3,6 @@ fastapi>=0.115.11  # Updated from 0.111.1 (March 2025)
 uvicorn[standard]>=0.34.0  # Updated from 0.32.0 (December 2024)
 python-multipart>=0.0.20  # Updated from 0.0.12 (December 2024) - Note: versions 0.0.13-0.0.14 were yanked
 
-# Option 1: Pydantic v1 (backward compatible)
-# pydantic==1.10.21  # Updated from 1.10.13 (January 2025)
-
 # Option 2: Pydantic v2 (requires code changes)
 pydantic>=2.0,<3.0.0  # Major version update with API changes - uncomment to use v2
 

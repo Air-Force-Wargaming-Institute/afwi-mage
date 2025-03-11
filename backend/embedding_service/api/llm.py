@@ -10,7 +10,7 @@ import logging
 import json
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Import from core module with proper error handling
 try:
@@ -36,6 +36,17 @@ class VectorStoreAnalysisRequest(BaseModel):
     sample_size: int = 1000
     summary_length: str = "long"  # "short", "medium", "long"
     sampling_strategy: str = "random"  # "random", "grouped_by_source", "temporal", "clustering"
+    
+    model_config = {
+        "extra": "ignore",
+        "json_schema_extra": {
+            "example": {
+                "sample_size": 1000,
+                "summary_length": "long",
+                "sampling_strategy": "random"
+            }
+        }
+    }
 
 
 class VectorStoreAnalysisResponse(BaseModel):
@@ -47,6 +58,10 @@ class VectorStoreAnalysisResponse(BaseModel):
     chunk_count: int
     sample_size: int
     sampling_strategy: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreLLMQueryRequest(BaseModel):
@@ -56,6 +71,19 @@ class VectorStoreLLMQueryRequest(BaseModel):
     score_threshold: float = 0.5
     use_llm: bool = True
     include_sources: bool = True
+    
+    model_config = {
+        "extra": "ignore",
+        "json_schema_extra": {
+            "example": {
+                "query": "What is the main topic of the documents?",
+                "top_k": 5,
+                "score_threshold": 0.5,
+                "use_llm": True,
+                "include_sources": True
+            }
+        }
+    }
 
 
 class VectorStoreLLMQueryResponse(BaseModel):
@@ -63,6 +91,10 @@ class VectorStoreLLMQueryResponse(BaseModel):
     answer: str
     sources: Optional[List[Dict[str, Any]]] = None
     raw_chunks: Optional[List[Dict[str, Any]]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 @router.post("/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)

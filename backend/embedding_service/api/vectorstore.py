@@ -15,7 +15,7 @@ import uuid
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import numpy as np
 from datetime import datetime
 
@@ -85,6 +85,10 @@ class VectorStoreInfo(BaseModel):
     file_count: int
     chunk_size: Optional[int] = 1000
     chunk_overlap: Optional[int] = 100
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreDetailInfo(BaseModel):
@@ -101,6 +105,10 @@ class VectorStoreDetailInfo(BaseModel):
     chunking_method: Optional[str] = "fixed"
     max_paragraph_length: Optional[int] = 1500
     min_paragraph_length: Optional[int] = 50
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class CreateVectorStoreRequest(BaseModel):
@@ -117,6 +125,10 @@ class CreateVectorStoreRequest(BaseModel):
     batch_processing: bool = True
     file_batch_size: int = 5
     doc_batch_size: int = 1000
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class CreateVectorStoreResponse(BaseModel):
@@ -126,6 +138,10 @@ class CreateVectorStoreResponse(BaseModel):
     vectorstore_id: Optional[str] = None
     job_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreRequest(BaseModel):
@@ -136,6 +152,10 @@ class UpdateVectorStoreRequest(BaseModel):
     batch_processing: bool = True
     file_batch_size: int = 5
     doc_batch_size: int = 1000
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreResponse(BaseModel):
@@ -144,11 +164,19 @@ class UpdateVectorStoreResponse(BaseModel):
     message: str
     job_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class RemoveDocumentsRequest(BaseModel):
     """Request to remove documents from a vector store."""
     document_ids: List[str]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class RemoveDocumentsResponse(BaseModel):
@@ -157,6 +185,10 @@ class RemoveDocumentsResponse(BaseModel):
     message: str
     job_id: Optional[str] = None
     removed_count: int = 0
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class BatchUpdateRequest(BaseModel):
@@ -168,6 +200,10 @@ class BatchUpdateRequest(BaseModel):
     batch_processing: bool = True
     file_batch_size: int = 5
     doc_batch_size: int = 1000
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class BatchUpdateResponse(BaseModel):
@@ -177,6 +213,10 @@ class BatchUpdateResponse(BaseModel):
     job_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
     removed_count: int = 0
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class QueryRequest(BaseModel):
@@ -184,11 +224,19 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
     score_threshold: float = 0.5
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class QueryResponse(BaseModel):
     """Response from a vector store query."""
     results: List[Dict[str, Any]]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreAnalysisRequest(BaseModel):
@@ -196,6 +244,10 @@ class VectorStoreAnalysisRequest(BaseModel):
     sample_size: int = 1000
     summary_length: str = "long"  # "short", "medium", "long"
     sampling_strategy: str = "random"  # "random", "grouped_by_source", "temporal", "clustering"
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreAnalysisResponse(BaseModel):
@@ -207,6 +259,10 @@ class VectorStoreAnalysisResponse(BaseModel):
     chunk_count: int
     sample_size: int
     sampling_strategy: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreLLMQueryRequest(BaseModel):
@@ -216,6 +272,10 @@ class VectorStoreLLMQueryRequest(BaseModel):
     score_threshold: float = 0.5
     use_llm: bool = True
     include_sources: bool = True
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreLLMQueryResponse(BaseModel):
@@ -223,12 +283,20 @@ class VectorStoreLLMQueryResponse(BaseModel):
     answer: str
     sources: Optional[List[Dict[str, Any]]] = None
     raw_chunks: Optional[List[Dict[str, Any]]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreMetadataRequest(BaseModel):
     """Request to update vector store metadata."""
     name: Optional[str] = None
     description: Optional[str] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreMetadataResponse(BaseModel):
@@ -236,6 +304,10 @@ class UpdateVectorStoreMetadataResponse(BaseModel):
     success: bool
     message: str
     vectorstore_id: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 def get_vectorstore_manager():

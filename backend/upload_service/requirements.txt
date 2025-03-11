@@ -6,10 +6,9 @@ pydantic>=2.0,<3.0
 
 # PDF and document processing
 PyPDF2>=3.0.0
-python-docx==1.0.1
-
+python-docx==1.1.2
 # System and file operations
-aiofiles==23.2.1
+aiofiles>=24.1.0
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv==1.0.1
