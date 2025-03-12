@@ -12,7 +12,6 @@ import FineTune from './FineTune';
 import Test from './Test';
 import UserGuide from './UserGuide';
 import MultiAgentBuilder from './MultiAgentBuilder';
-import MultiAgentChat from './MultiAgentChat';
 import MultiAgentHILChat from './MultiAgentHILChat';
 import RetrievalGuide from './RetrievalGuide';
 import BuildRetrievalDatabases from './BuildRetrievalDatabases';
@@ -67,7 +66,6 @@ const AuthenticatedRoutes = () => {
           {/* Other sections without navigation context yet */}
           <Route path="/multi-agent/guide" component={UserGuide} />
           <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
-          {/*<Route path="/multi-agent/chat" component={MultiAgentChat} />*/}
           <Route path="/multi-agent/chat" component={MultiAgentHILChat} />
           <Route path="/retrieval/guide" component={RetrievalGuide} />
           <Route path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
