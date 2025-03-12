@@ -12,6 +12,7 @@ import {
   TextField,
   Chip,
 } from '@material-ui/core';
+import Pagination from '@material-ui/lab/Pagination';
 import { makeStyles } from '@material-ui/core/styles';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -107,6 +108,17 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(4),
     textAlign: 'center',
     color: theme.palette.text.secondary,
+  },
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(2),
+  },
+  pageInfo: {
+    textAlign: 'center',
+    marginBottom: theme.spacing(1),
+    color: theme.palette.text.secondary,
   }
 }));
 
@@ -114,13 +126,23 @@ function ConversationTree() {
   const classes = useStyles();
   const [conversations, setConversations] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [expandedInteractions, setExpandedInteractions] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
+  
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [itemsPerPage] = useState(5);
 
   useEffect(() => {
     fetchConversations();
   }, []);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   const fetchConversations = async () => {
     try {
@@ -146,6 +168,25 @@ function ConversationTree() {
       }
       return newSet;
     });
+  };
+
+  const handleSubNodeToggle = (nodeId) => {
+    setExpandedInteractions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePageChange = (event, value) => {
+    setPage(value);
+    // Collapse all nodes when changing pages
+    setExpandedNodes(new Set());
+    setExpandedInteractions(new Set());
   };
 
   const renderResponse = (response, metadata, classes) => {
@@ -255,20 +296,44 @@ function ConversationTree() {
         </ListItem>
         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
-            {Object.entries(conversation.nodes || {}).map(([nodeId, node]) => (
-              <ListItem key={nodeId} className={classes.nested}>
-                <Box className={classes.nodeContent}>
-                  <Box className={classes.nodeHeader}>
-                    <Typography variant="subtitle2">
-                      {node.name} ({node.role})
-                    </Typography>
-                  </Box>
-                  {node.interactions && node.interactions.map(interaction => 
-                    renderInteraction(interaction, classes)
-                  )}
-                </Box>
-              </ListItem>
-            ))}
+            {Object.entries(conversation.nodes || {}).map(([nodeId, node]) => {
+              const isSubNodeExpanded = expandedInteractions.has(nodeId);
+              
+              return (
+                <React.Fragment key={nodeId}>
+                  <ListItem 
+                    className={classes.nested}
+                    button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSubNodeToggle(nodeId);
+                    }}
+                  >
+                    <IconButton size="small">
+                      {isSubNodeExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                    <ListItemText
+                      primary={
+                        <Box className={classes.nodeHeader}>
+                          <Typography variant="subtitle2">
+                            {node.name} ({node.role})
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                  <Collapse in={isSubNodeExpanded} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {node.interactions && node.interactions.map(interaction => (
+                        <ListItem key={interaction.id} className={classes.nested} style={{ paddingLeft: 48 }}>
+                          {renderInteraction(interaction, classes)}
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+                </React.Fragment>
+              );
+            })}
           </List>
         </Collapse>
       </Paper>
@@ -279,6 +344,12 @@ function ConversationTree() {
     conv.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
     conv.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredConversations.length / itemsPerPage);
+  const startIndex = (page - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedConversations = filteredConversations.slice(startIndex, endIndex);
 
   return (
     <div className={classes.root}>
@@ -314,11 +385,28 @@ function ConversationTree() {
             <Typography>No conversations found</Typography>
           </div>
         ) : (
-          <List>
-            {filteredConversations.map(conversation => 
-              renderConversation(conversation, classes)
+          <>
+            <Typography className={classes.pageInfo}>
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredConversations.length)} of {filteredConversations.length} conversations
+            </Typography>
+            <List>
+              {paginatedConversations.map(conversation => 
+                renderConversation(conversation, classes)
+              )}
+            </List>
+            {totalPages > 1 && (
+              <Box className={classes.paginationContainer}>
+                <Pagination 
+                  count={totalPages} 
+                  page={page} 
+                  onChange={handlePageChange} 
+                  color="primary" 
+                  showFirstButton 
+                  showLastButton
+                />
+              </Box>
             )}
-          </List>
+          </>
         )}
       </Paper>
     </div>

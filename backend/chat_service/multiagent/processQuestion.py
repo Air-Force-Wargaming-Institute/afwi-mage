@@ -139,7 +139,8 @@ async def process_question(question: str, session_id: str = None, team_id: str =
                 "expert_models": agent_models,
                 "plan": plan,
                 "vectorstore": team.vectorstore[0],
-                "selected_experts": selected_agents
+                "selected_experts": selected_agents,
+                "session_id": session_id
             }
             
         except ValueError:

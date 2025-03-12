@@ -6,6 +6,9 @@ from config_ import load_config
 from multiagent.retriever_manager import RetrieverManager
 from multiagent.agents.helpers import create_banner
 from utils.prompt_manager import SystemPromptManager
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 def librarian(requester:str, agent_request:str, vs:str):
     print(create_banner("LIBRARIAN"))

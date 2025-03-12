@@ -21,6 +21,7 @@ class GraphState(TypedDict):
     expert_final_analysis: Annotated[Dict[str, str], operator.__ior__]
     synthesized_report: str
     vectorstore: str
+    session_id: str
 
 class ExpertState(TypedDict):
     question: str
@@ -37,12 +38,14 @@ class ExpertState(TypedDict):
     expert_collaborator_analysis: Annotated[list[Dict[str, str]], operator.add]
     expert_final_analysis: Annotated[Dict[str, str], operator.__ior__]
     vectorstore: str
+    session_id: str
 
 class ModGuidanceState(TypedDict):
     question: str
     selected_experts: list[str]
     expert_moderator_guidance: Annotated[Dict[str, str], operator.__ior__]
     vectorstore: str
+    session_id: str
 
 class CollabState(TypedDict):
     question: str
@@ -55,3 +58,4 @@ class CollabState(TypedDict):
     expert_collab_areas: Annotated[Dict[str, list[str]], operator.__ior__]
     expert_collaborator_analysis: Annotated[list[Dict[str, str]], operator.add]
     vectorstore: str
+    session_id: str

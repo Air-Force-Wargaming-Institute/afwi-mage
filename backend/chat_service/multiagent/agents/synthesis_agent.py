@@ -6,35 +6,31 @@ import json
 import os
 from datetime import datetime
 import logging
+import uuid
 
 from multiagent.graphState import GraphState
 from utils.llm_manager import LLMManager
+from utils.conversation_manager import ConversationManager
 from multiagent.agents.helpers import create_banner
 from utils.prompt_manager import SystemPromptManager
-from config_ import load_config
 
 logger = logging.getLogger(__name__)
 
-class ExpertAnalyses(BaseModel):
-    """Structure containing expert analyses for synthesis
+# Define ExpertAnalyses class with proper string representation
+class ExpertAnalyses:
+    def __init__(self, question: str, analyses: dict):
+        self.question = question
+        self.analyses = analyses
     
-    This model represents a collection of expert analyses on a given question,
-    where each expert provides their specialized perspective based on their domain expertise.
-    The synthesis should consider how different expert viewpoints complement or contrast with each other.
-    """
-    question: str = Field(
-        description="The original question or topic that was analyzed by the experts. "
-                   "This question serves as the central focus for all expert analyses."
-    )
-    analyses: Dict[str, str] = Field(
-        description="A mapping of expert names to their detailed analyses. "
-                   "Each expert provides their unique perspective based on their specialized domain knowledge. "
-                   "The key is the expert's identifier/name, and the value is their comprehensive analysis. "
-                   "Empty or null analyses have been filtered out."
-    )
+    def __str__(self):
+        # Format the analyses for better logging
+        analyses_str = "\n".join([f"{expert}: {analysis[:100]}..." for expert, analysis in self.analyses.items()])
+        return f"ExpertAnalyses(question=\"{self.question}\", analyses={{{analyses_str}}})"
+    
+    def __repr__(self):
+        return self.__str__()
 
 def synthesis_agent(state: GraphState) -> GraphState:
-    # config = load_config()
     print(create_banner("SYNTHESIS AGENT"))
     logger.info("Starting synthesis agent")
 
@@ -52,31 +48,73 @@ def synthesis_agent(state: GraphState) -> GraphState:
                 if state['expert_final_analysis'].get(expert)  # Only include non-empty analyses
             }
         )
-        logger.info(f"Expert Analysis: {state['expert_final_analysis']}")
-        # Create and run the chain
-        chain = prompt | llm | StrOutputParser()
-        response = chain.invoke({
+        
+        # Prepare the input for the prompt
+        prompt_input = {
             "question": analyses.question,
             "analyses": analyses.analyses
-        })
-
-        # Use configured path for conversation logs
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # filename = os.path.join(config['CONVERSATION_PATH'], f"conversation_{timestamp}.json")
+        }
         
-        # # Create the conversation data structure
-        # conversation_data = {
-        #     "timestamp": timestamp,
-        #     "iteration": state['iteration'],
-        #     "question": analyses.question,
-        #     "analyses": analyses.analyses,
-        #     "synthesized_report": response,
-        #     "full_conversation": state['conversation_history']
-        # }
+        # Get the formatted prompt text by formatting the template with our input
+        # This ensures we capture exactly what's sent to the LLM
+        actual_prompt_text = prompt.format(**prompt_input)
         
-        # Write to JSON file
-        # with open(filename, 'w', encoding='utf-8') as f:
-        #     json.dump(conversation_data, f, indent=4, ensure_ascii=False)
+        # Create and run the chain
+        chain = prompt | llm | StrOutputParser()
+        response = chain.invoke(prompt_input)
+        
+        # Track the conversation using ConversationManager
+        conversation_manager = ConversationManager()
+        
+        # Get session_id from state or generate a fallback if not present
+        session_id = state.get('session_id', str(uuid.uuid4()))
+        
+        try:
+            # Get all conversations for this session
+            conversations = conversation_manager._list_conversations()
+            session_conversations = [
+                conv for conv in conversations 
+                if conv.get("session_id") == session_id
+            ]
+            
+            # If we have existing conversations, use the most recent one
+            if session_conversations:
+                # Sort by timestamp (descending) and get the most recent conversation ID
+                most_recent = max(session_conversations, key=lambda x: x["timestamp"])
+                conversation_id = most_recent["id"]
+                logger.info(f"Using existing conversation {conversation_id} for session {session_id}")
+            else:
+                # Create a new conversation if none exists
+                conversation_id = conversation_manager.create_conversation_sync(
+                    question=state['question'],
+                    session_id=session_id
+                )
+                logger.info(f"Created new conversation {conversation_id} for session {session_id}")
+            
+            # Add a system node for the synthesizer
+            node_id = conversation_manager.add_system_node_sync(
+                conversation_id=conversation_id,
+                name="Synthesizer",
+                role="synthesis"
+            )
+            
+            # Add the interaction with the actual prompt text used
+            conversation_manager.add_interaction_sync(
+                conversation_id=conversation_id,
+                node_id=node_id,
+                prompt=actual_prompt_text,
+                response=response,
+                prompt_name="synthesis_agent_prompt",
+                model=prompt_data.get("llm")
+            )
+            
+            # Save the synthesized report to the conversation
+            conversation_manager._save_conversation(conversation_id)
+            logger.info(f"Recorded synthesis in conversation {conversation_id}")
+            
+        except Exception as e:
+            # Log the error but don't fail the function
+            logger.error(f"Error recording conversation: {e}", exc_info=True)
         
         return {**state, 'synthesized_report': response}
         

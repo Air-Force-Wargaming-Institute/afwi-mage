@@ -111,98 +111,6 @@ executor = ThreadPoolExecutor(max_workers=20)
 MAX_CONCURRENT_REQUESTS = 10
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
-@app.post("/chat/init")
-async def init_chat(request_data: ChatMessage):
-    try:
-        logger.info(f"Received init chat request: {request_data}")
-        async with semaphore:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                executor,
-                lambda: _process_init_chat(request_data)
-            )
-    except Exception as e:
-        logger.error(f"Error initializing chat: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-def _process_init_chat(request_data: ChatMessage):
-    llm = LLMManager().get_llm()
-    
-    class relevancy_check(BaseModel):
-        """
-        Structured output for the relevancy check of the user's message.
-        relevant: Boolean value indicating if the message is relevant to the team's expertise
-        reason: Explanation for why the message is relevant or not
-        """
-        relevant: bool  # Boolean true/false value indicating if the message is relevant to the team's expertise
-        reason: str     # Explanation for why the message is relevant or not
-
-    teams = Team.load_teams()
-    team = teams.get(request_data.team_id)
-    if not team:
-        raise ValueError(f"Team {request_data.team_id} not found")
-    
-    agent_names = []
-    agent_instructions = {}
-
-    for agent_id, agent in team.agents.items():
-        agent_names.append(agent.name)
-        agent_instructions[agent.name] = agent.instructions
-
-    agents_with_instructions = "\n".join(
-        f"- {agent}: {agent_instructions[agent]}" 
-        for agent in sorted(agent_names)
-    )
-
-    # Initialize conversation manager and create new conversation
-    conversation_manager = ConversationManager()
-    conversation_id = conversation_manager.create_conversation_sync(
-        question=request_data.message,
-        session_id=request_data.session_id,
-        metadata={"team_id": request_data.team_id}
-    )
-
-    # Add relevancy check as system node
-    system_node_id = conversation_manager.add_system_node_sync(
-        conversation_id=conversation_id,
-        name="Relevancy Checker",
-        metadata={"type": "relevancy_check"}
-    )
-
-    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
-    prompt = relevance_prompt.format(
-        current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        agents_with_instructions=agents_with_instructions,
-        message=request_data.message
-    )
-    
-    response = llm.with_structured_output(relevancy_check).invoke([HumanMessage(content=prompt)])
-
-    # Record the interaction
-    conversation_manager.add_interaction_sync(
-        conversation_id=conversation_id,
-        node_id=system_node_id,
-        prompt=prompt,
-        response=response,
-        metadata={
-            "prompt_name": "relevance_prompt",
-            "model": llm.model_name
-        }
-    )
-
-    if response.relevant:   
-        return {
-            "message": "Chat initialized successfully", 
-            "continue": True,
-            "conversation_id": conversation_id
-        }
-    else:
-        return {
-            "message": "Chat not initialized because the message is not relevant to the team's expertise: " + response.reason, 
-            "continue": False,
-            "conversation_id": conversation_id
-        }
-
 @app.post("/chat/refine")
 async def refine_chat(request_data: ChatMessage):
     try:
@@ -290,28 +198,28 @@ def _process_refine_chat(request_data: ChatMessage):
         formatted_history.append(chat_entry)
     conversation_history = "\n\n".join(formatted_history)
 
+    # Initialize conversation manager
+    conversation_manager = ConversationManager()
+    
+    # Create a new conversation or get existing one if this is a refinement of an existing plan
+    conversation_id = conversation_manager.create_conversation_sync(
+        question=request_data.message,
+        session_id=request_data.session_id,
+        metadata={"team_id": request_data.team_id}
+    )
+    
+    # Add planning node to track the planning phase
+    planning_node_id = conversation_manager.add_system_node_sync(
+        conversation_id=conversation_id,
+        name="Planning Coordinator",
+        metadata={"type": "planning", "team_id": request_data.team_id}
+    )
+
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
-        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
-        # 1. Use the previous plan as the foundation for your new plan
-        # 2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        # 3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
-        # 4. Explain clearly and in detail what and how each agent will contribute to the response
-        # 5. Format this plan in a way that is easy to understand for the user
-    
-        # Message: {message}
-        # Previous Plan: {previous_plan}
-        # Team of Experts: {agents_with_instructions}
-
-        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        # """
-        # prompt = PromptTemplate(
-        #     input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
-        #     template=plan_template
-        # )
         prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_previous_plan")
-        prompt = prompt.format(
+        prompt_text = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
             original_message=request_data.original_message,
@@ -320,39 +228,35 @@ def _process_refine_chat(request_data: ChatMessage):
             agents_with_instructions=agents_with_instructions
         )
     else:
-        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous messages in the conversation (if any), and the message the user has sent you, you will do the following: 
-        # 1. Review the previous conversation to incorporate any relevant information regarding the user's message
-        # 2. If necessary, attempt to determine the user's intent and modify their message to better align with the team's expertise or to increase the specificity of the message topic. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
-        # 3. Determine which agents are qualified and necessary to respond to the new message you created
-        # 4. Create a clear and detailed plan for how each agent will contribute to the response. Always include the subject of the message in the details for each selected agent.
-        # 5. Format this plan in a way that is easy to understand for the user
-    
-        # Message: {message}
-        # Previous Conversation: {conversation_history}
-        # Team of Experts: {agents_with_instructions}
-
-        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the user's message and/or your modified message are included in the details for each selected agent. If you chose to modify the user's message, make sure to explain why you made the changes you did and how they will help get a better response from the team. Your response should be clear and user-friendly, avoiding technical jargon where possible.
-        # """
-        # prompt = PromptTemplate(
-        #     input_variables=["current_datetime", "message", "conversation_history", "agents_with_instructions"],
-        #     template=plan_template
-        # )
         prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_conversation_history")
-        prompt = prompt.format(
+        prompt_text = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
             conversation_history=conversation_history,
             agents_with_instructions=agents_with_instructions
         )
 
-    response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
+    # Get both raw and structured response using include_raw=True
+    response = llm.with_structured_output(UserPlan, include_raw=True).invoke([HumanMessage(content=prompt_text)])
+    # Record the raw response in the conversation manager
+    conversation_manager.add_interaction_sync(
+        conversation_id=conversation_id,
+        node_id=planning_node_id,
+        prompt=prompt_text,
+        response=response['raw'],
+        metadata={
+            "prompt_name": "plan_prompt_with_previous_plan" if request_data.plan else "plan_prompt_with_conversation_history",
+            "model": llm.model_name
+        }
+    )
     
     # Send the plan to the user for approval
     return {
-        "plan": response.plan,
-        "modified_message": response.modified_message,
-        "plan_notes": response.plan_notes,
-        "selected_agents": response.selected_agents,
+        "plan": response['parsed'].plan,
+        "modified_message": response['parsed'].modified_message,
+        "plan_notes": response['parsed'].plan_notes,
+        "selected_agents": response['parsed'].selected_agents,
+        "conversation_id": conversation_id
     }
 
 @app.post("/chat/process")
