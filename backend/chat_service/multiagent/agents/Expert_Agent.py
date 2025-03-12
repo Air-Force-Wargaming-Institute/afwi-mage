@@ -5,6 +5,7 @@ from multiagent.agents.helpers import determine_collaboration, create_banner
 from utils.llm_manager import LLMManager
 from multiagent.agents.librarian_agent import librarian
 import logging
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +181,7 @@ def expert_subgraph_entry(state: ExpertState):
     )
     
     # Determine collaborators
-    expert_agents_withoutme = state['expert_list']
+    expert_agents_withoutme = copy.deepcopy(state['expert_list'])
     expert_agents_withoutme.remove(whoami)
     collaborators = determine_collaboration(reflection, analysis, expert_agents_withoutme)
     
