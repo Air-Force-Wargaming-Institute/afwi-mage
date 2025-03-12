@@ -242,6 +242,12 @@ def _process_refine_chat(request_data: ChatMessage):
 
     selected_agents = select_agents()
 
+    #update the agents_with_instructions to only include the selected agents
+    agents_with_instructions = "\n".join(
+        f"- {agent}: {agent_instructions[agent]}" 
+        for agent in sorted(selected_agents)
+    )
+
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
@@ -262,6 +268,7 @@ def _process_refine_chat(request_data: ChatMessage):
         #     input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
         #     template=plan_template
         # )
+        # TODO: If the user picks agents from the check boxes, update selected agents and the agents_with_instructions
         prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_previous_plan")
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -269,6 +276,7 @@ def _process_refine_chat(request_data: ChatMessage):
             original_message=request_data.original_message,
             comments=request_data.comments,
             previous_plan=request_data.plan,
+            agent_names=str(selected_agents),
             agents_with_instructions=agents_with_instructions
         )
     else:
@@ -293,7 +301,7 @@ def _process_refine_chat(request_data: ChatMessage):
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
-            agents=str(selected_agents),
+            agent_names=str(selected_agents),
             agents_with_instructions=agents_with_instructions
         )
 
