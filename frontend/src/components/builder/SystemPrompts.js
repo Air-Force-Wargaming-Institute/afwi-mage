@@ -78,6 +78,11 @@ function SystemPrompts() {
   const [availableVariables, setAvailableVariables] = useState([]);
   const [newVariable, setNewVariable] = useState('');
   const [availableLLMs, setAvailableLLMs] = useState([]);
+  
+  // Add delete confirmation dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [promptToDelete, setPromptToDelete] = useState(null);
+  const [promptNameToDelete, setPromptNameToDelete] = useState('');
 
   const templateTypes = [
     { value: 'system', label: 'System Prompt' },
@@ -234,6 +239,21 @@ function SystemPrompts() {
         message: 'Error deleting prompt',
         severity: 'error'
       });
+    } finally {
+      // Close delete dialog and reset state
+      setDeleteDialogOpen(false);
+      setPromptToDelete(null);
+      setPromptNameToDelete('');
+    }
+  };
+
+  // Add confirmation handler
+  const handleDeleteConfirmation = (promptId) => {
+    const promptData = prompts[promptId];
+    if (promptData) {
+      setPromptToDelete(promptId);
+      setPromptNameToDelete(promptData.name);
+      setDeleteDialogOpen(true);
     }
   };
 
@@ -333,7 +353,7 @@ function SystemPrompts() {
               <IconButton edge="end" onClick={() => handleEditPrompt(id)}>
                 <EditIcon />
               </IconButton>
-              <IconButton edge="end" onClick={() => handleDeletePrompt(id)}>
+              <IconButton edge="end" onClick={() => handleDeleteConfirmation(id)}>
                 <DeleteIcon />
               </IconButton>
             </ListItemSecondaryAction>
@@ -469,6 +489,46 @@ function SystemPrompts() {
           </Button>
           <Button onClick={handleSavePrompt} color="primary" variant="contained">
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setPromptToDelete(null);
+          setPromptNameToDelete('');
+        }}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to delete the prompt "{promptNameToDelete}"?
+          </Typography>
+          <Typography variant="body2" color="error" style={{ marginTop: '12px' }}>
+            This action cannot be undone. Any references to this prompt in other templates may become invalid.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setPromptToDelete(null);
+              setPromptNameToDelete('');
+            }}
+            color="primary"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => handleDeletePrompt(promptToDelete)}
+            color="secondary"
+            variant="contained"
+            startIcon={<DeleteIcon />}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

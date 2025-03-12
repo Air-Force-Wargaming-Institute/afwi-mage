@@ -593,6 +593,11 @@ function MultiAgentHILChat() {
   const [editSessionId, setEditSessionId] = useState(null);
   const [editSessionName, setEditSessionName] = useState('');
   const [editSessionTeam, setEditSessionTeam] = useState('');
+  
+  // Add delete confirmation dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const [deleteSessionName, setDeleteSessionName] = useState('');
 
   // Add this useEffect at the top level of the component
   useEffect(() => {
@@ -758,53 +763,36 @@ function MultiAgentHILChat() {
     // Prevent event from bubbling up to ListItem
     event.stopPropagation();
     
-    setIsLoadingTeams(true);
-    setTeamError('');
-    
     try {
-      // Get available teams
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
-      setAvailableTeams(response.data.teams);
-      
       // Find current session
       const currentSession = state.chatSessions.find(s => s.id === sessionId);
       if (currentSession) {
         setEditSessionId(sessionId);
         setEditSessionName(currentSession.name);
         setEditSessionTeam(currentSession.team);
-        
-        // Reorder teams to put current team first
-        const reorderedTeams = response.data.teams.sort((a, b) => {
-          if (a.name === currentSession.team) return -1;
-          if (b.name === currentSession.team) return 1;
-          return 0;
-        });
-        setAvailableTeams(reorderedTeams);
       }
       
       setEditDialogOpen(true);
     } catch (error) {
-      console.error('Error fetching teams:', error);
-      setTeamError('Failed to load available teams. Please try again.');
-    } finally {
-      setIsLoadingTeams(false);
+      console.error('Error preparing session edit:', error);
+      setTeamError('Failed to prepare session for editing. Please try again.');
     }
   };
 
   // Add handler for edit submission
   const handleEditSubmit = async () => {
-    if (!editSessionTeam || !editSessionName.trim()) {
-      setTeamError('Please select a team and enter a session name');
+    if (!editSessionName.trim()) {
+      setTeamError('Please enter a session name');
       return;
     }
 
     try {
-      const selectedTeamObj = availableTeams.find(team => team.name === editSessionTeam);
+      const currentSession = state.chatSessions.find(s => s.id === editSessionId);
       
       await axios.put(getApiUrl('CHAT', `/sessions/${editSessionId}`), {
         session_name: editSessionName.trim(),
-        team_id: selectedTeamObj?.id,
-        team_name: editSessionTeam
+        team_id: currentSession.teamId,
+        team_name: currentSession.team
       });
 
       // Update local state
@@ -813,8 +801,8 @@ function MultiAgentHILChat() {
         payload: {
           id: editSessionId,
           name: editSessionName.trim(),
-          team: editSessionTeam,
-          teamId: selectedTeamObj?.id
+          team: currentSession.team,
+          teamId: currentSession.teamId
         }
       });
 
@@ -829,26 +817,37 @@ function MultiAgentHILChat() {
     }
   };
 
-  const handleDeleteSession = async (event, sessionId) => {
+  const handleDeleteConfirmation = (event, sessionId) => {
     // Stop the click event from bubbling up to the ListItem
     event.stopPropagation();
     
+    // Find session name for confirmation message
+    const sessionToDelete = state.chatSessions.find(s => s.id === sessionId);
+    
+    if (sessionToDelete) {
+      setDeleteSessionId(sessionId);
+      setDeleteSessionName(sessionToDelete.name);
+      setDeleteDialogOpen(true);
+    }
+  };
+
+  const handleDeleteSession = async () => {
     try {
-      console.log(`Attempting to delete session: ${sessionId}`);
+      console.log(`Attempting to delete session: ${deleteSessionId}`);
       
       // Send delete request to backend
-      await axios.delete(getApiUrl('CHAT', `/sessions/${sessionId}`));
+      await axios.delete(getApiUrl('CHAT', `/sessions/${deleteSessionId}`));
       
-      console.log(`Successfully deleted session: ${sessionId}`);
+      console.log(`Successfully deleted session: ${deleteSessionId}`);
       
       // Remove from local state
       dispatch({ 
         type: ACTIONS.DELETE_CHAT_SESSION,
-        payload: sessionId 
+        payload: deleteSessionId 
       });
 
       // If the deleted session was the current session, clear it
-      if (state.currentSessionId === sessionId) {
+      if (state.currentSessionId === deleteSessionId) {
         dispatch({ 
           type: ACTIONS.SET_CURRENT_SESSION, 
           payload: null 
@@ -859,11 +858,16 @@ function MultiAgentHILChat() {
         });
       }
     } catch (error) {
-      console.error(`Error deleting session ${sessionId}:`, error);
+      console.error(`Error deleting session ${deleteSessionId}:`, error);
       dispatch({ 
         type: ACTIONS.SET_ERROR, 
         payload: 'Failed to delete chat session. Please try again later.' 
       });
+    } finally {
+      // Close the confirmation dialog
+      setDeleteDialogOpen(false);
+      setDeleteSessionId(null);
+      setDeleteSessionName('');
     }
   };
 
@@ -1121,7 +1125,7 @@ function MultiAgentHILChat() {
                           <IconButton 
                             edge="end" 
                             aria-label="delete" 
-                            onClick={(e) => handleDeleteSession(e, session.id)}
+                            onClick={(e) => handleDeleteConfirmation(e, session.id)}
                             className={classes.sessionActionButton}
                           >
                             <DeleteIcon />
@@ -1516,7 +1520,6 @@ function MultiAgentHILChat() {
             setEditDialogOpen(false);
             setEditSessionId(null);
             setEditSessionName('');
-            setEditSessionTeam('');
             setTeamError('');
           }}
         >
@@ -1533,31 +1536,23 @@ function MultiAgentHILChat() {
                 error={teamError && !editSessionName.trim()}
                 helperText={teamError && !editSessionName.trim() ? 'Session name is required' : ''}
               />
-              <FormControl fullWidth>
-                <InputLabel>Select Team</InputLabel>
-                <Select
-                  value={editSessionTeam}
-                  onChange={(e) => setEditSessionTeam(e.target.value)}
-                  error={teamError && !editSessionTeam}
-                >
-                  {isLoadingTeams ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} /> Loading teams...
-                    </MenuItem>
-                  ) : (
-                    availableTeams.map(team => (
-                      <MenuItem key={team.id} value={team.name}>
-                        {team.name}
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-                {teamError && !editSessionTeam && (
-                  <Typography color="error" variant="caption">
-                    Please select a team
-                  </Typography>
-                )}
-              </FormControl>
+              <Typography variant="body2" color="textSecondary">
+                Note: The team associated with this session cannot be changed.
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="primary" 
+                style={{ 
+                  fontWeight: 600, 
+                  marginTop: '4px', 
+                  backgroundColor: '#f0f7ff', 
+                  padding: '8px 12px', 
+                  borderRadius: '4px',
+                  display: 'inline-block'
+                }}
+              >
+                Current team: {editSessionTeam}
+              </Typography>
               {teamError && (
                 <Typography color="error" variant="body2">
                   {teamError}
@@ -1570,7 +1565,6 @@ function MultiAgentHILChat() {
               setEditDialogOpen(false);
               setEditSessionId(null);
               setEditSessionName('');
-              setEditSessionTeam('');
               setTeamError('');
             }}>
               Cancel
@@ -1579,9 +1573,48 @@ function MultiAgentHILChat() {
               onClick={handleEditSubmit}
               color="primary"
               variant="contained"
-              disabled={isLoadingTeams}
             >
               Update
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => {
+            setDeleteDialogOpen(false);
+            setDeleteSessionId(null);
+            setDeleteSessionName('');
+          }}
+        >
+          <DialogTitle>Confirm Deletion</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1">
+              Are you sure you want to delete the chat session "{deleteSessionName}"?
+            </Typography>
+            <Typography variant="body2" color="error" style={{ marginTop: '12px' }}>
+              This action cannot be undone. All chat history in this session will be permanently deleted.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeleteSessionId(null);
+                setDeleteSessionName('');
+              }}
+              color="primary"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteSession}
+              color="secondary"
+              variant="contained"
+              startIcon={<DeleteIcon />}
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>

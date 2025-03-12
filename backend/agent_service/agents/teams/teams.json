@@ -1,25 +1,5 @@
 [
     {
-        "name": "PRC Team",
-        "unique_id": "c05c64d2-d991-42d6-bea8-a0409faaaa4e",
-        "description": "Team of PRC Agents",
-        "agents": [
-            "420b387a-f571-4cf2-8490-d9bb8f779203",
-            "f4f60ea7-1e63-4b05-a919-4154a428ea17",
-            "c2371707-2910-41bc-8be3-4a69c53edd5b",
-            "65100e24-0319-4903-86f9-8d491c87a7d7",
-            "6aa7aaf9-f61f-48ab-a5e4-d7df9347c770",
-            "5daf3969-c40f-4854-b3e4-a7abc5205539",
-            "11a061dd-ee45-48f2-8cb4-12db32001eef"
-        ],
-        "color": "#B22222",
-        "created_at": "2025-03-11T16:11:58.624519Z",
-        "last_modified": "2025-03-11T16:11:58.624529Z",
-        "vectorstore": [
-            "8d82b322-6b2c-406f-b7ce-93206ec0eb82"
-        ]
-    },
-    {
         "name": "small prc team",
         "unique_id": "d9b0ac07-d40c-4258-b2bf-c76b90a857a1",
         "description": "small team",

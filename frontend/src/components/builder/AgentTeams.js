@@ -193,7 +193,7 @@ function AgentTeams() {
     name: '',
     description: '',
     color: colorOptions[0],
-    agents: Array(8).fill(''),
+    agents: Array(4).fill(''),
     team_instructions: '',
     vectorstore: []
   });
@@ -274,10 +274,10 @@ function AgentTeams() {
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
   const handleEditOpen = (team) => {
-    // Create a copy of the team with all 8 agent slots
+    // Create a copy of the team with all 4 agent slots
     const fullTeam = {
       ...team,
-      agents: [...team.agents, ...Array(8 - team.agents.length).fill('')],
+      agents: [...team.agents, ...Array(4 - team.agents.length).fill('')],
       // Ensure vectorstore is initialized as an array
       vectorstore: team.vectorstore || []
     };
@@ -504,12 +504,12 @@ function AgentTeams() {
         ? [team.agents]
         : [];
 
-    // Create a copy of the team with all 8 agent slots
+    // Create a copy of the team with all 4 agent slots
     const fullTeam = {
       ...team,
       agents: [
         ...agentsList,                            // First, include all existing agents
-        ...Array(8 - agentsList.length).fill('')  // Then fill remaining slots with empty strings
+        ...Array(4 - agentsList.length).fill('')  // Then fill remaining slots with empty strings
       ]
     };
     setEditingTeam(fullTeam);
@@ -763,7 +763,7 @@ function AgentTeams() {
             </ul>
           </Typography>
           <Box className={classes.agentSelectGrid}>
-            {[...Array(8)].map((_, index) => (
+            {[...Array(4)].map((_, index) => (
               <FormControl key={index} className={classes.agentSelect}>
                 <InputLabel id={`agent-select-label-${index}`}>Agent {index + 1}</InputLabel>
                 <Select
@@ -941,7 +941,7 @@ function AgentTeams() {
                   </Typography>
                 )}
               </FormControl>
-            ))}
+            )).slice(0, 4)}
           </Box>
         </DialogContent>
         <DialogActions>
