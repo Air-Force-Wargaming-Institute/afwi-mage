@@ -378,3 +378,13 @@ class ConversationManager:
         )
         self._save_conversation(conversation_id)
         return interaction_id
+
+    def add_expert_sync(self, conversation_id: str, name: str, **metadata) -> str:
+        """Synchronous version of add_expert"""
+        conversation = self._get_conversation(conversation_id)
+        if not conversation:
+            raise ValueError(f"Conversation {conversation_id} not found")
+        
+        node_id = conversation.add_expert(name, **metadata)
+        self._save_conversation(conversation_id)
+        return node_id

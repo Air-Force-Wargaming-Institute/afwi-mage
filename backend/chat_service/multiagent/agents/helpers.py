@@ -4,6 +4,10 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from utils.llm_manager import LLMManager
 from utils.prompt_manager import SystemPromptManager
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 class CollabList(BaseModel):
     collaborators:list[str]

@@ -71,10 +71,6 @@ def create_graph() -> StateGraph:
     
     
     workflow = StateGraph(GraphState)
-    # Add base nodes
-    # workflow.add_node("conversation_history_manager", conversation_history_manager)
-    # workflow.add_node("identify_experts", identify_experts)
-    # workflow.add_node("get_Moderator_Guidance", get_Moderator_Guidance)
     workflow.add_node("entry_point", entry_point)
     workflow.add_node("modguidance_subgraph", subworkflow2.compile())
     workflow.add_node("expert_subgraph", subworkflow.compile())

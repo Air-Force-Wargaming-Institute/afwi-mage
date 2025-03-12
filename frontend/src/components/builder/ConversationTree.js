@@ -65,11 +65,13 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.default,
     borderRadius: theme.shape.borderRadius,
+    width: '100%',
   },
   prompt: {
     backgroundColor: theme.palette.grey[100],
     padding: theme.spacing(1),
     borderRadius: theme.shape.borderRadius,
+    marginTop: theme.spacing(1),
     marginBottom: theme.spacing(1),
   },
   response: {
@@ -88,6 +90,12 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     marginBottom: theme.spacing(1),
+  },
+  interactionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    cursor: 'pointer',
   },
   markdown: {
     '& p': {
@@ -127,6 +135,7 @@ function ConversationTree() {
   const [conversations, setConversations] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [expandedInteractions, setExpandedInteractions] = useState(new Set());
+  const [expandedIndividualInteractions, setExpandedIndividualInteractions] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
@@ -182,11 +191,24 @@ function ConversationTree() {
     });
   };
 
+  const handleIndividualInteractionToggle = (interactionId) => {
+    setExpandedIndividualInteractions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(interactionId)) {
+        newSet.delete(interactionId);
+      } else {
+        newSet.add(interactionId);
+      }
+      return newSet;
+    });
+  };
+
   const handlePageChange = (event, value) => {
     setPage(value);
     // Collapse all nodes when changing pages
     setExpandedNodes(new Set());
     setExpandedInteractions(new Set());
+    setExpandedIndividualInteractions(new Set());
   };
 
   const renderResponse = (response, metadata, classes) => {
@@ -227,25 +249,26 @@ function ConversationTree() {
     );
   };
 
-  const renderInteraction = (interaction, classes) => (
-    <Box key={interaction.id} className={classes.interaction}>
-      <Box className={classes.prompt}>
-        <Typography variant="caption" color="textSecondary">
-          {interaction.metadata?.prompt_name ? 
-            `Prompt: ${interaction.metadata.prompt_name}` : 
-            'Prompt:'}
-        </Typography>
-        <ReactMarkdown className={classes.markdown}>
-          {interaction.prompt}
-        </ReactMarkdown>
-      </Box>
-      <Box className={classes.response}>
-        <Typography variant="caption" color="textSecondary">Response:</Typography>
-        {renderResponse(interaction.response, interaction.metadata, classes)}
-      </Box>
-      {interaction.metadata && (
-        <Box mt={1}>
-          {interaction.metadata.model && (
+  const renderInteraction = (interaction, classes) => {
+    const isExpanded = expandedIndividualInteractions.has(interaction.id);
+    
+    return (
+      <Box key={interaction.id} className={classes.interaction}>
+        <Box 
+          className={classes.interactionHeader}
+          onClick={() => handleIndividualInteractionToggle(interaction.id)}
+        >
+          <Box display="flex" alignItems="center">
+            <IconButton size="small">
+              {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+            <Typography variant="caption" color="textSecondary">
+              {interaction.metadata?.prompt_name ? 
+                `Prompt: ${interaction.metadata.prompt_name}` : 
+                'Prompt:'}
+            </Typography>
+          </Box>
+          {interaction.metadata?.model && (
             <Chip
               className={classes.chip}
               label={`Model: ${interaction.metadata.model}`}
@@ -254,12 +277,114 @@ function ConversationTree() {
             />
           )}
         </Box>
-      )}
-    </Box>
-  );
+        
+        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+          <Box className={classes.prompt}>
+            <ReactMarkdown className={classes.markdown}>
+              {interaction.prompt}
+            </ReactMarkdown>
+          </Box>
+          <Box className={classes.response}>
+            <Typography variant="caption" color="textSecondary">Response:</Typography>
+            {renderResponse(interaction.response, interaction.metadata?.metadata, classes)}
+          </Box>
+        </Collapse>
+      </Box>
+    );
+  };
 
   const renderConversation = (conversation, classes) => {
     const isExpanded = expandedNodes.has(conversation.id);
+
+    // Build a hierarchical structure from flat nodes
+    const buildNodeHierarchy = (nodes) => {
+      const rootNodes = [];
+      const childrenMap = {};
+
+      // First pass: identify root nodes and create children containers
+      Object.entries(nodes || {}).forEach(([nodeId, node]) => {
+        if (!node.parent_id) {
+          // This is a root node (expert or system)
+          rootNodes.push({ id: nodeId, ...node, children: [] });
+        } else {
+          // This is a child node (collaborator)
+          if (!childrenMap[node.parent_id]) {
+            childrenMap[node.parent_id] = [];
+          }
+          childrenMap[node.parent_id].push({ id: nodeId, ...node, children: [] });
+        }
+      });
+
+      // Second pass: attach children to their parents
+      rootNodes.forEach(node => {
+        if (childrenMap[node.id]) {
+          node.children = childrenMap[node.id];
+        }
+      });
+
+      return rootNodes;
+    };
+
+    const hierarchicalNodes = buildNodeHierarchy(conversation.nodes);
+
+    // Recursive function to render a node and its children
+    const renderNode = (node, depth = 0) => {
+      const nodeId = node.id;
+      const isNodeExpanded = expandedInteractions.has(nodeId);
+      const paddingLeft = 16 + (depth * 16); // Increase padding based on depth
+      
+      return (
+        <React.Fragment key={nodeId}>
+          <ListItem 
+            className={classes.nested}
+            button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSubNodeToggle(nodeId);
+            }}
+            style={{ paddingLeft }}
+          >
+            <IconButton size="small">
+              {isNodeExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+            <ListItemText
+              primary={
+                <Box className={classes.nodeHeader}>
+                  <Typography variant="subtitle2">
+                    {node.name} ({node.role})
+                  </Typography>
+                  {node.role === "collaborator" && (
+                    <Chip
+                      size="small"
+                      label="Collaborator"
+                      color="secondary"
+                      style={{ marginLeft: 8 }}
+                    />
+                  )}
+                </Box>
+              }
+            />
+          </ListItem>
+          <Collapse in={isNodeExpanded} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {/* Render interactions */}
+              {node.interactions && node.interactions.map(interaction => (
+                <ListItem key={interaction.id} className={classes.nested} style={{ paddingLeft: paddingLeft + 32 }}>
+                  {renderInteraction(interaction, classes)}
+                </ListItem>
+              ))}
+              
+              {/* Render child nodes (collaborators) */}
+              {node.children && node.children.length > 0 && (
+                <Box ml={2}>
+                  {node.children.map(childNode => renderNode(childNode, depth + 1))}
+                </Box>
+              )}
+            </List>
+          </Collapse>
+        </React.Fragment>
+      );
+    };
 
     return (
       <Paper key={conversation.id} elevation={1} style={{ margin: '8px 0' }}>
@@ -296,44 +421,7 @@ function ConversationTree() {
         </ListItem>
         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
           <List component="div" disablePadding>
-            {Object.entries(conversation.nodes || {}).map(([nodeId, node]) => {
-              const isSubNodeExpanded = expandedInteractions.has(nodeId);
-              
-              return (
-                <React.Fragment key={nodeId}>
-                  <ListItem 
-                    className={classes.nested}
-                    button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSubNodeToggle(nodeId);
-                    }}
-                  >
-                    <IconButton size="small">
-                      {isSubNodeExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </IconButton>
-                    <ListItemText
-                      primary={
-                        <Box className={classes.nodeHeader}>
-                          <Typography variant="subtitle2">
-                            {node.name} ({node.role})
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                  <Collapse in={isSubNodeExpanded} timeout="auto" unmountOnExit>
-                    <List component="div" disablePadding>
-                      {node.interactions && node.interactions.map(interaction => (
-                        <ListItem key={interaction.id} className={classes.nested} style={{ paddingLeft: 48 }}>
-                          {renderInteraction(interaction, classes)}
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Collapse>
-                </React.Fragment>
-              );
-            })}
+            {hierarchicalNodes.map(node => renderNode(node))}
           </List>
         </Collapse>
       </Paper>
