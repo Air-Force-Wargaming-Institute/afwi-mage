@@ -111,98 +111,6 @@ executor = ThreadPoolExecutor(max_workers=20)
 MAX_CONCURRENT_REQUESTS = 10
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
-@app.post("/chat/init")
-async def init_chat(request_data: ChatMessage):
-    try:
-        logger.info(f"Received init chat request: {request_data}")
-        async with semaphore:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                executor,
-                lambda: _process_init_chat(request_data)
-            )
-    except Exception as e:
-        logger.error(f"Error initializing chat: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-def _process_init_chat(request_data: ChatMessage):
-    llm = LLMManager().get_llm()
-    
-    class relevancy_check(BaseModel):
-        """
-        Structured output for the relevancy check of the user's message.
-        relevant: Boolean value indicating if the message is relevant to the team's expertise
-        reason: Explanation for why the message is relevant or not
-        """
-        relevant: bool  # Boolean true/false value indicating if the message is relevant to the team's expertise
-        reason: str     # Explanation for why the message is relevant or not
-
-    teams = Team.load_teams()
-    team = teams.get(request_data.team_id)
-    if not team:
-        raise ValueError(f"Team {request_data.team_id} not found")
-    
-    agent_names = []
-    agent_instructions = {}
-
-    for agent_id, agent in team.agents.items():
-        agent_names.append(agent.name)
-        agent_instructions[agent.name] = agent.instructions
-
-    agents_with_instructions = "\n".join(
-        f"- {agent}: {agent_instructions[agent]}" 
-        for agent in sorted(agent_names)
-    )
-
-    # Initialize conversation manager and create new conversation
-    conversation_manager = ConversationManager()
-    conversation_id = conversation_manager.create_conversation_sync(
-        question=request_data.message,
-        session_id=request_data.session_id,
-        metadata={"team_id": request_data.team_id}
-    )
-
-    # Add relevancy check as system node
-    system_node_id = conversation_manager.add_system_node_sync(
-        conversation_id=conversation_id,
-        name="Relevancy Checker",
-        metadata={"type": "relevancy_check"}
-    )
-
-    relevance_prompt = SystemPromptManager().get_prompt_template("relevance_prompt")
-    prompt = relevance_prompt.format(
-        current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        agents_with_instructions=agents_with_instructions,
-        message=request_data.message
-    )
-    
-    response = llm.with_structured_output(relevancy_check).invoke([HumanMessage(content=prompt)])
-
-    # Record the interaction
-    conversation_manager.add_interaction_sync(
-        conversation_id=conversation_id,
-        node_id=system_node_id,
-        prompt=prompt,
-        response=response,
-        metadata={
-            "prompt_name": "relevance_prompt",
-            "model": llm.model_name
-        }
-    )
-
-    if response.relevant:   
-        return {
-            "message": "Chat initialized successfully", 
-            "continue": True,
-            "conversation_id": conversation_id
-        }
-    else:
-        return {
-            "message": "Chat not initialized because the message is not relevant to the team's expertise: " + response.reason, 
-            "continue": False,
-            "conversation_id": conversation_id
-        }
-
 @app.post("/chat/refine")
 async def refine_chat(request_data: ChatMessage):
     try:
@@ -220,6 +128,13 @@ async def refine_chat(request_data: ChatMessage):
 def _process_refine_chat(request_data: ChatMessage):
     # Initialize LLM
     llm = LLMManager().get_llm()
+    class SelectedAgents(BaseModel):
+        """
+        Structured output for storing the names of the agents selected to answer the message
+        agents: a list of agent names that will be tasked with answering the message
+        """
+        agents: List[str]
+
     class UserPlan(BaseModel):
         """
         Structured output for the planning phase of multi-agent interactions.
@@ -228,10 +143,10 @@ def _process_refine_chat(request_data: ChatMessage):
         plan_notes: notes about the plan created for the user
         modified_message: the new message that the user may approve
         """
-        selected_agents: List[str]  # a list of agent names that will be tasked with answering the message
         plan: str                   # The approach each agent will take to answering the message, and what they will contribute to the response
         plan_notes: str             # notes about the plan created for the user
-        modified_message: str      # the new message that the user has approved
+        modified_message: str       # the new message that the user has approved
+
     # Initialize SessionManager
     session_manager = SessionManager()
 
@@ -290,6 +205,43 @@ def _process_refine_chat(request_data: ChatMessage):
         formatted_history.append(chat_entry)
     conversation_history = "\n\n".join(formatted_history)
 
+    def select_agents():
+        """
+        Pre-select the agents that will be tasked with answering the message
+        TODO: Further refine this process to handle whether or not the user is refining a plan
+        """
+        select_agents_template = """You are given a list of expert agents and another list with each agent mapped to their instructions. These instructions define how each agent attempts to respond to messages and what sort of topics they cover in their responses. Using these two lists, select agents that are well-suited for responding to the message from the user.
+        You can select any number of agents from the list, up to the number of agents in the team. If no agents seem to be a good fit, you can select no agents. If the user's message seems irrelevant to the team's expertise, you can select no agents. Here are some examples of irrelevant messages: \"Hello!\", \"What is the meaning of life?\", \"My name is John.\", \"What day is it?\", \"Test\", \"What is the weather in Tokyo?\", \"Guess my favorite color.\"
+        Make sure you do not select the same agent more than once. The name of each agent you select should be in the list of expert agents.
+        Format your response as a Python list of agent names.
+        Message: {message}
+        Expert Agents: {agent_names}
+        Expert Agents Mapped to Instructions: {agents_with_instructions}
+        """
+        prompt = PromptTemplate(
+            input_variables=["message", "agent_names", "agents_with_instructions"],
+            template=select_agents_template
+        )
+        prompt = prompt.format(
+            message=request_data.message,
+            agent_names=str(agent_names),
+            agents_with_instructions=agents_with_instructions
+        )
+        response = llm.with_structured_output(SelectedAgents).invoke([HumanMessage(content=prompt)])
+        
+        # Validate that all agents in response.agents exist in agent_names
+        valid_agents = [agent for agent in response.agents if agent in agent_names]
+        
+        # Log any invalid agents that were removed
+        if len(valid_agents) != len(response.agents):
+            invalid_agents = [agent for agent in response.agents if agent not in agent_names]
+            logger.warning(f"Removed invalid agents from LLM response: {invalid_agents}")
+            
+        logger.info(f"Selected agents: {valid_agents}")
+        return valid_agents
+
+    selected_agents = select_agents()
+
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
@@ -341,7 +293,7 @@ def _process_refine_chat(request_data: ChatMessage):
         prompt = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
-            conversation_history=conversation_history,
+            agents=str(selected_agents),
             agents_with_instructions=agents_with_instructions
         )
 
@@ -352,7 +304,7 @@ def _process_refine_chat(request_data: ChatMessage):
         "plan": response.plan,
         "modified_message": response.modified_message,
         "plan_notes": response.plan_notes,
-        "selected_agents": response.selected_agents,
+        "selected_agents": selected_agents,
     }
 
 @app.post("/chat/process")

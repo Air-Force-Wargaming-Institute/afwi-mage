@@ -34,5 +34,22 @@
         "vectorstore": [
             "8d82b322-6b2c-406f-b7ce-93206ec0eb82"
         ]
+    },
+    {
+        "name": "4-man prc team",
+        "unique_id": "b43abd5d-9bee-483e-a5f6-e51cd14418e2",
+        "description": "4 man prc team",
+        "agents": [
+            "0a5a5b61-e72f-4bea-a5c9-63f5c3552b07",
+            "9dd64135-f6c3-4046-b9ba-7c99ec282a70",
+            "6e4840e7-8771-4974-a81f-17ab82364962",
+            "25b4db45-2103-4326-8f44-57145e6216f1"
+        ],
+        "color": "#FF0000",
+        "created_at": "2025-03-12T16:56:51.881732Z",
+        "last_modified": "2025-03-12T16:56:51.881744Z",
+        "vectorstore": [
+            "8d82b322-6b2c-406f-b7ce-93206ec0eb82"
+        ]
     }
 ]
