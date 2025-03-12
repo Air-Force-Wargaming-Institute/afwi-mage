@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from functools import wraps
+import threading
 
 # Set up logging
 logger = logging.getLogger("embedding_service")
@@ -53,7 +54,12 @@ class JobError(Exception):
 
 class JobManager:
     """
-    Manages long-running background jobs.
+    Manager for long-running background jobs.
+    
+    Responsibilities:
+    - Managing job status
+    - Creating and updating job records
+    - Tracking job progress
     """
     
     def __init__(self, job_dir: str):
@@ -66,9 +72,59 @@ class JobManager:
         self.job_dir = Path(job_dir)
         self.job_dir.mkdir(parents=True, exist_ok=True)
         
-        # Set the global job directory
-        global _JOB_DIR
-        _JOB_DIR = str(self.job_dir)
+        # Job retention policy in seconds
+        self.retention_periods = {
+            JobStatus.COMPLETED: 600,  # 10 minutes for completed jobs
+            JobStatus.FAILED: 900,     # 15 minutes for failed jobs
+            JobStatus.CANCELLED: 300,  # 5 minutes for cancelled jobs
+            # pending and processing jobs are kept indefinitely
+        }
+        
+        # Run an initial cleanup of old job files
+        self._clean_old_job_files()
+    
+    def _clean_old_job_files(self):
+        """
+        Clean up old job files based on retention policy.
+        """
+        now = time.time()
+        cleaned_count = 0
+        
+        try:
+            for job_file in self.job_dir.glob("*.json"):
+                try:
+                    # Read job status to determine retention period
+                    with open(job_file, "r") as f:
+                        job_data = json.load(f)
+                    
+                    status = job_data.get("status")
+                    
+                    # Skip if job is pending or processing (no retention period)
+                    if status in [JobStatus.PENDING, JobStatus.PROCESSING]:
+                        continue
+                    
+                    # Get retention period based on status
+                    retention_period = self.retention_periods.get(status)
+                    if not retention_period:
+                        continue
+                    
+                    # Check modification time
+                    mod_time = job_file.stat().st_mtime
+                    age = now - mod_time
+                    
+                    if age > retention_period:
+                        # Job file is older than its retention period, delete it
+                        job_file.unlink()
+                        cleaned_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error cleaning job file {job_file}: {str(e)}")
+            
+            if cleaned_count > 0:
+                logger.info(f"Cleaned up {cleaned_count} old job files")
+                
+        except Exception as e:
+            logger.error(f"Error during job file cleanup: {str(e)}")
     
     def register_job(
         self,
@@ -156,18 +212,35 @@ class JobManager:
             
             # Update details with current operation and file
             details = job_data.get("details", {})
+            
+            # Store in flat structure for direct access
             if current_file:
                 details["current_file"] = current_file
             if current_operation:
                 details["current_operation"] = current_operation
             
+            # Also store in structured format for better organization
+            # This helps with frontend compatibility that expects a nested structure
+            current_progress = details.get("current_progress", {})
+            if current_file:
+                current_progress["current_file"] = current_file
+            if current_operation:
+                current_progress["current_operation"] = current_operation
+            
+            # Update timestamp for progress info
+            current_progress["updated_at"] = datetime.now().isoformat()
+            details["current_progress"] = current_progress
+            
             # Calculate progress percentage
             if job_data.get("total_items", 0) > 0:
-                details["progress_percentage"] = (
+                progress_percentage = (
                     processed_items / job_data["total_items"]
                 ) * 100
+                details["progress_percentage"] = progress_percentage
+                current_progress["progress_percentage"] = progress_percentage
             else:
                 details["progress_percentage"] = 0
+                current_progress["progress_percentage"] = 0
                 
             job_data["details"] = details
             
@@ -461,20 +534,56 @@ class JobManager:
         # Store the future for cancellation
         _futures[job_id] = future
 
+    def _periodic_cleanup(self):
+        """
+        Start a background thread to periodically clean up old job files.
+        """
+        def cleanup_worker():
+            try:
+                # Sleep first to avoid immediate cleanup after startup
+                time.sleep(300)  # 5 minutes
+                
+                while True:
+                    try:
+                        logger.debug("Running periodic job file cleanup")
+                        self._clean_old_job_files()
+                    except Exception as e:
+                        logger.error(f"Error in periodic cleanup: {str(e)}")
+                    
+                    # Wait for next cleanup cycle
+                    time.sleep(300)  # 5 minutes
+            except Exception as e:
+                logger.error(f"Job cleanup thread terminated: {str(e)}")
+        
+        # Start cleanup thread as daemon so it doesn't block application shutdown
+        cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+        cleanup_thread.start()
+        logger.info("Started periodic job cleanup thread (every 5 minutes)")
+
 
 # Initialize the global job manager
 _job_manager = None
 
 
-def initialize_job_manager(job_dir: str):
+def initialize_job_manager(job_dir=None):
     """
-    Initialize the global job manager.
+    Initialize the job manager.
     
     Args:
-        job_dir: Directory where job status files are stored
+        job_dir: Optional directory for job files. If not provided, will use env var or default.
+        
+    Returns:
+        JobManager instance
     """
+    if job_dir is None:
+        job_dir = os.environ.get("JOB_DIR", _JOB_DIR)
+    
     global _job_manager
-    _job_manager = JobManager(job_dir)
+    if _job_manager is None:
+        _job_manager = JobManager(job_dir)
+        # Start periodic cleanup
+        _job_manager._periodic_cleanup()
+        
     return _job_manager
 
 

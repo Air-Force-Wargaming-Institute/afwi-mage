@@ -51,3 +51,6 @@ pytest-shutil==1.8.1
 PyYAML>=6.0.1
 filelock>=3.17
 portalocker>=3.1
+
+# System monitoring
+psutil==5.9.5

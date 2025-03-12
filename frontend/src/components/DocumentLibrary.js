@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import {
   Container,
   Paper,
@@ -150,6 +150,316 @@ class ErrorBoundary extends React.Component {
 function DocumentLibrary() {
   const { state, dispatch } = useDocumentLibrary();
 
+  // Extract draggedItem and dropTarget early since we need them in auto-scroll functions
+  const draggedItem = state?.draggedItem;
+  const dropTarget = state?.dropTarget;
+
+  // Add ref for table container to enable auto-scrolling
+  const tableContainerRef = useRef(null);
+  
+  // Add state for auto-scrolling
+  const [autoScrollActive, setAutoScrollActive] = useState(false);
+  const [autoScrollDirection, setAutoScrollDirection] = useState(null);
+  const [scrollSpeed, setScrollSpeed] = useState(5);
+  const [mousePosition, setMousePosition] = useState({ y: 0 });
+  const autoScrollTimerRef = useRef(null);
+  
+  // Create a ref for the cleanup function to avoid circular dependencies
+  const cleanupDragOperationRef = useRef(null);
+
+  // Extract other needed state variables
+  const documents = state?.documents || [];
+  const selectedDocs = state?.selectedDocs || [];
+  const previewFile = state?.previewFile;
+  const dragOver = state?.dragOver;
+  const isLoading = state?.isLoading;
+  const isRefreshing = state?.isRefreshing;
+  const operationProgress = state?.operationProgress;
+  const error = state?.error;
+  const openConfirmDialog = state?.openConfirmDialog;
+  const currentPath = state?.currentPath;
+  const newFolderDialogOpen = state?.newFolderDialogOpen;
+  const newFolderName = state?.newFolderName;
+  const breadcrumbs = state?.breadcrumbs;
+  const renameDialogOpen = state?.renameDialogOpen;
+  const itemToRename = state?.itemToRename;
+  const newName = state?.newName;
+
+  // Add a ref to track the last time we processed a drag event
+  const lastDragProcessTimeRef = useRef(0);
+  // Add a ref to store the current debounced drag handler
+  const currentDragHandlerRef = useRef(null);
+  // Add a ref to directly store the dragged item outside of React state
+  const draggedItemRef = useRef(null);
+
+  // Function to stop auto-scrolling
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollActive) {
+      setAutoScrollActive(false);
+      setAutoScrollDirection(null);
+      setScrollSpeed(5);
+      
+      if (autoScrollTimerRef.current) {
+        cancelAnimationFrame(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = null;
+      }
+    }
+  }, [autoScrollActive]);
+  
+  // Function to start auto-scrolling when needed
+  const startAutoScroll = useCallback((passedDirection, passedSpeed) => {
+    // Check if we have a dragged item (from state or ref)
+    const effectiveDraggedItem = state?.draggedItem || draggedItemRef.current;
+    
+    // Only start if not already active, have a dragged item, and a valid container
+    if (!autoScrollActive && effectiveDraggedItem && tableContainerRef.current) {
+      // Set state to active right away
+      setAutoScrollActive(true);
+      
+      // Clear any existing timers
+      if (autoScrollTimerRef.current) {
+        cancelAnimationFrame(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = null;
+      }
+      
+      // Use passed direction/speed if available, fall back to state, then defaults
+      const direction = passedDirection || autoScrollDirection || 'down';
+      const speed = passedSpeed || scrollSpeed || 10;
+      
+      // Force first scroll action for immediate feedback
+      if (tableContainerRef.current) {
+        // Get the current scroll metrics
+        const container = tableContainerRef.current;
+        const scrollTop = container.scrollTop;
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        
+        // Immediate first scroll to improve responsiveness
+        if (direction === 'up') {
+          if (scrollTop > 0) {
+            container.scrollTop = Math.max(0, scrollTop - speed);
+          }
+        } else if (direction === 'down') {
+          if (scrollTop < maxScroll) {
+            container.scrollTop = Math.min(maxScroll, scrollTop + speed);
+          }
+        }
+      }
+      
+      // Use requestAnimationFrame for smoother performance
+      const scrollStep = () => {
+        if (!tableContainerRef.current || !autoScrollActive) {
+          stopAutoScroll();
+          return;
+        }
+        
+        // Continue to use the explicitly passed direction/speed throughout the animation
+        const currentDirection = direction;
+        const currentSpeed = speed;
+        
+        const container = tableContainerRef.current;
+        const scrollTop = container.scrollTop;
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        
+        if (currentDirection === 'up') {
+          // Add a check to make sure we're not already at the top
+          if (scrollTop > 0) {
+            const oldScrollTop = scrollTop;
+            // Use Math.max to ensure we don't go below 0
+            container.scrollTop = Math.max(0, scrollTop - currentSpeed);
+            
+            // Calculate the actual change for debugging
+            const actualChange = oldScrollTop - container.scrollTop;
+            
+            // If we couldn't move at all, stop scrolling
+            if (actualChange === 0 && currentSpeed > 0) {
+              stopAutoScroll();
+              return;
+            }
+          } else {
+            // Stop if we've reached the top
+            stopAutoScroll();
+            return;
+          }
+        } else if (currentDirection === 'down') {
+          if (scrollTop < maxScroll) {
+            const oldScrollTop = scrollTop;
+            // Use Math.min to ensure we don't go above maxScroll
+            container.scrollTop = Math.min(maxScroll, scrollTop + currentSpeed);
+            
+            // Calculate the actual change for debugging
+            const actualChange = container.scrollTop - oldScrollTop;
+            
+            // If we couldn't move at all, stop scrolling
+            if (actualChange === 0 && currentSpeed > 0) {
+              stopAutoScroll();
+              return;
+            }
+          } else {
+            // Stop if we've reached the bottom
+            stopAutoScroll();
+            return;
+          }
+        } else {
+          // If no direction is set, stop scrolling
+          stopAutoScroll();
+          return;
+        }
+        
+        // Continue the animation loop only if still active
+        if (autoScrollActive) {
+          autoScrollTimerRef.current = requestAnimationFrame(scrollStep);
+        }
+      };
+      
+      // Start the animation loop
+      autoScrollTimerRef.current = requestAnimationFrame(scrollStep);
+    }
+  }, [autoScrollActive, autoScrollDirection, scrollSpeed, state?.draggedItem, stopAutoScroll]);
+
+  // Handle mouse movement during drag to determine scroll direction and speed
+  const handleDragMove = useCallback((e) => {
+    // Always prevent default for drag events
+    e.preventDefault();
+    
+    // Check both state and ref for dragged item
+    const effectiveDraggedItem = state?.draggedItem || draggedItemRef.current;
+    
+    // Only process if we have a container and are in a drag operation
+    if (!tableContainerRef.current) {
+      return;
+    }
+    
+    if (!effectiveDraggedItem) {
+      return;
+    }
+    
+    const container = tableContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Check if mouse is within the container bounds horizontally
+    const isInContainerX = e.clientX >= rect.left && e.clientX <= rect.right;
+    
+    const scrollTop = container.scrollTop;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    
+    // Define scroll zones (percentage of container height) - INCREASED SIZES
+    const topZoneSize = 0.4; // 40% of container height (was 30%)
+    const bottomZoneSize = 0.3; // 30% of container height (was 20%)
+    
+    const topZoneThreshold = rect.top + (rect.height * topZoneSize);
+    const bottomZoneThreshold = rect.bottom - (rect.height * bottomZoneSize);
+    
+    // Check which zone the mouse is in
+    let newDirection = null;
+    let newSpeed = 0;
+    let shouldStartScroll = false;
+    
+    if (e.clientY < topZoneThreshold && e.clientY >= rect.top) {
+      // In top scroll zone
+      if (scrollTop > 0) {
+        newDirection = 'up';
+        // Calculate intensity (0-1) - MADE MORE AGGRESSIVE
+        const intensity = 1.2 - ((e.clientY - rect.top) / (rect.height * topZoneSize));
+        // Clamp intensity between 0.1 and 1.0
+        const clampedIntensity = Math.min(Math.max(intensity, 0.1), 1.0);
+        // INCREASED SPEED RANGE (Min 10px, max 50px)
+        newSpeed = Math.ceil(clampedIntensity * 40) + 10;
+        shouldStartScroll = true;
+      }
+    } else if (e.clientY > bottomZoneThreshold && e.clientY <= rect.bottom) {
+      // In bottom scroll zone
+      if (scrollTop < maxScroll) {
+        newDirection = 'down';
+        // Calculate intensity (0-1) - MADE MORE AGGRESSIVE
+        const intensity = 1.2 * ((e.clientY - bottomZoneThreshold) / (rect.height * bottomZoneSize));
+        // Clamp intensity between 0.1 and 1.0
+        const clampedIntensity = Math.min(Math.max(intensity, 0.1), 1.0);
+        // INCREASED SPEED RANGE (Min 10px, max 50px)
+        newSpeed = Math.ceil(clampedIntensity * 40) + 10;
+        shouldStartScroll = true;
+      }
+    } else {
+      if (autoScrollActive) {
+        // Not in a scroll zone but auto-scroll is active
+        stopAutoScroll();
+      }
+    }
+    
+    // Start auto-scrolling if needed
+    if (shouldStartScroll) {
+      // Update state values (these may not be immediately available but we'll pass them directly)
+      if (autoScrollDirection !== newDirection) {
+        setAutoScrollDirection(newDirection);
+      }
+      if (scrollSpeed !== newSpeed) {
+        setScrollSpeed(newSpeed);
+      }
+      
+      // Pass the direction and speed directly to avoid relying on state updates
+      if (!autoScrollActive) {
+        // We need to start scrolling
+        startAutoScroll(newDirection, newSpeed);
+      } else {
+        // If scrolling is already active, just update the direction and speed
+        // This update may still need to scroll in a new direction
+        if (autoScrollDirection !== newDirection || scrollSpeed !== newSpeed) {
+          stopAutoScroll();
+          // No delay to make it more responsive
+          startAutoScroll(newDirection, newSpeed);
+        }
+      }
+    }
+    
+    // Update mouse position state for rendering scroll indicators
+    setMousePosition({ y: e.clientY });
+  }, [startAutoScroll, stopAutoScroll, autoScrollActive, autoScrollDirection, scrollSpeed, state?.draggedItem]);
+  
+  // Add cleanup function to handle any drag end
+  const cleanupDragOperation = useCallback(() => {
+    // Remove all drag-related event listeners
+    if (currentDragHandlerRef.current) {
+      document.removeEventListener('dragover', currentDragHandlerRef.current);
+      currentDragHandlerRef.current = null;
+    }
+    
+    document.removeEventListener('dragover', handleDragMove);
+    document.removeEventListener('dragend', cleanupDragOperationRef.current);
+    document.body.removeEventListener('dragend', cleanupDragOperationRef.current);
+    document.body.removeEventListener('drop', cleanupDragOperationRef.current);
+    
+    // Stop auto-scrolling if active
+    if (autoScrollActive) {
+      stopAutoScroll();
+    }
+    
+    // Clear dragged item state
+    setDraggedItem(null);
+    draggedItemRef.current = null;
+    setDropTarget(null);
+  }, [handleDragMove, stopAutoScroll, autoScrollActive]);
+
+  // Store the cleanup function in ref to avoid circular dependencies
+  cleanupDragOperationRef.current = cleanupDragOperation;
+  
+  // Add effect to clean up auto-scrolling when component unmounts
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('dragover', handleDragMove);
+      document.removeEventListener('dragend', cleanupDragOperationRef.current);
+      if (autoScrollTimerRef.current) {
+        cancelAnimationFrame(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = null;
+      }
+    };
+  }, [handleDragMove]);
+
+  // Modify the useEffect for container event listener to prevent duplicate events
+  useEffect(() => {
+    // We'll handle drag events at the document level instead of having both
+    // document and container listeners to avoid duplicate processing
+    return () => {};
+  }, []);
+
   // Memoize the fetchDocuments function
   const fetchDocuments = useCallback(async (path) => {
     // Skip if already refreshing
@@ -209,28 +519,6 @@ function DocumentLibrary() {
       fetchDocuments(state.currentPath);
     }
   }, [state?.currentPath]); // Only depend on the path changes
-
-  // Remove unused setIsRefreshing from the state setters
-  const {
-    documents = [],
-    selectedDocs = [],
-    previewFile,
-    dragOver,
-    isLoading,
-    isRefreshing,
-    operationProgress,
-    error,
-    openConfirmDialog,
-    currentPath,
-    newFolderDialogOpen,
-    newFolderName,
-    breadcrumbs,
-    renameDialogOpen,
-    itemToRename,
-    newName,
-    draggedItem,
-    dropTarget,
-  } = state;
 
   // State setters
   const setSelectedDocs = (docs) => dispatch({ type: ACTIONS.SET_SELECTED_DOCS, payload: docs });
@@ -616,15 +904,34 @@ function DocumentLibrary() {
     }
   };
 
+  // Enhance drag start handler
   const handleDragStart = (e, item) => {
     e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
-
-    // If the dragged item is selected, drag all selected items
-    // Otherwise, just drag the current item
+    
+    // Remove any existing listeners first to prevent duplicates
+    document.removeEventListener('dragover', handleDragMove);
+    document.removeEventListener('dragend', cleanupDragOperationRef.current);
+    
+    // Create a direct handler function that logs and prevents default
+    const dragMoveHandler = (moveEvent) => {
+      // Always prevent default in dragover handlers - this is needed to allow dropping
+      moveEvent.preventDefault();
+      
+      // Call our regular handler
+      handleDragMove(moveEvent);
+    };
+    
+    // The rest of the existing drag start code
     const itemsToDrag = selectedDocs.includes(item.id) ? 
       documents.filter(doc => selectedDocs.includes(doc.id)) : 
       [item];
+    
+    // Store the dragged item in the ref for direct access
+    draggedItemRef.current = itemsToDrag;
+    
+    // Set the state (this may not be available immediately in event handlers)
+    setDraggedItem(itemsToDrag);
 
     // Create drag image before setting draggedItem
     const dragImage = document.createElement('div');
@@ -656,47 +963,46 @@ function DocumentLibrary() {
     document.body.appendChild(dragImage);
     e.dataTransfer.setDragImage(dragImage, 10, 10);
     setTimeout(() => document.body.removeChild(dragImage), 0);
-
-    // Set draggedItem after creating drag image
-    setDraggedItem(itemsToDrag);
-  };
-
-  const handleDragOver = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
     
-    if (item?.isFolder && item.id !== draggedItem?.id) {
-      setDropTarget(item);
-      e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
-    }
-  };
-
-  const handleDragLeave = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
+    // Add a small delay before attaching handler
+    setTimeout(() => {
+      // Store handler reference and attach it
+      currentDragHandlerRef.current = dragMoveHandler;
+      document.addEventListener('dragover', dragMoveHandler, { passive: false });
+      
+      // Add dragend to body and document for backup
+      document.addEventListener('dragend', cleanupDragOperationRef.current);
+      document.body.addEventListener('dragend', cleanupDragOperationRef.current);
+      document.body.addEventListener('drop', cleanupDragOperationRef.current);
+    }, 10);
     
-    if (item?.isFolder) {
-      setDropTarget(null);
-      e.currentTarget.style.backgroundColor = '';
-    }
+    // Safety timeout to cleanup if events somehow get lost
+    setTimeout(() => {
+      if (state?.draggedItem || draggedItemRef.current) {
+        cleanupDragOperationRef.current();
+      }
+    }, 30000);
   };
 
+  // Enhance handleDrop to clean up event listeners
   const handleDrop = async (e, targetFolder) => {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.style.backgroundColor = '';
     
-    if (!draggedItem || !targetFolder?.isFolder || 
-        (Array.isArray(draggedItem) ? draggedItem.some(item => item.id === targetFolder.id) : draggedItem.id === targetFolder.id)) {
-      setDraggedItem(null);
-      setDropTarget(null);
+    // Clean up event listeners and stop auto-scrolling
+    cleanupDragOperationRef.current();
+    
+    if (!state?.draggedItem || !targetFolder?.isFolder || 
+        (Array.isArray(state.draggedItem) ? state.draggedItem.some(item => item.id === targetFolder.id) : state.draggedItem.id === targetFolder.id)) {
       return;
     }
 
+    // Rest of the existing drop handler...
     try {
-      const sourcePaths = Array.isArray(draggedItem) ? 
-        draggedItem.map(item => item.path) : 
-        [draggedItem.path];
+      const sourcePaths = Array.isArray(state.draggedItem) ? 
+        state.draggedItem.map(item => item.path) : 
+        [state.draggedItem.path];
 
       const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
@@ -754,7 +1060,89 @@ function DocumentLibrary() {
       });
     } finally {
       setDraggedItem(null);
+      draggedItemRef.current = null;
       setDropTarget(null);
+    }
+  };
+
+  // Also enhance breadcrumb drop handler to clean up
+  const handleBreadcrumbDrop = async (e, crumb) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.style.backgroundColor = '';
+    
+    // Clean up event listeners and stop auto-scrolling
+    cleanupDragOperationRef.current();
+    
+    if (!state?.draggedItem) return;
+    
+    // Rest of the existing handler code...
+    try {
+      const sourcePaths = Array.isArray(state.draggedItem) ? 
+        state.draggedItem.map(item => item.path) : 
+        [state.draggedItem.path];
+
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_paths: sourcePaths,
+          target_folder: crumb.path
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      await fetchDocuments(currentPath);
+      setOperationProgress({
+        status: `Successfully moved ${sourcePaths.length} item(s) to ${crumb.name}`,
+        processed_items: undefined,
+        total_items: undefined
+      });
+    } catch (error) {
+      console.error('Error moving items:', error);
+      setOperationProgress({
+        status: `Error moving items: ${error.message}`,
+        processed_items: undefined,
+        total_items: undefined
+      });
+    } finally {
+      setDraggedItem(null);
+      draggedItemRef.current = null;
+    }
+  };
+
+  const handleDragOver = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if we have a dragged item (from state or ref)
+    const draggedItem = state?.draggedItem || draggedItemRef.current;
+    
+    if (item?.isFolder && draggedItem) {
+      // Only set if they're different items
+      const isDifferentItem = Array.isArray(draggedItem) ? 
+        !draggedItem.some(drag => drag.id === item.id) : 
+        draggedItem.id !== item.id;
+
+      if (isDifferentItem) {
+        setDropTarget(item);
+        e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
+      }
+    }
+  };
+
+  const handleDragLeave = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (item?.isFolder) {
+      setDropTarget(null);
+      e.currentTarget.style.backgroundColor = '';
     }
   };
 
@@ -819,51 +1207,6 @@ function DocumentLibrary() {
     e.stopPropagation();
     // Remove visual feedback
     e.currentTarget.style.backgroundColor = '';
-  };
-
-  const handleBreadcrumbDrop = async (e, crumb) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.style.backgroundColor = '';
-    
-    if (!draggedItem) return;
-    
-    try {
-      const sourcePaths = Array.isArray(draggedItem) ? 
-        draggedItem.map(item => item.path) : 
-        [draggedItem.path];
-
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          source_paths: sourcePaths,
-          target_folder: crumb.path
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      await fetchDocuments(currentPath);
-      setOperationProgress({
-        status: `Successfully moved ${sourcePaths.length} item(s) to ${crumb.name}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
-    } catch (error) {
-      console.error('Error moving items:', error);
-      setOperationProgress({
-        status: `Error moving items: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
-    } finally {
-      setDraggedItem(null);
-    }
   };
 
   const handleClassificationChange = async (item, newClassification) => {
@@ -1173,6 +1516,7 @@ function DocumentLibrary() {
                 </Toolbar>
 
                 <TableContainer 
+                  ref={tableContainerRef}
                   className="table-container" 
                   style={{ 
                     margin: '0', 
@@ -1180,7 +1524,98 @@ function DocumentLibrary() {
                     maxHeight: 'calc(100% - 120px)',  // Subtract space for header and tip
                     overflow: 'auto'  // Enable scrolling
                   }}
+                  onDragOver={(e) => {
+                    // Add a container-level dragover handler to ensure we always get events
+                    // even when the mouse is not over a specific table row
+                    e.preventDefault();
+                    
+                    // Reduced debounce time to make it more responsive (50ms instead of 100ms)
+                    const now = Date.now();
+                    if (now - lastDragProcessTimeRef.current > 50) {
+                      lastDragProcessTimeRef.current = now;
+                      
+                      // Call the regular handler
+                      if (currentDragHandlerRef.current) {
+                        currentDragHandlerRef.current(e);
+                      } else {
+                        // Fallback to direct handler
+                        handleDragMove(e);
+                      }
+                    }
+                  }}
+                  onDragLeave={(e) => {
+                    // Only trigger if we're leaving the entire container
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const isActuallyLeaving = 
+                      e.clientX < rect.left || 
+                      e.clientX > rect.right ||
+                      e.clientY < rect.top || 
+                      e.clientY > rect.bottom;
+                      
+                    if (isActuallyLeaving) {
+                      stopAutoScroll();
+                    }
+                  }}
                 >
+                  {/* Add scroll indicators with increased height to match larger zones */}
+                  {autoScrollActive && autoScrollDirection === 'up' && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '60px', // Increased from 40px
+                        background: 'linear-gradient(to bottom, rgba(25, 118, 210, 0.3), transparent)',
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'flex-start',
+                        paddingTop: '5px'
+                      }}
+                    >
+                      <div style={{ 
+                        color: '#1976d2', 
+                        fontWeight: 'bold',
+                        backgroundColor: 'rgba(255,255,255,0.7)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        Auto-Scrolling ↑
+                      </div>
+                    </div>
+                  )}
+                  
+                  {autoScrollActive && autoScrollDirection === 'down' && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '60px', // Increased from 40px
+                        background: 'linear-gradient(to top, rgba(25, 118, 210, 0.3), transparent)',
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'flex-end',
+                        paddingBottom: '5px'
+                      }}
+                    >
+                      <div style={{ 
+                        color: '#1976d2', 
+                        fontWeight: 'bold',
+                        backgroundColor: 'rgba(255,255,255,0.7)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        Auto-Scrolling ↓
+                      </div>
+                    </div>
+                  )}
+
                   {(isLoading || isRefreshing) && (
                     <div style={{
                       position: 'absolute',
@@ -1270,7 +1705,20 @@ function DocumentLibrary() {
                           }}
                           draggable
                           onDragStart={(e) => handleDragStart(e, item)}
-                          onDragOver={(e) => handleDragOver(e, item)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            if (item?.isFolder && 
+                                (!state?.draggedItem || 
+                                 (Array.isArray(state?.draggedItem) 
+                                  ? !state?.draggedItem.some(i => i.id === item.id)
+                                  : state?.draggedItem.id !== item.id))) {
+                              
+                              setDropTarget(item);
+                              e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
+                            }
+                          }}
                           onDragLeave={(e) => handleDragLeave(e, item)}
                           onDrop={(e) => handleDrop(e, item)}
                         >

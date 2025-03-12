@@ -10,5 +10,11 @@ python-docx==1.1.2
 # System and file operations
 aiofiles>=24.1.0
 
+# Data processing
+pandas>=2.0.0
+openpyxl>=3.1.2  # For Excel (.xlsx) support
+xlrd>=2.0.1      # For Excel (.xls) support
+pyarrow>=14.0.0  # For improved pandas performance
+
 # Utilities
 python-dotenv==1.0.1
