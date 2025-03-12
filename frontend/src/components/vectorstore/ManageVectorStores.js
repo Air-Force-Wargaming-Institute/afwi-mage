@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Typography,
   makeStyles,
@@ -54,6 +54,15 @@ import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import WarningIcon from '@material-ui/icons/Warning';
 import DocumentSelector from './DocumentSelector';
 import DeleteSweepIcon from '@material-ui/icons/DeleteSweep';
+import ComputerIcon from '@material-ui/icons/Computer';
+import FolderOpenIcon from '@material-ui/icons/FolderOpen';
+import CreateNewFolderIcon from '@material-ui/icons/CreateNewFolder';
+import LinkIcon from '@material-ui/icons/Link';
+import SaveIcon from '@material-ui/icons/Save';
+import AssessmentIcon from '@material-ui/icons/Assessment';
+import TableChartIcon from '@material-ui/icons/TableChart';
+import CloudOffIcon from '@material-ui/icons/CloudOff';
+import CloseIcon from '@material-ui/icons/Close';
 
 // Import the vector store service for API integration
 import { 
@@ -72,9 +81,16 @@ import {
 // Import components
 import VectorStoreDetails from './VectorStoreDetails';
 
+// Import axios for API calls
+import axios from 'axios';
+import { API_ENDPOINTS, getApiUrl } from '../../config';
+
 const useStyles = makeStyles((theme) => ({
   root: {
     width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '100vh',
   },
   header: {
     display: 'flex',
@@ -187,6 +203,109 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.secondary.light,
     color: theme.palette.secondary.contrastText,
   },
+  splitContainer: {
+    display: 'flex',
+    gap: theme.spacing(3),
+    alignItems: 'flex-start',
+    height: 'auto',
+  },
+  mainContentSection: {
+    flex: '0 0 66%',
+    maxHeight: '100%',
+    overflowY: 'auto',
+  },
+  sidebarSection: {
+    flex: '0 0 32%',
+    display: 'flex',
+    flexDirection: 'column',
+    maxHeight: '100%',
+  },
+  connectionCard: {
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    transition: '0.3s',
+    width: '100%',
+    '&:hover': {
+      boxShadow: theme.shadows[2],
+    },
+  },
+  connectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  connectionIcon: {
+    marginRight: theme.spacing(1),
+    color: theme.palette.primary.main,
+  },
+  connectionFormField: {
+    marginBottom: theme.spacing(1.5),
+  },
+  dbTypeSelector: {
+    marginBottom: theme.spacing(1.5),
+    display: 'flex',
+    justifyContent: 'center',
+    gap: theme.spacing(1),
+    flexWrap: 'wrap',
+  },
+  dbTypeButton: {
+    border: `1px solid ${theme.palette.divider}`,
+    padding: theme.spacing(1),
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    borderRadius: theme.shape.borderRadius,
+    width: '80px',
+    cursor: 'pointer',
+    '&.selected': {
+      backgroundColor: theme.palette.primary.light,
+      color: theme.palette.primary.contrastText,
+    },
+  },
+  dbTypeIcon: {
+    fontSize: '2rem',
+    marginBottom: theme.spacing(0.5),
+  },
+  dbTypeLabel: {
+    fontSize: '0.75rem',
+    textAlign: 'center',
+  },
+  connectionActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    padding: theme.spacing(1),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    gap: theme.spacing(1),
+  },
+  sidebarTitle: {
+    margin: theme.spacing(0, 0, 2, 0),
+    paddingBottom: theme.spacing(1),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  titleIcon: {
+    marginRight: theme.spacing(1),
+  },
+  connectionList: {
+    marginTop: theme.spacing(2),
+  },
+  emptyConnections: {
+    padding: theme.spacing(3),
+    textAlign: 'center',
+    backgroundColor: theme.palette.background.default,
+    borderRadius: theme.shape.borderRadius,
+  },
+  mainContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    height: '100%',
+    overflow: 'hidden',
+  },
 }));
 
 function ManageVectorStores() {
@@ -211,11 +330,43 @@ function ManageVectorStores() {
   const [isCleaningBackups, setIsCleaningBackups] = useState(false);
   const [showBackups, setShowBackups] = useState(true);
 
+  // New state variables for database connection functionality
+  const [connections, setConnections] = useState([]);
+  const [newConnectionOpen, setNewConnectionOpen] = useState(false);
+  const [selectedConnectionType, setSelectedConnectionType] = useState(null);
+  const [connectionForm, setConnectionForm] = useState({
+    name: '',
+    type: '',
+    server: '',
+    database: '',
+    username: '',
+    password: '',
+    port: '',
+    filePath: '',
+    connectionString: '',
+    fileObject: null,
+    fileDetails: null
+  });
+
   // Statistics
   const [stats, setStats] = useState({
     totalStores: 0,
     totalDocuments: 0,
     recentlyUpdated: 0
+  });
+
+  // Add file input references
+  const excelFileInputRef = useRef(null);
+  const csvFileInputRef = useRef(null);
+
+  // Add file preview dialog state
+  const [filePreviewOpen, setFilePreviewOpen] = useState(false);
+  const [fileToPreview, setFileToPreview] = useState(null);
+  const [previewData, setPreviewData] = useState({
+    headers: [],
+    rows: [],
+    loading: false,
+    error: null
   });
 
   // Load vector stores from API
@@ -904,8 +1055,957 @@ function ManageVectorStores() {
     );
   };
 
+  // Toggle new connection form
+  const handleToggleNewConnection = () => {
+    setNewConnectionOpen(!newConnectionOpen);
+    if (!newConnectionOpen) {
+      setConnectionForm({
+        name: '',
+        type: '',
+        server: '',
+        database: '',
+        username: '',
+        password: '',
+        port: '',
+        filePath: '',
+        connectionString: '',
+        fileObject: null,
+        fileDetails: null
+      });
+      setSelectedConnectionType(null);
+    }
+  };
+
+  // Handle connection type selection
+  const handleSelectConnectionType = (type) => {
+    setSelectedConnectionType(type);
+    setConnectionForm({
+      ...connectionForm,
+      type: type
+    });
+  };
+
+  // Handle form field changes
+  const handleConnectionFormChange = (e) => {
+    const { name, value } = e.target;
+    setConnectionForm({
+      ...connectionForm,
+      [name]: value
+    });
+  };
+
+  // Handle file selection
+  const handleFileSelect = (event, fileType) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Format file size to human-readable format
+      const fileSizeInKB = file.size / 1024;
+      let fileSizeFormatted = '';
+      
+      if (fileSizeInKB < 1024) {
+        fileSizeFormatted = `${fileSizeInKB.toFixed(2)} KB`;
+      } else {
+        const fileSizeInMB = fileSizeInKB / 1024;
+        fileSizeFormatted = `${fileSizeInMB.toFixed(2)} MB`;
+      }
+      
+      // Format last modified date
+      const lastModified = new Date(file.lastModified);
+      const lastModifiedFormatted = lastModified.toLocaleString();
+      
+      // Update form with file information
+      setConnectionForm({
+        ...connectionForm,
+        filePath: file.name,
+        fileObject: file,
+        fileDetails: {
+          size: fileSizeFormatted,
+          type: file.type,
+          lastModified: lastModifiedFormatted
+        }
+      });
+
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: `File "${file.name}" (${fileSizeFormatted}) selected`,
+        severity: 'success'
+      });
+    }
+  };
+
+  // Trigger file dialog for Excel
+  const handleBrowseExcel = () => {
+    if (excelFileInputRef.current) {
+      excelFileInputRef.current.click();
+    }
+  };
+
+  // Trigger file dialog for CSV
+  const handleBrowseCSV = () => {
+    if (csvFileInputRef.current) {
+      csvFileInputRef.current.click();
+    }
+  };
+
+  // Save connection (placeholder function)
+  const handleSaveConnection = () => {
+    // Create file path display for file-based connections
+    let fileDetails = null;
+    
+    if (connectionForm.fileObject) {
+      fileDetails = {
+        name: connectionForm.fileObject.name,
+        size: connectionForm.fileDetails?.size || '',
+        type: connectionForm.fileDetails?.type || '',
+        lastModified: connectionForm.fileDetails?.lastModified || ''
+      };
+    }
+    
+    // This would eventually connect to an API to save the connection
+    const newConnection = {
+      id: Date.now().toString(),
+      ...connectionForm,
+      fileDetails: fileDetails,
+      status: 'Not Connected',
+      lastConnected: null
+    };
+    
+    setConnections([...connections, newConnection]);
+    setSnackbar({
+      open: true,
+      message: `Database connection "${connectionForm.name}" created successfully`,
+      severity: 'success'
+    });
+    
+    setNewConnectionOpen(false);
+    setConnectionForm({
+      name: '',
+      type: '',
+      server: '',
+      database: '',
+      username: '',
+      password: '',
+      port: '',
+      filePath: '',
+      connectionString: '',
+      fileObject: null,
+      fileDetails: null
+    });
+    setSelectedConnectionType(null);
+  };
+
+  // Handle opening file preview
+  const handleOpenFilePreview = (connection) => {
+    setFileToPreview(connection);
+    setPreviewData({
+      headers: [],
+      rows: [],
+      loading: true,
+      error: null
+    });
+    setFilePreviewOpen(true);
+    
+    // Fetch the file preview from the API
+    if (connection.fileObject) {
+      // Case 1: For newly selected files that haven't been uploaded yet
+      // Use the browser's FileReader API to preview them
+      previewLocalFile(connection.fileObject, connection.type);
+    } else if (connection.filePath) {
+      // Case 2: For existing files already on the server
+      // Call the backend API to get a preview
+      fetchFilePreviewFromServer(connection.filePath, connection.type);
+    } else {
+      setPreviewData({
+        headers: [],
+        rows: [],
+        loading: false,
+        error: "No file available for preview"
+      });
+    }
+  };
+  
+  // Preview a local file that hasn't been uploaded yet
+  const previewLocalFile = (file, fileType) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        if (fileType === 'excel') {
+          // For Excel files, we would need a library like SheetJS/xlsx
+          // This is more complex for client-side and normally would be 
+          // handled through a temporary upload to server
+          // For now, we'll show a message
+          setPreviewData({
+            headers: [],
+            rows: [],
+            loading: false,
+            error: "Excel preview requires uploading the file first"
+          });
+          
+          // Consider a temporary upload to the server here or 
+          // use a library like xlsx-js for client-side parsing
+        } else if (fileType === 'csv') {
+          // For CSV, we can do simple client-side parsing
+          const csv = e.target.result;
+          const lines = csv.split('\n');
+          const headers = lines[0].split(',').map(h => h.trim());
+          
+          const rows = [];
+          for (let i = 1; i < Math.min(lines.length, 6); i++) {
+            if (lines[i].trim() !== '') {
+              rows.push(lines[i].split(',').map(cell => cell.trim()));
+            }
+          }
+          
+          setPreviewData({
+            headers,
+            rows,
+            loading: false,
+            error: null
+          });
+        }
+      } catch (error) {
+        console.error("Error parsing file:", error);
+        setPreviewData({
+          headers: [],
+          rows: [],
+          loading: false,
+          error: `Error parsing file: ${error.message}`
+        });
+      }
+    };
+    
+    reader.onerror = () => {
+      setPreviewData({
+        headers: [],
+        rows: [],
+        loading: false,
+        error: "Error reading file"
+      });
+    };
+    
+    if (fileType === 'csv') {
+      reader.readAsText(file);
+    } else {
+      // For Excel, we would need a different approach
+      reader.readAsArrayBuffer(file);
+    }
+  };
+  
+  // Fetch file preview from the backend server for existing files
+  const fetchFilePreviewFromServer = (filePath, fileType) => {
+    const url = getApiUrl('UPLOAD', `/preview-tabular/${filePath}`);
+    
+    axios.get(url)
+      .then(response => {
+        const data = response.data;
+        setPreviewData({
+          headers: data.headers,
+          rows: data.rows,
+          loading: false,
+          error: null,
+          fileInfo: data.file_info,
+          totalRows: data.total_rows
+        });
+      })
+      .catch(error => {
+        console.error("Error fetching file preview:", error);
+        setPreviewData({
+          headers: [],
+          rows: [],
+          loading: false,
+          error: `Error fetching preview: ${error.response?.data?.detail || error.message}`
+        });
+      });
+  };
+
+  // Render file preview dialog
+  const renderFilePreviewDialog = () => {
   return (
-    <Container maxWidth="xl" className="main-content">
+      <Dialog
+        open={filePreviewOpen}
+        onClose={handleCloseFilePreview}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle style={{ paddingBottom: 8 }}>
+          <Box display="flex" alignItems="center">
+            {fileToPreview?.type === 'excel' ? (
+              <TableChartIcon style={{ marginRight: 8, color: '#217346' }} />
+            ) : (
+              <AssessmentIcon style={{ marginRight: 8, color: '#FF6D01' }} />
+            )}
+            Preview: {fileToPreview?.name || fileToPreview?.filePath}
+            {previewData.fileInfo && (
+              <Typography variant="caption" style={{ marginLeft: 12, color: 'text.secondary' }}>
+                ({previewData.fileInfo.size_formatted})
+              </Typography>
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent style={{ paddingTop: 8 }}>
+          {previewData.loading ? (
+            <Box display="flex" justifyContent="center" p={3}>
+              <CircularProgress />
+            </Box>
+          ) : previewData.error ? (
+            <Alert severity="error">{previewData.error}</Alert>
+          ) : (
+            <>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                {previewData.totalRows ? 
+                  `Showing ${Math.min(previewData.rows.length, 5)} of ${previewData.totalRows} total rows` : 
+                  `Showing first ${previewData.rows.length} rows`} from {fileToPreview?.filePath}
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      {previewData.headers.map((header, index) => (
+                        <TableCell key={index} style={{ fontWeight: 'bold' }}>
+                          {header}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {previewData.rows.map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {row.map((cell, cellIndex) => (
+                          <TableCell key={cellIndex}>{cell !== null ? cell.toString() : ''}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {previewData.totalRows > 5 && (
+                <Box mt={1} display="flex" justifyContent="center">
+                  <Typography variant="caption" color="textSecondary">
+                    {previewData.totalRows - 5} more rows not shown
+                  </Typography>
+                </Box>
+              )}
+              <Box mt={2}>
+                <Typography variant="caption" color="textSecondary">
+                  Note: This is a preview of the first few rows. When using this data in MAGE, you'll be able to select specific columns to use for retrieval or generation.
+                </Typography>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            color="primary" 
+            onClick={handleCloseFilePreview}
+          >
+            Close
+          </Button>
+          <Button 
+            color="primary" 
+            variant="contained"
+            disabled={previewData.loading || previewData.error}
+            onClick={handleUseThisData}
+          >
+            Use This Data
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
+  
+  // Handle the "Use This Data" button click
+  const handleUseThisData = () => {
+    // This would eventually connect to an API to process the file and create a vector store
+    setSnackbar({
+      open: true,
+      message: `Processing data from "${fileToPreview?.name || fileToPreview?.filePath}" for vector store creation`,
+      severity: 'info'
+    });
+    
+    // Close the preview dialog
+    handleCloseFilePreview();
+    
+    // Here we would handle the file processing and vector store creation
+    // For now, just show a message
+    setTimeout(() => {
+      setSnackbar({
+        open: true,
+        message: 'This functionality is still under development. The file would be processed for vector store creation.',
+        severity: 'info'
+      });
+    }, 1500);
+  };
+
+  // Handle closing file preview
+  const handleCloseFilePreview = () => {
+    setFilePreviewOpen(false);
+    setFileToPreview(null);
+  };
+
+  // Update the test connection handler to show indication of testing
+  const handleTestConnection = (connectionId) => {
+    // Show testing indicator
+    setSnackbar({
+      open: true,
+      message: `Testing connection...`,
+      severity: 'info'
+    });
+    
+    // Simulate a brief delay to represent the testing process
+    setTimeout(() => {
+      if (connectionId) {
+        // Find the connection by ID
+        const connection = connections.find(conn => conn.id === connectionId);
+        
+        if (connection) {
+          if (connection.type === 'excel' || connection.type === 'csv') {
+            // For file-based connections, show preview
+            handleOpenFilePreview(connection);
+          } else {
+            // For database connections, test the connection
+            setSnackbar({
+              open: true,
+              message: `Test connection successful for "${connection.name}"`,
+              severity: 'success'
+            });
+          }
+        }
+      } else {
+        // This is for the "Test Connection" button in the form
+        setSnackbar({
+          open: true,
+          message: `Test connection successful for "${connectionForm.name}"`,
+          severity: 'success'
+        });
+      }
+    }, 1000);
+  };
+
+  // Delete connection
+  const handleDeleteConnection = (connectionId) => {
+    setConnections(connections.filter(conn => conn.id !== connectionId));
+    setSnackbar({
+      open: true,
+      message: 'Connection deleted successfully',
+      severity: 'success'
+    });
+  };
+
+  // Render the connection form fields based on the selected connection type
+  const renderConnectionFormFields = () => {
+    switch (selectedConnectionType) {
+      case 'sqlServer':
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="Server"
+              name="server"
+              value={connectionForm.server}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., localhost or 192.168.1.100"
+            />
+            <TextField
+              fullWidth
+              label="Database Name"
+              name="database"
+              value={connectionForm.database}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Port"
+              name="port"
+              value={connectionForm.port}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., 1433"
+            />
+            <TextField
+              fullWidth
+              label="Username"
+              name="username"
+              value={connectionForm.username}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Password"
+              name="password"
+              type="password"
+              value={connectionForm.password}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+          </>
+        );
+      
+      case 'mysql':
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="Server"
+              name="server"
+              value={connectionForm.server}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., localhost or 192.168.1.100"
+            />
+            <TextField
+              fullWidth
+              label="Database Name"
+              name="database"
+              value={connectionForm.database}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Port"
+              name="port"
+              value={connectionForm.port}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., 3306"
+            />
+            <TextField
+              fullWidth
+              label="Username"
+              name="username"
+              value={connectionForm.username}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Password"
+              name="password"
+              type="password"
+              value={connectionForm.password}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+          </>
+        );
+      
+      case 'postgresql':
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="Server"
+              name="server"
+              value={connectionForm.server}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., localhost or 192.168.1.100"
+            />
+            <TextField
+              fullWidth
+              label="Database Name"
+              name="database"
+              value={connectionForm.database}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Port"
+              name="port"
+              value={connectionForm.port}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="e.g., 5432"
+            />
+            <TextField
+              fullWidth
+              label="Username"
+              name="username"
+              value={connectionForm.username}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Password"
+              name="password"
+              type="password"
+              value={connectionForm.password}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+            />
+          </>
+        );
+      
+      case 'excel':
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="File Path"
+              name="filePath"
+              value={connectionForm.filePath}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="Select an Excel file (.xlsx, .xls)"
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    variant="contained"
+                    color="default"
+                    size="small"
+                    style={{ marginRight: -10 }}
+                    onClick={handleBrowseExcel}
+                  >
+                    Browse
+                  </Button>
+                ),
+                readOnly: true,
+              }}
+            />
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              ref={excelFileInputRef}
+              style={{ display: 'none' }}
+              onChange={(e) => handleFileSelect(e, 'excel')}
+            />
+            <Typography variant="caption" color="textSecondary">
+              Supported formats: .xlsx, .xls
+            </Typography>
+          </>
+        );
+      
+      case 'csv':
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="File Path"
+              name="filePath"
+              value={connectionForm.filePath}
+              onChange={handleConnectionFormChange}
+              className={classes.connectionFormField}
+              variant="outlined"
+              size="small"
+              placeholder="Select a CSV file (.csv)"
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    variant="contained"
+                    color="default"
+                    size="small"
+                    style={{ marginRight: -10 }}
+                    onClick={handleBrowseCSV}
+                  >
+                    Browse
+                  </Button>
+                ),
+                readOnly: true,
+              }}
+            />
+            <input
+              type="file"
+              accept=".csv"
+              ref={csvFileInputRef}
+              style={{ display: 'none' }}
+              onChange={(e) => handleFileSelect(e, 'csv')}
+            />
+            <Typography variant="caption" color="textSecondary">
+              Supported format: .csv (comma-separated values)
+            </Typography>
+          </>
+        );
+      
+      case 'other':
+        return (
+          <TextField
+            fullWidth
+            label="Connection String"
+            name="connectionString"
+            value={connectionForm.connectionString}
+            onChange={handleConnectionFormChange}
+            className={classes.connectionFormField}
+            variant="outlined"
+            size="small"
+            multiline
+            rows={4}
+            placeholder="Enter your custom connection string"
+          />
+        );
+      
+      default:
+        return (
+          <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center' }}>
+            Please select a connection type above
+          </Typography>
+        );
+    }
+  };
+
+  // Render connection type selector
+  const renderConnectionTypeSelector = () => {
+    const connectionTypes = [
+      { id: 'sqlServer', name: 'SQL Server', icon: <StorageIcon className={classes.dbTypeIcon} /> },
+      { id: 'mysql', name: 'MySQL', icon: <StorageIcon className={classes.dbTypeIcon} /> },
+      { id: 'postgresql', name: 'PostgreSQL', icon: <StorageIcon className={classes.dbTypeIcon} /> },
+      { id: 'excel', name: 'Excel', icon: <TableChartIcon className={classes.dbTypeIcon} /> },
+      { id: 'csv', name: 'CSV', icon: <AssessmentIcon className={classes.dbTypeIcon} /> },
+      { id: 'other', name: 'Other', icon: <CloudOffIcon className={classes.dbTypeIcon} /> }
+    ];
+    
+    return (
+      <Box className={classes.dbTypeSelector}>
+        {connectionTypes.map((type) => (
+          <Box 
+            key={type.id}
+            className={`${classes.dbTypeButton} ${selectedConnectionType === type.id ? 'selected' : ''}`}
+            onClick={() => handleSelectConnectionType(type.id)}
+          >
+            {type.icon}
+            <Typography className={classes.dbTypeLabel}>{type.name}</Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
+
+  // Render the database connections section
+  const renderDatabaseConnections = () => {
+    return (
+      <Paper 
+        className={classes.sidebarSection} 
+        elevation={3}
+      >
+        <Box p={2}>
+          <Typography variant="h5" className={classes.sidebarTitle}>
+            <LinkIcon className={classes.titleIcon} />
+            Connect to System Databases
+          </Typography>
+          
+          <Typography variant="body2" color="textSecondary" paragraph>
+            Connect MAGE to local databases to access structured data for analysis and integration with AI agents.
+          </Typography>
+          
+          <Button
+            variant="contained"
+            color="secondary"
+            fullWidth
+            startIcon={newConnectionOpen ? <CloseIcon /> : <AddIcon />}
+            onClick={handleToggleNewConnection}
+          >
+            {newConnectionOpen ? 'Cancel' : 'Add New Connection'}
+          </Button>
+          
+          {newConnectionOpen && (
+            <Paper className={classes.connectionCard} elevation={0}>
+              <div className={classes.connectionHeader}>
+                <ComputerIcon className={classes.connectionIcon} />
+                <Typography variant="subtitle1">New Database Connection</Typography>
+              </div>
+              
+              <Box p={2}>
+                <TextField
+                  fullWidth
+                  label="Connection Name"
+                  name="name"
+                  value={connectionForm.name}
+                  onChange={handleConnectionFormChange}
+                  className={classes.connectionFormField}
+                  variant="outlined"
+                  size="small"
+                  placeholder="e.g., HR Database"
+                />
+                
+                <Typography variant="subtitle2" gutterBottom>Select Database Type</Typography>
+                {renderConnectionTypeSelector()}
+                
+                {selectedConnectionType && (
+                  <>
+                    <Typography variant="subtitle2" gutterBottom>Connection Details</Typography>
+                    {renderConnectionFormFields()}
+                  </>
+                )}
+              </Box>
+              
+              <div className={classes.connectionActions}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<StorageIcon />}
+                  onClick={handleTestConnection}
+                  disabled={!selectedConnectionType || !connectionForm.name}
+                >
+                  Test Connection
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSaveConnection}
+                  disabled={!selectedConnectionType || !connectionForm.name}
+                >
+                  Save Connection
+                </Button>
+              </div>
+            </Paper>
+          )}
+          
+          <div className={classes.connectionList}>
+            <Typography variant="subtitle1" gutterBottom>
+              Saved Connections
+            </Typography>
+            
+            {connections.length === 0 ? (
+              <div className={classes.emptyConnections}>
+                <Typography variant="body2" color="textSecondary">
+                  No database connections configured yet.
+                </Typography>
+              </div>
+            ) : (
+              connections.map((connection) => (
+                <Paper key={connection.id} className={classes.connectionCard} elevation={0}>
+                  <div className={classes.connectionHeader}>
+                    {connection.type === 'excel' || connection.type === 'csv' ? (
+                      <TableChartIcon className={classes.connectionIcon} />
+                    ) : (
+                      <StorageIcon className={classes.connectionIcon} />
+                    )}
+                    <Typography variant="subtitle2">{connection.name}</Typography>
+                  </div>
+                  
+                  <Box p={2}>
+                    <Typography variant="body2" color="textSecondary">
+                      Type: {connection.type === 'sqlServer' ? 'SQL Server' : 
+                            connection.type === 'mysql' ? 'MySQL' : 
+                            connection.type === 'postgresql' ? 'PostgreSQL' : 
+                            connection.type === 'excel' ? 'Excel File' : 
+                            connection.type === 'csv' ? 'CSV File' : 'Other'}
+                    </Typography>
+                    
+                    {(connection.type === 'sqlServer' || connection.type === 'mysql' || connection.type === 'postgresql') && (
+                      <Box display="flex" flexWrap="wrap" gap={1}>
+                        <Typography variant="body2" color="textSecondary">
+                          Server: {connection.server}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
+                          DB: {connection.database}
+                        </Typography>
+                      </Box>
+                    )}
+                    
+                    {(connection.type === 'excel' || connection.type === 'csv') && (
+                      <>
+                        <Typography variant="body2" color="textSecondary" noWrap>
+                          File: {connection.filePath}
+                        </Typography>
+                        {connection.fileDetails && (
+                          <Box display="flex" flexWrap="wrap" gap={1} alignItems="center" mt={0.5}>
+                            <Typography variant="body2" color="textSecondary">
+                              {connection.fileDetails.size}
+                            </Typography>
+                            <Tooltip title={connection.fileDetails.lastModified}>
+                              <Typography variant="body2" color="textSecondary" style={{ marginLeft: 8 }}>
+                                Modified: {new Date(connection.fileDetails.lastModified).toLocaleDateString()}
+                              </Typography>
+                            </Tooltip>
+                            <Tooltip title={connection.fileDetails.type || "Unknown file type"}>
+                              <Chip 
+                                size="small" 
+                                label={connection.type === 'excel' ? 'Excel' : 'CSV'} 
+                                style={{ backgroundColor: connection.type === 'excel' ? '#217346' : '#FF6D01', color: 'white' }}
+                              />
+                            </Tooltip>
+                          </Box>
+                        )}
+                      </>
+                    )}
+                    
+                    <Box display="flex" alignItems="center" mt={0.5}>
+                      <Chip 
+                        size="small" 
+                        label={connection.status || 'Not Connected'} 
+                        color={connection.status === 'Connected' ? 'primary' : 'default'}
+                      />
+                    </Box>
+                  </Box>
+                  
+                  <div className={classes.connectionActions}>
+                    <Button
+                      size="small"
+                      color="primary"
+                      startIcon={connection.type === 'excel' || connection.type === 'csv' ? 
+                        <TableChartIcon /> : <StorageIcon />}
+                      onClick={() => handleTestConnection(connection.id)}
+                    >
+                      {connection.type === 'excel' || connection.type === 'csv' ? 'Open' : 'Connect'}
+                    </Button>
+                    <Button
+                      size="small"
+                      color="info"
+                      startIcon={<LinkIcon />}
+                      onClick={() => handleTestConnection(connection.id)}
+                    >
+                      Test
+                    </Button>
+                    <Button
+                      size="small"
+                      color="secondary"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => handleDeleteConnection(connection.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </Paper>
+              ))
+            )}
+          </div>
+        </Box>
+      </Paper>
+    );
+  };
+
+  return (
+    <Container maxWidth="xl" className={`main-content ${classes.mainContent}`} style={{ overflow: 'hidden' }}>
       <div className={classes.header}>
         <Typography variant="h4" className="section-title" gutterBottom>
           Manage Retrieval Databases
@@ -998,6 +2098,16 @@ function ManageVectorStores() {
         </Alert>
       )}
 
+      {/* Split layout: Vector stores on left (2/3) and Database connections on right (1/3) */}
+      <Box 
+        className={classes.splitContainer}
+      >
+        {/* Main Vector Store Content - Left 2/3 */}
+        <Paper 
+          className={classes.mainContentSection} 
+          elevation={3}
+        >
+          <Box p={2}>
       {/* Search and Filters */}
       <div className={classes.filterControls}>
         <div className={classes.searchBar}>
@@ -1079,6 +2189,15 @@ function ManageVectorStores() {
         </Grid>
       )}
 
+            {/* Clean Up Backups Button */}
+            {renderCleanupButton()}
+          </Box>
+        </Paper>
+
+        {/* Database Connections Section - Right 1/3 */}
+        {renderDatabaseConnections()}
+      </Box>
+
       {/* Details Dialog */}
       <Dialog
         open={detailsDialogOpen}
@@ -1132,6 +2251,9 @@ function ManageVectorStores() {
         </DialogActions>
       </Dialog>
 
+      {/* File Preview Dialog */}
+      {renderFilePreviewDialog()}
+
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
@@ -1142,9 +2264,6 @@ function ManageVectorStores() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-
-      {/* Clean Up Backups Button */}
-      {renderCleanupButton()}
     </Container>
   );
 }

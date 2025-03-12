@@ -19,6 +19,11 @@ from PyPDF2 import PdfReader, PdfWriter
 from docx_converter import DocxConverter
 import uuid  # Add import for UUID generation
 
+# Add imports for Excel and CSV parsing
+import pandas as pd
+import csv
+from typing import Tuple, List, Dict, Any, Optional
+
 # Get logger for this module
 logger = logging.getLogger("upload_service")
 
@@ -53,6 +58,13 @@ class BulkDownloadRequest(BaseModel):
 class FileMoveRequest(BaseModel):
     source_paths: List[str]
     target_folder: str
+
+class TabularPreviewResponse(BaseModel):
+    """Response for tabular data preview (Excel, CSV)"""
+    headers: List[str]
+    rows: List[List[Any]]
+    total_rows: int
+    file_info: Dict[str, Any]
 
 def create_metadata(
     file_path: Path,
@@ -810,3 +822,74 @@ async def get_pdf_info(file_path: str):
     except Exception as e:
         logger.error(f"Error getting PDF info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting PDF info: {str(e)}")
+
+@router.get("/preview-tabular/{file_path:path}", response_model=TabularPreviewResponse)
+async def preview_tabular_file(file_path: str, max_rows: int = 5):
+    """Preview Excel (.xlsx, .xls) or CSV files"""
+    try:
+        # Construct the full file path
+        full_path = Path(UPLOAD_DIR) / file_path
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail=f"File {file_path} not found")
+        
+        file_size = full_path.stat().st_size
+        last_modified = full_path.stat().st_mtime
+        file_extension = full_path.suffix.lower()
+        
+        # Check if the file is a supported format
+        if file_extension not in ['.xlsx', '.xls', '.csv']:
+            raise HTTPException(status_code=400, 
+                                detail=f"Unsupported file format. Only Excel (.xlsx, .xls) and CSV files are supported.")
+        
+        # Create file info dictionary
+        file_info = {
+            "name": full_path.name,
+            "path": str(full_path.relative_to(UPLOAD_DIR)),
+            "size": file_size,
+            "size_formatted": format_file_size(file_size),
+            "last_modified": last_modified,
+            "last_modified_formatted": datetime.fromtimestamp(last_modified).strftime('%m/%d/%Y, %H:%M:%S'),
+            "extension": file_extension
+        }
+        
+        # Read the file based on its format
+        if file_extension in ['.xlsx', '.xls']:
+            # Excel file
+            df = pd.read_excel(full_path, nrows=max_rows+1)  # +1 to check if there are more rows
+            headers = df.columns.tolist()
+            total_rows = len(pd.read_excel(full_path, usecols=[0]))  # Count rows efficiently
+            rows = df.head(max_rows).values.tolist()
+            
+        elif file_extension == '.csv':
+            # CSV file
+            df = pd.read_csv(full_path, nrows=max_rows+1)
+            headers = df.columns.tolist()
+            
+            # Count total rows efficiently without loading the entire file
+            with open(full_path, 'r') as f:
+                total_rows = sum(1 for _ in f) - 1  # -1 for header
+            
+            rows = df.head(max_rows).values.tolist()
+        
+        logger.info(f"Successfully previewed tabular file: {file_path}")
+        return TabularPreviewResponse(
+            headers=headers,
+            rows=rows,
+            total_rows=total_rows,
+            file_info=file_info
+        )
+        
+    except Exception as e:
+        logger.error(f"Error previewing tabular file {file_path}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error previewing file: {str(e)}")
+
+def format_file_size(size_bytes):
+    """Format file size in bytes to human-readable format"""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"

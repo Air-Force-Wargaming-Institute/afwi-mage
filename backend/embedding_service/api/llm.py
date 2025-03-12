@@ -11,6 +11,7 @@ import json
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
+import os
 
 # Import from core module with proper error handling
 try:
@@ -328,39 +329,64 @@ def generate_analysis_prompt(chunks: List[Dict[str, Any]], vectorstore_name: str
     return prompt
 
 
-def generate_query_prompt(query: str, chunks: List[str], metadata_list: List[Dict[str, Any]]) -> str:
-    """Generate a prompt for answering a query based on retrieved chunks."""
+def generate_query_prompt(query: str, chunks: List[str], metadata_list: List[Dict[str, Any]] = None) -> str:
+    """
+    Generate a prompt for LLM query responses based on retrieved chunks.
+    
+    Args:
+        query: The user's query
+        chunks: List of text chunks retrieved from the vector store
+        metadata_list: Optional list of metadata for each chunk
+        
+    Returns:
+        A formatted prompt for the LLM
+    """
     prompt = f"""
-    You are answering a query based on retrieved information.
+    You are a helpful assistant answering questions based on specific information retrieved from a vector store.
     
-    QUERY: {query}
+    USER QUERY: {query}
     
-    Here are the relevant text chunks:
+    Below are the most relevant text chunks retrieved from the vector store to help answer this query:
     
     """
     
-    for i, (chunk, metadata) in enumerate(zip(chunks, metadata_list)):
-        # Build source info string with security classification and filename
-        source_info = []
+    # Add the chunks with their metadata
+    for i, chunk in enumerate(chunks):
+        prompt += f"CHUNK {i+1}:\n"
         
-        if metadata.get("filename") or metadata.get("original_filename"):
-            filename = metadata.get("filename", metadata.get("original_filename", ""))
-            source_info.append(f"Source: {filename}")
-            
-        if metadata.get("security_classification"):
-            source_info.append(f"Classification: {metadata.get('security_classification')}")
-            
-        if metadata.get("page"):
-            source_info.append(f"Page: {metadata.get('page')}")
-            
-        source_str = " | ".join(source_info) if source_info else ""
+        # Add relevant metadata if available
+        if metadata_list and i < len(metadata_list):
+            metadata = metadata_list[i]
+            if metadata:
+                # Include source information if available
+                source = metadata.get("filename", metadata.get("source", ""))
+                if source:
+                    prompt += f"Source: {source}\n"
+                
+                # Include page information if available
+                page = metadata.get("page_number", metadata.get("page", ""))
+                if page:
+                    prompt += f"Page: {page}\n"
+                    
+                # Include classification if available
+                classification = metadata.get("security_classification", "")
+                if classification:
+                    prompt += f"Classification: {classification}\n"
         
-        prompt += f"CHUNK {i+1}:{' ' + source_str if source_str else ''}\n{chunk}\n\n"
+        # Add the chunk text
+        prompt += f"Content: {chunk}\n\n"
     
     prompt += """
-    Based ONLY on the information provided in these chunks, please answer the query.
-    If the information is not in the provided chunks, state that you don't have enough information.
-    Do not make up information. Cite specific chunks when appropriate in your answer.
+    INSTRUCTIONS:
+    1. Answer the user's query using ONLY the information provided in the chunks above.
+    2. If the information to answer the query is not contained in the provided chunks, say "I don't have enough information to answer this question based on the retrieved content."
+    3. Do not make up or infer information that is not explicitly stated in the chunks.
+    4. If different chunks have contradictory information, acknowledge this in your answer.
+    5. Use an objective, informative tone.
+    6. If appropriate, structure your answer with bullet points or numbered lists for clarity.
+    7. Focus on directly answering the query without unnecessary preamble.
+    
+    YOUR ANSWER:
     """
     
     return prompt
@@ -401,14 +427,98 @@ def get_llm_response(prompt: str) -> str:
     """
     Get LLM response to a query prompt.
     
-    This is a placeholder that would be replaced with actual LLM integration.
-    In a production system, this would call an external API or a local model.
+    This function uses the Ollama API to generate responses to user queries.
     """
-    # TODO: Replace with actual LLM call
-    logger.info("LLM query request (placeholder implementation)")
+    try:
+        # Log the LLM request
+        logger.info("Sending query request to LLM")
+        
+        # Import the LLM module
+        try:
+            from ..core.llm import generate_with_best_model
+            
+            # Use the LLM module to generate a response with appropriate settings
+            options = {
+                "temperature": 0.3,  # Lower temperature for more factual responses
+                "max_tokens": 800,
+                "top_p": 0.9
+            }
+            
+            llm_response = generate_with_best_model(prompt, options)
+            return llm_response
+            
+        except ImportError:
+            # If the LLM module is not available, fall back to direct Ollama API call
+            logger.warning("LLM module not found, falling back to direct Ollama API call")
+            
+            # Get Ollama URL from config
+            try:
+                from ..config import OLLAMA_BASE_URL
+            except ImportError:
+                try:
+                    from config import OLLAMA_BASE_URL
+                except ImportError:
+                    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+            
+            # Prepare Ollama API request
+            base_url = OLLAMA_BASE_URL.rstrip('/')
+            url = f"{base_url}/api/generate"
+            
+            # Use llama3.2 as a reasonable default model if available
+            # Models like llama3.2, mistral, or gemma are good choices for this task
+            model = "llama3.2:latest"
+            
+            # Log the model and URL being used
+            logger.info(f"Using Ollama API at {url} with model {model}")
+            
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.3,  # Lower temperature for more factual responses
+                    "top_p": 0.9,
+                    "max_tokens": 800
+                }
+            }
+            
+            # Make the API request
+            import requests
+            response = requests.post(url, json=payload, timeout=60)
+            
+            # Check for successful response
+            if response.status_code == 200:
+                result = response.json()
+                llm_response = result.get("response", "")
+                
+                # Log success and response length
+                logger.info(f"Successfully received response from Ollama ({len(llm_response)} chars)")
+                
+                return llm_response
+            else:
+                # Log error and try fallback
+                logger.error(f"Error from Ollama API: Status {response.status_code}, message: {response.text}")
+                
+                # Try alternate model if the first one failed
+                if model == "llama3.2:latest":
+                    logger.info("Trying fallback to mistral model")
+                    payload["model"] = "mistral"
+                    response = requests.post(url, json=payload, timeout=60)
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        llm_response = result.get("response", "")
+                        logger.info(f"Successfully received response from fallback model ({len(llm_response)} chars)")
+                        return llm_response
+                
+                # If all real LLM attempts failed, return a generic fallback response
+                logger.warning("All LLM attempts failed, returning placeholder response")
+                return "Based on the provided information, I'm not able to generate a specific answer at this time due to technical difficulties with the language model. Please try your query again later, or contact support if this issue persists."
     
-    # For now, return a placeholder response
-    return "Based on the provided information, the system handles metadata by extracting key fields such as security classification and original filename from associated metadata files. If a metadata file doesn't exist, the system falls back to default values and attempts to extract information from file content. This approach ensures that critical metadata is preserved throughout the document processing pipeline."
+    except Exception as e:
+        # Log the error and return an error message
+        logger.error(f"Error getting LLM response: {str(e)}", exc_info=True)
+        return f"I encountered an error while processing your query: {str(e)}. Please try again later or contact support if this issue persists."
 
 
 def parse_llm_analysis(response: str) -> Dict[str, Any]:

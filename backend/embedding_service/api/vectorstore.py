@@ -935,7 +935,8 @@ async def process_batch_update(
                 job_id, 
                 10, 
                 status=JobStatus.PROCESSING,
-                current_operation="Copying files"
+                current_operation="Copying files to staging directory",
+                current_file=f"Preparing {len(request.add)} files"
             )
             
             # Ensure upload directory exists
@@ -956,7 +957,8 @@ async def process_batch_update(
                 job_id, 
                 20, 
                 status=JobStatus.PROCESSING,
-                current_operation="Loading documents"
+                current_operation="Loading and parsing documents",
+                current_file=f"Processing {len(staging_file_paths)} files for chunking"
             )
             
             from core.document import load_documents
@@ -966,12 +968,40 @@ async def process_batch_update(
             chunk_size = vs_info.get("chunk_size", 1000)
             chunk_overlap = vs_info.get("chunk_overlap", 100)
             
-            # Load documents
-            documents, skipped = load_documents(
-                staging_file_paths,
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap
-            )
+            # Load documents with progress updates for individual files
+            documents = []
+            skipped = []
+            
+            for idx, file_path in enumerate(staging_file_paths):
+                try:
+                    file_name = os.path.basename(file_path)
+                    # Update progress for each file
+                    update_job_progress(
+                        job_id,
+                        20 + int(10 * idx / len(staging_file_paths)),
+                        status=JobStatus.PROCESSING,
+                        current_operation="Loading document",
+                        current_file=file_name
+                    )
+                    
+                    # Load documents for this file
+                    file_docs, file_skipped = load_documents(
+                        [file_path],
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap
+                    )
+                    
+                    if file_docs:
+                        documents.extend(file_docs)
+                        logger.info(f"Loaded {len(file_docs)} chunks from {file_name}")
+                    
+                    if file_skipped:
+                        skipped.extend(file_skipped)
+                        logger.warning(f"Skipped {file_name} during document loading")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing file {file_path}: {str(e)}")
+                    skipped.append(file_path)
             
             if skipped:
                 logger.warning(f"Skipped {len(skipped)} files during document loading")
@@ -998,7 +1028,8 @@ async def process_batch_update(
                 job_id, 
                 40, 
                 status=JobStatus.PROCESSING,
-                current_operation="Updating vector store"
+                current_operation="Initializing embedding model",
+                current_file=f"Preparing to embed {len(documents)} chunks"
             )
             
             # Get embedding model
@@ -1006,6 +1037,16 @@ async def process_batch_update(
             
             # Update vector store
             if documents and embedding_model:
+                # Give detailed progress update before starting embedding
+                update_job_progress(
+                    job_id, 
+                    45, 
+                    status=JobStatus.PROCESSING,
+                    current_operation="Starting document embedding process",
+                    current_file=f"Using model: {vs_info.get('embedding_model', 'nomic-embed-text')}"
+                )
+                
+                # Update vector store - this will add its own progress updates
                 result = manager.update_vectorstore(
                     vectorstore_id=vectorstore_id,
                     documents=documents,
@@ -1018,11 +1059,34 @@ async def process_batch_update(
                 if result:
                     documents_added = len(documents)
                     logger.info(f"Successfully added {documents_added} documents to vector store")
+                    
+                    # Final success update
+                    update_job_progress(
+                        job_id, 
+                        95, 
+                        status=JobStatus.PROCESSING,
+                        current_operation="Finalizing vector store update",
+                        current_file="Embedding complete, updating metadata"
+                    )
                 else:
                     logger.error("Failed to update vector store with new documents")
+                    update_job_progress(
+                        job_id, 
+                        50, 
+                        status=JobStatus.PROCESSING,
+                        current_operation="Error updating vector store",
+                        current_file="Failed to add documents"
+                    )
             else:
                 if not documents:
                     logger.warning("No documents to add after processing")
+                    update_job_progress(
+                        job_id, 
+                        50, 
+                        status=JobStatus.PROCESSING,
+                        current_operation="No documents to add",
+                        current_file="Skipping embedding phase"
+                    )
                 if not embedding_model:
                     logger.error(f"Could not get embedding model: {vs_info.get('embedding_model', 'nomic-embed-text')}")
         
@@ -1351,32 +1415,45 @@ async def analyze_vectorstore(
 
 
 def generate_analysis_prompt(chunks: List[Dict[str, Any]], vectorstore_name: str, context_headers: List[str]) -> str:
-    """Generate a prompt for analyzing vector store content."""
+    """
+    Generate a prompt for analyzing vector store content.
+    
+    Args:
+        chunks: List of text chunks with metadata
+        vectorstore_name: Name of the vector store
+        context_headers: List of context headers for chunks
+        
+    Returns:
+        LLM prompt for analysis
+    """
     prompt = f"""
-    You are analyzing content from a vector store named '{vectorstore_name}'.
-    Below are sample text chunks from the vector store:
+    You are an expert analyst tasked with examining content from a vector store named '{vectorstore_name}'.
+    Below are sample text chunks from the vector store. Analyze them carefully to understand what type of information is contained in this collection.
     
     """
     
-    for i, chunk in enumerate(chunks):
-        context_header = context_headers[i] if i < len(context_headers) else f"Document {i+1}"
-        prompt += f"{context_header}\n{chunk['text']}\n\n"
+    # Include chunks with their context headers, if available
+    for i, (chunk, header) in enumerate(zip(chunks, context_headers) if context_headers else [(c, None) for c in chunks]):
+        if header:
+            prompt += f"CHUNK {i+1} CONTEXT: {header}\n"
+        prompt += f"CHUNK {i+1} CONTENT:\n{chunk['text']}\n\n"
     
     prompt += """
-    Based on these samples, please provide:
-    
-    1. CONTENT ANALYSIS: A comprehensive analysis of what type of information is in this vector store.
-    2. EXAMPLE QUERIES: 5-10 example queries that would be useful to run against this vector store.
-    
-    Format your response as:
+    Based on these samples, please provide a comprehensive analysis in the following format:
     
     CONTENT ANALYSIS:
-    [Your analysis here]
+    [Provide a detailed analysis of what type of information is contained in this vector store. Include details about:
+    1. Subject matter and domains covered
+    2. Document types (e.g., technical manuals, reports, specifications)
+    3. Writing style and formality level
+    4. Any observed patterns in classification or security markings
+    5. Apparent purpose or use case for these documents
+    6. Any specialized terminology or jargon that appears frequently]
     
     EXAMPLE QUERIES:
-    1. [Query 1]
-    2. [Query 2]
-    ...
+    [List 8-10 specific and diverse example queries that would be useful to run against this vector store. These should demonstrate the range of information available and show the kinds of questions this data can answer. Number each query.]
+    
+    FORMAT YOUR RESPONSE EXACTLY according to the template above, with clearly labeled sections for CONTENT ANALYSIS and EXAMPLE QUERIES.
     """
     
     return prompt
@@ -1399,32 +1476,101 @@ def get_llm_analysis(prompt: str) -> str:
         # Log the LLM request
         logger.info("Sending analysis request to LLM")
         
-        # In a real implementation, you would call your LLM here
-        # For now, we'll just return a placeholder
-        # If you have an actual LLM integration, replace this with the real call
-        import time
-        time.sleep(2)  # Simulate LLM processing time
-        
-        # Return a placeholder response
-        return """
-        CONTENT ANALYSIS:
-        Based on the provided text chunks, this vector store appears to contain military and defense-related documents, specifically focusing on training guides, technical specifications, and tactical logistics. The documents include information about the PLA Air Force's tactical logistics operations, hypersonic vehicle technology, and officer training materials. The content appears to span different security classifications, from Unclassified to Top Secret with various handling instructions.
-
-        The documents contain detailed technical information, training procedures, and operational guidelines. They include information about logistics support in various environments, officer capabilities, and advanced military technologies. The writing style suggests these are official military documents, likely intelligence reports, technical manuals, or training guides.
-
-        EXAMPLE QUERIES:
-        1. What are the key challenges in PLA Air Force tactical logistics?
-        2. How does the officer basic capability training guide structure professional development?
-        3. What are the latest developments in hypersonic vehicle technology?
-        4. What security measures are required for handling documents classified as SECRET//NOFORN?
-        5. How does the PLA Air Force handle logistics in plateau and desert areas?
-        6. What are the primary components of hypersonic vehicle cooling structures?
-        7. What communication skills are emphasized in officer training?
-        8. How are flight logistics supported in challenging environments?
-        """
+        # Import the LLM module
+        try:
+            from ..core.llm import generate_with_best_model
+            
+            # Use the LLM module to generate a response
+            options = {
+                "temperature": 0.7,
+                "max_tokens": 1500,
+                "top_p": 0.9
+            }
+            
+            llm_response = generate_with_best_model(prompt, options)
+            return llm_response
+            
+        except ImportError:
+            # If the LLM module is not available, fall back to direct Ollama API call
+            logger.warning("LLM module not found, falling back to direct Ollama API call")
+            
+            # Get Ollama URL from config
+            try:
+                from ..config import OLLAMA_BASE_URL
+            except ImportError:
+                try:
+                    from config import OLLAMA_BASE_URL
+                except ImportError:
+                    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+            
+            # Prepare Ollama API request
+            base_url = OLLAMA_BASE_URL.rstrip('/')
+            url = f"{base_url}/api/generate"
+            
+            # Use llama3.2 as a reasonable default model if available
+            # Models like llama3.2, mistral, or gemma are good choices for this task
+            model = "llama3.2:latest"
+            
+            # Log the model and URL being used
+            logger.info(f"Using Ollama API at {url} with model {model}")
+            
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "max_tokens": 1000
+                }
+            }
+            
+            # Make the API request
+            import requests
+            response = requests.post(url, json=payload, timeout=60)
+            
+            # Check for successful response
+            if response.status_code == 200:
+                result = response.json()
+                llm_response = result.get("response", "")
+                
+                # Log success and response length
+                logger.info(f"Successfully received response from Ollama ({len(llm_response)} chars)")
+                
+                return llm_response
+            else:
+                # Log error and try fallback
+                logger.error(f"Error from Ollama API: Status {response.status_code}, message: {response.text}")
+                
+                # Try alternate model if the first one failed
+                if model == "llama3.2:latest":
+                    logger.info("Trying fallback to mistral model")
+                    payload["model"] = "mistral"
+                    response = requests.post(url, json=payload, timeout=60)
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        llm_response = result.get("response", "")
+                        logger.info(f"Successfully received response from fallback model ({len(llm_response)} chars)")
+                        return llm_response
+                
+                # If all real LLM attempts failed, return the placeholder response with a warning
+                logger.warning("All LLM attempts failed, returning placeholder response")
+                return """
+                FAILED TO GENERATE ANALYSIS
+                """
+    
     except Exception as e:
+        # Log the error and return an error message
         logger.error(f"Error getting LLM analysis: {str(e)}", exc_info=True)
-        return f"Error generating analysis: {str(e)}"
+        return f"""
+        CONTENT ANALYSIS:
+        Error generating analysis: {str(e)}
+        
+        EXAMPLE QUERIES:
+        1. What error occurred during analysis?
+        2. How can I fix this error?
+        """
 
 
 def parse_llm_analysis(response: str) -> Dict[str, Any]:
@@ -1551,12 +1697,44 @@ async def process_vectorstore_creation(
         staging_file_paths = list(staged_files.values())
         logger.info(f"Loading documents from {len(staging_file_paths)} staged files")
         
-        # Load documents with basic parameters
-        documents, skipped_files = load_documents(
-            file_paths=staging_file_paths,
-            chunk_size=request.chunk_size,
-            chunk_overlap=request.chunk_overlap
-        )
+        # Load documents with progress updates for individual files
+        documents = []
+        skipped = []
+        
+        for idx, file_path in enumerate(staging_file_paths):
+            try:
+                file_name = os.path.basename(file_path)
+                # Update progress for each file
+                update_job_progress(
+                    job_id,
+                    20 + int(10 * idx / len(staging_file_paths)),
+                    status=JobStatus.PROCESSING,
+                    current_operation="Loading document",
+                    current_file=file_name
+                )
+                
+                # Load documents for this file
+                file_docs, file_skipped = load_documents(
+                    [file_path],
+                    chunk_size=request.chunk_size,
+                    chunk_overlap=request.chunk_overlap
+                )
+                
+                if file_docs:
+                    documents.extend(file_docs)
+                    logger.info(f"Loaded {len(file_docs)} chunks from {file_name}")
+                    
+                if file_skipped:
+                    skipped.extend(file_skipped)
+                    logger.warning(f"Skipped {file_name} during document loading")
+                    
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {str(e)}")
+                skipped.append(file_path)
+        
+        if skipped:
+            logger.warning(f"Skipped {len(skipped)} files during document loading")
+            skipped_files.extend(skipped)
         
         # Get embedding model
         embedding_model = get_embedding_model(request.embedding_model)
@@ -1575,7 +1753,7 @@ async def process_vectorstore_creation(
         file_infos = []
         for file_path in staging_file_paths:
             # Skip files that were in the skipped list
-            if file_path in skipped_files:
+            if file_path in skipped:
                 continue
                 
             original_filename = os.path.basename(file_path)

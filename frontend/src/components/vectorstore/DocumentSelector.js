@@ -90,6 +90,13 @@ const useStyles = makeStyles((theme) => ({
   checkboxCell: {
     width: 40,
   },
+  checkboxHeaderCell: {
+    width: 40,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    backgroundColor: theme.palette.background.default,
+    color: theme.palette.text.primary,
+  },
   nameCell: {
     width: '40%',
   },
@@ -100,10 +107,10 @@ const useStyles = makeStyles((theme) => ({
     width: '10%',
   },
   securityCell: {
-    width: '15%',
+    width: '10%',
   },
   statusCell: {
-    width: '25%',
+    width: '10%',
   },
   warningIcon: {
     color: theme.palette.warning.main,
@@ -216,6 +223,58 @@ const useStyles = makeStyles((theme) => ({
   },
   countNumber: {
     fontSize: '1.2rem',
+    fontWeight: 'bold',
+  },
+  addCheckboxStyle: {
+    '& svg': {
+      color: theme.palette.success.main,
+    },
+    '&.Mui-checked': {
+      color: theme.palette.success.main,
+    },
+    '&:hover': {
+      backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    },
+    '&.Mui-disabled': {
+      opacity: 0.5,
+      '& svg': {
+        color: theme.palette.success.light,
+      }
+    },
+  },
+  removeCheckboxStyle: {
+    '& svg': {
+      color: theme.palette.error.main,
+    },
+    '&.Mui-checked': {
+      color: theme.palette.error.main,
+    },
+    '&:hover': {
+      backgroundColor: 'rgba(244, 67, 54, 0.08)',
+    },
+    '&.Mui-disabled': {
+      opacity: 0.5,
+      '& svg': {
+        color: theme.palette.error.light,
+      }
+    },
+  },
+  addHeaderCell: {
+    backgroundColor: 'rgba(76, 175, 80, 0.12)',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  removeHeaderCell: {
+    backgroundColor: 'rgba(244, 67, 54, 0.12)',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  addHeaderText: {
+    color: theme.palette.success.main,
+    fontWeight: 'bold',
+  },
+  removeHeaderText: {
+    color: theme.palette.error.main,
     fontWeight: 'bold',
   },
 }));
@@ -1029,7 +1088,8 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
                   <Table stickyHeader size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell padding="checkbox" className={classes.checkboxCell}>
+                        <TableCell className={classes.statusCell}>Status</TableCell>
+                        <TableCell padding="checkbox" className={`${classes.checkboxHeaderCell} ${classes.addHeaderCell}`}>
                           <Tooltip title="Select all eligible documents for addition">
                             <span>
                               <Checkbox
@@ -1037,12 +1097,15 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
                                 checked={eligibleToAddCount > 0 && currentViewSelectedToAddCount === eligibleToAddCount}
                                 onChange={handleSelectAllToAdd}
                                 disabled={eligibleToAddCount === 0}
-                                color="primary"
+                                className={classes.addCheckboxStyle}
                               />
+                              <Typography variant="caption" display="block" align="center" className={classes.addHeaderText}>
+                                Add
+                              </Typography>
                             </span>
                           </Tooltip>
                         </TableCell>
-                        <TableCell padding="checkbox" className={classes.checkboxCell}>
+                        <TableCell padding="checkbox" className={`${classes.checkboxHeaderCell} ${classes.removeHeaderCell}`}>
                           <Tooltip title="Select all documents for removal">
                             <span>
                               <Checkbox
@@ -1050,23 +1113,24 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
                                 checked={eligibleToRemoveCount > 0 && currentViewSelectedToRemoveCount === eligibleToRemoveCount}
                                 onChange={handleSelectAllToRemove}
                                 disabled={eligibleToRemoveCount === 0}
-                                color="secondary"
+                                className={classes.removeCheckboxStyle}
                               />
+                              <Typography variant="caption" display="block" align="center" className={classes.removeHeaderText}>
+                                Remove
+                              </Typography>
                             </span>
                           </Tooltip>
                         </TableCell>
-                        <TableCell className={classes.iconCell}></TableCell>
                         <TableCell className={classes.nameCell}>Name</TableCell>
+                        <TableCell className={classes.securityCell}>Security</TableCell>
                         <TableCell className={classes.typeCell}>Type</TableCell>
                         <TableCell className={classes.sizeCell}>Size</TableCell>
-                        <TableCell className={classes.securityCell}>Security</TableCell>
-                        <TableCell className={classes.statusCell}>Status</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {filteredDocuments.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} align="center">
+                          <TableCell colSpan={7} align="center">
                             No documents found in this location
                           </TableCell>
                         </TableRow>
@@ -1090,56 +1154,6 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
                                                    'rgba(25, 118, 210, 0.08)' : undefined
                               }}
                             >
-                              <TableCell padding="checkbox" className={classes.checkboxCell}>
-                                {!document.isFolder && (
-                                  <Checkbox
-                                    checked={isItemSelectedToAdd}
-                                    disabled={!eligibleForAddition(document)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => eligibleForAddition(document) && handleSelectItem(document.path, document)}
-                                    color="primary"
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell padding="checkbox" className={classes.checkboxCell}>
-                                {!document.isFolder && (
-                                  <Checkbox
-                                    checked={isItemSelectedToRemove}
-                                    disabled={!eligibleForRemoval(document)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => eligibleForRemoval(document) && handleSelectItem(document.path, document)}
-                                    color="secondary"
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell className={classes.iconCell}>
-                                {document.isFolder ? <FolderIcon color="primary" /> : <FileIcon />}
-                              </TableCell>
-                              <TableCell className={classes.nameCell}>
-                                {document.name}
-                                {recursiveSearch && searchTerm && document.parentPath && (
-                                  <Typography 
-                                    variant="caption" 
-                                    display="block" 
-                                    style={{ 
-                                      color: document.parentPath !== currentPath ? '#1976d2' : 'grey',
-                                      fontWeight: document.parentPath !== currentPath ? 'bold' : 'normal'
-                                    }}
-                                  >
-                                    {document.parentPath !== currentPath ? '📁 From: ' : 'Path: '}
-                                    {document.parentPath}
-                                  </Typography>
-                                )}
-                              </TableCell>
-                              <TableCell className={classes.typeCell}>
-                                {document.isFolder ? 'Folder' : document.type}
-                              </TableCell>
-                              <TableCell className={classes.sizeCell}>
-                                {document.isFolder ? '-' : formatFileSize(document.size)}
-                              </TableCell>
-                              <TableCell className={classes.securityCell}>
-                                {document.securityClassification || 'Unclassified'}
-                              </TableCell>
                               <TableCell className={classes.statusCell}>
                                 {document.isInStore && (
                                   <Chip
@@ -1158,6 +1172,54 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
                                     />
                                   </Tooltip>
                                 )}
+                              </TableCell>
+                              <TableCell padding="checkbox" className={classes.checkboxCell}>
+                                {!document.isFolder && (
+                                  <Checkbox
+                                    checked={isItemSelectedToAdd}
+                                    disabled={!eligibleForAddition(document)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => eligibleForAddition(document) && handleSelectItem(document.path, document)}
+                                    className={classes.addCheckboxStyle}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell padding="checkbox" className={classes.checkboxCell}>
+                                {!document.isFolder && (
+                                  <Checkbox
+                                    checked={isItemSelectedToRemove}
+                                    disabled={!eligibleForRemoval(document)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => eligibleForRemoval(document) && handleSelectItem(document.path, document)}
+                                    className={classes.removeCheckboxStyle}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className={classes.nameCell}>
+                                {document.isFolder ? <FolderIcon color="primary" style={{marginRight: 8}} /> : <FileIcon style={{marginRight: 8}} />}
+                                {document.name}
+                                {recursiveSearch && searchTerm && document.parentPath && (
+                                  <Typography 
+                                    variant="caption" 
+                                    display="block" 
+                                    style={{ 
+                                      color: document.parentPath !== currentPath ? '#1976d2' : 'grey',
+                                      fontWeight: document.parentPath !== currentPath ? 'bold' : 'normal'
+                                    }}
+                                  >
+                                    {document.parentPath !== currentPath ? '📁 From: ' : 'Path: '}
+                                    {document.parentPath}
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell className={classes.securityCell}>
+                                {document.securityClassification || 'Unclassified'}
+                              </TableCell>
+                              <TableCell className={classes.typeCell}>
+                                {document.isFolder ? 'Folder' : document.type}
+                              </TableCell>
+                              <TableCell className={classes.sizeCell}>
+                                {document.isFolder ? '-' : formatFileSize(document.size)}
                               </TableCell>
                             </TableRow>
                           );

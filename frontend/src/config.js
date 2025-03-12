@@ -15,9 +15,28 @@ const API_URLS = {
 
 export const getApiUrl = (service, endpoint) => {
   const baseUrl = API_URLS[service];
+  // Ensure endpoint starts with / if it doesn't already
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  // For DIRECT_CHAT, we prepend /api/v1, for other services we use the endpoint as is
   const url = service === 'DIRECT_CHAT' ? 
-    `${baseUrl}/api/v1${endpoint}` : 
-    `${baseUrl}${endpoint}`;
+    `${baseUrl}/api/v1${formattedEndpoint}` : 
+    `${baseUrl}${formattedEndpoint}`;
+  
   console.log('API URL:', url); // Debug log
   return url;
+};
+
+// Add direct API endpoints export
+export const API_ENDPOINTS = {
+  CORE: API_URLS.CORE,
+  CHAT: API_URLS.CHAT,
+  AGENT: API_URLS.AGENT,
+  EXTRACTION: API_URLS.EXTRACTION,
+  GENERATION: API_URLS.GENERATION,
+  REVIEW: API_URLS.REVIEW,
+  UPLOAD: API_URLS.UPLOAD,
+  EMBEDDING: API_URLS.EMBEDDING,
+  AUTH: API_URLS.AUTH,
+  DIRECT_CHAT: API_URLS.DIRECT_CHAT
 };
