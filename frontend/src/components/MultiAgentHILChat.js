@@ -26,7 +26,8 @@ import {
   ListItemText,
   Divider,
   Tooltip,
-  ListItemIcon
+  ListItemIcon,
+  Checkbox
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
@@ -586,6 +587,7 @@ function MultiAgentHILChat() {
   const [planNotes, setPlanNotes] = useState('');
   const [modifiedQuestion, setModifiedQuestion] = useState('');
   const [selectedAgents, setSelectedAgents] = useState([]);
+  const [availableAgents, setAvailableAgents] = useState([]);
   const [messageChoice, setMessageChoice] = useState('modified');
 
   // Add new state for edit dialog
@@ -951,7 +953,17 @@ function MultiAgentHILChat() {
       setPlanNotes(response.data.plan_notes || '');
       setModifiedQuestion(response.data.modified_message || '');
       setMessageChoice('modified');
-      setSelectedAgents(response.data.selected_agents || []);
+      
+      // Get the selected agents from the response - check both possible field names
+      const responseAgents = response.data.agents || response.data.selected_agents || [];
+      setSelectedAgents(responseAgents);
+      
+      // Fetch all available agents for the team
+      if (currentSession && currentSession.teamId) {
+        const teamAgents = await fetchTeamAgents(currentSession.teamId);
+        setAvailableAgents(teamAgents);
+      }
+      
       setPlanDialogOpen(true);
       return;
 
@@ -971,6 +983,49 @@ function MultiAgentHILChat() {
       if (!planDialogOpen) {
         dispatch({ type: ACTIONS.SET_LOADING, payload: false });
       }
+    }
+  };
+
+  // Update the fetchTeamAgents function to filter only team agents
+  const fetchTeamAgents = async (teamId) => {
+    try {
+      // First, get the complete team details with agent names using list_teams
+      const teamsListResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      if (!teamsListResponse.data || !teamsListResponse.data.teams) {
+        throw new Error('Failed to retrieve teams data');
+      }
+      
+      // Find our specific team with full details including agent names
+      const teamDetails = teamsListResponse.data.teams.find(team => team.unique_id === teamId);
+      if (!teamDetails) {
+        console.error(`Team with ID ${teamId} not found in complete teams list`);
+        return [];
+      }
+      
+      // Get the agent names for this team
+      const teamAgentNames = teamDetails.agents || [];
+      console.log(`Team ${teamDetails.name} has ${teamAgentNames.length} agents:`, teamAgentNames);
+      
+      // Fetch all available agents
+      const agentsResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      if (!agentsResponse.data || !agentsResponse.data.agents) {
+        throw new Error('Failed to retrieve agents data');
+      }
+      
+      // Filter agents to only those in the team
+      const teamAgents = agentsResponse.data.agents.filter(agent => 
+        teamAgentNames.includes(agent.name)
+      );
+      
+      console.log(`Filtered ${teamAgents.length} agents for team ${teamDetails.name}`);
+      return teamAgents;
+    } catch (error) {
+      console.error('Error fetching team agents:', error);
+      dispatch({ 
+        type: ACTIONS.SET_ERROR, 
+        payload: 'Failed to load team agents. Please try again later.' 
+      });
+      return [];
     }
   };
 
@@ -1296,23 +1351,65 @@ function MultiAgentHILChat() {
         >
           <DialogTitle>Review Plan</DialogTitle>
           <DialogContent>
-            {selectedAgents.length > 0 && (
-              <Box mb={3}>
-                <Typography variant="h6" gutterBottom>Selected Agents</Typography>
-                <Paper elevation={1} className={classes.agentsBox}>
-                  <List dense>
-                    {selectedAgents.map((agent, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
-                          <PersonIcon className={classes.agentIcon} />
-                        </ListItemIcon>
-                        <ListItemText primary={agent} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              </Box>
-            )}
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>Agents</Typography>
+              <Paper elevation={1} className={classes.agentsBox}>
+                <Box 
+                  display="flex" 
+                  flexWrap="wrap" 
+                  justifyContent="flex-start" 
+                  alignItems="flex-start"
+                  gap={2}
+                  p={2}
+                >
+                  {availableAgents.length > 0 ? (
+                    availableAgents.map((agent) => (
+                      <Box 
+                        key={agent.id} 
+                        display="flex" 
+                        flexDirection="column" 
+                        alignItems="center"
+                        width="120px"
+                        mb={2}
+                      >
+                        <PersonIcon style={{ fontSize: 40, color: '#757575', marginBottom: '8px' }} />
+                        <Typography variant="body2" align="center" style={{ marginBottom: '4px' }}>
+                          {agent.name || agent.agent_name || "Unnamed Agent"}
+                        </Typography>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={
+                                // Since selected agents is a string array of names, check if the current agent's name is in it
+                                selectedAgents.includes(agent.name)
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  // Add agent name (not ID) to selected agents
+                                  setSelectedAgents(prev => [...prev, agent.name]);
+                                } else {
+                                  // Remove agent name from selected agents
+                                  setSelectedAgents(prev => prev.filter(name => name !== agent.name));
+                                }
+                              }}
+                              color="primary"
+                              size="small"
+                            />
+                          }
+                          label="Select"
+                        />
+                      </Box>
+                    ))
+                  ) : (
+                    <Box p={2}>
+                      <Typography variant="body2" color="textSecondary">
+                        No agents available for this team
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
+            </Box>
 
             <Box mb={3}>
               <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
