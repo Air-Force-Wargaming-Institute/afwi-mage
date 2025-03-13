@@ -242,6 +242,11 @@ def _process_refine_chat(request_data: ChatMessage):
 
     selected_agents = select_agents()
 
+    # If the user has selected agents, use them instead
+    if request_data.selected_agents and set(selected_agents) != set(request_data.selected_agents):
+        logger.info(f"[Selecting Agents]: User has selected a different set of agents; using the ones they selected: {request_data.selected_agents}")
+        selected_agents = request_data.selected_agents
+
     #update the agents_with_instructions to only include the selected agents
     agents_with_instructions = "\n".join(
         f"- {agent}: {agent_instructions[agent]}" 
@@ -308,6 +313,8 @@ def _process_refine_chat(request_data: ChatMessage):
     response = llm.with_structured_output(UserPlan).invoke([HumanMessage(content=prompt)])
     
     # Send the plan to the user for approval
+    logger.info(f"[REFINE_AFTER_LLM] Sending following agents to users: {selected_agents}")
+    print(f"\n\tSending following agents to users: {selected_agents}")
     return {
         "plan": response.plan,
         "modified_message": response.modified_message,

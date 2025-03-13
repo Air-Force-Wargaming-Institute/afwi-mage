@@ -433,6 +433,52 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
   },
+  systemMessage: {
+    alignSelf: 'center',
+    width: '95%',
+    backgroundColor: '#f5f5f5',
+    border: `1px solid ${theme.palette.primary.light}`,
+    borderRadius: '8px',
+    '& p, & li': {
+      margin: '4px 0',
+    },
+    '& strong': {
+      color: theme.palette.primary.dark,
+    },
+  },
+  planCollapsedHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: theme.spacing(1, 1.5),
+    cursor: 'pointer',
+    borderRadius: '8px 8px 0 0',
+    backgroundColor: 'rgba(92, 107, 192, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(92, 107, 192, 0.15)',
+    },
+  },
+  planExpandToggle: {
+    transition: 'transform 0.3s ease',
+    color: theme.palette.primary.main,
+  },
+  planContent: {
+    padding: theme.spacing(2),
+    transition: 'max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease, padding 0.3s ease',
+    overflow: 'hidden',
+  },
+  planCollapsed: {
+    maxHeight: 0,
+    opacity: 0,
+    padding: '0 16px',
+    pointerEvents: 'none',
+  },
+  planExpanded: {
+    maxHeight: '2000px', // Large enough to fit content
+    opacity: 1,
+    transition: 'max-height 0.4s ease-in-out, opacity 0.5s ease',
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -454,10 +500,14 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
   );
 };
 
-// Memoized Message Component
+// Memoized Message Component with collapsible system messages
 const Message = memo(({ message }) => {
   const classes = useStyles();
   const [expandedSections, setExpandedSections] = useState({});
+  const [isPlanExpanded, setIsPlanExpanded] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const contentRef = useRef(null);
+  const selectionTimeoutRef = useRef(null);
 
   const handleToggle = (id) => {
     setExpandedSections((prev) => ({
@@ -466,12 +516,220 @@ const Message = memo(({ message }) => {
     }));
   };
 
+  // Handle mousedown/up to track text selection
+  const handleMouseDown = (e) => {
+    // Only track mousedown within the content area
+    if (contentRef.current && contentRef.current.contains(e.target)) {
+      setIsSelecting(true);
+    }
+  };
+
+  const handleMouseUp = () => {
+    // Use setTimeout to ensure click handlers fire first
+    selectionTimeoutRef.current = setTimeout(() => {
+      // Only clear selection if no text is actually selected
+      if (!window.getSelection().toString()) {
+        setIsSelecting(false);
+      } else {
+        // If text is selected, set another timeout to clear the selecting state
+        // after user has had time to copy
+        selectionTimeoutRef.current = setTimeout(() => {
+          setIsSelecting(false);
+        }, 3000); // 3 seconds should be plenty of time to copy
+      }
+    }, 150);
+  };
+
+  // Determine if a click should toggle plan expansion
+  const handlePlanToggle = (e) => {
+    // Only proceed if click was on the header itself or the toggle button
+    if (!e.target.closest(`.${classes.planCollapsedHeader}`) && 
+        !e.target.closest(`.${classes.planExpandToggle}`)) {
+      return;
+    }
+    
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
+      return;
+    }
+    
+    setIsPlanExpanded(!isPlanExpanded);
+  };
+
+  // When mounted, add selection listeners to document
+  useEffect(() => {
+    if (message.sender === 'system') {
+      // When plan is first added, set it as expanded for better visibility
+      setIsPlanExpanded(true);
+
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('selectstart', () => setIsSelecting(true));
+      
+      return () => {
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('selectstart', () => setIsSelecting(true));
+        
+        // Clear any pending timeouts on unmount
+        if (selectionTimeoutRef.current) {
+          clearTimeout(selectionTimeoutRef.current);
+        }
+      };
+    }
+  }, [message.sender]);
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Determine message class based on sender
+  const getMessageClass = () => {
+    switch(message.sender) {
+      case 'user':
+        return classes.userMessage;
+      case 'ai':
+        return classes.aiMessage;
+      case 'system':
+        return classes.systemMessage;
+      default:
+        return classes.aiMessage;
+    }
+  };
+
+  // Extract plan type info from system message (if it exists)
+  const getPlanInfo = () => {
+    if (message.sender !== 'system') return null;
+    
+    // Try to extract plan type from the message text
+    const planTypeMatch = message.text.match(/Execution Plan \((.*?)\)/);
+    if (planTypeMatch && planTypeMatch[1]) {
+      return planTypeMatch[1]; // "Original user message" or "AI-modified message"
+    }
+    return "Plan";
+  };
+
+  // Add sender icon based on message type
+  const renderSenderIcon = () => {
+    if (message.sender === 'system') {
+      return (
+        <Box display="flex" alignItems="center">
+          <FormatListBulletedIcon style={{ marginRight: 8, color: '#5c6bc0' }} />
+          <Typography variant="subtitle2" style={{ fontWeight: 'bold', color: '#5c6bc0' }}>
+            Plan Accepted
+          </Typography>
+        </Box>
+      );
+    }
+    return null;
+  };
+
+  // Add modification indicator if message was modified
+  const renderModificationIndicator = () => {
+    if (message.sender === 'user' && message.originalText) {
+      return (
+        <Tooltip title={`Original message: "${message.originalText}"`}>
+          <Box display="flex" alignItems="center" justifyContent="flex-end" mt={1} mb={-1}>
+            <Typography variant="caption" style={{ marginRight: 4, fontStyle: 'italic', color: '#ffffff80' }}>
+              Modified by AI
+            </Typography>
+            <EditIcon style={{ fontSize: 12, color: '#ffffff80' }} />
+          </Box>
+        </Tooltip>
+      );
+    }
+    return null;
+  };
+
+  // If this is a system message (plan), render it as collapsible
+  if (message.sender === 'system') {
+    const planInfo = getPlanInfo();
+    
+    return (
+      <div className={`${classes.message} ${getMessageClass()}`}>
+        {/* Clickable header that toggles plan visibility */}
+        <div 
+          className={classes.planCollapsedHeader}
+          onClick={handlePlanToggle}
+        >
+          <Box display="flex" alignItems="center">
+            <FormatListBulletedIcon style={{ marginRight: 8, color: '#5c6bc0' }} />
+            <Box>
+              <Typography variant="subtitle2" style={{ fontWeight: 'bold', color: '#5c6bc0' }}>
+                Plan Accepted
+              </Typography>
+              <Typography variant="caption" color="textSecondary" style={{ display: 'flex', alignItems: 'center' }}>
+                {planInfo ? `Execution Plan (${planInfo})` : 'Plan'}
+                <Typography variant="caption" color="primary" style={{ marginLeft: 8, fontStyle: 'italic' }}>
+                  {isPlanExpanded ? 'Click to collapse' : 'Click to expand'}
+                </Typography>
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton 
+            size="small"
+            className={classes.planExpandToggle}
+            style={{ transform: isPlanExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent multiple event triggers
+              setIsPlanExpanded(!isPlanExpanded);
+            }}
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </div>
+        
+        {/* Expandable plan content */}
+        <div 
+          ref={contentRef}
+          className={`${classes.planContent} ${isPlanExpanded ? classes.planExpanded : classes.planCollapsed}`}
+          onMouseDown={handleMouseDown}
+        >
+          <ReactMarkdown
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              code: CodeBlock,
+              details: ({ node, children, ...props }) => {
+                // Generate a stable ID using message ID and detail index
+                const detailsIndex = node.position ? node.position.start.line : Math.random();
+                const id = `message-${message.id}-details-${detailsIndex}`;
+
+                return (
+                  <details
+                    {...props}
+                    open={expandedSections[id] || false}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent event bubbling
+                      handleToggle(id);
+                    }}
+                    className={classes.markdownDetails}
+                  >
+                    {children}
+                  </details>
+                );
+              },
+            }}
+            className={classes.markdown}
+          >
+            {message.text}
+          </ReactMarkdown>
+        </div>
+        <Typography variant="caption" className={classes.messageTimestamp}>
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </Typography>
+      </div>
+    );
+  }
+
+  // Regular non-system messages
   return (
     <div
-      className={`${classes.message} ${
-        message.sender === 'user' ? classes.userMessage : classes.aiMessage
-      }`}
+      className={`${classes.message} ${getMessageClass()}`}
     >
+      {renderModificationIndicator()}
       <ReactMarkdown
         rehypePlugins={[rehypeRaw]}
         components={{
@@ -705,6 +963,8 @@ function MultiAgentHILChat() {
   const handleNewChat = async () => {
     setIsLoadingTeams(true);
     setTeamError('');
+    // Reset selectedAgents when starting a new chat
+    setSelectedAgents([]);
     try {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
       setAvailableTeams(response.data.teams);
@@ -912,6 +1172,11 @@ function MultiAgentHILChat() {
     const userMessage = state.input.trim();
     setOriginalMessage(userMessage);
 
+    // Reset selected agents and form state since this is a new query
+    setSelectedAgents([]);
+    setRejectionText('');
+    setPlanChoice('');
+
     const messageData = { 
       message: userMessage, 
       team_name: currentSession.team,
@@ -956,6 +1221,7 @@ function MultiAgentHILChat() {
       
       // Get the selected agents from the response - check both possible field names
       const responseAgents = response.data.agents || response.data.selected_agents || [];
+      console.log('Backend recommended agents:', responseAgents);
       setSelectedAgents(responseAgents);
       
       // Fetch all available agents for the team
@@ -1029,18 +1295,20 @@ function MultiAgentHILChat() {
     }
   };
 
-  // Add handler for plan dialog submission
+  // Update the handlePlanSubmit function to modify the last user message if needed
   const handlePlanSubmit = async () => {
     if (planChoice === 'reject' && !rejectionText.trim()) {
       return;
     }
 
     //Maybe add the plan message to the chat if plan is accepted
-
     const currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
     
     // Determine which message to send based on user selection
     const messageToSend = messageChoice === 'original' ? originalMessage : modifiedQuestion;
+    
+    // Log the selected agents before sending to backend for debugging
+    console.log('Submitting with user-selected agents:', selectedAgents);
     
     const messageData = {
       message: messageToSend,
@@ -1051,12 +1319,64 @@ function MultiAgentHILChat() {
       session_id: currentSession.id,
       team_id: currentSession.teamId,
       selected_agents: selectedAgents,
+      agents: selectedAgents, // Add this field as well for compatibility
       comments: rejectionText.trim()
     };
 
     // Close dialog and show loading first
     setPlanDialogOpen(false);
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+    // If accepting the plan, add it to the chat history
+    if (planChoice === 'accept') {
+      // If using modified question, update the last user message to reflect what was actually processed
+      if (messageChoice === 'modified' && modifiedQuestion !== originalMessage) {
+        // Find the last user message in the chat history
+        const userMessages = state.messages.filter(msg => msg.sender === 'user');
+        if (userMessages.length > 0) {
+          const lastUserMessage = userMessages[userMessages.length - 1];
+          
+          // Update the message text to show the modified question
+          dispatch({
+            type: ACTIONS.UPDATE_MESSAGE,
+            payload: {
+              id: lastUserMessage.id,
+              updates: { 
+                text: modifiedQuestion,
+                originalText: originalMessage // Store original text for reference if needed
+              }
+            }
+          });
+        }
+      }
+      
+      // Create a formatted version of the plan for the chat
+      const selectedAgentsText = selectedAgents.length > 0 
+        ? `\n\n### Selected Agents\n${selectedAgents.map(agent => `- ${agent}`).join('\n')}` 
+        : '';
+      
+      const messageTypeInfo = messageChoice === 'original' 
+        ? '(Original user message)' 
+        : '(AI-modified message)';
+      
+      const notesSection = planNotes 
+        ? `\n\n### Plan Notes\n${planNotes}` 
+        : '';
+      
+      const messageText = `## Execution Plan ${messageTypeInfo}\n\n### Question\n${messageToSend}${selectedAgentsText}\n\n### Plan Details\n${planContent}${notesSection}`;
+      
+      // Add the plan to the chat as a system message
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          id: uuidv4(),
+          text: messageText, 
+          sender: 'system', 
+          timestamp: new Date(),
+          sessionId: currentSession.id
+        }
+      });
+    }
 
     try {
       const endpoint = planChoice === 'accept' ? '/chat/process' : '/chat/refine';
@@ -1074,7 +1394,20 @@ function MultiAgentHILChat() {
         setPlanContent(response.data.plan || response.data.response || response.data.message);
         setPlanNotes(response.data.plan_notes || '');
         setModifiedQuestion(response.data.modified_message || '');
-        setSelectedAgents(response.data.selected_agents || []);
+        
+        // Get the selected agents from the response - check both field names
+        const responseAgents = response.data.agents || response.data.selected_agents || [];
+        console.log('Backend responded with agents:', responseAgents);
+        
+        // If the user pressed "reject", we should use the backend's new recommendations
+        // If the user pressed "accept", we leave the current selections
+        if (planChoice === 'reject') {
+          setSelectedAgents(responseAgents);
+        }
+        
+        // Clear rejection text for the new plan dialog
+        setRejectionText('');
+        
         setPlanDialogOpen(true);
         return;
       }
