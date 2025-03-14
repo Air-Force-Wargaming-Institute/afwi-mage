@@ -665,6 +665,15 @@ const useStyles = makeStyles((theme) => ({
     opacity: 1,
     transition: 'max-height 0.4s ease-in-out, opacity 0.5s ease',
   },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: '80px',
+    right: '20px',
+    zIndex: 1000,
+    backgroundColor: '#3f51b5', // Fixed: use direct color instead of theme => theme.palette.primary.main
+    color: 'white',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -709,41 +718,17 @@ const Message = memo(({ message, onSectionExpanded }) => {
   useEffect(() => {
     // Force a reflow/repaint when expansion state changes to ensure proper sizing
     if (messageRef.current) {
-      // Get all expanded sections
-      const expandedCount = Object.values(expandedSections).filter(Boolean).length;
-      
-      // Apply transform based on expanded sections count
-      messageRef.current.style.transform = 'translateZ(0)';
-      
-      // For multiple expanded sections, add a longer delay to allow all content to expand properly
-      const delay = expandedCount > 1 ? 1000 : 800;
-      
-      // Remove the transform after a moment (allows time for content to expand)
-      setTimeout(() => {
-        if (messageRef.current) {
-          messageRef.current.style.transform = '';
-          
-          // Additional reflow after a short delay if multiple sections are expanded
-          if (expandedCount > 1) {
-            setTimeout(() => {
-              if (messageRef.current) {
-                // Force another reflow to accommodate all expanded content
-                const height = messageRef.current.offsetHeight;
-                messageRef.current.style.transition = 'none';
-                messageRef.current.style.transform = 'translateZ(0)';
-                
-                // Reset transition
-                setTimeout(() => {
-                  if (messageRef.current) {
-                    messageRef.current.style.transition = '';
-                    messageRef.current.style.transform = '';
-                  }
-                }, 50);
-              }
-            }, 500);
+      // Apply a transform to force a reflow so the content expands properly
+      requestAnimationFrame(() => {
+        messageRef.current.style.transform = 'translateZ(0)';
+        
+        // Remove the transform in the next frame to complete the reflow
+        requestAnimationFrame(() => {
+          if (messageRef.current) {
+            messageRef.current.style.transform = '';
           }
-        }
-      }, delay);
+        });
+      });
     }
   }, [expandedSections, isPlanExpanded]);
 
@@ -823,33 +808,29 @@ const Message = memo(({ message, onSectionExpanded }) => {
       return;
     }
     
-    // Get current expanded state of this section
-    const currentlyExpanded = expandedSections[id] || false;
-    
-    // Find the closest scrollable parent
+    // Find the closest scrollable parent - typically the message area
     const scrollableParent = findScrollableParent(e.target);
     const scrollTop = scrollableParent ? scrollableParent.scrollTop : 0;
     
     // Toggle this section's expanded state
     handleExpandSection(id);
     
-    // Force parent message container to repaint after toggling
+    // Simply force a re-render of our container without any scroll changing behavior
     if (messageRef.current) {
-      // If expanding, we need more time to ensure content renders properly
-      const delay = !currentlyExpanded ? 100 : 10;
-      
-      setTimeout(() => {
-        const height = messageRef.current.offsetHeight;
+      // Trigger a reflow to ensure content renders properly
+      requestAnimationFrame(() => {
         messageRef.current.style.transform = 'translateZ(0)';
         
-        // Restore scroll position after reflow
-        setTimeout(() => {
+        // In the next frame, reset transform and restore scroll position
+        requestAnimationFrame(() => {
           messageRef.current.style.transform = '';
+          
+          // Explicitly restore original scroll position
           if (scrollableParent) {
             scrollableParent.scrollTop = scrollTop;
           }
-        }, 50);
-      }, delay);
+        });
+      });
     }
     
     return false;
@@ -1166,10 +1147,18 @@ function MultiAgentHILChat() {
   // Track when sections are expanded/collapsed
   const [expandedSectionsTracker, setExpandedSectionsTracker] = useState({});
   
-  // Update scroll handling to use useCallback with debounce
+  // First, add a state to track if user is at bottom
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  
+  // Update scroll handling to track if user is at bottom
   const handleScroll = useCallback(
     debounce(({ target }) => {
       const { scrollTop, scrollHeight, clientHeight } = target;
+      
+      // Check if user is at bottom (with a small threshold)
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsAtBottom(atBottom);
+      
       dispatch({ 
         type: ACTIONS.SET_SCROLL_TOP, 
         payload: scrollTop > 200 
@@ -1194,6 +1183,7 @@ function MultiAgentHILChat() {
     }
   }, [handleScroll]);
 
+  // Keep the scrollToBottom function for optional use, but don't call it automatically
   const scrollToBottom = useCallback(() => {
     if (messageEndRef.current) {
       // First try scrollIntoView
@@ -1210,58 +1200,37 @@ function MultiAgentHILChat() {
     }
   }, [messageEndRef, messageAreaRef]);
 
-  // Improved scroll effect - only scroll on new messages, never on section toggling
+  // Make sure we handle even when new messages arrive - just update the isAtBottom state without auto-scrolling
   useEffect(() => {
-    // Only auto-scroll when a new message is added
-    if (state.messages.length > 0) {
-      const lastMessage = state.messages[state.messages.length - 1];
-      const isNewMessageAdded = lastMessage.id && !state.isLoading;
-      
-      if (isNewMessageAdded) {
-        // Small delay to ensure the DOM has updated
-        setTimeout(() => {
-          scrollToBottom();
-        }, 100);
-      }
+    // When a new message is added, check if we need to show the scroll button
+    if (messageAreaRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messageAreaRef.current;
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsAtBottom(atBottom);
     }
-  }, [state.messages.length, scrollToBottom]); // Only depend on messages length, not expandedSections
+  }, [state.messages.length]);
   
-  // Add a method to track when details sections are expanded/collapsed
+  // Add a CSS class for the scroll button through makeStyles instead of inline styles
+  const scrollToBottomButton = (
+    <Fade in={!isAtBottom}>
+      <IconButton
+        onClick={scrollToBottom}
+        className={classes.scrollToBottomButton}
+        size="small"
+      >
+        <KeyboardArrowDownIcon />
+      </IconButton>
+    </Fade>
+  );
+  
+  // Simple tracking of expanded sections with no scrolling side effects
   const handleSectionExpanded = useCallback((messageId, sectionId, isExpanded) => {
-    // Save current scroll position before updating state
-    const messageArea = messageAreaRef.current;
-    const currentScrollTop = messageArea ? messageArea.scrollTop : 0;
-    
-    setExpandedSectionsTracker(prev => {
-      const newState = {
-        ...prev,
-        [`${messageId}-${sectionId}`]: isExpanded
-      };
-      
-      // Force reflow to ensure proper rendering, but maintain scroll position
-      if (messageArea) {
-        // Add a consistent delay to let the content update
-        const scrollDelay = 300;
-        
-        setTimeout(() => {
-          // Force a reflow
-          messageArea.style.transform = 'translateZ(0)';
-          
-          setTimeout(() => {
-            if (messageArea) {
-              // Reset transform
-              messageArea.style.transform = '';
-              
-              // Always maintain the current scroll position, never auto-scroll
-              messageArea.scrollTop = currentScrollTop;
-            }
-          }, 50);
-        }, scrollDelay);
-      }
-      
-      return newState;
-    });
-  }, []); // Remove scrollToBottom dependency
+    // Simply track which sections are expanded, no scrolling side effects
+    setExpandedSectionsTracker(prev => ({
+      ...prev,
+      [`${messageId}-${sectionId}`]: isExpanded
+    }));
+  }, []);
   
   // Pass the handler to the Message component
   const renderMessage = useCallback((message) => {
@@ -2519,6 +2488,9 @@ function MultiAgentHILChat() {
             {state.error}
           </Alert>
         </Snackbar>
+
+        {/* Scroll-to-bottom Button */}
+        {scrollToBottomButton}
 
       </Container>
     </>
