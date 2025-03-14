@@ -56,6 +56,12 @@ import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
 import PersonIcon from '@mui/icons-material/Person';
 
+// Simple function to replace triple backticks with spaces
+const removeTripleBackticks = (text) => {
+  if (!text) return '';
+  return text.replace(/```/g, ' ');
+};
+
 const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
@@ -1347,7 +1353,7 @@ function MultiAgentHILChat() {
           if (entry.response) {
             messages.push({
               id: uuidv4(),
-              text: entry.response,
+              text: removeTripleBackticks(entry.response),
               sender: 'ai',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
@@ -1843,7 +1849,7 @@ function MultiAgentHILChat() {
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: uuidv4(),
-          text: response.data.response || response.data.message, 
+          text: removeTripleBackticks(response.data.response || response.data.message), 
           sender: 'ai', 
           timestamp: new Date(),
           sessionId: currentSession.id
