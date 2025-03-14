@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import {
   Container,
@@ -526,7 +526,7 @@ const useStyles = makeStyles((theme) => ({
   },
   // Visible content for expanded sections
   expandedContent: {
-    maxHeight: '15000px', // Increased from 5000px to handle multiple expanded sections
+    maxHeight: '21000px', // Increased from 5000px to handle multiple expanded sections
     opacity: 1,
     overflow: 'visible',
     padding: theme.spacing(2),
@@ -667,13 +667,13 @@ const useStyles = makeStyles((theme) => ({
     pointerEvents: 'none',
   },
   planExpanded: {
-    maxHeight: '2000px', // Large enough to fit content
+    maxHeight: '5000px', // Large enough to fit content
     opacity: 1,
     transition: 'max-height 0.4s ease-in-out, opacity 0.5s ease',
   },
   scrollToBottomButton: {
     position: 'absolute',
-    bottom: '165px', // Decreased from 80px to 30px to move button lower on the screen
+    bottom: '165px',
     right: '60px',
     zIndex: 1000,
     backgroundColor: '#3f51b5', // Fixed: use direct color instead of theme => theme.palette.primary.main
@@ -712,11 +712,62 @@ const Message = memo(({ message, onSectionExpanded }) => {
   const selectionTimeoutRef = useRef(null);
   const detailsRefs = useRef({});
   const messageRef = useRef(null); // Add ref for the message container
+  const reasoningRefs = useRef({}); // Add refs for reasoning sections
+
+  // Remove all think tags from text and extract their content
+  const extractThinkTags = useCallback((text) => {
+    if (!text || message.sender !== 'ai') return { processedText: text, thinkContents: [] };
+    
+    const thinkContents = [];
+    let processedText = text;
+    
+    // Extract content between <think> tags
+    const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+    let match;
+    
+    while ((match = thinkRegex.exec(text)) !== null) {
+      // Record the position - is this at the start or after a closing summary tag?
+      const position = match.index === 0 ? 'beginning' : 
+                      text.substring(0, match.index).trimEnd().endsWith('</summary>') ? 'after-summary' : 'other';
+      
+      thinkContents.push({
+        content: match[1].trim(),
+        fullMatch: match[0],
+        startIndex: match.index,
+        position: position
+      });
+    }
+    
+    // Remove all think tags from the text
+    processedText = text.replace(thinkRegex, '');
+    
+    // Clean up any empty lines that might be left after removing think tags
+    processedText = processedText.replace(/\n\s*\n\s*\n/g, '\n\n');
+    
+    return { processedText, thinkContents };
+  }, [message.sender]);
+  
+  // Extract think content
+  const { processedText, thinkContents } = useMemo(() => {
+    const result = extractThinkTags(message.text);
+    // Filter out empty think tags
+    result.thinkContents = result.thinkContents.filter(thinkItem => 
+      thinkItem.content && thinkItem.content.trim() !== ''
+    );
+    return result;
+  }, [message.text, extractThinkTags]);
 
   // Create a ref callback function at the component level
   const createRefCallback = useCallback((id) => (node) => {
     if (node !== null) {
       detailsRefs.current[id] = node;
+    }
+  }, []);
+
+  // Similar callback for reasoning sections
+  const createReasoningRefCallback = useCallback((id) => (node) => {
+    if (node !== null) {
+      reasoningRefs.current[id] = node;
     }
   }, []);
 
@@ -736,7 +787,7 @@ const Message = memo(({ message, onSectionExpanded }) => {
         });
       });
     }
-  }, [expandedSections, isPlanExpanded]);
+  }, [expandedSections, isPlanExpanded]); 
 
   // Handle mousedown/up to track text selection
   const handleMouseDown = (e) => {
@@ -784,6 +835,19 @@ const Message = memo(({ message, onSectionExpanded }) => {
     }
     
     setIsPlanExpanded(!isPlanExpanded);
+  };
+
+  // Handle reasoning toggle
+  const handleReasoningToggle = (id) => (e) => {
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
+      return;
+    }
+    
+    setExpandedSections(prev => ({
+      ...prev,
+      [`reasoning-${id}`]: !prev[`reasoning-${id}`]
+    }));
   };
 
   // Update setExpandedSections to notify parent component
@@ -858,8 +922,77 @@ const Message = memo(({ message, onSectionExpanded }) => {
     return findScrollableParent(element.parentElement);
   };
 
+  // Render an AI reasoning section
+  const renderReasoningSection = (reasoningText, reasoningId, position = 'beginning') => {
+    if (!reasoningText || reasoningText.trim() === '') return null;
+    
+    const isExpanded = expandedSections[`reasoning-${reasoningId}`] || false;
+    
+    // Apply slightly different styling for after-summary reasoning sections to make them appear as children
+    const isAfterSummary = position === 'after-summary';
+    
+    return (
+      <div 
+        className={classes.customDetails} 
+        style={{ 
+          marginBottom: '12px',
+          ...(isAfterSummary ? {
+            marginLeft: '12px',
+            marginTop: '8px',
+            borderLeft: '3px solid rgba(33, 150, 243, 0.3)'
+          } : {})
+        }}
+      >
+        {/* Custom header for reasoning section */}
+        <div 
+          className={`${classes.analysisDetailsHeader}`}
+          style={{ 
+            backgroundColor: 'rgba(33, 150, 243, 0.08)',
+            ...(isAfterSummary ? {
+              borderTopLeftRadius: '0',
+              paddingLeft: '12px'
+            } : {})
+          }}
+          onClick={handleReasoningToggle(reasoningId)}
+        >
+          <Typography className={classes.analysisTitle} title="AI Reasoning">
+            AI Reasoning{isAfterSummary ? ' for this section' : ''}
+          </Typography>
+          <IconButton 
+            className={`${classes.analysisExpandToggle} ${isExpanded ? classes.analysisExpanded : ''}`}
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleReasoningToggle(reasoningId)(e);
+            }}
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </div>
+        
+        {/* Content area for reasoning */}
+        <div 
+          ref={createReasoningRefCallback(reasoningId)}
+          className={`${classes.analysisContent} ${isExpanded ? classes.expandedContent : classes.collapsedContent}`}
+          onClick={(e) => e.stopPropagation()}
+          style={isExpanded ? { height: 'auto' } : {}}
+        >
+          <ReactMarkdown
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              code: CodeBlock,
+            }}
+            className={classes.markdown}
+          >
+            {reasoningText}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  };
+
   // Enhanced details renderer with custom header to match plan experience
-  const renderEnhancedDetails = ({ node, children, ...props }) => {
+  function renderEnhancedDetails({ node, children, ...props }) {
     // Generate a stable ID using message ID and detail index
     const detailsIndex = node.position ? node.position.start.line : Math.random();
     const id = `message-${message.id}-details-${detailsIndex}`;
@@ -923,6 +1056,34 @@ const Message = memo(({ message, onSectionExpanded }) => {
     // No more useCallback here - fixes the React hooks rule violation
     const detailsContentRef = createRefCallback(id);
 
+    // Check if any think tags should be associated with this details section
+    // They would follow immediately after the closing </summary> tag
+    const associatedThinkContent = thinkContents.find(think => {
+      // Only consider think tags that are positioned after a summary
+      if (think.position !== 'after-summary') return false;
+      
+      // Get the text before the think tag
+      const textBeforeThink = message.text.substring(0, think.startIndex);
+      
+      // Check if this text ends with a summary tag containing our title
+      // First, find the last </summary> tag position
+      const lastSummaryClosePos = textBeforeThink.lastIndexOf('</summary>');
+      if (lastSummaryClosePos === -1) return false;
+      
+      // Find the corresponding opening summary tag
+      const openingSummaryPos = textBeforeThink.lastIndexOf('<summary>', lastSummaryClosePos);
+      if (openingSummaryPos === -1) return false;
+      
+      // Extract the content of the summary tag
+      const summaryContent = textBeforeThink.substring(
+        openingSummaryPos + 9, // length of <summary>
+        lastSummaryClosePos
+      ).trim();
+      
+      // Check if this summary content matches our title or contains it
+      return summaryContent === title || summaryContent.includes(title);
+    });
+
     // Filter out any redundant "Expert Analyses" text paragraphs
     const filteredContent = detailsContent.map(child => {
       if (child?.props?.children && typeof child?.props?.children === 'string') {
@@ -966,10 +1127,15 @@ const Message = memo(({ message, onSectionExpanded }) => {
           style={isExpanded ? { height: 'auto' } : {}} // Ensure height is auto when expanded
         >
           {filteredContent}
+          
+          {/* If a think tag follows this details section, add an AI Reasoning section */}
+          {associatedThinkContent && (
+            renderReasoningSection(associatedThinkContent.content, `detail-${detailsIndex}`, 'after-summary')
+          )}
         </div>
       </div>
     );
-  };
+  }
 
   // When mounted, add selection listeners to document
   useEffect(() => {
@@ -1058,6 +1224,42 @@ const Message = memo(({ message, onSectionExpanded }) => {
     }
     return null;
   };
+  
+  // Process content with think tags after markdown rendering
+  const processContentWithThinkTags = (content) => {
+    // First, check if this is an AI message that might have think tags
+    if (message.sender !== 'ai' || thinkContents.length === 0) {
+      return content;
+    }
+    
+    // Sort think contents by their position in the original text
+    // This helps ensure we process them in the correct order
+    const sortedThinkContents = [...thinkContents].sort((a, b) => a.startIndex - b.startIndex);
+    
+    // Process the first think tag separately if it appears at the beginning
+    const firstThink = sortedThinkContents[0];
+    const processedContent = [];
+    
+    // If the first think tag is at the beginning of the message
+    if (firstThink && firstThink.startIndex === 0) {
+      // Add the reasoning section for this think tag
+      processedContent.push(
+        renderReasoningSection(firstThink.content, `intro-reasoning`)
+      );
+      
+      // Remove this think tag from the list to process
+      sortedThinkContents.shift();
+    }
+    
+    // Add the main content
+    processedContent.push(content);
+    
+    // Process any remaining think tags
+    // Note: This implementation will not inject think tags within the markdown-rendered content
+    // as that would require more complex DOM manipulation after rendering
+    
+    return processedContent;
+  };
 
   // If this is a system message (plan), render it as collapsible
   if (message.sender === 'system') {
@@ -1096,7 +1298,6 @@ const Message = memo(({ message, onSectionExpanded }) => {
             rehypePlugins={[rehypeRaw]}
             components={{
               code: CodeBlock,
-              // Use our enhanced details renderer for collapsible sections in the plan
               details: renderEnhancedDetails,
             }}
             className={classes.markdown}
@@ -1111,6 +1312,59 @@ const Message = memo(({ message, onSectionExpanded }) => {
     );
   }
 
+  // For AI messages with think tags, prepare reasoning sections at the appropriate locations
+  const renderMessageWithReasoningSections = () => {
+    if (message.sender !== 'ai' || thinkContents.length === 0) {
+      // No think tags to process, render normally
+      return (
+        <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            code: CodeBlock,
+            details: renderEnhancedDetails,
+          }}
+          className={classes.markdown}
+        >
+          {message.text}
+        </ReactMarkdown>
+      );
+    }
+
+    // This message has think tags to transform into reasoning sections
+    const components = [];
+    
+    // First, add reasoning sections for tags at the beginning
+    const beginningThinkTags = thinkContents.filter(think => 
+      think.position === 'beginning' && think.content.trim() !== ''
+    );
+    
+    // Add reasoning sections for beginning think tags
+    for (const thinkItem of beginningThinkTags) {
+      components.push(
+        <React.Fragment key={`reasoning-beginning-${thinkItem.startIndex}`}>
+          {renderReasoningSection(thinkItem.content, `msg-${thinkItem.startIndex}`, 'beginning')}
+        </React.Fragment>
+      );
+    }
+    
+    // Then add the main content with think tags removed
+    components.push(
+      <ReactMarkdown
+        key="main-content"
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          code: CodeBlock,
+          details: renderEnhancedDetails, // This will handle after-summary think tags
+        }}
+        className={classes.markdown}
+      >
+        {processedText}
+      </ReactMarkdown>
+    );
+    
+    return components;
+  };
+
   // Regular non-system messages
   return (
     <div
@@ -1118,17 +1372,27 @@ const Message = memo(({ message, onSectionExpanded }) => {
       ref={messageRef} // Add ref to message container
     >
       {renderModificationIndicator()}
-      <ReactMarkdown
-        rehypePlugins={[rehypeRaw]}
-        components={{
-          code: CodeBlock,
-          // Use our enhanced details renderer for all collapsible sections
-          details: renderEnhancedDetails,
-        }}
-        className={classes.markdown}
-      >
-        {message.text}
-      </ReactMarkdown>
+      
+      {message.sender === 'ai' && thinkContents.length > 0 ? (
+        // For AI messages with think content, use our custom rendering
+        <>
+          {/* Use our renderMessageWithReasoningSections function */}
+          {renderMessageWithReasoningSections()}
+        </>
+      ) : (
+        // For regular messages, render normally
+        <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            code: CodeBlock,
+            details: renderEnhancedDetails,
+          }}
+          className={classes.markdown}
+        >
+          {message.text}
+        </ReactMarkdown>
+      )}
+      
       <Typography variant="caption" className={classes.messageTimestamp}>
         {new Date(message.timestamp).toLocaleTimeString()}
       </Typography>
