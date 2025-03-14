@@ -390,20 +390,75 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   markdownDetails: {
-    cursor: 'pointer',
+    // Reset all potentially problematic properties 
+    listStyle: 'none',
+    display: 'block',
+    margin: '1em 0',
+    padding: 0,
+    borderRadius: theme.shape.borderRadius,
     transition: 'all 0.3s ease',
-    '& summary': {
-      fontWeight: 600,
-      cursor: 'pointer',
-      padding: '0.5em 0',
-      outline: 'none',
-      '&:hover': {
-        color: theme.palette.primary.main,
-      },
+  },
+  // New container for our custom implementation
+  customDetails: {
+    margin: '1em 0',
+    borderRadius: theme.shape.borderRadius,
+    overflow: 'hidden',
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[1],
+  },
+  analysisDetailsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: theme.spacing(1, 1.5),
+    cursor: 'pointer',
+    borderRadius: '8px 8px 0 0',
+    backgroundColor: 'rgba(92, 107, 192, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(92, 107, 192, 0.15)',
     },
-    '& details[open] summary': {
-      color: theme.palette.primary.main,
+  },
+  analysisTitle: {
+    fontWeight: 600,
+    fontSize: '0.95rem',
+    color: theme.palette.text.primary,
+  },
+  analysisExpandToggle: {
+    transition: 'transform 0.3s ease',
+    color: theme.palette.primary.main,
+  },
+  analysisExpanded: {
+    transform: 'rotate(180deg)',
+  },
+  // Expert Analysis gets a slightly different color to visually distinguish it
+  expertAnalysisHeader: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(76, 175, 80, 0.15)',
     },
+  },
+  // Inner details content container
+  analysisContent: {
+    padding: theme.spacing(1.5),
+    backgroundColor: theme.palette.background.paper,
+    transition: 'max-height 0.3s ease, opacity 0.3s ease',
+  },
+  // Hidden content for collapsed sections
+  collapsedContent: {
+    maxHeight: 0,
+    padding: 0,
+    opacity: 0,
+    overflow: 'hidden',
+    transition: 'max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease',
+  },
+  // Visible content for expanded sections
+  expandedContent: {
+    maxHeight: '2000px', // Large enough to fit content
+    opacity: 1,
+    overflow: 'visible',
+    padding: theme.spacing(2),
+    transition: 'max-height 0.5s ease, opacity 0.3s ease, padding 0.3s ease',
   },
   messageTimestamp: {
     fontSize: '0.75rem',
@@ -535,21 +590,22 @@ const Message = memo(({ message }) => {
   const [expandedSections, setExpandedSections] = useState({});
   const [isPlanExpanded, setIsPlanExpanded] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [selectingSectionId, setSelectingSectionId] = useState(null);
   const contentRef = useRef(null);
   const selectionTimeoutRef = useRef(null);
-
-  const handleToggle = (id) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
+  const detailsRefs = useRef({});
 
   // Handle mousedown/up to track text selection
   const handleMouseDown = (e) => {
     // Only track mousedown within the content area
     if (contentRef.current && contentRef.current.contains(e.target)) {
       setIsSelecting(true);
+
+      // Check if mousedown happened in a details section
+      const detailsEl = e.target.closest('details');
+      if (detailsEl && detailsEl.id) {
+        setSelectingSectionId(detailsEl.id);
+      }
     }
   };
 
@@ -559,11 +615,13 @@ const Message = memo(({ message }) => {
       // Only clear selection if no text is actually selected
       if (!window.getSelection().toString()) {
         setIsSelecting(false);
+        setSelectingSectionId(null);
       } else {
         // If text is selected, set another timeout to clear the selecting state
         // after user has had time to copy
         selectionTimeoutRef.current = setTimeout(() => {
           setIsSelecting(false);
+          setSelectingSectionId(null);
         }, 3000); // 3 seconds should be plenty of time to copy
       }
     }, 150);
@@ -583,6 +641,133 @@ const Message = memo(({ message }) => {
     }
     
     setIsPlanExpanded(!isPlanExpanded);
+  };
+
+  // Improved toggle handler for the details sections
+  // This prevents the toggling from affecting parent sections
+  const handleToggle = (id, e) => {
+    // If event is provided, stop propagation to prevent parent toggling
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    // Don't toggle if user is selecting text within the details section
+    if (window.getSelection().toString() || isSelecting) {
+      if (e) {
+        e.preventDefault();
+      }
+      return;
+    }
+    
+    setExpandedSections((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  // Enhanced details renderer with custom header to match plan experience
+  const renderEnhancedDetails = ({ node, children, ...props }) => {
+    // Generate a stable ID using message ID and detail index
+    const detailsIndex = node.position ? node.position.start.line : Math.random();
+    const id = `message-${message.id}-details-${detailsIndex}`;
+
+    // Extract the exact summary text
+    let title = "Expert Analyses"; // Default fallback
+    let summaryContent = null;
+    let detailsContent = [];
+    
+    // Find the summary element and get its exact text
+    React.Children.forEach(children, child => {
+      if (child?.props?.originalType === 'summary') {
+        summaryContent = child;
+        
+        // Extract the exact text content
+        if (typeof child.props.children === 'string') {
+          title = child.props.children; // Use exactly what's in the summary tag
+          console.log("title", title);
+        } else if (Array.isArray(child.props.children)) {
+          // For complex content, join all text parts
+          title = child.props.children
+            .filter(c => typeof c === 'string')
+            .join('');
+        }
+      } else {
+        detailsContent.push(child);
+      }
+    });
+
+    // Style differently only if this is an expert analysis
+    // This doesn't change the title, just the visual appearance
+    const isExpertAnalysis = typeof title === 'string' && 
+      (title === "Expert Analyses" || title.includes("Expert Analysis"));
+    
+    // Get current expanded state
+    const isExpanded = expandedSections[id] || false;
+
+    // Toggle this section only
+    const toggleSection = (e) => {
+      // Stop event propagation
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Don't toggle if user is selecting text
+      if (window.getSelection().toString() || isSelecting) {
+        return;
+      }
+      
+      // Toggle this section's expanded state
+      setExpandedSections((prev) => ({
+        ...prev,
+        [id]: !prev[id],
+      }));
+      
+      return false;
+    };
+
+    // Filter out any redundant "Expert Analyses" text paragraphs
+    const filteredContent = detailsContent.map(child => {
+      if (child?.props?.children && typeof child?.props?.children === 'string') {
+        const text = child.props.children;
+        if (text.trim() === 'Expert Analyses:' || 
+            text.trim() === 'Expert Analysis:') {
+          return null; // Skip this redundant text
+        }
+      }
+      return child;
+    }).filter(Boolean); // Remove null items
+
+    // Return a completely custom div-based implementation that doesn't use native details/summary
+    return (
+      <div className={classes.customDetails}>
+        {/* Custom header with toggle button - using exactly what was in the summary tag */}
+        <div 
+          className={`${classes.analysisDetailsHeader} ${isExpertAnalysis ? classes.expertAnalysisHeader : ''}`}
+          onClick={toggleSection}
+        >
+          <Typography className={classes.analysisTitle}>
+            {title}
+          </Typography>
+          <IconButton 
+            className={`${classes.analysisExpandToggle} ${isExpanded ? classes.analysisExpanded : ''}`}
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSection(e);
+            }}
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </div>
+        
+        {/* Content area - shown/hidden based on expanded state */}
+        <div 
+          className={`${classes.analysisContent} ${isExpanded ? classes.expandedContent : classes.collapsedContent}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {filteredContent}
+        </div>
+      </div>
+    );
   };
 
   // When mounted, add selection listeners to document
@@ -707,25 +892,8 @@ const Message = memo(({ message }) => {
             rehypePlugins={[rehypeRaw]}
             components={{
               code: CodeBlock,
-              details: ({ node, children, ...props }) => {
-                // Generate a stable ID using message ID and detail index
-                const detailsIndex = node.position ? node.position.start.line : Math.random();
-                const id = `message-${message.id}-details-${detailsIndex}`;
-
-                return (
-                  <details
-                    {...props}
-                    open={expandedSections[id] || false}
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent event bubbling
-                      handleToggle(id);
-                    }}
-                    className={classes.markdownDetails}
-                  >
-                    {children}
-                  </details>
-                );
-              },
+              // Use our enhanced details renderer for collapsible sections in the plan
+              details: renderEnhancedDetails,
             }}
             className={classes.markdown}
           >
@@ -749,25 +917,8 @@ const Message = memo(({ message }) => {
         rehypePlugins={[rehypeRaw]}
         components={{
           code: CodeBlock,
-          details: ({ node, children, ...props }) => {
-            // Generate a stable ID using message ID and detail index
-            const detailsIndex = node.position ? node.position.start.line : Math.random();
-            const id = `message-${message.id}-details-${detailsIndex}`;
-
-            return (
-              <details
-                {...props}
-                open={expandedSections[id] || false}
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent event bubbling
-                  handleToggle(id);
-                }}
-                className={classes.markdownDetails}
-              >
-                {children}
-              </details>
-            );
-          },
+          // Use our enhanced details renderer for all collapsible sections
+          details: renderEnhancedDetails,
         }}
         className={classes.markdown}
       >
