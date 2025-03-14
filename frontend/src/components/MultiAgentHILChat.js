@@ -174,6 +174,35 @@ const useStyles = makeStyles((theme) => ({
     '& code': {
       fontFamily: 'monospace',
     },
+    '& details': {
+      margin: '0.5em 0',
+      padding: '0.5em',
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius,
+      boxShadow: theme.shadows[1],
+      
+      '& details': {
+        margin: '0.5em 0',
+        padding: '0.5em',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        boxShadow: 'none',
+        borderLeft: '3px solid rgba(0, 0, 0, 0.1)',
+      }
+    },
+    '& summary': {
+      cursor: 'pointer',
+      fontWeight: 500,
+      marginBottom: '0.3em',
+      padding: '0.3em',
+      '&:hover': {
+        color: theme.palette.primary.main,
+      }
+    },
+    '& details[open] > summary': {
+      marginBottom: '0.5em',
+      fontWeight: 600,
+      color: theme.palette.primary.main,
+    },
   },
   inputArea: {
     display: 'flex',
@@ -649,36 +678,22 @@ const Message = memo(({ message }) => {
     const planInfo = getPlanInfo();
     
     return (
-      <div className={`${classes.message} ${getMessageClass()}`}>
-        {/* Clickable header that toggles plan visibility */}
+      <div className={`${classes.message} ${classes.systemMessage}`}>
+        {/* Clickable header */}
         <div 
           className={classes.planCollapsedHeader}
           onClick={handlePlanToggle}
         >
-          <Box display="flex" alignItems="center">
-            <FormatListBulletedIcon style={{ marginRight: 8, color: '#5c6bc0' }} />
-            <Box>
-              <Typography variant="subtitle2" style={{ fontWeight: 'bold', color: '#5c6bc0' }}>
-                Plan Accepted
-              </Typography>
-              <Typography variant="caption" color="textSecondary" style={{ display: 'flex', alignItems: 'center' }}>
-                {planInfo ? `Execution Plan (${planInfo})` : 'Plan'}
-                <Typography variant="caption" color="primary" style={{ marginLeft: 8, fontStyle: 'italic' }}>
-                  {isPlanExpanded ? 'Click to collapse' : 'Click to expand'}
-                </Typography>
-              </Typography>
-            </Box>
-          </Box>
+          {renderSenderIcon()}
           <IconButton 
+            className={`${classes.planExpandToggle} ${isPlanExpanded ? classes.expanded : ''}`}
             size="small"
-            className={classes.planExpandToggle}
-            style={{ transform: isPlanExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
             onClick={(e) => {
-              e.stopPropagation(); // Prevent multiple event triggers
+              e.stopPropagation();
               setIsPlanExpanded(!isPlanExpanded);
             }}
           >
-            <KeyboardArrowDownIcon />
+            {isPlanExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </div>
         
