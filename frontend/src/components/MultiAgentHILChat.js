@@ -114,6 +114,8 @@ const useStyles = makeStyles((theme) => ({
     textAlign: 'left',
     fontSize: '0.7rem',
     scrollBehavior: 'smooth',
+    width: '100%',
+    boxSizing: 'border-box',
     '&::-webkit-scrollbar': {
       width: '8px',
       zIndex: 2,
@@ -130,6 +132,15 @@ const useStyles = makeStyles((theme) => ({
         background: theme.palette.grey[400],
       },
     },
+    // Improve container for handling expanded content
+    '& > div': {
+      width: 'fit-content',
+      maxWidth: '80%',
+      alignSelf: props => props.sender === 'user' ? 'flex-end' : 'flex-start',
+      [theme.breakpoints.down('sm')]: {
+        maxWidth: '95%',
+      },
+    },
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -143,10 +154,19 @@ const useStyles = makeStyles((theme) => ({
     whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    overflow: 'visible',
+    width: 'auto',
+    willChange: 'transform',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch', // Ensure children stretch to fill container width
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
+    },
+    [theme.breakpoints.down('sm')]: {
+      maxWidth: '95%',
     },
   },
   userMessage: {
@@ -166,13 +186,22 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.grey[100],
     color: theme.palette.text.primary,
     borderBottomLeftRadius: '4px',
+    minWidth: '300px',
+    width: 'fit-content',
+    display: 'flex',          // Add flex display to ensure proper content alignment
+    flexDirection: 'column',  // Stack children vertically
+    alignItems: 'flex-start', // Align children at the start
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
       overflow: 'auto',
+      maxWidth: 'calc(100% - 16px)',
     },
     '& code': {
       fontFamily: 'monospace',
+      maxWidth: '100%',
+      overflowX: 'auto',
+      display: 'inline-block',
     },
     '& details': {
       margin: '0.5em 0',
@@ -180,13 +209,14 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: theme.palette.background.paper,
       borderRadius: theme.shape.borderRadius,
       boxShadow: theme.shadows[1],
+      width: '100%',
       
       '& details': {
         margin: '0.5em 0',
         padding: '0.5em',
         backgroundColor: 'rgba(0, 0, 0, 0.03)',
-        boxShadow: 'none',
         borderLeft: '3px solid rgba(0, 0, 0, 0.1)',
+        width: '100%',
       }
     },
     '& summary': {
@@ -202,6 +232,10 @@ const useStyles = makeStyles((theme) => ({
       marginBottom: '0.5em',
       fontWeight: 600,
       color: theme.palette.primary.main,
+    },
+    // Handle multiple expert analyses sections more elegantly
+    '& .customDetails + .customDetails': {
+      marginTop: theme.spacing(2),
     },
   },
   inputArea: {
@@ -364,6 +398,7 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(2),
   },
   markdown: {
+    width: '100%', // Ensure markdown takes full width of parent 
     '& details': {
       margin: '1em 0',
       padding: '0.5em',
@@ -388,6 +423,20 @@ const useStyles = makeStyles((theme) => ({
         backgroundColor: 'rgba(0, 0, 0, 0.03)',
       },
     },
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      overflowWrap: 'break-word',
+      wordBreak: 'break-word', 
+      maxWidth: '100%',
+    },
+    '& img': {
+      maxWidth: '100%',
+      height: 'auto',
+    },
+    '& table': {
+      maxWidth: '100%',
+      overflow: 'auto',
+      display: 'block',
+    },
   },
   markdownDetails: {
     // Reset all potentially problematic properties 
@@ -402,9 +451,19 @@ const useStyles = makeStyles((theme) => ({
   customDetails: {
     margin: '1em 0',
     borderRadius: theme.shape.borderRadius,
-    overflow: 'hidden',
+    overflow: 'visible',
     backgroundColor: theme.palette.background.paper,
     boxShadow: theme.shadows[1],
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: '250px',
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    // Better handle multiple expanded sections
+    '&:not(:last-child)': {
+      marginBottom: theme.spacing(2),
+    },
   },
   analysisDetailsHeader: {
     display: 'flex',
@@ -423,6 +482,10 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '0.95rem',
     color: theme.palette.text.primary,
+    flexGrow: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   analysisExpandToggle: {
     transition: 'transform 0.3s ease',
@@ -443,6 +506,9 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1.5),
     backgroundColor: theme.palette.background.paper,
     transition: 'max-height 0.3s ease, opacity 0.3s ease',
+    width: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
   },
   // Hidden content for collapsed sections
   collapsedContent: {
@@ -454,11 +520,47 @@ const useStyles = makeStyles((theme) => ({
   },
   // Visible content for expanded sections
   expandedContent: {
-    maxHeight: '2000px', // Large enough to fit content
+    maxHeight: '15000px', // Increased from 5000px to handle multiple expanded sections
     opacity: 1,
     overflow: 'visible',
     padding: theme.spacing(2),
-    transition: 'max-height 0.5s ease, opacity 0.3s ease, padding 0.3s ease',
+    transition: 'max-height 1s ease-in-out, opacity 0.5s ease, padding 0.4s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    '& img, & video': {
+      maxWidth: '100%',
+      height: 'auto',
+    },
+    '& table': {
+      width: '100%',
+      borderCollapse: 'collapse',
+      overflowX: 'auto',
+      display: 'block',
+    },
+    '& p': {
+      margin: '0.5em 0',
+      maxWidth: '100%',
+    },
+    '& ul, & ol': {
+      paddingLeft: '2em',
+      margin: '0.5em 0',
+      maxWidth: '100%',
+    },
+    '& > .customDetails': {
+      width: '100%',
+      marginLeft: 0,
+      marginRight: 0,
+    },
+    '& > *': {
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    },
+    // Nested expanded sections need special handling
+    '& .expandedContent': {
+      maxHeight: '6000px', // Slightly smaller for nested sections
+      width: '100%',
+    },
   },
   messageTimestamp: {
     fontSize: '0.75rem',
@@ -585,7 +687,7 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
 };
 
 // Memoized Message Component with collapsible system messages
-const Message = memo(({ message }) => {
+const Message = memo(({ message, onSectionExpanded }) => {
   const classes = useStyles();
   const [expandedSections, setExpandedSections] = useState({});
   const [isPlanExpanded, setIsPlanExpanded] = useState(false);
@@ -594,6 +696,56 @@ const Message = memo(({ message }) => {
   const contentRef = useRef(null);
   const selectionTimeoutRef = useRef(null);
   const detailsRefs = useRef({});
+  const messageRef = useRef(null); // Add ref for the message container
+
+  // Create a ref callback function at the component level
+  const createRefCallback = useCallback((id) => (node) => {
+    if (node !== null) {
+      detailsRefs.current[id] = node;
+    }
+  }, []);
+
+  // Add a useEffect to update container size when sections are expanded/collapsed
+  useEffect(() => {
+    // Force a reflow/repaint when expansion state changes to ensure proper sizing
+    if (messageRef.current) {
+      // Get all expanded sections
+      const expandedCount = Object.values(expandedSections).filter(Boolean).length;
+      
+      // Apply transform based on expanded sections count
+      messageRef.current.style.transform = 'translateZ(0)';
+      
+      // For multiple expanded sections, add a longer delay to allow all content to expand properly
+      const delay = expandedCount > 1 ? 1000 : 800;
+      
+      // Remove the transform after a moment (allows time for content to expand)
+      setTimeout(() => {
+        if (messageRef.current) {
+          messageRef.current.style.transform = '';
+          
+          // Additional reflow after a short delay if multiple sections are expanded
+          if (expandedCount > 1) {
+            setTimeout(() => {
+              if (messageRef.current) {
+                // Force another reflow to accommodate all expanded content
+                const height = messageRef.current.offsetHeight;
+                messageRef.current.style.transition = 'none';
+                messageRef.current.style.transform = 'translateZ(0)';
+                
+                // Reset transition
+                setTimeout(() => {
+                  if (messageRef.current) {
+                    messageRef.current.style.transition = '';
+                    messageRef.current.style.transform = '';
+                  }
+                }, 50);
+              }
+            }, 500);
+          }
+        }
+      }, delay);
+    }
+  }, [expandedSections, isPlanExpanded]);
 
   // Handle mousedown/up to track text selection
   const handleMouseDown = (e) => {
@@ -643,26 +795,52 @@ const Message = memo(({ message }) => {
     setIsPlanExpanded(!isPlanExpanded);
   };
 
-  // Improved toggle handler for the details sections
-  // This prevents the toggling from affecting parent sections
-  const handleToggle = (id, e) => {
-    // If event is provided, stop propagation to prevent parent toggling
-    if (e) {
-      e.stopPropagation();
-    }
-    
-    // Don't toggle if user is selecting text within the details section
-    if (window.getSelection().toString() || isSelecting) {
-      if (e) {
-        e.preventDefault();
+  // Update setExpandedSections to notify parent component
+  const handleExpandSection = useCallback((id, isExpanded) => {
+    setExpandedSections(prev => {
+      const newState = {
+        ...prev,
+        [id]: !prev[id]
+      };
+      
+      // Notify parent component of change
+      if (onSectionExpanded) {
+        onSectionExpanded(message.id, id, !prev[id]);
       }
+      
+      return newState;
+    });
+  }, [message.id, onSectionExpanded]);
+  
+  // Toggle this section only with proper container updates
+  const toggleSection = (id, e) => {
+    // Stop event propagation
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
       return;
     }
     
-    setExpandedSections((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    // Get current expanded state of this section
+    const currentlyExpanded = expandedSections[id] || false;
+    
+    // Toggle this section's expanded state
+    handleExpandSection(id);
+    
+    // Force parent message container to repaint after toggling
+    if (messageRef.current) {
+      // If expanding, we need more time to ensure content renders properly
+      const delay = !currentlyExpanded ? 100 : 10;
+      
+      setTimeout(() => {
+        const height = messageRef.current.offsetHeight;
+        messageRef.current.style.transform = 'translateZ(0)';
+      }, delay);
+    }
+    
+    return false;
   };
 
   // Enhanced details renderer with custom header to match plan experience
@@ -671,9 +849,6 @@ const Message = memo(({ message }) => {
     const detailsIndex = node.position ? node.position.start.line : Math.random();
     const id = `message-${message.id}-details-${detailsIndex}`;
 
-    // DEBUG: Log the entire children structure
-    console.log("Details children structure:", children);
-    
     // Extract the exact text content
     let title = "Expert Analyses"; // Default fallback
     let summaryContent = null;
@@ -681,9 +856,6 @@ const Message = memo(({ message }) => {
     
     // Find the summary element and get its exact text
     React.Children.forEach(children, child => {
-      // DEBUG: Log each child's structure
-      console.log("Child:", child, "Type:", child?.props?.originalType, "Node Type:", child?.props?.node?.type);
-      
       // Try multiple possible properties to identify summary elements
       const isSummary = 
         child?.props?.originalType === 'summary' || 
@@ -694,22 +866,16 @@ const Message = memo(({ message }) => {
       if (isSummary) {
         summaryContent = child;
         
-        // DEBUG: Log the summary content structure
-        console.log("Found summary:", child.props.children);
-        
         // Extract the exact text content
         if (typeof child.props.children === 'string') {
           title = child.props.children; // Use exactly what's in the summary tag
-          console.log("title (string):", title);
         } else if (Array.isArray(child.props.children)) {
           // For complex content, join all text parts
           title = child.props.children
             .filter(c => typeof c === 'string')
             .join('');
-          console.log("title (array):", title);
         } else if (child.props.children && typeof child.props.children === 'object') {
           // Handle React element objects (might contain value or props.children)
-          console.log("Found object children:", child.props.children);
           
           if (child.props.children.props && child.props.children.props.children) {
             // Try to extract from nested props
@@ -724,8 +890,6 @@ const Message = memo(({ message }) => {
             // Some markdown parsers use a 'value' property
             title = child.props.children.value;
           }
-          
-          console.log("title (object):", title);
         }
       } else {
         detailsContent.push(child);
@@ -740,25 +904,9 @@ const Message = memo(({ message }) => {
     // Get current expanded state
     const isExpanded = expandedSections[id] || false;
 
-    // Toggle this section only
-    const toggleSection = (e) => {
-      // Stop event propagation
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Don't toggle if user is selecting text
-      if (window.getSelection().toString() || isSelecting) {
-        return;
-      }
-      
-      // Toggle this section's expanded state
-      setExpandedSections((prev) => ({
-        ...prev,
-        [id]: !prev[id],
-      }));
-      
-      return false;
-    };
+    // Use the ref callback function created at the component level
+    // No more useCallback here - fixes the React hooks rule violation
+    const detailsContentRef = createRefCallback(id);
 
     // Filter out any redundant "Expert Analyses" text paragraphs
     const filteredContent = detailsContent.map(child => {
@@ -775,15 +923,12 @@ const Message = memo(({ message }) => {
     // Return a completely custom div-based implementation that doesn't use native details/summary
     return (
       <div className={classes.customDetails}>
-        {/* Debug right before render */}
-        {console.log("FINAL TITLE BEING RENDERED:", title)}
-        
         {/* Custom header with toggle button - using exactly what was in the summary tag */}
         <div 
           className={`${classes.analysisDetailsHeader} ${isExpertAnalysis ? classes.expertAnalysisHeader : ''}`}
-          onClick={toggleSection}
+          onClick={(e) => toggleSection(id, e)}
         >
-          <Typography className={classes.analysisTitle}>
+          <Typography className={classes.analysisTitle} title={title}>
             {title}
           </Typography>
           <IconButton 
@@ -791,7 +936,7 @@ const Message = memo(({ message }) => {
             size="small"
             onClick={(e) => {
               e.stopPropagation();
-              toggleSection(e);
+              toggleSection(id, e);
             }}
           >
             <KeyboardArrowDownIcon />
@@ -800,8 +945,10 @@ const Message = memo(({ message }) => {
         
         {/* Content area - shown/hidden based on expanded state */}
         <div 
+          ref={detailsContentRef}
           className={`${classes.analysisContent} ${isExpanded ? classes.expandedContent : classes.collapsedContent}`}
           onClick={(e) => e.stopPropagation()}
+          style={isExpanded ? { height: 'auto' } : {}} // Ensure height is auto when expanded
         >
           {filteredContent}
         </div>
@@ -902,7 +1049,10 @@ const Message = memo(({ message }) => {
     const planInfo = getPlanInfo();
     
     return (
-      <div className={`${classes.message} ${classes.systemMessage}`}>
+      <div 
+        className={`${classes.message} ${classes.systemMessage}`}
+        ref={messageRef} // Add ref to message container
+      >
         {/* Clickable header */}
         <div 
           className={classes.planCollapsedHeader}
@@ -950,6 +1100,7 @@ const Message = memo(({ message }) => {
   return (
     <div
       className={`${classes.message} ${getMessageClass()}`}
+      ref={messageRef} // Add ref to message container
     >
       {renderModificationIndicator()}
       <ReactMarkdown
@@ -984,6 +1135,9 @@ function MultiAgentHILChat() {
   // Add original message state
   const [originalMessage, setOriginalMessage] = useState('');
   
+  // Track when sections are expanded/collapsed
+  const [expandedSectionsTracker, setExpandedSectionsTracker] = useState({});
+  
   // Update scroll handling to use useCallback with debounce
   const handleScroll = useCallback(
     debounce(({ target }) => {
@@ -1012,16 +1166,85 @@ function MultiAgentHILChat() {
     }
   }, [handleScroll]);
 
-  const scrollToBottom = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (messageEndRef.current) {
+      // First try scrollIntoView
+      messageEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      
+      // As a backup, also use scrollTop directly after a short delay
+      // This helps with very large content that might not scroll properly with scrollIntoView
+      setTimeout(() => {
+        if (messageAreaRef.current) {
+          const scrollHeight = messageAreaRef.current.scrollHeight;
+          messageAreaRef.current.scrollTop = scrollHeight;
+        }
+      }, 100);
+    }
+  }, [messageEndRef, messageAreaRef]);
 
+  // Improved scroll effect to handle expanded sections
   useEffect(() => {
     if (state.messages.length > 0) {
-      scrollToBottom();
+      // Use a short delay to ensure the DOM has updated
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     }
-  }, [state.messages]);
-
+  }, [state.messages, expandedSectionsTracker]);
+  
+  // Add a method to track when details sections are expanded/collapsed
+  const handleSectionExpanded = useCallback((messageId, sectionId, isExpanded) => {
+    setExpandedSectionsTracker(prev => {
+      const newState = {
+        ...prev,
+        [`${messageId}-${sectionId}`]: isExpanded
+      };
+      
+      // Count how many sections are expanded in this message
+      const expandedSectionsInMessage = Object.keys(newState)
+        .filter(key => key.startsWith(`${messageId}-`) && newState[key])
+        .length;
+      
+      // If a section is expanded, scroll to make sure it's visible
+      if (isExpanded) {
+        // Add a variable delay depending on how many sections are expanded
+        // More expanded sections need more time to render completely
+        const scrollDelay = 300 + (expandedSectionsInMessage * 100);
+        
+        setTimeout(() => {
+          // Force another layout calculation before scrolling
+          if (messageAreaRef.current) {
+            // Force reflow
+            messageAreaRef.current.style.transform = 'translateZ(0)';
+            
+            // Reset and scroll
+            setTimeout(() => {
+              if (messageAreaRef.current) {
+                messageAreaRef.current.style.transform = '';
+                scrollToBottom();
+              }
+            }, 50);
+          } else {
+            scrollToBottom();
+          }
+        }, scrollDelay);
+      }
+      
+      return newState;
+    });
+  }, [scrollToBottom]);
+  
+  // Pass the handler to the Message component
+  const renderMessage = useCallback((message) => {
+    return (
+      <Message 
+        key={message.id} 
+        message={message} 
+        onSectionExpanded={handleSectionExpanded}
+      />
+    );
+  }, [handleSectionExpanded]);
+  
   // Loading indicator component
   const TypingIndicator = () => (
     <div className={classes.typingIndicator}>
@@ -1761,9 +1984,7 @@ function MultiAgentHILChat() {
               </div>
             </div>
             <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
-              {state.messages.map((message) => (
-                <Message key={message.id} message={message} />
-              ))}
+              {state.messages.map(renderMessage)}
               <div ref={messageEndRef} />
             </div>
 
@@ -2275,4 +2496,5 @@ function MultiAgentHILChat() {
   );
 }
 
-export default memo(MultiAgentHILChat); 
+// Single export at the end
+export default memo(MultiAgentHILChat);
