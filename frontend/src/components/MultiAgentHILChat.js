@@ -667,8 +667,8 @@ const useStyles = makeStyles((theme) => ({
   },
   scrollToBottomButton: {
     position: 'absolute',
-    bottom: '80px',
-    right: '20px',
+    bottom: '165px', // Decreased from 80px to 30px to move button lower on the screen
+    right: '60px',
     zIndex: 1000,
     backgroundColor: '#3f51b5', // Fixed: use direct color instead of theme => theme.palette.primary.main
     color: 'white',
