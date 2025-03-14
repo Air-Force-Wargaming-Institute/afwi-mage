@@ -85,19 +85,33 @@ def expert_subgraph_report(state: ExpertState):
     
     # Get conversation manager
     conversation_manager = ConversationManager()
-    conversation_id = state.get('conversation_id')
+    session_id = state.get('session_id')
     expert_node_id = None
-    
-    # Find the expert node ID
-    if conversation_id:
+    conversation_id = None
+
+    # Get or create conversation based on session_id
+    if session_id:
+        logger.info(f"Session ID: {session_id}")
         try:
-            # Try to find the expert node ID in state
-            if 'node_ids' in state and whoami in state['node_ids']:
-                expert_node_id = state['node_ids'][whoami]
-                logger.info(f"Found expert node ID in state: {expert_node_id}")
+            # Try to get the latest conversation for this session
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            conversation_id = loop.run_until_complete(
+                conversation_manager.get_latest_conversation_id(session_id)
+            )
+            loop.close()
             
-            # If not found in state, try to find it in the conversation
-            if not expert_node_id:
+            if not conversation_id:
+                logger.info(f"No existing conversation, creating a new one")
+                # No existing conversation, create a new one
+                conversation_id = conversation_manager.create_conversation_sync(
+                    question=state['question'],
+                    session_id=session_id,
+                    team_id=state.get('team_id', 'unknown')
+                )
+                logger.info(f"Created new conversation: {conversation_id}")
+            else:
+                logger.info(f"Using existing conversation: {conversation_id}")
                 # Load the conversation
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -105,17 +119,18 @@ def expert_subgraph_report(state: ExpertState):
                     conversation_manager.get_conversation(conversation_id)
                 )
                 loop.close()
-                
+
                 if conversation:
-                    # Look for the expert node
+                    # First, find the expert node
                     for node_id, node in conversation.nodes.items():
                         if node.role == 'expert' and node.name == whoami:
                             expert_node_id = node_id
-                            logger.info(f"Found expert node in conversation: {expert_node_id}")
+                            logger.info(f"Found expert node for {whoami}: {expert_node_id}")
                             break
+                logger.info(f"Using existing conversation: {conversation_id}")
         except Exception as e:
-            logger.error(f"Error finding expert node: {e}", exc_info=True)
-    
+            logger.error(f"Error setting up conversation: {e}")
+
     # Get document summary
     request = get_librarian_request(whoami, state['question'], agent_instructions)
     
@@ -126,7 +141,7 @@ def expert_subgraph_report(state: ExpertState):
         document_summary = f"No relevant documents found for {whoami}'s request: {request}"
         relevant_documents = []
     
-    # Record librarian interaction for final report
+    # Record librarian interaction
     if expert_node_id and conversation_id:
         try:
             conversation_manager.add_interaction_sync(
@@ -134,12 +149,12 @@ def expert_subgraph_report(state: ExpertState):
                 expert_node_id,
                 prompt=request,
                 response=document_summary,
-                prompt_name="final_report_librarian",
+                prompt_name="librarian_request",
                 model="librarian"
             )
         except Exception as e:
-            logger.error(f"Error recording librarian interaction: {e}", exc_info=True)
-    
+            logger.error(f"Error recording librarian interaction: {e}")
+
     # Process collaborator feedback
     collab_report, prompt_template = process_collaborator_feedback(state, whoami)
     
@@ -159,33 +174,29 @@ def expert_subgraph_report(state: ExpertState):
     # Format the prompt with actual values
     formatted_prompt = prompt_template.format(**analysis_inputs)
     
-    logger.info(f"Expert {whoami} model: {state['expert_models'][whoami]}")
+    #logger.info(f"Expert {whoami} model: {state['expert_models'][whoami]}")
     analysis = create_chain(
         prompt_template,
         model=state['expert_models'][whoami],
         **analysis_inputs
     )
-    logger.info(f"Expert {whoami} final analysis: {analysis}")
+    #logger.info(f"Expert {whoami} final analysis: {analysis}")
     
-    # Record final analysis interaction and set final analysis
+    # Record expert final analysis interaction
     if expert_node_id and conversation_id:
         try:
-            # First add the interaction
             conversation_manager.add_interaction_sync(
                 conversation_id,
                 expert_node_id,
                 prompt=formatted_prompt,
                 response=analysis,
-                prompt_name="final_analysis",
-                model=state['expert_models'][whoami]
+                prompt_name="expert_final_analysis",
+                model=state['expert_models'].get(whoami, "default_model")
             )
             
-            # Then explicitly set the final analysis field
-            # Create a new event loop for the async operation
+            # Set final analysis for the expert node
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            
-            # Run the set_final_analysis method
             loop.run_until_complete(
                 conversation_manager.set_final_analysis(
                     conversation_id,
@@ -195,25 +206,9 @@ def expert_subgraph_report(state: ExpertState):
             )
             loop.close()
             
-            logger.info(f"Set final analysis for expert node: {expert_node_id}")
-            
-            # Verify the final analysis was set
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            conversation = loop.run_until_complete(
-                conversation_manager.get_conversation(conversation_id)
-            )
-            loop.close()
-            
-            if conversation and expert_node_id in conversation.nodes:
-                if conversation.nodes[expert_node_id].final_analysis:
-                    logger.info(f"Verified final analysis is set for node {expert_node_id}")
-                else:
-                    logger.warning(f"Final analysis field is still empty for node {expert_node_id}")
-            
         except Exception as e:
-            logger.error(f"Error recording final analysis: {e}", exc_info=True)
-    
+            logger.error(f"Error recording expert final analysis: {e}")
+
     return {'expert_final_analysis': {whoami: analysis}}
 
 def collab_subgraph_entry(state: CollabState):
@@ -242,11 +237,11 @@ def collab_subgraph_entry(state: CollabState):
             loop.close()
             
             if conversation_id:
-                print(f"Found existing conversation: {conversation_id}")
+                logger.info(f"Found existing conversation: {conversation_id}")
             else:
-                print(f"No existing conversation found for session: {session_id}")
+                logger.info(f"No existing conversation found for session: {session_id}")
         except Exception as e:
-            print(f"Error finding conversation: {e}")
+            logger.error(f"Error finding conversation: {e}")
     
     # If we have a conversation ID, find the expert node and create/find the collaborator node
     if conversation_id:
@@ -265,7 +260,7 @@ def collab_subgraph_entry(state: CollabState):
                 for node_id, node in conversation.nodes.items():
                     if node.role == 'expert' and node.name == my_expert:
                         expert_node_id = node_id
-                        print(f"Found expert node for {my_expert}: {expert_node_id}")
+                        logger.info(f"Found expert node for {my_expert}: {expert_node_id}")
                         break
                 
                 if expert_node_id:
@@ -275,7 +270,7 @@ def collab_subgraph_entry(state: CollabState):
                             node.name == whoami and 
                             node.parent_id == expert_node_id):
                             collaborator_node_id = node_id
-                            print(f"Found existing collaborator node for {whoami} under {my_expert}: {collaborator_node_id}")
+                            logger.info(f"Found existing collaborator node for {whoami} under {my_expert}: {collaborator_node_id}")
                             break
                     
                     # If no collaborator node found, create one
@@ -292,9 +287,9 @@ def collab_subgraph_entry(state: CollabState):
                             )
                         )
                         loop.close()
-                        print(f"Created new collaborator node for {whoami} under {my_expert}: {collaborator_node_id}")
+                        logger.info(f"Created new collaborator node for {whoami} under {my_expert}: {collaborator_node_id}")
         except Exception as e:
-            print(f"Error finding or creating collaborator node: {e}")
+            logger.error(f"Error finding or creating collaborator node: {e}")
     
     # Get document summary with collaboration context
     context = f"Report from {my_expert}:\n{state['expert_analysis'][my_expert]}\nAreas needing work:\n{state['expert_collab_areas'][my_expert]}"
@@ -313,7 +308,7 @@ def collab_subgraph_entry(state: CollabState):
                 model="librarian"
             )
         except Exception as e:
-            print(f"Error recording librarian interaction: {e}")
+            logger.error(f"Error recording librarian interaction: {e}")
     
     # Generate collaboration analysis
     prompt_template = PromptTemplate(
@@ -365,7 +360,7 @@ def collab_subgraph_entry(state: CollabState):
             loop.close()
             
         except Exception as e:
-            print(f"Error recording collaboration analysis: {e}")
+            logger.error(f"Error recording collaboration analysis: {e}")
     
     # Return the collaboration analysis with the correct structure
     # Note: The report is from the collaborator (whoami) to the expert (my_expert)
@@ -401,9 +396,9 @@ def expert_subgraph_entry(state: ExpertState):
                     session_id=session_id,
                     team_id=state.get('team_id', 'unknown')
                 )
-                print(f"Created new conversation: {conversation_id}")
+                logger.info(f"Created new conversation: {conversation_id}")
             else:
-                print(f"Using existing conversation: {conversation_id}")
+                logger.info(f"Using existing conversation: {conversation_id}")
                 
             # Add expert node to the conversation using the new sync method
             expert_node_id = conversation_manager.add_expert_sync(
@@ -411,14 +406,14 @@ def expert_subgraph_entry(state: ExpertState):
                 whoami, 
                 instructions=state['expert_instructions'][whoami]
             )
-            print(f"Added expert node: {expert_node_id}")
+            logger.info(f"Added expert node: {expert_node_id}")
             
             # Store conversation_id in state for future reference
             if 'conversation_id' not in state:
                 state['conversation_id'] = conversation_id
                 
         except Exception as e:
-            print(f"Error setting up conversation: {e}")
+            logger.error(f"Error setting up conversation: {e}")
     
     # Get initial document summary
     agent_instructions = state['expert_instructions'][whoami]
@@ -437,7 +432,7 @@ def expert_subgraph_entry(state: ExpertState):
                 model="librarian"
             )
         except Exception as e:
-            print(f"Error recording librarian interaction: {e}")
+            logger.error(f"Error recording librarian interaction: {e}")
     
     # Generate initial analysis
     documents_text = "\n\n".join([doc.page_content for doc in relevant_documents])
@@ -474,7 +469,7 @@ def expert_subgraph_entry(state: ExpertState):
                 model=state['expert_models'][whoami]
             )
         except Exception as e:
-            print(f"Error recording initial analysis: {e}")
+            logger.error(f"Error recording initial analysis: {e}")
     
     # Generate reflection
     reflection_prompt_template = create_reflection_prompt()
@@ -509,7 +504,7 @@ def expert_subgraph_entry(state: ExpertState):
                 model=state['expert_models'][whoami]
             )
         except Exception as e:
-            print(f"Error recording reflection: {e}")
+            logger.error(f"Error recording reflection: {e}")
     
     # Determine collaborators
     expert_agents_withoutme = copy.deepcopy(state['expert_list'])
@@ -571,7 +566,7 @@ def expert_subgraph_entry(state: ExpertState):
                         )
                     )
                     loop.close()
-                    print(f"Added collaborator node: {collab_node_id}")
+                    logger.info(f"Added collaborator node: {collab_node_id}")
                     
                     # Store collaborator node ID in state
                     if 'node_ids' not in state:
@@ -581,7 +576,7 @@ def expert_subgraph_entry(state: ExpertState):
                     state['node_ids']['collaborator_ids'][collaborator] = collab_node_id
                     
             except Exception as e:
-                print(f"Error handling collaborations: {e}")
+                logger.error(f"Error handling collaborations: {e}")
         
         result.update({
             'expert_collab_areas': {whoami: collab_areas},
@@ -608,7 +603,7 @@ def expert_subgraph_entry(state: ExpertState):
             )
             loop.close()
         except Exception as e:
-            print(f"Error setting final analysis: {e}")
+            logger.error(f"Error setting final analysis: {e}")
     
     # Store node ID in state for future reference
     if expert_node_id:
