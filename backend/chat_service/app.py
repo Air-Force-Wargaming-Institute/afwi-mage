@@ -255,8 +255,7 @@ def _process_refine_chat(request_data: ChatMessage):
         "plan": response['parsed'].plan,
         "modified_message": response['parsed'].modified_message,
         "plan_notes": response['parsed'].plan_notes,
-        "selected_agents": response['parsed'].selected_agents,
-        "conversation_id": conversation_id
+        "selected_agents": response['parsed'].selected_agents
     }
 
 @app.post("/chat/process")
