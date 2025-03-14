@@ -671,25 +671,61 @@ const Message = memo(({ message }) => {
     const detailsIndex = node.position ? node.position.start.line : Math.random();
     const id = `message-${message.id}-details-${detailsIndex}`;
 
-    // Extract the exact summary text
+    // DEBUG: Log the entire children structure
+    console.log("Details children structure:", children);
+    
+    // Extract the exact text content
     let title = "Expert Analyses"; // Default fallback
     let summaryContent = null;
     let detailsContent = [];
     
     // Find the summary element and get its exact text
     React.Children.forEach(children, child => {
-      if (child?.props?.originalType === 'summary') {
+      // DEBUG: Log each child's structure
+      console.log("Child:", child, "Type:", child?.props?.originalType, "Node Type:", child?.props?.node?.type);
+      
+      // Try multiple possible properties to identify summary elements
+      const isSummary = 
+        child?.props?.originalType === 'summary' || 
+        child?.props?.node?.type === 'element' && child?.props?.node?.tagName === 'summary' ||
+        child?.props?.node?.type === 'summary' ||
+        child?.type === 'summary';
+      
+      if (isSummary) {
         summaryContent = child;
+        
+        // DEBUG: Log the summary content structure
+        console.log("Found summary:", child.props.children);
         
         // Extract the exact text content
         if (typeof child.props.children === 'string') {
           title = child.props.children; // Use exactly what's in the summary tag
-          console.log("title", title);
+          console.log("title (string):", title);
         } else if (Array.isArray(child.props.children)) {
           // For complex content, join all text parts
           title = child.props.children
             .filter(c => typeof c === 'string')
             .join('');
+          console.log("title (array):", title);
+        } else if (child.props.children && typeof child.props.children === 'object') {
+          // Handle React element objects (might contain value or props.children)
+          console.log("Found object children:", child.props.children);
+          
+          if (child.props.children.props && child.props.children.props.children) {
+            // Try to extract from nested props
+            if (typeof child.props.children.props.children === 'string') {
+              title = child.props.children.props.children;
+            } else if (Array.isArray(child.props.children.props.children)) {
+              title = child.props.children.props.children
+                .filter(c => typeof c === 'string')
+                .join('');
+            }
+          } else if (child.props.children.value) {
+            // Some markdown parsers use a 'value' property
+            title = child.props.children.value;
+          }
+          
+          console.log("title (object):", title);
         }
       } else {
         detailsContent.push(child);
@@ -739,6 +775,9 @@ const Message = memo(({ message }) => {
     // Return a completely custom div-based implementation that doesn't use native details/summary
     return (
       <div className={classes.customDetails}>
+        {/* Debug right before render */}
+        {console.log("FINAL TITLE BEING RENDERED:", title)}
+        
         {/* Custom header with toggle button - using exactly what was in the summary tag */}
         <div 
           className={`${classes.analysisDetailsHeader} ${isExpertAnalysis ? classes.expertAnalysisHeader : ''}`}
