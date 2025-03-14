@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Enum
 from database import Base
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum as PyEnum
 
 class UserPermission(str, PyEnum):
@@ -26,8 +26,8 @@ class UserOut(BaseModel):
     username: str
     permission: UserPermission
 
-    class Config:
-        orm_mode = True
+    # Replace Config class with model_config
+    model_config = ConfigDict(from_attributes=True)  # replaces orm_mode=True
 
 class Token(BaseModel):
     access_token: str

@@ -1,17 +1,15 @@
 # Web framework and related
-fastapi==0.68.1
-uvicorn==0.15.0
-pydantic>=1.8.2,<2.0.0
-python-multipart==0.0.5
-python-docx==0.8.11
-PyPDF4==1.27.0
-aiofiles==0.7.0
-python-magic==0.4.24
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+fastapi>=0.115.11
+uvicorn>=0.34.0
+pydantic>=2.0,<3.0.0
+python-multipart>=0.0.20
+python-docx>=1.1.2
+PyPDF4>=1.27.0
+aiofiles>=24.1.0
+python-magic>=0.4.27
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
 
 # System and file operations
-pathlib==1.0.1
-python-dotenv==1.0.0
-
-requests
+# pathlib removed - part of Python standard library since 3.4
+python-dotenv==1.0.1

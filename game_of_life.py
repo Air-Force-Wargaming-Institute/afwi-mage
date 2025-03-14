@@ -35,7 +35,7 @@ def animate(frame):
     img.set_array(game.grid)
     return [img]
 
-# Create game instance and setup visualization
+# Create game instance and setup visualizations
 game = GameOfLife(100)
 fig, ax = plt.subplots()
 img = ax.imshow(game.grid, interpolation='nearest')

@@ -38,6 +38,10 @@ class EmbeddingModelInfo(BaseModel):
     name: str
     description: str
     provider: str
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreInfo(BaseModel):
@@ -50,6 +54,10 @@ class VectorStoreInfo(BaseModel):
     file_count: int
     chunk_size: int = 1000
     chunk_overlap: int = 100
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class VectorStoreDetailInfo(BaseModel):
@@ -62,6 +70,10 @@ class VectorStoreDetailInfo(BaseModel):
     files: List[Dict[str, Any]]
     chunk_size: int = 1000
     chunk_overlap: int = 100
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class CreateVectorStoreRequest(BaseModel):
@@ -71,6 +83,10 @@ class CreateVectorStoreRequest(BaseModel):
     embedding_model: str = "nomic-embed-text"
     chunk_size: int = 1000
     chunk_overlap: int = 100
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class CreateVectorStoreResponse(BaseModel):
@@ -78,17 +94,29 @@ class CreateVectorStoreResponse(BaseModel):
     message: str
     vectorstore_id: Optional[str] = None
     skipped_files: Optional[List[str]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreRequest(BaseModel):
     vectorstore_id: str
     files: List[str]
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class UpdateVectorStoreResponse(BaseModel):
     success: bool
     message: str
     skipped_files: Optional[List[str]] = None
+    
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 # Create the router

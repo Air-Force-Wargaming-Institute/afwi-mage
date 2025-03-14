@@ -1,0 +1,32 @@
+{
+  "document_id": "5fad4134-256c-458e-8e9a-c44195946b3b",
+  "security_classification": "NATO Secret",
+  "upload_date": "2025-03-12T20:34:20.378953",
+  "original_file": "2024-05-20 To Be More Precise - Beidou.pdf",
+  "converted_pdf": null,
+  "file_info": {
+    "name": "2024-05-20 To Be More Precise - Beidou.pdf",
+    "type": "PDF",
+    "size": 3201373,
+    "path": "Folder Test/2024-05-20 To Be More Precise - Beidou.pdf",
+    "extension": ".pdf"
+  },
+  "content_info": {
+    "total_pages": 135,
+    "has_conversion": false,
+    "conversion_info": null,
+    "content_type": "PDF",
+    "encoding": null,
+    "pdf_info": {
+      "version": "%PDF-1.7",
+      "is_encrypted": false,
+      "metadata": {
+        "/Author": "Brendan Mulvaney",
+        "/Creator": "Microsoft\u00ae Word for Microsoft 365",
+        "/CreationDate": "D:20240405194551-04'00'",
+        "/ModDate": "D:20240405194551-04'00'",
+        "/Producer": "Microsoft\u00ae Word for Microsoft 365"
+      }
+    }
+  }
+}

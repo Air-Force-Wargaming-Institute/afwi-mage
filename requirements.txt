@@ -1,42 +1,56 @@
 # Web Framework and Core Dependencies
-fastapi==0.111.1 #0.115.8
-uvicorn[standard]==0.32.0 #0.34.0
-python-multipart==0.0.12 #0.0.20
-pydantic>=2.0 #2.10.6
+fastapi>=0.115.11
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.20 
+pydantic>=2.0,<3.0.0
 
 # LangChain and AI
-langchain-openai==0.2.4 #0.3.6
-langchain-community==0.3.3 #0.3.18
-langchain-core==0.3.13 #0.3.37
-langchain==0.3.4 #0.3.19
-langgraph==0.2.39 #0.2.74
-faiss-cpu==1.9.0 #1.10.0
+langchain-openai>=0.3 
+langchain-community>=0.3 
+langchain-core>=0.3 
+langchain-text-splitters>=0.3
+langchain-openai>=0.3
+langchain-ollama>=0.2
+langchain>=0.3
+langgraph>=0.3 
+faiss-cpu>=1.7.0
+ollama==0.3.3
 
 # Database
-SQLAlchemy==2.0.27 #2.0.38
-psycopg2-binary==2.9.9 #3.2.4
+SQLAlchemy>=2.0.27
+psycopg2-binary>=2.9.9
 
 # Security
-python-jose[cryptography]==3.3.0 #3.4.0
-passlib[bcrypt]==1.7.4
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
 
 # Document Processing
 PyPDF4==1.27.0
+PyPDF2>=3.0.0
+pypdf>=5.3.1
 python-docx==1.1.2
-pdfplumber==0.11.3 #0.11.5
+pdfplumber==0.11.3
 nltk==3.9.1
+unstructured==0.10.16
+unstructured-inference==0.6.6
 
 # File Operations
-aiofiles==23.2.1 #24.1.0
-python-magic==0.4.24
+aiofiles==24.1.0
+python-magic>=0.4.27
 
 # HTTP and API
-requests==2.31.0 #2.32.3
-httpx>=0.24.0,<0.27.0 #0.28.1
+requests==2.31.0
+httpx>=0.24.0
+flask>=3.1
+flask-cors>=5.0
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv==1.0.1
 typing-extensions==4.12.2
-pathlib==1.0.1
 pytest-shutil==1.8.1
-PyYAML==6.0.1
+PyYAML>=6.0.1
+filelock>=3.17
+portalocker>=3.1
+
+# System monitoring
+psutil==5.9.5

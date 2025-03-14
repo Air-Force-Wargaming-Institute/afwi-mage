@@ -254,9 +254,9 @@ def extract_from_pdf(file_path):
             extracted_content = []
             
             with open(file_path, 'rb') as file:
-                reader = PdfReader(file)
-                for page in range(len(reader.pages)):
-                    text = reader.pages[page].extract_text()
+                reader = PdfFileReader(file)
+                for page in range(reader.getNumPages()):
+                    text = reader.getPage(page).extractText()
                     if text and text.strip():
                         # Normalize newlines and spaces
                         text = re.sub(r'\s+', ' ', text)

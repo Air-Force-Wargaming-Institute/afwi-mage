@@ -9,7 +9,7 @@ This module provides API endpoints for:
 import sys
 from typing import List, Dict, Any
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Import from the core module with better error handling
 try:
@@ -44,6 +44,18 @@ class EmbeddingModelInfo(BaseModel):
     name: str
     description: str
     provider: str
+    
+    model_config = {
+        "extra": "ignore",  # Equivalent to the old Config.extra = "ignore"
+        "json_schema_extra": {
+            "example": {
+                "id": "nomic-embed-text",
+                "name": "Nomic Embed Text",
+                "description": "Text embedding model from Nomic AI",
+                "provider": "Nomic AI"
+            }
+        }
+    }
 
 
 @router.get("", response_model=List[EmbeddingModelInfo])

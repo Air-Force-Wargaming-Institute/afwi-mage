@@ -128,6 +128,13 @@ async def refine_chat(request_data: ChatMessage):
 def _process_refine_chat(request_data: ChatMessage):
     # Initialize LLM
     llm = LLMManager().get_llm()
+    class SelectedAgents(BaseModel):
+        """
+        Structured output for storing the names of the agents selected to answer the message
+        agents: a list of agent names that will be tasked with answering the message
+        """
+        agents: List[str]
+
     class UserPlan(BaseModel):
         """
         Structured output for the planning phase of multi-agent interactions.
@@ -136,10 +143,10 @@ def _process_refine_chat(request_data: ChatMessage):
         plan_notes: notes about the plan created for the user
         modified_message: the new message that the user may approve
         """
-        selected_agents: List[str]  # a list of agent names that will be tasked with answering the message
         plan: str                   # The approach each agent will take to answering the message, and what they will contribute to the response
         plan_notes: str             # notes about the plan created for the user
-        modified_message: str      # the new message that the user has approved
+        modified_message: str       # the new message that the user has approved
+
     # Initialize SessionManager
     session_manager = SessionManager()
 
@@ -198,6 +205,49 @@ def _process_refine_chat(request_data: ChatMessage):
         formatted_history.append(chat_entry)
     conversation_history = "\n\n".join(formatted_history)
 
+    def select_agents():
+        """
+        Pre-select the agents that will be tasked with answering the message
+        TODO: Further refine this process to handle whether or not the user is refining a plan
+        """
+        select_agents_template = """You are given a list of expert agents and another list with each agent mapped to their instructions. These instructions define how each agent attempts to respond to messages and what sort of topics they cover in their responses. Using these two lists, select agents that are well-suited for responding to the message from the user.
+        You can select any number of agents from the list, up to the number of agents in the team. If no agents seem to be a good fit, you can select no agents. If the user's message seems irrelevant to the team's expertise, you can select no agents. Here are some examples of irrelevant messages: \"Hello!\", \"What is the meaning of life?\", \"My name is John.\", \"What day is it?\", \"Test\", \"What is the weather in Tokyo?\", \"Guess my favorite color.\"
+        Make sure you do not select the same agent more than once. The name of each agent you select should be in the list of expert agents.
+        Format your response as a Python list of agent names.
+        Message: {message}
+        Expert Agents: {agent_names}
+        Expert Agents Mapped to Instructions: {agents_with_instructions}
+        """
+        prompt = PromptTemplate(
+            input_variables=["message", "agent_names", "agents_with_instructions"],
+            template=select_agents_template
+        )
+        prompt = prompt.format(
+            message=request_data.message,
+            agent_names=str(agent_names),
+            agents_with_instructions=agents_with_instructions
+        )
+        response = llm.with_structured_output(SelectedAgents).invoke([HumanMessage(content=prompt)])
+        
+        # Validate that all agents in response.agents exist in agent_names
+        valid_agents = [agent for agent in response.agents if agent in agent_names]
+        
+        # Log any invalid agents that were removed
+        if len(valid_agents) != len(response.agents):
+            invalid_agents = [agent for agent in response.agents if agent not in agent_names]
+            logger.warning(f"Removed invalid agents from LLM response: {invalid_agents}")
+            
+        logger.info(f"Selected agents: {valid_agents}")
+        return valid_agents
+
+    selected_agents = select_agents()
+
+    #update the agents_with_instructions to only include the selected agents
+    agents_with_instructions = "\n".join(
+        f"- {agent}: {agent_instructions[agent]}" 
+        for agent in sorted(selected_agents)
+    )
+
     # Initialize conversation manager
     conversation_manager = ConversationManager()
     
@@ -218,6 +268,24 @@ def _process_refine_chat(request_data: ChatMessage):
     # Handle plan creation
     if request_data.plan:
         logger.info("[REFINE_PLAN] Using subsequent refinement template")
+        # plan_template = config["HIGH_LEVEL_PROMPT"] + """You are a planning coordinator for a multi-agent AI team. Given the following team of experts and their domain, the previous attempt at a plan, and the message the user has sent you explaining what they would like to change in the plan, you will do the following: 
+        # 1. Use the previous plan as the foundation for your new plan
+        # 2. Review the user's message to modify the plan in the ways they request. Be sure not to lose sight of the user's original intent, however. Do not use general language such as "the query topic", "the query", "the topic at hand", etc.
+        # 3. Determine which agents are qualified and necessary to work in the new plan. Always include the subject of the plan in the details for each selected agent.
+        # 4. Explain clearly and in detail what and how each agent will contribute to the response
+        # 5. Format this plan in a way that is easy to understand for the user
+    
+        # Message: {message}
+        # Previous Plan: {previous_plan}
+        # Team of Experts: {agents_with_instructions}
+
+        # While writing your plan, make sure you explain why you are choosing each agent and how they will contribute to the response, ensuring that facets of the plan are contained in each agent's details. Your response should be clear and user-friendly, avoiding technical jargon where possible.
+        # """
+        # prompt = PromptTemplate(
+        #     input_variables=["current_datetime", "message", "previous_plan", "agents_with_instructions"],
+        #     template=plan_template
+        # )
+        # TODO: If the user picks agents from the check boxes, update selected agents and the agents_with_instructions
         prompt = SystemPromptManager().get_prompt_template("plan_prompt_with_previous_plan")
         prompt_text = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -225,6 +293,7 @@ def _process_refine_chat(request_data: ChatMessage):
             original_message=request_data.original_message,
             comments=request_data.comments,
             previous_plan=request_data.plan,
+            agent_names=str(selected_agents),
             agents_with_instructions=agents_with_instructions
         )
     else:
@@ -232,7 +301,7 @@ def _process_refine_chat(request_data: ChatMessage):
         prompt_text = prompt.format(
             current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             message=request_data.message,
-            conversation_history=conversation_history,
+            agent_names=str(selected_agents),
             agents_with_instructions=agents_with_instructions
         )
 
@@ -255,7 +324,7 @@ def _process_refine_chat(request_data: ChatMessage):
         "plan": response['parsed'].plan,
         "modified_message": response['parsed'].modified_message,
         "plan_notes": response['parsed'].plan_notes,
-        "selected_agents": response['parsed'].selected_agents
+        "selected_agents": selected_agents
     }
 
 @app.post("/chat/process")

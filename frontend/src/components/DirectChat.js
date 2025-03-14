@@ -2111,6 +2111,11 @@ const DirectChat = () => {
     TK: false
   });
 
+  // Add delete confirmation dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const [deleteSessionName, setDeleteSessionName] = useState('');
+
   // Function to reset all caveats
   const resetCaveats = () => {
     setCaveatStates({
@@ -2225,13 +2230,27 @@ const DirectChat = () => {
     }
   };
   
-  const handleDeleteChat = async (sessionId) => {
+  const handleDeleteConfirmation = (event, sessionId) => {
+    // Prevent the event from bubbling up to the ListItem
+    event.stopPropagation();
+    
+    // Find session name for confirmation message
+    const sessionToDelete = chatSessions.find(s => s.id === sessionId);
+    
+    if (sessionToDelete) {
+      setDeleteSessionId(sessionId);
+      setDeleteSessionName(sessionToDelete.name);
+      setDeleteDialogOpen(true);
+    }
+  };
+  
+  const handleDeleteChat = async () => {
     try {
-      await deleteChatSession(sessionId);
-      setChatSessions(prev => prev.filter(session => session.id !== sessionId));
+      await deleteChatSession(deleteSessionId);
+      setChatSessions(prev => prev.filter(session => session.id !== deleteSessionId));
       
-      if (sessionId === currentSessionId) {
-        const remainingSessions = chatSessions.filter(s => s.id !== sessionId);
+      if (deleteSessionId === currentSessionId) {
+        const remainingSessions = chatSessions.filter(s => s.id !== deleteSessionId);
         if (remainingSessions.length > 0) {
           setCurrentSessionId(remainingSessions[0].id);
         } else {
@@ -2241,6 +2260,11 @@ const DirectChat = () => {
       }
     } catch (error) {
       setError('Failed to delete chat');
+    } finally {
+      // Close the confirmation dialog
+      setDeleteDialogOpen(false);
+      setDeleteSessionId(null);
+      setDeleteSessionName('');
     }
   };
 
@@ -2504,7 +2528,7 @@ const DirectChat = () => {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete">
-                      <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteChat(session.id)}>
+                      <IconButton edge="end" aria-label="delete" onClick={(e) => handleDeleteConfirmation(e, session.id)}>
                         <DeleteIcon />
                       </IconButton>
                     </Tooltip>
@@ -2910,6 +2934,46 @@ const DirectChat = () => {
             disabled={!editSessionName.trim() || editSessionName === editingSession?.name}
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setDeleteSessionId(null);
+          setDeleteSessionName('');
+        }}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to delete the chat session "{deleteSessionName}"?
+          </Typography>
+          <Typography variant="body2" color="error" style={{ marginTop: '12px' }}>
+            This action cannot be undone. All chat history in this session will be permanently deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setDeleteSessionId(null);
+              setDeleteSessionName('');
+            }}
+            color="primary"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteChat}
+            color="secondary"
+            variant="contained"
+            startIcon={<DeleteIcon />}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

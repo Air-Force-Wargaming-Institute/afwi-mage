@@ -17,7 +17,7 @@
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd AFWI-MAGE-FineTune
+cd afwi-multi-agent-generative-engine
 ```
 
 ### 2. Start Docker Desktop
@@ -25,7 +25,18 @@ cd AFWI-MAGE-FineTune
 - Look for the whale icon in your system tray
 - Wait until it stops animating
 
-### 3. Start the Backend
+### 3. Build the source container image
+
+- If it's the first time running the app, you need to install the backend dependencies with:
+```bash
+docker build -t mage-base:latest -f Dockerfile.base .
+```
+- Alternatvely, use the build script provided:
+```bash
+.\build-base-image.sh
+```
+
+### 4. Start the Backend
 ```bash
 # Windows users: Use Git Bash or WSL terminal
 cd backend
@@ -33,14 +44,13 @@ cd backend
 # Copy environment file
 cp auth_service/.env.example auth_service/.env
 
-# If it's the first time running the app, you need to install the backend dependencies with:
 docker compose build   # Note: First build will take longer due to NLTK data download (about 3.5GB)
 
 # Start all services
 docker compose up # Add the -d flag at the end to run in detached mode and hide the logs
 ```
 
-### 4. Start the Frontend
+### 5. Start the Frontend
 ```bash
 # Open a new terminal window
 cd frontend
@@ -48,11 +58,11 @@ npm install
 npm start
 ```
 
-### 5. Access the Application
+### 6. Access the Application
 - The application will automatically open in your default browser
 - If it doesn't, visit: http://localhost:3000
 
-### 6. Default AdminLog In
+### 7. Default AdminLog In
 - Username: `admin`
 - Password: `12345`
 
