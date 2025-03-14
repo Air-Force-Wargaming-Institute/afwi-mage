@@ -826,6 +826,10 @@ const Message = memo(({ message, onSectionExpanded }) => {
     // Get current expanded state of this section
     const currentlyExpanded = expandedSections[id] || false;
     
+    // Find the closest scrollable parent
+    const scrollableParent = findScrollableParent(e.target);
+    const scrollTop = scrollableParent ? scrollableParent.scrollTop : 0;
+    
     // Toggle this section's expanded state
     handleExpandSection(id);
     
@@ -837,10 +841,34 @@ const Message = memo(({ message, onSectionExpanded }) => {
       setTimeout(() => {
         const height = messageRef.current.offsetHeight;
         messageRef.current.style.transform = 'translateZ(0)';
+        
+        // Restore scroll position after reflow
+        setTimeout(() => {
+          messageRef.current.style.transform = '';
+          if (scrollableParent) {
+            scrollableParent.scrollTop = scrollTop;
+          }
+        }, 50);
       }, delay);
     }
     
     return false;
+  };
+  
+  // Helper function to find the closest scrollable parent
+  const findScrollableParent = (element) => {
+    if (!element) return null;
+    
+    // Check if the element itself is scrollable
+    if (
+      element.scrollHeight > element.clientHeight ||
+      element.scrollWidth > element.clientWidth
+    ) {
+      return element;
+    }
+    
+    // Recursively check parent elements
+    return findScrollableParent(element.parentElement);
   };
 
   // Enhanced details renderer with custom header to match plan experience
@@ -1182,57 +1210,58 @@ function MultiAgentHILChat() {
     }
   }, [messageEndRef, messageAreaRef]);
 
-  // Improved scroll effect to handle expanded sections
+  // Improved scroll effect - only scroll on new messages, never on section toggling
   useEffect(() => {
+    // Only auto-scroll when a new message is added
     if (state.messages.length > 0) {
-      // Use a short delay to ensure the DOM has updated
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
+      const lastMessage = state.messages[state.messages.length - 1];
+      const isNewMessageAdded = lastMessage.id && !state.isLoading;
+      
+      if (isNewMessageAdded) {
+        // Small delay to ensure the DOM has updated
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      }
     }
-  }, [state.messages, expandedSectionsTracker]);
+  }, [state.messages.length, scrollToBottom]); // Only depend on messages length, not expandedSections
   
   // Add a method to track when details sections are expanded/collapsed
   const handleSectionExpanded = useCallback((messageId, sectionId, isExpanded) => {
+    // Save current scroll position before updating state
+    const messageArea = messageAreaRef.current;
+    const currentScrollTop = messageArea ? messageArea.scrollTop : 0;
+    
     setExpandedSectionsTracker(prev => {
       const newState = {
         ...prev,
         [`${messageId}-${sectionId}`]: isExpanded
       };
       
-      // Count how many sections are expanded in this message
-      const expandedSectionsInMessage = Object.keys(newState)
-        .filter(key => key.startsWith(`${messageId}-`) && newState[key])
-        .length;
-      
-      // If a section is expanded, scroll to make sure it's visible
-      if (isExpanded) {
-        // Add a variable delay depending on how many sections are expanded
-        // More expanded sections need more time to render completely
-        const scrollDelay = 300 + (expandedSectionsInMessage * 100);
+      // Force reflow to ensure proper rendering, but maintain scroll position
+      if (messageArea) {
+        // Add a consistent delay to let the content update
+        const scrollDelay = 300;
         
         setTimeout(() => {
-          // Force another layout calculation before scrolling
-          if (messageAreaRef.current) {
-            // Force reflow
-            messageAreaRef.current.style.transform = 'translateZ(0)';
-            
-            // Reset and scroll
-            setTimeout(() => {
-              if (messageAreaRef.current) {
-                messageAreaRef.current.style.transform = '';
-                scrollToBottom();
-              }
-            }, 50);
-          } else {
-            scrollToBottom();
-          }
+          // Force a reflow
+          messageArea.style.transform = 'translateZ(0)';
+          
+          setTimeout(() => {
+            if (messageArea) {
+              // Reset transform
+              messageArea.style.transform = '';
+              
+              // Always maintain the current scroll position, never auto-scroll
+              messageArea.scrollTop = currentScrollTop;
+            }
+          }, 50);
         }, scrollDelay);
       }
       
       return newState;
     });
-  }, [scrollToBottom]);
+  }, []); // Remove scrollToBottom dependency
   
   // Pass the handler to the Message component
   const renderMessage = useCallback((message) => {
