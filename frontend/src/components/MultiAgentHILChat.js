@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import {
   Container,
@@ -26,7 +26,8 @@ import {
   ListItemText,
   Divider,
   Tooltip,
-  ListItemIcon
+  ListItemIcon,
+  Checkbox
 } from '@material-ui/core';
 import SendIcon from '@material-ui/icons/Send';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
@@ -54,6 +55,12 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
 import PersonIcon from '@mui/icons-material/Person';
+
+// Simple function to replace triple backticks with spaces
+const removeTripleBackticks = (text) => {
+  if (!text) return '';
+  return text.replace(/```/g, ' ');
+};
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -113,6 +120,8 @@ const useStyles = makeStyles((theme) => ({
     textAlign: 'left',
     fontSize: '0.7rem',
     scrollBehavior: 'smooth',
+    width: '100%',
+    boxSizing: 'border-box',
     '&::-webkit-scrollbar': {
       width: '8px',
       zIndex: 2,
@@ -129,6 +138,15 @@ const useStyles = makeStyles((theme) => ({
         background: theme.palette.grey[400],
       },
     },
+    // Improve container for handling expanded content
+    '& > div': {
+      width: 'fit-content',
+      maxWidth: '80%',
+      alignSelf: props => props.sender === 'user' ? 'flex-end' : 'flex-start',
+      [theme.breakpoints.down('sm')]: {
+        maxWidth: '95%',
+      },
+    },
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -142,10 +160,19 @@ const useStyles = makeStyles((theme) => ({
     whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    overflow: 'visible',
+    width: 'auto',
+    willChange: 'transform',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch', // Ensure children stretch to fill container width
     '&:hover': {
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
       transform: 'translateY(-1px)',
+    },
+    [theme.breakpoints.down('sm')]: {
+      maxWidth: '95%',
     },
   },
   userMessage: {
@@ -165,13 +192,56 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.grey[100],
     color: theme.palette.text.primary,
     borderBottomLeftRadius: '4px',
+    minWidth: '300px',
+    width: 'fit-content',
+    display: 'flex',          // Add flex display to ensure proper content alignment
+    flexDirection: 'column',  // Stack children vertically
+    alignItems: 'flex-start', // Align children at the start
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
       overflow: 'auto',
+      maxWidth: 'calc(100% - 16px)',
     },
     '& code': {
       fontFamily: 'monospace',
+      maxWidth: '100%',
+      overflowX: 'auto',
+      display: 'inline-block',
+    },
+    '& details': {
+      margin: '0.5em 0',
+      padding: '0.5em',
+      backgroundColor: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius,
+      boxShadow: theme.shadows[1],
+      width: '100%',
+      
+      '& details': {
+        margin: '0.5em 0',
+        padding: '0.5em',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        borderLeft: '3px solid rgba(0, 0, 0, 0.1)',
+        width: '100%',
+      }
+    },
+    '& summary': {
+      cursor: 'pointer',
+      fontWeight: 500,
+      marginBottom: '0.3em',
+      padding: '0.3em',
+      '&:hover': {
+        color: theme.palette.primary.main,
+      }
+    },
+    '& details[open] > summary': {
+      marginBottom: '0.5em',
+      fontWeight: 600,
+      color: theme.palette.primary.main,
+    },
+    // Handle multiple expert analyses sections more elegantly
+    '& .customDetails + .customDetails': {
+      marginTop: theme.spacing(2),
     },
   },
   inputArea: {
@@ -334,6 +404,7 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(2),
   },
   markdown: {
+    width: '100%', // Ensure markdown takes full width of parent 
     '& details': {
       margin: '1em 0',
       padding: '0.5em',
@@ -358,21 +429,143 @@ const useStyles = makeStyles((theme) => ({
         backgroundColor: 'rgba(0, 0, 0, 0.03)',
       },
     },
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      overflowWrap: 'break-word',
+      wordBreak: 'break-word', 
+      maxWidth: '100%',
+    },
+    '& img': {
+      maxWidth: '100%',
+      height: 'auto',
+    },
+    '& table': {
+      maxWidth: '100%',
+      overflow: 'auto',
+      display: 'block',
+    },
   },
   markdownDetails: {
-    cursor: 'pointer',
+    // Reset all potentially problematic properties 
+    listStyle: 'none',
+    display: 'block',
+    margin: '1em 0',
+    padding: 0,
+    borderRadius: theme.shape.borderRadius,
     transition: 'all 0.3s ease',
-    '& summary': {
-      fontWeight: 600,
-      cursor: 'pointer',
-      padding: '0.5em 0',
-      outline: 'none',
-      '&:hover': {
-        color: theme.palette.primary.main,
-      },
+  },
+  // New container for our custom implementation
+  customDetails: {
+    margin: '1em 0',
+    borderRadius: theme.shape.borderRadius,
+    overflow: 'visible',
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[1],
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: '250px',
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    // Better handle multiple expanded sections
+    '&:not(:last-child)': {
+      marginBottom: theme.spacing(2),
     },
-    '& details[open] summary': {
-      color: theme.palette.primary.main,
+  },
+  analysisDetailsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: theme.spacing(1, 1.5),
+    cursor: 'pointer',
+    borderRadius: '8px 8px 0 0',
+    backgroundColor: 'rgba(92, 107, 192, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(92, 107, 192, 0.15)',
+    },
+  },
+  analysisTitle: {
+    fontWeight: 600,
+    fontSize: '0.95rem',
+    color: theme.palette.text.primary,
+    flexGrow: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  analysisExpandToggle: {
+    transition: 'transform 0.3s ease',
+    color: theme.palette.primary.main,
+  },
+  analysisExpanded: {
+    transform: 'rotate(180deg)',
+  },
+  // Expert Analysis gets a slightly different color to visually distinguish it
+  expertAnalysisHeader: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    },
+  },
+  // Inner details content container
+  analysisContent: {
+    padding: theme.spacing(1.5),
+    backgroundColor: theme.palette.background.paper,
+    transition: 'max-height 0.3s ease, opacity 0.3s ease',
+    width: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+  },
+  // Hidden content for collapsed sections
+  collapsedContent: {
+    maxHeight: 0,
+    padding: 0,
+    opacity: 0,
+    overflow: 'hidden',
+    transition: 'max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease',
+  },
+  // Visible content for expanded sections
+  expandedContent: {
+    maxHeight: '21000px', // Increased from 5000px to handle multiple expanded sections
+    opacity: 1,
+    overflow: 'visible',
+    padding: theme.spacing(2),
+    transition: 'max-height 1s ease-in-out, opacity 0.5s ease, padding 0.4s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    '& img, & video': {
+      maxWidth: '100%',
+      height: 'auto',
+    },
+    '& table': {
+      width: '100%',
+      borderCollapse: 'collapse',
+      overflowX: 'auto',
+      display: 'block',
+    },
+    '& p': {
+      margin: '0.5em 0',
+      maxWidth: '100%',
+    },
+    '& ul, & ol': {
+      paddingLeft: '2em',
+      margin: '0.5em 0',
+      maxWidth: '100%',
+    },
+    '& > .customDetails': {
+      width: '100%',
+      marginLeft: 0,
+      marginRight: 0,
+    },
+    '& > *': {
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    },
+    // Nested expanded sections need special handling
+    '& .expandedContent': {
+      maxHeight: '6000px', // Slightly smaller for nested sections
+      width: '100%',
     },
   },
   messageTimestamp: {
@@ -432,6 +625,61 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
   },
+  systemMessage: {
+    alignSelf: 'center',
+    width: '95%',
+    backgroundColor: '#f5f5f5',
+    border: `1px solid ${theme.palette.primary.light}`,
+    borderRadius: '8px',
+    '& p, & li': {
+      margin: '4px 0',
+    },
+    '& strong': {
+      color: theme.palette.primary.dark,
+    },
+  },
+  planCollapsedHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: theme.spacing(1, 1.5),
+    cursor: 'pointer',
+    borderRadius: '8px 8px 0 0',
+    backgroundColor: 'rgba(92, 107, 192, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(92, 107, 192, 0.15)',
+    },
+  },
+  planExpandToggle: {
+    transition: 'transform 0.3s ease',
+    color: theme.palette.primary.main,
+  },
+  planContent: {
+    padding: theme.spacing(2),
+    transition: 'max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease, padding 0.3s ease',
+    overflow: 'hidden',
+  },
+  planCollapsed: {
+    maxHeight: 0,
+    opacity: 0,
+    padding: '0 16px',
+    pointerEvents: 'none',
+  },
+  planExpanded: {
+    maxHeight: '5000px', // Large enough to fit content
+    opacity: 1,
+    transition: 'max-height 0.4s ease-in-out, opacity 0.5s ease',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: '165px',
+    right: '60px',
+    zIndex: 1000,
+    backgroundColor: '#3f51b5', // Fixed: use direct color instead of theme => theme.palette.primary.main
+    color: 'white',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -453,52 +701,698 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
   );
 };
 
-// Memoized Message Component
-const Message = memo(({ message }) => {
+// Memoized Message Component with collapsible system messages
+const Message = memo(({ message, onSectionExpanded }) => {
   const classes = useStyles();
   const [expandedSections, setExpandedSections] = useState({});
+  const [isPlanExpanded, setIsPlanExpanded] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectingSectionId, setSelectingSectionId] = useState(null);
+  const contentRef = useRef(null);
+  const selectionTimeoutRef = useRef(null);
+  const detailsRefs = useRef({});
+  const messageRef = useRef(null); // Add ref for the message container
+  const reasoningRefs = useRef({}); // Add refs for reasoning sections
 
-  const handleToggle = (id) => {
-    setExpandedSections((prev) => ({
+  // Remove all think tags from text and extract their content
+  const extractThinkTags = useCallback((text) => {
+    if (!text || message.sender !== 'ai') return { processedText: text, thinkContents: [] };
+    
+    const thinkContents = [];
+    let processedText = text;
+    
+    // Extract content between <think> tags
+    const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+    let match;
+    
+    while ((match = thinkRegex.exec(text)) !== null) {
+      // Record the position - is this at the start or after a closing summary tag?
+      const position = match.index === 0 ? 'beginning' : 
+                      text.substring(0, match.index).trimEnd().endsWith('</summary>') ? 'after-summary' : 'other';
+      
+      thinkContents.push({
+        content: match[1].trim(),
+        fullMatch: match[0],
+        startIndex: match.index,
+        position: position
+      });
+    }
+    
+    // Remove all think tags from the text
+    processedText = text.replace(thinkRegex, '');
+    
+    // Clean up any empty lines that might be left after removing think tags
+    processedText = processedText.replace(/\n\s*\n\s*\n/g, '\n\n');
+    
+    return { processedText, thinkContents };
+  }, [message.sender]);
+  
+  // Extract think content
+  const { processedText, thinkContents } = useMemo(() => {
+    const result = extractThinkTags(message.text);
+    // Filter out empty think tags
+    result.thinkContents = result.thinkContents.filter(thinkItem => 
+      thinkItem.content && thinkItem.content.trim() !== ''
+    );
+    return result;
+  }, [message.text, extractThinkTags]);
+
+  // Create a ref callback function at the component level
+  const createRefCallback = useCallback((id) => (node) => {
+    if (node !== null) {
+      detailsRefs.current[id] = node;
+    }
+  }, []);
+
+  // Similar callback for reasoning sections
+  const createReasoningRefCallback = useCallback((id) => (node) => {
+    if (node !== null) {
+      reasoningRefs.current[id] = node;
+    }
+  }, []);
+
+  // Add a useEffect to update container size when sections are expanded/collapsed
+  useEffect(() => {
+    // Force a reflow/repaint when expansion state changes to ensure proper sizing
+    if (messageRef.current) {
+      // Apply a transform to force a reflow so the content expands properly
+      requestAnimationFrame(() => {
+        messageRef.current.style.transform = 'translateZ(0)';
+        
+        // Remove the transform in the next frame to complete the reflow
+        requestAnimationFrame(() => {
+          if (messageRef.current) {
+            messageRef.current.style.transform = '';
+          }
+        });
+      });
+    }
+  }, [expandedSections, isPlanExpanded]); 
+
+  // Handle mousedown/up to track text selection
+  const handleMouseDown = (e) => {
+    // Only track mousedown within the content area
+    if (contentRef.current && contentRef.current.contains(e.target)) {
+      setIsSelecting(true);
+
+      // Check if mousedown happened in a details section
+      const detailsEl = e.target.closest('details');
+      if (detailsEl && detailsEl.id) {
+        setSelectingSectionId(detailsEl.id);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    // Use setTimeout to ensure click handlers fire first
+    selectionTimeoutRef.current = setTimeout(() => {
+      // Only clear selection if no text is actually selected
+      if (!window.getSelection().toString()) {
+        setIsSelecting(false);
+        setSelectingSectionId(null);
+      } else {
+        // If text is selected, set another timeout to clear the selecting state
+        // after user has had time to copy
+        selectionTimeoutRef.current = setTimeout(() => {
+          setIsSelecting(false);
+          setSelectingSectionId(null);
+        }, 3000); // 3 seconds should be plenty of time to copy
+      }
+    }, 150);
+  };
+
+  // Determine if a click should toggle plan expansion
+  const handlePlanToggle = (e) => {
+    // Only proceed if click was on the header itself or the toggle button
+    if (!e.target.closest(`.${classes.planCollapsedHeader}`) && 
+        !e.target.closest(`.${classes.planExpandToggle}`)) {
+      return;
+    }
+    
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
+      return;
+    }
+    
+    setIsPlanExpanded(!isPlanExpanded);
+  };
+
+  // Handle reasoning toggle
+  const handleReasoningToggle = (id) => (e) => {
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
+      return;
+    }
+    
+    setExpandedSections(prev => ({
       ...prev,
-      [id]: !prev[id],
+      [`reasoning-${id}`]: !prev[`reasoning-${id}`]
     }));
   };
 
-  return (
-    <div
-      className={`${classes.message} ${
-        message.sender === 'user' ? classes.userMessage : classes.aiMessage
-      }`}
-    >
+  // Update setExpandedSections to notify parent component
+  const handleExpandSection = useCallback((id, isExpanded) => {
+    setExpandedSections(prev => {
+      const newState = {
+        ...prev,
+        [id]: !prev[id]
+      };
+      
+      // Notify parent component of change
+      if (onSectionExpanded) {
+        onSectionExpanded(message.id, id, !prev[id]);
+      }
+      
+      return newState;
+    });
+  }, [message.id, onSectionExpanded]);
+  
+  // Toggle this section only with proper container updates
+  const toggleSection = (id, e) => {
+    // Stop event propagation
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Don't toggle if user is selecting text
+    if (window.getSelection().toString() || isSelecting) {
+      return;
+    }
+    
+    // Find the closest scrollable parent - typically the message area
+    const scrollableParent = findScrollableParent(e.target);
+    const scrollTop = scrollableParent ? scrollableParent.scrollTop : 0;
+    
+    // Toggle this section's expanded state
+    handleExpandSection(id);
+    
+    // Simply force a re-render of our container without any scroll changing behavior
+    if (messageRef.current) {
+      // Trigger a reflow to ensure content renders properly
+      requestAnimationFrame(() => {
+        messageRef.current.style.transform = 'translateZ(0)';
+        
+        // In the next frame, reset transform and restore scroll position
+        requestAnimationFrame(() => {
+          messageRef.current.style.transform = '';
+          
+          // Explicitly restore original scroll position
+          if (scrollableParent) {
+            scrollableParent.scrollTop = scrollTop;
+          }
+        });
+      });
+    }
+    
+    return false;
+  };
+  
+  // Helper function to find the closest scrollable parent
+  const findScrollableParent = (element) => {
+    if (!element) return null;
+    
+    // Check if the element itself is scrollable
+    if (
+      element.scrollHeight > element.clientHeight ||
+      element.scrollWidth > element.clientWidth
+    ) {
+      return element;
+    }
+    
+    // Recursively check parent elements
+    return findScrollableParent(element.parentElement);
+  };
+
+  // Render an AI reasoning section
+  const renderReasoningSection = (reasoningText, reasoningId, position = 'beginning') => {
+    if (!reasoningText || reasoningText.trim() === '') return null;
+    
+    const isExpanded = expandedSections[`reasoning-${reasoningId}`] || false;
+    
+    // Apply slightly different styling for after-summary reasoning sections to make them appear as children
+    const isAfterSummary = position === 'after-summary';
+    
+    return (
+      <div 
+        className={classes.customDetails} 
+        style={{ 
+          marginBottom: '12px',
+          ...(isAfterSummary ? {
+            marginLeft: '12px',
+            marginTop: '8px',
+            borderLeft: '3px solid rgba(33, 150, 243, 0.3)'
+          } : {})
+        }}
+      >
+        {/* Custom header for reasoning section */}
+        <div 
+          className={`${classes.analysisDetailsHeader}`}
+          style={{ 
+            backgroundColor: 'rgba(33, 150, 243, 0.08)',
+            ...(isAfterSummary ? {
+              borderTopLeftRadius: '0',
+              paddingLeft: '12px'
+            } : {})
+          }}
+          onClick={handleReasoningToggle(reasoningId)}
+        >
+          <Typography className={classes.analysisTitle} title="AI Reasoning">
+            AI Reasoning{isAfterSummary ? ' for this section' : ''}
+          </Typography>
+          <IconButton 
+            className={`${classes.analysisExpandToggle} ${isExpanded ? classes.analysisExpanded : ''}`}
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleReasoningToggle(reasoningId)(e);
+            }}
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </div>
+        
+        {/* Content area for reasoning */}
+        <div 
+          ref={createReasoningRefCallback(reasoningId)}
+          className={`${classes.analysisContent} ${isExpanded ? classes.expandedContent : classes.collapsedContent}`}
+          onClick={(e) => e.stopPropagation()}
+          style={isExpanded ? { height: 'auto' } : {}}
+        >
+          <ReactMarkdown
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              code: CodeBlock,
+            }}
+            className={classes.markdown}
+          >
+            {reasoningText}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  };
+
+  // Enhanced details renderer with custom header to match plan experience
+  function renderEnhancedDetails({ node, children, ...props }) {
+    // Generate a stable ID using message ID and detail index
+    const detailsIndex = node.position ? node.position.start.line : Math.random();
+    const id = `message-${message.id}-details-${detailsIndex}`;
+
+    // Extract the exact text content
+    let title = "Expert Analyses"; // Default fallback
+    let summaryContent = null;
+    let detailsContent = [];
+    
+    // Find the summary element and get its exact text
+    React.Children.forEach(children, child => {
+      // Try multiple possible properties to identify summary elements
+      const isSummary = 
+        child?.props?.originalType === 'summary' || 
+        child?.props?.node?.type === 'element' && child?.props?.node?.tagName === 'summary' ||
+        child?.props?.node?.type === 'summary' ||
+        child?.type === 'summary';
+      
+      if (isSummary) {
+        summaryContent = child;
+        
+        // Extract the exact text content
+        if (typeof child.props.children === 'string') {
+          title = child.props.children; // Use exactly what's in the summary tag
+        } else if (Array.isArray(child.props.children)) {
+          // For complex content, join all text parts
+          title = child.props.children
+            .filter(c => typeof c === 'string')
+            .join('');
+        } else if (child.props.children && typeof child.props.children === 'object') {
+          // Handle React element objects (might contain value or props.children)
+          
+          if (child.props.children.props && child.props.children.props.children) {
+            // Try to extract from nested props
+            if (typeof child.props.children.props.children === 'string') {
+              title = child.props.children.props.children;
+            } else if (Array.isArray(child.props.children.props.children)) {
+              title = child.props.children.props.children
+                .filter(c => typeof c === 'string')
+                .join('');
+            }
+          } else if (child.props.children.value) {
+            // Some markdown parsers use a 'value' property
+            title = child.props.children.value;
+          }
+        }
+      } else {
+        detailsContent.push(child);
+      }
+    });
+
+    // Style differently only if this is an expert analysis
+    // This doesn't change the title, just the visual appearance
+    const isExpertAnalysis = typeof title === 'string' && 
+      (title === "Expert Analyses" || title.includes("Expert Analysis"));
+    
+    // Get current expanded state
+    const isExpanded = expandedSections[id] || false;
+
+    // Use the ref callback function created at the component level
+    // No more useCallback here - fixes the React hooks rule violation
+    const detailsContentRef = createRefCallback(id);
+
+    // Check if any think tags should be associated with this details section
+    // They would follow immediately after the closing </summary> tag
+    const associatedThinkContent = thinkContents.find(think => {
+      // Only consider think tags that are positioned after a summary
+      if (think.position !== 'after-summary') return false;
+      
+      // Get the text before the think tag
+      const textBeforeThink = message.text.substring(0, think.startIndex);
+      
+      // Check if this text ends with a summary tag containing our title
+      // First, find the last </summary> tag position
+      const lastSummaryClosePos = textBeforeThink.lastIndexOf('</summary>');
+      if (lastSummaryClosePos === -1) return false;
+      
+      // Find the corresponding opening summary tag
+      const openingSummaryPos = textBeforeThink.lastIndexOf('<summary>', lastSummaryClosePos);
+      if (openingSummaryPos === -1) return false;
+      
+      // Extract the content of the summary tag
+      const summaryContent = textBeforeThink.substring(
+        openingSummaryPos + 9, // length of <summary>
+        lastSummaryClosePos
+      ).trim();
+      
+      // Check if this summary content matches our title or contains it
+      return summaryContent === title || summaryContent.includes(title);
+    });
+
+    // Filter out any redundant "Expert Analyses" text paragraphs
+    const filteredContent = detailsContent.map(child => {
+      if (child?.props?.children && typeof child?.props?.children === 'string') {
+        const text = child.props.children;
+        if (text.trim() === 'Expert Analyses:' || 
+            text.trim() === 'Expert Analysis:') {
+          return null; // Skip this redundant text
+        }
+      }
+      return child;
+    }).filter(Boolean); // Remove null items
+
+    // Return a completely custom div-based implementation that doesn't use native details/summary
+    return (
+      <div className={classes.customDetails}>
+        {/* Custom header with toggle button - using exactly what was in the summary tag */}
+        <div 
+          className={`${classes.analysisDetailsHeader} ${isExpertAnalysis ? classes.expertAnalysisHeader : ''}`}
+          onClick={(e) => toggleSection(id, e)}
+        >
+          <Typography className={classes.analysisTitle} title={title}>
+            {title}
+          </Typography>
+          <IconButton 
+            className={`${classes.analysisExpandToggle} ${isExpanded ? classes.analysisExpanded : ''}`}
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSection(id, e);
+            }}
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </div>
+        
+        {/* Content area - shown/hidden based on expanded state */}
+        <div 
+          ref={detailsContentRef}
+          className={`${classes.analysisContent} ${isExpanded ? classes.expandedContent : classes.collapsedContent}`}
+          onClick={(e) => e.stopPropagation()}
+          style={isExpanded ? { height: 'auto' } : {}} // Ensure height is auto when expanded
+        >
+          {filteredContent}
+          
+          {/* If a think tag follows this details section, add an AI Reasoning section */}
+          {associatedThinkContent && (
+            renderReasoningSection(associatedThinkContent.content, `detail-${detailsIndex}`, 'after-summary')
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // When mounted, add selection listeners to document
+  useEffect(() => {
+    if (message.sender === 'system') {
+      // When plan is first added, set it as expanded for better visibility
+      setIsPlanExpanded(true);
+
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('selectstart', () => setIsSelecting(true));
+      
+      return () => {
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('selectstart', () => setIsSelecting(true));
+        
+        // Clear any pending timeouts on unmount
+        if (selectionTimeoutRef.current) {
+          clearTimeout(selectionTimeoutRef.current);
+        }
+      };
+    }
+  }, [message.sender]);
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Determine message class based on sender
+  const getMessageClass = () => {
+    switch(message.sender) {
+      case 'user':
+        return classes.userMessage;
+      case 'ai':
+        return classes.aiMessage;
+      case 'system':
+        return classes.systemMessage;
+      default:
+        return classes.aiMessage;
+    }
+  };
+
+  // Extract plan type info from system message (if it exists)
+  const getPlanInfo = () => {
+    if (message.sender !== 'system') return null;
+    
+    // Try to extract plan type from the message text
+    const planTypeMatch = message.text.match(/Execution Plan \((.*?)\)/);
+    if (planTypeMatch && planTypeMatch[1]) {
+      return planTypeMatch[1]; // "Original user message" or "AI-modified message"
+    }
+    return "Plan";
+  };
+
+  // Add sender icon based on message type
+  const renderSenderIcon = () => {
+    if (message.sender === 'system') {
+      return (
+        <Box display="flex" alignItems="center">
+          <FormatListBulletedIcon style={{ marginRight: 8, color: '#5c6bc0' }} />
+          <Typography variant="subtitle2" style={{ fontWeight: 'bold', color: '#5c6bc0' }}>
+            Plan Accepted
+          </Typography>
+        </Box>
+      );
+    }
+    return null;
+  };
+
+  // Add modification indicator if message was modified
+  const renderModificationIndicator = () => {
+    if (message.sender === 'user' && message.originalText) {
+      return (
+        <Tooltip title={`Original message: "${message.originalText}"`}>
+          <Box display="flex" alignItems="center" justifyContent="flex-end" mt={1} mb={-1}>
+            <Typography variant="caption" style={{ marginRight: 4, fontStyle: 'italic', color: '#ffffff80' }}>
+              Modified by AI
+            </Typography>
+            <EditIcon style={{ fontSize: 12, color: '#ffffff80' }} />
+          </Box>
+        </Tooltip>
+      );
+    }
+    return null;
+  };
+  
+  // Process content with think tags after markdown rendering
+  const processContentWithThinkTags = (content) => {
+    // First, check if this is an AI message that might have think tags
+    if (message.sender !== 'ai' || thinkContents.length === 0) {
+      return content;
+    }
+    
+    // Sort think contents by their position in the original text
+    // This helps ensure we process them in the correct order
+    const sortedThinkContents = [...thinkContents].sort((a, b) => a.startIndex - b.startIndex);
+    
+    // Process the first think tag separately if it appears at the beginning
+    const firstThink = sortedThinkContents[0];
+    const processedContent = [];
+    
+    // If the first think tag is at the beginning of the message
+    if (firstThink && firstThink.startIndex === 0) {
+      // Add the reasoning section for this think tag
+      processedContent.push(
+        renderReasoningSection(firstThink.content, `intro-reasoning`)
+      );
+      
+      // Remove this think tag from the list to process
+      sortedThinkContents.shift();
+    }
+    
+    // Add the main content
+    processedContent.push(content);
+    
+    // Process any remaining think tags
+    // Note: This implementation will not inject think tags within the markdown-rendered content
+    // as that would require more complex DOM manipulation after rendering
+    
+    return processedContent;
+  };
+
+  // If this is a system message (plan), render it as collapsible
+  if (message.sender === 'system') {
+    const planInfo = getPlanInfo();
+    
+    return (
+      <div 
+        className={`${classes.message} ${classes.systemMessage}`}
+        ref={messageRef} // Add ref to message container
+      >
+        {/* Clickable header */}
+        <div 
+          className={classes.planCollapsedHeader}
+          onClick={handlePlanToggle}
+        >
+          {renderSenderIcon()}
+          <IconButton 
+            className={`${classes.planExpandToggle} ${isPlanExpanded ? classes.expanded : ''}`}
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPlanExpanded(!isPlanExpanded);
+            }}
+          >
+            {isPlanExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </div>
+        
+        {/* Expandable plan content */}
+        <div 
+          ref={contentRef}
+          className={`${classes.planContent} ${isPlanExpanded ? classes.planExpanded : classes.planCollapsed}`}
+          onMouseDown={handleMouseDown}
+        >
+          <ReactMarkdown
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              code: CodeBlock,
+              details: renderEnhancedDetails,
+            }}
+            className={classes.markdown}
+          >
+            {message.text}
+          </ReactMarkdown>
+        </div>
+        <Typography variant="caption" className={classes.messageTimestamp}>
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </Typography>
+      </div>
+    );
+  }
+
+  // For AI messages with think tags, prepare reasoning sections at the appropriate locations
+  const renderMessageWithReasoningSections = () => {
+    if (message.sender !== 'ai' || thinkContents.length === 0) {
+      // No think tags to process, render normally
+      return (
+        <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            code: CodeBlock,
+            details: renderEnhancedDetails,
+          }}
+          className={classes.markdown}
+        >
+          {message.text}
+        </ReactMarkdown>
+      );
+    }
+
+    // This message has think tags to transform into reasoning sections
+    const components = [];
+    
+    // First, add reasoning sections for tags at the beginning
+    const beginningThinkTags = thinkContents.filter(think => 
+      think.position === 'beginning' && think.content.trim() !== ''
+    );
+    
+    // Add reasoning sections for beginning think tags
+    for (const thinkItem of beginningThinkTags) {
+      components.push(
+        <React.Fragment key={`reasoning-beginning-${thinkItem.startIndex}`}>
+          {renderReasoningSection(thinkItem.content, `msg-${thinkItem.startIndex}`, 'beginning')}
+        </React.Fragment>
+      );
+    }
+    
+    // Then add the main content with think tags removed
+    components.push(
       <ReactMarkdown
+        key="main-content"
         rehypePlugins={[rehypeRaw]}
         components={{
           code: CodeBlock,
-          details: ({ node, children, ...props }) => {
-            // Generate a stable ID using message ID and detail index
-            const detailsIndex = node.position ? node.position.start.line : Math.random();
-            const id = `message-${message.id}-details-${detailsIndex}`;
-
-            return (
-              <details
-                {...props}
-                open={expandedSections[id] || false}
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent event bubbling
-                  handleToggle(id);
-                }}
-                className={classes.markdownDetails}
-              >
-                {children}
-              </details>
-            );
-          },
+          details: renderEnhancedDetails, // This will handle after-summary think tags
         }}
         className={classes.markdown}
       >
-        {message.text}
+        {processedText}
       </ReactMarkdown>
+    );
+    
+    return components;
+  };
+
+  // Regular non-system messages
+  return (
+    <div
+      className={`${classes.message} ${getMessageClass()}`}
+      ref={messageRef} // Add ref to message container
+    >
+      {renderModificationIndicator()}
+      
+      {message.sender === 'ai' && thinkContents.length > 0 ? (
+        // For AI messages with think content, use our custom rendering
+        <>
+          {/* Use our renderMessageWithReasoningSections function */}
+          {renderMessageWithReasoningSections()}
+        </>
+      ) : (
+        // For regular messages, render normally
+        <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
+          components={{
+            code: CodeBlock,
+            details: renderEnhancedDetails,
+          }}
+          className={classes.markdown}
+        >
+          {message.text}
+        </ReactMarkdown>
+      )}
+      
       <Typography variant="caption" className={classes.messageTimestamp}>
         {new Date(message.timestamp).toLocaleTimeString()}
       </Typography>
@@ -520,10 +1414,21 @@ function MultiAgentHILChat() {
   // Add original message state
   const [originalMessage, setOriginalMessage] = useState('');
   
-  // Update scroll handling to use useCallback with debounce
+  // Track when sections are expanded/collapsed
+  const [expandedSectionsTracker, setExpandedSectionsTracker] = useState({});
+  
+  // First, add a state to track if user is at bottom
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  
+  // Update scroll handling to track if user is at bottom
   const handleScroll = useCallback(
     debounce(({ target }) => {
       const { scrollTop, scrollHeight, clientHeight } = target;
+      
+      // Check if user is at bottom (with a small threshold)
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsAtBottom(atBottom);
+      
       dispatch({ 
         type: ACTIONS.SET_SCROLL_TOP, 
         payload: scrollTop > 200 
@@ -548,16 +1453,66 @@ function MultiAgentHILChat() {
     }
   }, [handleScroll]);
 
-  const scrollToBottom = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (state.messages.length > 0) {
-      scrollToBottom();
+  // Keep the scrollToBottom function for optional use, but don't call it automatically
+  const scrollToBottom = useCallback(() => {
+    if (messageEndRef.current) {
+      // First try scrollIntoView
+      messageEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      
+      // As a backup, also use scrollTop directly after a short delay
+      // This helps with very large content that might not scroll properly with scrollIntoView
+      setTimeout(() => {
+        if (messageAreaRef.current) {
+          const scrollHeight = messageAreaRef.current.scrollHeight;
+          messageAreaRef.current.scrollTop = scrollHeight;
+        }
+      }, 100);
     }
-  }, [state.messages]);
+  }, [messageEndRef, messageAreaRef]);
 
+  // Make sure we handle even when new messages arrive - just update the isAtBottom state without auto-scrolling
+  useEffect(() => {
+    // When a new message is added, check if we need to show the scroll button
+    if (messageAreaRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messageAreaRef.current;
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setIsAtBottom(atBottom);
+    }
+  }, [state.messages.length]);
+  
+  // Add a CSS class for the scroll button through makeStyles instead of inline styles
+  const scrollToBottomButton = (
+    <Fade in={!isAtBottom}>
+      <IconButton
+        onClick={scrollToBottom}
+        className={classes.scrollToBottomButton}
+        size="small"
+      >
+        <KeyboardArrowDownIcon />
+      </IconButton>
+    </Fade>
+  );
+  
+  // Simple tracking of expanded sections with no scrolling side effects
+  const handleSectionExpanded = useCallback((messageId, sectionId, isExpanded) => {
+    // Simply track which sections are expanded, no scrolling side effects
+    setExpandedSectionsTracker(prev => ({
+      ...prev,
+      [`${messageId}-${sectionId}`]: isExpanded
+    }));
+  }, []);
+  
+  // Pass the handler to the Message component
+  const renderMessage = useCallback((message) => {
+    return (
+      <Message 
+        key={message.id} 
+        message={message} 
+        onSectionExpanded={handleSectionExpanded}
+      />
+    );
+  }, [handleSectionExpanded]);
+  
   // Loading indicator component
   const TypingIndicator = () => (
     <div className={classes.typingIndicator}>
@@ -586,6 +1541,7 @@ function MultiAgentHILChat() {
   const [planNotes, setPlanNotes] = useState('');
   const [modifiedQuestion, setModifiedQuestion] = useState('');
   const [selectedAgents, setSelectedAgents] = useState([]);
+  const [availableAgents, setAvailableAgents] = useState([]);
   const [messageChoice, setMessageChoice] = useState('modified');
 
   // Add new state for edit dialog
@@ -661,7 +1617,7 @@ function MultiAgentHILChat() {
           if (entry.response) {
             messages.push({
               id: uuidv4(),
-              text: entry.response,
+              text: removeTripleBackticks(entry.response),
               sender: 'ai',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
@@ -703,6 +1659,8 @@ function MultiAgentHILChat() {
   const handleNewChat = async () => {
     setIsLoadingTeams(true);
     setTeamError('');
+    // Reset selectedAgents when starting a new chat
+    setSelectedAgents([]);
     try {
       const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
       setAvailableTeams(response.data.teams);
@@ -910,6 +1868,11 @@ function MultiAgentHILChat() {
     const userMessage = state.input.trim();
     setOriginalMessage(userMessage);
 
+    // Reset selected agents and form state since this is a new query
+    setSelectedAgents([]);
+    setRejectionText('');
+    setPlanChoice('');
+
     const messageData = { 
       message: userMessage, 
       team_name: currentSession.team,
@@ -951,7 +1914,18 @@ function MultiAgentHILChat() {
       setPlanNotes(response.data.plan_notes || '');
       setModifiedQuestion(response.data.modified_message || '');
       setMessageChoice('modified');
-      setSelectedAgents(response.data.selected_agents || []);
+      
+      // Get the selected agents from the response - check both possible field names
+      const responseAgents = response.data.agents || response.data.selected_agents || [];
+      console.log('Backend recommended agents:', responseAgents);
+      setSelectedAgents(responseAgents);
+      
+      // Fetch all available agents for the team
+      if (currentSession && currentSession.teamId) {
+        const teamAgents = await fetchTeamAgents(currentSession.teamId);
+        setAvailableAgents(teamAgents);
+      }
+      
       setPlanDialogOpen(true);
       return;
 
@@ -974,18 +1948,63 @@ function MultiAgentHILChat() {
     }
   };
 
-  // Add handler for plan dialog submission
+  // Update the fetchTeamAgents function to filter only team agents
+  const fetchTeamAgents = async (teamId) => {
+    try {
+      // First, get the complete team details with agent names using list_teams
+      const teamsListResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      if (!teamsListResponse.data || !teamsListResponse.data.teams) {
+        throw new Error('Failed to retrieve teams data');
+      }
+      
+      // Find our specific team with full details including agent names
+      const teamDetails = teamsListResponse.data.teams.find(team => team.unique_id === teamId);
+      if (!teamDetails) {
+        console.error(`Team with ID ${teamId} not found in complete teams list`);
+        return [];
+      }
+      
+      // Get the agent names for this team
+      const teamAgentNames = teamDetails.agents || [];
+      console.log(`Team ${teamDetails.name} has ${teamAgentNames.length} agents:`, teamAgentNames);
+      
+      // Fetch all available agents
+      const agentsResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      if (!agentsResponse.data || !agentsResponse.data.agents) {
+        throw new Error('Failed to retrieve agents data');
+      }
+      
+      // Filter agents to only those in the team
+      const teamAgents = agentsResponse.data.agents.filter(agent => 
+        teamAgentNames.includes(agent.name)
+      );
+      
+      console.log(`Filtered ${teamAgents.length} agents for team ${teamDetails.name}`);
+      return teamAgents;
+    } catch (error) {
+      console.error('Error fetching team agents:', error);
+      dispatch({ 
+        type: ACTIONS.SET_ERROR, 
+        payload: 'Failed to load team agents. Please try again later.' 
+      });
+      return [];
+    }
+  };
+
+  // Update the handlePlanSubmit function to modify the last user message if needed
   const handlePlanSubmit = async () => {
     if (planChoice === 'reject' && !rejectionText.trim()) {
       return;
     }
 
     //Maybe add the plan message to the chat if plan is accepted
-
     const currentSession = state.chatSessions.find(session => session.id === state.currentSessionId);
     
     // Determine which message to send based on user selection
     const messageToSend = messageChoice === 'original' ? originalMessage : modifiedQuestion;
+    
+    // Log the selected agents before sending to backend for debugging
+    console.log('Submitting with user-selected agents:', selectedAgents);
     
     const messageData = {
       message: messageToSend,
@@ -996,12 +2015,64 @@ function MultiAgentHILChat() {
       session_id: currentSession.id,
       team_id: currentSession.teamId,
       selected_agents: selectedAgents,
+      agents: selectedAgents, // Add this field as well for compatibility
       comments: rejectionText.trim()
     };
 
     // Close dialog and show loading first
     setPlanDialogOpen(false);
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+
+    // If accepting the plan, add it to the chat history
+    if (planChoice === 'accept') {
+      // If using modified question, update the last user message to reflect what was actually processed
+      if (messageChoice === 'modified' && modifiedQuestion !== originalMessage) {
+        // Find the last user message in the chat history
+        const userMessages = state.messages.filter(msg => msg.sender === 'user');
+        if (userMessages.length > 0) {
+          const lastUserMessage = userMessages[userMessages.length - 1];
+          
+          // Update the message text to show the modified question
+          dispatch({
+            type: ACTIONS.UPDATE_MESSAGE,
+            payload: {
+              id: lastUserMessage.id,
+              updates: { 
+                text: modifiedQuestion,
+                originalText: originalMessage // Store original text for reference if needed
+              }
+            }
+          });
+        }
+      }
+      
+      // Create a formatted version of the plan for the chat
+      const selectedAgentsText = selectedAgents.length > 0 
+        ? `\n\n### Selected Agents\n${selectedAgents.map(agent => `- ${agent}`).join('\n')}` 
+        : '';
+      
+      const messageTypeInfo = messageChoice === 'original' 
+        ? '(Original user message)' 
+        : '(AI-modified message)';
+      
+      const notesSection = planNotes 
+        ? `\n\n### Plan Notes\n${planNotes}` 
+        : '';
+      
+      const messageText = `## Execution Plan ${messageTypeInfo}\n\n### Question\n${messageToSend}${selectedAgentsText}\n\n### Plan Details\n${planContent}${notesSection}`;
+      
+      // Add the plan to the chat as a system message
+      dispatch({ 
+        type: ACTIONS.ADD_MESSAGE, 
+        payload: { 
+          id: uuidv4(),
+          text: messageText, 
+          sender: 'system', 
+          timestamp: new Date(),
+          sessionId: currentSession.id
+        }
+      });
+    }
 
     try {
       const endpoint = planChoice === 'accept' ? '/chat/process' : '/chat/refine';
@@ -1019,7 +2090,20 @@ function MultiAgentHILChat() {
         setPlanContent(response.data.plan || response.data.response || response.data.message);
         setPlanNotes(response.data.plan_notes || '');
         setModifiedQuestion(response.data.modified_message || '');
-        setSelectedAgents(response.data.selected_agents || []);
+        
+        // Get the selected agents from the response - check both field names
+        const responseAgents = response.data.agents || response.data.selected_agents || [];
+        console.log('Backend responded with agents:', responseAgents);
+        
+        // If the user pressed "reject", we should use the backend's new recommendations
+        // If the user pressed "accept", we leave the current selections
+        if (planChoice === 'reject') {
+          setSelectedAgents(responseAgents);
+        }
+        
+        // Clear rejection text for the new plan dialog
+        setRejectionText('');
+        
         setPlanDialogOpen(true);
         return;
       }
@@ -1029,7 +2113,7 @@ function MultiAgentHILChat() {
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: uuidv4(),
-          text: response.data.response || response.data.message, 
+          text: removeTripleBackticks(response.data.response || response.data.message), 
           sender: 'ai', 
           timestamp: new Date(),
           sessionId: currentSession.id
@@ -1168,9 +2252,7 @@ function MultiAgentHILChat() {
               </div>
             </div>
             <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
-              {state.messages.map((message) => (
-                <Message key={message.id} message={message} />
-              ))}
+              {state.messages.map(renderMessage)}
               <div ref={messageEndRef} />
             </div>
 
@@ -1296,23 +2378,65 @@ function MultiAgentHILChat() {
         >
           <DialogTitle>Review Plan</DialogTitle>
           <DialogContent>
-            {selectedAgents.length > 0 && (
-              <Box mb={3}>
-                <Typography variant="h6" gutterBottom>Selected Agents</Typography>
-                <Paper elevation={1} className={classes.agentsBox}>
-                  <List dense>
-                    {selectedAgents.map((agent, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
-                          <PersonIcon className={classes.agentIcon} />
-                        </ListItemIcon>
-                        <ListItemText primary={agent} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              </Box>
-            )}
+            <Box mb={3}>
+              <Typography variant="h6" gutterBottom>Agents</Typography>
+              <Paper elevation={1} className={classes.agentsBox}>
+                <Box 
+                  display="flex" 
+                  flexWrap="wrap" 
+                  justifyContent="flex-start" 
+                  alignItems="flex-start"
+                  gap={2}
+                  p={2}
+                >
+                  {availableAgents.length > 0 ? (
+                    availableAgents.map((agent) => (
+                      <Box 
+                        key={agent.id} 
+                        display="flex" 
+                        flexDirection="column" 
+                        alignItems="center"
+                        width="120px"
+                        mb={2}
+                      >
+                        <PersonIcon style={{ fontSize: 40, color: '#757575', marginBottom: '8px' }} />
+                        <Typography variant="body2" align="center" style={{ marginBottom: '4px' }}>
+                          {agent.name || agent.agent_name || "Unnamed Agent"}
+                        </Typography>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={
+                                // Since selected agents is a string array of names, check if the current agent's name is in it
+                                selectedAgents.includes(agent.name)
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  // Add agent name (not ID) to selected agents
+                                  setSelectedAgents(prev => [...prev, agent.name]);
+                                } else {
+                                  // Remove agent name from selected agents
+                                  setSelectedAgents(prev => prev.filter(name => name !== agent.name));
+                                }
+                              }}
+                              color="primary"
+                              size="small"
+                            />
+                          }
+                          label="Select"
+                        />
+                      </Box>
+                    ))
+                  ) : (
+                    <Box p={2}>
+                      <Typography variant="body2" color="textSecondary">
+                        No agents available for this team
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
+            </Box>
 
             <Box mb={3}>
               <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
@@ -1635,9 +2759,13 @@ function MultiAgentHILChat() {
           </Alert>
         </Snackbar>
 
+        {/* Scroll-to-bottom Button */}
+        {scrollToBottomButton}
+
       </Container>
     </>
   );
 }
 
-export default memo(MultiAgentHILChat); 
+// Single export at the end
+export default memo(MultiAgentHILChat);

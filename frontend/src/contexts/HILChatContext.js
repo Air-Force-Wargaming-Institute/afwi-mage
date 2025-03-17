@@ -39,6 +39,7 @@ const ACTIONS = {
   // Message Actions
   SET_MESSAGES: 'SET_MESSAGES',
   ADD_MESSAGE: 'ADD_MESSAGE',
+  UPDATE_MESSAGE: 'UPDATE_MESSAGE',
   REMOVE_ERROR_MESSAGES: 'REMOVE_ERROR_MESSAGES',
   
   // Session Actions
@@ -88,6 +89,14 @@ function hilChatReducer(state, action) {
       break;
     case ACTIONS.ADD_MESSAGE:
       newState = { ...state, messages: [...state.messages, action.payload] };
+      break;
+    case ACTIONS.UPDATE_MESSAGE:
+      newState = { 
+        ...state, 
+        messages: state.messages.map(msg => 
+          msg.id === action.payload.id ? { ...msg, ...action.payload.updates } : msg
+        ) 
+      };
       break;
     case ACTIONS.REMOVE_ERROR_MESSAGES:
       newState = {

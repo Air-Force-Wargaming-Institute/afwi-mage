@@ -1,35 +1,19 @@
 [
     {
-        "name": "small prc team",
-        "unique_id": "d9b0ac07-d40c-4258-b2bf-c76b90a857a1",
-        "description": "small team",
+        "name": "china 4 team",
+        "unique_id": "4201d5c7-b002-4123-8d86-64142eaacd75",
+        "description": "china 4 team",
         "agents": [
-            "65100e24-0319-4903-86f9-8d491c87a7d7",
-            "11a061dd-ee45-48f2-8cb4-12db32001eef",
-            "c2371707-2910-41bc-8be3-4a69c53edd5b"
-        ],
-        "color": "#B22222",
-        "created_at": "2025-03-11T17:18:01.072787Z",
-        "last_modified": "2025-03-11T17:18:01.072798Z",
-        "vectorstore": [
-            "8d82b322-6b2c-406f-b7ce-93206ec0eb82"
-        ]
-    },
-    {
-        "name": "4-man prc team",
-        "unique_id": "b43abd5d-9bee-483e-a5f6-e51cd14418e2",
-        "description": "4 man prc team",
-        "agents": [
-            "0a5a5b61-e72f-4bea-a5c9-63f5c3552b07",
-            "9dd64135-f6c3-4046-b9ba-7c99ec282a70",
-            "6e4840e7-8771-4974-a81f-17ab82364962",
-            "25b4db45-2103-4326-8f44-57145e6216f1"
+            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
+            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
+            "0c1437ac-305a-48e1-876a-f5b22a37f593",
+            "7094e92e-e1e6-420f-be8e-1c59929662bc"
         ],
         "color": "#FF0000",
-        "created_at": "2025-03-12T16:56:51.881732Z",
-        "last_modified": "2025-03-12T16:56:51.881744Z",
+        "created_at": "2025-03-13T16:04:27.991879Z",
+        "last_modified": "2025-03-13T16:04:27.991892Z",
         "vectorstore": [
-            "8d82b322-6b2c-406f-b7ce-93206ec0eb82"
+            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
         ]
     }
 ]
