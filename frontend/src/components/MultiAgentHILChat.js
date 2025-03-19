@@ -354,18 +354,21 @@ const useStyles = makeStyles((theme) => ({
   },
   markdown: {
     width: '100%', // Ensure markdown takes full width of parent 
+    textAlign: 'left', // Explicitly set left alignment for markdown content
     '& details': {
       margin: '1em 0',
       padding: '0.5em',
       backgroundColor: theme.palette.background.paper,
       borderRadius: theme.shape.borderRadius,
       boxShadow: theme.shadows[1],
+      textAlign: 'left', // Ensure details are left-aligned
       
       '& summary': {
         cursor: 'pointer',
         fontWeight: 500,
         marginBottom: '0.5em',
         padding: '0.5em',
+        textAlign: 'left', // Ensure summaries are left-aligned
         
         '&:hover': {
           color: theme.palette.primary.main,
@@ -376,12 +379,14 @@ const useStyles = makeStyles((theme) => ({
         margin: '0.5em 0',
         padding: '0.5em',
         backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        textAlign: 'left', // Ensure nested details are left-aligned
       },
     },
     '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
       overflowWrap: 'break-word',
       wordBreak: 'break-word', 
       maxWidth: '100%',
+      textAlign: 'left', // Ensure all text elements are left-aligned
     },
     '& img': {
       maxWidth: '100%',
@@ -391,6 +396,7 @@ const useStyles = makeStyles((theme) => ({
       maxWidth: '100%',
       overflow: 'auto',
       display: 'block',
+      textAlign: 'left', // Ensure tables are left-aligned
     },
   },
   markdownDetails: {
@@ -464,6 +470,7 @@ const useStyles = makeStyles((theme) => ({
     width: '100%',
     boxSizing: 'border-box',
     overflow: 'hidden',
+    textAlign: 'left', // Ensure analysis content is left-aligned
   },
   // Hidden content for collapsed sections
   collapsedContent: {
@@ -483,6 +490,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
+    textAlign: 'left', // Ensure expanded content is left-aligned
     '& img, & video': {
       maxWidth: '100%',
       height: 'auto',
@@ -492,15 +500,18 @@ const useStyles = makeStyles((theme) => ({
       borderCollapse: 'collapse',
       overflowX: 'auto',
       display: 'block',
+      textAlign: 'left', // Ensure tables are left-aligned
     },
     '& p': {
       margin: '0.5em 0',
       maxWidth: '100%',
+      textAlign: 'left', // Ensure paragraphs are left-aligned
     },
     '& ul, & ol': {
       paddingLeft: '2em',
       margin: '0.5em 0',
       maxWidth: '100%',
+      textAlign: 'left', // Ensure lists are left-aligned
     },
     '& > .customDetails': {
       width: '100%',
@@ -515,6 +526,7 @@ const useStyles = makeStyles((theme) => ({
     '& .expandedContent': {
       maxHeight: '6000px', // Slightly smaller for nested sections
       width: '100%',
+      textAlign: 'left', // Ensure nested expanded content is left-aligned
     },
   },
   messageTimestamp: {
