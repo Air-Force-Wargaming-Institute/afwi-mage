@@ -114,6 +114,8 @@ const useStyles = makeStyles((theme) => ({
     overflowY: 'auto',
     padding: theme.spacing(2),
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -123,8 +125,6 @@ const useStyles = makeStyles((theme) => ({
     border: '1px solid #e0e0e0',
     maxWidth: '80%',
     wordBreak: 'break-word',
-    display: 'inline-block',
-    whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.3s ease',
@@ -145,14 +145,46 @@ const useStyles = makeStyles((theme) => ({
   userMessage: {
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
-    marginLeft: 'auto',
+    marginLeft: 'auto', // Push to the right side
+    marginRight: '0', // Ensure it stays on the right
     borderRadius: '20px 20px 0 20px',
+    textAlign: 'right', // Set base text alignment for user messages
+    alignSelf: 'flex-end', // Align to the end of the flex container
     '& $messageContent': {
       color: '#ffffff',
     },
-    '& p, & div': {
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
       color: '#ffffff !important',
+      textAlign: 'right !important', // Force right-align with !important
     },
+    '& .ReactMarkdown': {
+      textAlign: 'right !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'right !important', // Force right-align for code and lists
+    },
+    '& .$messageTimestamp': {
+      textAlign: 'right !important', // Force right-align for timestamp
+      marginLeft: 'auto',
+    }
+  },
+  // Add specific classes for user message markdown and timestamp
+  '& .user-markdown': {
+    textAlign: 'right !important',
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      textAlign: 'right !important',
+    },
+    '& code, & pre': {
+      textAlign: 'right !important',
+    },
+    '& table': {
+      marginLeft: 'auto',
+    },
+  },
+  '& .user-timestamp': {
+    textAlign: 'right !important',
+    width: '100%',
+    display: 'block',
   },
   aiMessage: {
     alignSelf: 'flex-start',
@@ -164,6 +196,15 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',          // Add flex display to ensure proper content alignment
     flexDirection: 'column',  // Stack children vertically
     alignItems: 'flex-start', // Align children at the start
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
+      textAlign: 'left !important', // Force left-align text for AI messages
+    },
+    '& .ReactMarkdown': {
+      textAlign: 'left !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'left !important', // Force left-align for code and lists
+    },
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
@@ -353,40 +394,25 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(2),
   },
   markdown: {
-    width: '100%', // Ensure markdown takes full width of parent 
-    textAlign: 'left', // Explicitly set left alignment for markdown content
+    fontFamily: theme.typography.fontFamily,
+    fontSize: theme.typography.body1.fontSize,
+    lineHeight: '1.5',
+    width: '100%',
+    overflowX: 'hidden',
+    wordBreak: 'break-word',
+    // Add text alignment based on parent - by default left-align
+    textAlign: 'left',
     '& details': {
       margin: '1em 0',
       padding: '0.5em',
-      backgroundColor: theme.palette.background.paper,
-      borderRadius: theme.shape.borderRadius,
-      boxShadow: theme.shadows[1],
-      textAlign: 'left', // Ensure details are left-aligned
-      
-      '& summary': {
-        cursor: 'pointer',
-        fontWeight: 500,
-        marginBottom: '0.5em',
-        padding: '0.5em',
-        textAlign: 'left', // Ensure summaries are left-aligned
-        
-        '&:hover': {
-          color: theme.palette.primary.main,
-        },
-      },
-      
-      '& details': {
-        margin: '0.5em 0',
-        padding: '0.5em',
-        backgroundColor: 'rgba(0, 0, 0, 0.03)',
-        textAlign: 'left', // Ensure nested details are left-aligned
-      },
+      backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      textAlign: 'left',
     },
     '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
       overflowWrap: 'break-word',
       wordBreak: 'break-word', 
       maxWidth: '100%',
-      textAlign: 'left', // Ensure all text elements are left-aligned
+      textAlign: 'inherit', // Inherit text alignment from parent
     },
     '& img': {
       maxWidth: '100%',
@@ -396,7 +422,7 @@ const useStyles = makeStyles((theme) => ({
       maxWidth: '100%',
       overflow: 'auto',
       display: 'block',
-      textAlign: 'left', // Ensure tables are left-aligned
+      textAlign: 'inherit', // Inherit text alignment from parent
     },
   },
   markdownDetails: {
@@ -421,6 +447,7 @@ const useStyles = makeStyles((theme) => ({
     minWidth: '250px',
     flexGrow: 1,
     alignSelf: 'stretch',
+    textAlign: 'left', // Ensure details content is left-aligned
     // Better handle multiple expanded sections
     '&:not(:last-child)': {
       marginBottom: theme.spacing(2),
@@ -490,7 +517,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
-    textAlign: 'left', // Ensure expanded content is left-aligned
+    textAlign: 'left', // Ensure expanded content is left-aligned by default
     '& img, & video': {
       maxWidth: '100%',
       height: 'auto',
@@ -534,6 +561,8 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
     opacity: 0.8,
     marginTop: theme.spacing(1),
+    display: 'block',
+    width: '100%',
   },
   fullscreenButton: {
     color: theme.palette.text.secondary,
@@ -591,8 +620,15 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: '#f5f5f5',
     border: `1px solid ${theme.palette.primary.light}`,
     borderRadius: '8px',
-    '& p, & li': {
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
       margin: '4px 0',
+      textAlign: 'left !important', // Force left-align text for system messages
+    },
+    '& .ReactMarkdown': {
+      textAlign: 'left !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'left !important', // Force left-align for code and lists
     },
     '& strong': {
       color: theme.palette.primary.dark,
@@ -619,6 +655,7 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     transition: 'max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease, padding 0.3s ease',
     overflow: 'hidden',
+    textAlign: 'left', // Left-align plan content text
   },
   planCollapsed: {
     maxHeight: 0,
@@ -676,6 +713,23 @@ const useStyles = makeStyles((theme) => ({
     opacity: 0,
     pointerEvents: 'none',
     transition: 'opacity 0.3s ease',
+  },
+  userMarkdown: {
+    textAlign: 'right !important',
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      textAlign: 'right !important',
+    },
+    '& code, & pre': {
+      textAlign: 'right !important',
+    },
+    '& table': {
+      marginLeft: 'auto',
+    },
+  },
+  userTimestamp: {
+    textAlign: 'right !important',
+    width: '100%',
+    display: 'block',
   },
 }));
 
@@ -1381,13 +1435,13 @@ const Message = memo(({ message, onSectionExpanded }) => {
             code: CodeBlock,
             details: renderEnhancedDetails,
           }}
-          className={classes.markdown}
+          className={`${classes.markdown} ${message.role === 'user' ? classes.userMarkdown : ''}`}
         >
           {message.text}
         </ReactMarkdown>
       )}
       
-      <Typography variant="caption" className={classes.messageTimestamp}>
+      <Typography variant="caption" className={`${classes.messageTimestamp} ${message.role === 'user' ? classes.userTimestamp : ''}`}>
         {new Date(message.timestamp).toLocaleTimeString()}
       </Typography>
     </div>
