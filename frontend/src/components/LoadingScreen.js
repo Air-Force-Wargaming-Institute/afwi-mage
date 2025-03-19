@@ -16,13 +16,24 @@ const useStyles = makeStyles(() => ({
     borderRadius: '8px',
     overflow: 'hidden',
     transform: 'scale(1.15)', // Scale up the entire component by 15%
-    transformOrigin: 'center center'
+    transformOrigin: 'center center',
+    backgroundColor: 'black' // Add black background to entire component
+  },
+  canvasContainer: {
+    display: 'flex',
+    width: '100%',
   },
   loadingText: {
     fontSize: '0.75rem',
     color: 'white',
-    marginTop: '4px',
-    marginBottom: '4px'
+    padding: '5px 10px',
+    backgroundColor: '#2a2a2a', // Dark gray background 
+    width: '100%',
+    textAlign: 'center',
+    marginTop: 0,
+    marginBottom: 0,
+    borderBottomLeftRadius: '8px',
+    borderBottomRightRadius: '8px'
   }
 }));
 
@@ -210,10 +221,12 @@ const LoadingScreen = () => {
   
   return (
     <div className={classes.gameOfLifeLoader}>
-      <canvas 
-        ref={canvasRef}
-        style={{ background: 'black' }}
-      />
+      <div className={classes.canvasContainer}>
+        <canvas 
+          ref={canvasRef}
+          style={{ background: 'black', display: 'block' }}
+        />
+      </div>
       <div className={classes.loadingText}>Processing...</div>
     </div>
   );

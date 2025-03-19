@@ -61,13 +61,27 @@ async def process_graph_stream(graph, inputs):
 
     return await loop.run_in_executor(graph_executor, run_stream)
 
-async def process_question(question: str, session_id: str = None, team_id: str = None, plan: str = None, selected_agents: List[str] = None):
+async def process_question(
+    question: str, 
+    session_id: str = None, 
+    team_id: str = None, 
+    plan: str = None, 
+    selected_agents: List[str] = None, 
+    is_plan_accepted: bool = True,
+    plan_notes: str = "",
+    original_message: str = None,
+    modified_message: str = None
+):
     """Process a question through the multiagent system, maintaining session state"""
     if not team_id:
         raise ValueError("team_id is required")
         
     iteration = 0
     session_manager = SessionManager()
+    
+    # Set default values for optional parameters
+    original_message = original_message or question
+    modified_message = modified_message or question
     
     try:
         start_time = time.time()
@@ -140,7 +154,10 @@ async def process_question(question: str, session_id: str = None, team_id: str =
                 "plan": plan,
                 "vectorstore": team.vectorstore[0],
                 "selected_experts": selected_agents,
-                "session_id": session_id
+                "session_id": session_id,
+                "plan_notes": plan_notes,
+                "original_message": original_message,
+                "modified_message": modified_message
             }
             
         except ValueError:
@@ -169,14 +186,29 @@ async def process_question(question: str, session_id: str = None, team_id: str =
         # Combine synthesized report with expert HTML
         full_response = final_output['synthesis']['synthesized_report'] + expert_html
         logger.info(f"Full response: {full_response}")
+        
+        # Create session history entry
+        session_entry = {
+            "question": question,
+            "response": full_response,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Add plan if provided with more comprehensive data
+        if plan:
+            session_entry["plan"] = {
+                "content": plan,
+                "accepted": is_plan_accepted,
+                "notes": plan_notes,
+                "selected_agents": selected_agents,
+                "original_message": original_message,
+                "modified_message": modified_message
+            }
+            
         # Update session with new interaction
         session_manager.add_to_session_history(
             session_id,
-            {
-                "question": question,
-                "response": full_response,
-                "timestamp": datetime.now().isoformat()
-            }
+            session_entry
         )
         
         # Get updated session data

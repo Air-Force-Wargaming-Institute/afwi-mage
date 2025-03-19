@@ -40,9 +40,12 @@ class ChatMessage(BaseModel):
     session_id: Optional[str] = None
     user_id: Optional[str] = None
     plan: Optional[str] = None
+    plan_notes: Optional[str] = None
     comments: Optional[str] = None
     selected_agents: Optional[List[str]] = None
+    agents: Optional[List[str]] = None  # For compatibility with older code
     original_message: Optional[str] = None
+    is_plan_accepted: Optional[bool] = True  # Default to True for backward compatibility
 
 class SessionCreate(BaseModel):
     """
@@ -363,7 +366,11 @@ async def chat_endpoint(request_data: ChatMessage):
                     session_id=request_data.session_id,
                     team_id=request_data.team_id,
                     plan=request_data.plan,
-                    selected_agents=request_data.selected_agents
+                    selected_agents=request_data.selected_agents,
+                    is_plan_accepted=request_data.is_plan_accepted,
+                    plan_notes=request_data.plan_notes,
+                    original_message=request_data.original_message,
+                    modified_message=request_data.message,  # Using the current message as modified
                 ))
             )
             logger.info(f"Response: {response}")

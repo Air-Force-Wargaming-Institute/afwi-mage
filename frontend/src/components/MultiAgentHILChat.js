@@ -1166,15 +1166,12 @@ const Message = memo(({ message, onSectionExpanded }) => {
 
   // Determine message class based on sender
   const getMessageClass = () => {
-    switch(message.sender) {
-      case 'user':
-        return classes.userMessage;
-      case 'ai':
-        return classes.aiMessage;
-      case 'system':
-        return classes.systemMessage;
-      default:
-        return classes.aiMessage;
+    if (message.role === 'user') {
+      return classes.userMessage;
+    } else if (message.role === 'system') {
+      return classes.systemMessage;
+    } else {
+      return classes.aiMessage;
     }
   };
 
@@ -1589,14 +1586,8 @@ function MultiAgentHILChat() {
   const handleSessionClick = async (sessionId) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+      const response = await axios.get(`${getApiUrl('CHAT', `/sessions/${sessionId}`)}`);
       
-      // Fetch session data from the backend
-      const response = await axios.get(getApiUrl('CHAT', `/sessions/${sessionId}`));
-      
-      // Update current session
-      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: sessionId });
-      
-      // If the session has a conversation history, format and set the messages
       if (response.data && response.data.conversation_history) {
         const formattedMessages = response.data.conversation_history.flatMap(entry => {
           const messages = [];
@@ -1607,8 +1598,50 @@ function MultiAgentHILChat() {
               id: uuidv4(),
               text: entry.question,
               sender: 'user',
+              role: 'user',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
+            });
+          }
+          
+          // Add plan as system message if it exists and is accepted
+          if (entry.plan && entry.plan.accepted) {
+            // Determine if modified message is different from original
+            const showModifiedMessage = entry.plan.modified_message !== entry.plan.original_message;
+            
+            // Original message section
+            const originalMessageSection = `### Original Message\n${entry.plan.original_message}`;
+            
+            // Modified message section (only if different from original)
+            const modifiedMessageSection = showModifiedMessage 
+              ? `\n\n### Modified Message\n${entry.plan.modified_message}` 
+              : '';
+            
+            // Plan details section
+            const planDetailsSection = `\n\n### Plan Details\n${entry.plan.content}`;
+            
+            // Selected agents section
+            const selectedAgentsSection = entry.plan.selected_agents && entry.plan.selected_agents.length > 0 
+              ? `\n\n### Selected Agents\n${entry.plan.selected_agents.map(agent => `- ${agent}`).join('\n')}` 
+              : '';
+            
+            // Plan notes section
+            const notesSection = entry.plan.notes
+              ? `\n\n### Plan Notes\n${entry.plan.notes}` 
+              : '';
+            
+            // Construct full plan text with all sections in the requested order
+            const planText = `## Execution Plan\n\n${originalMessageSection}${modifiedMessageSection}${planDetailsSection}${selectedAgentsSection}${notesSection}`;
+            
+            messages.push({
+              id: uuidv4(),
+              text: planText,
+              sender: 'system',
+              role: 'system',
+              timestamp: new Date(entry.timestamp),
+              sessionId: sessionId,
+              originalText: entry.plan.original_message,
+              modifiedText: showModifiedMessage ? entry.plan.modified_message : null
             });
           }
           
@@ -1618,6 +1651,7 @@ function MultiAgentHILChat() {
               id: uuidv4(),
               text: removeTripleBackticks(entry.response),
               sender: 'ai',
+              role: 'assistant',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
             });
@@ -1627,16 +1661,27 @@ function MultiAgentHILChat() {
         });
         
         dispatch({ type: ACTIONS.SET_MESSAGES, payload: formattedMessages });
-      } else {
-        // If no conversation history, clear messages
-        dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
       }
-
+      
+      // Update active session
+      dispatch({ 
+        type: ACTIONS.SET_CURRENT_SESSION, 
+        payload: sessionId 
+      });
+      
+      // Update session name if available
+      if (response.data && response.data.session_name) {
+        dispatch({
+          type: ACTIONS.SET_SESSION_NAME,
+          payload: response.data.session_name
+        });
+      }
+      
       // Focus on input field after state updates
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
-
+      
     } catch (error) {
       console.error('Error fetching session messages:', error);
       dispatch({ 
@@ -2015,7 +2060,9 @@ function MultiAgentHILChat() {
       team_id: currentSession.teamId,
       selected_agents: selectedAgents,
       agents: selectedAgents, // Add this field as well for compatibility
-      comments: rejectionText.trim()
+      comments: rejectionText.trim(),
+      is_plan_accepted: planChoice === 'accept', // Add explicit flag for plan acceptance
+      message_choice: messageChoice // Track whether original or modified message was used
     };
 
     // Close dialog and show loading first
@@ -2046,29 +2093,41 @@ function MultiAgentHILChat() {
       }
       
       // Create a formatted version of the plan for the chat
-      const selectedAgentsText = selectedAgents.length > 0 
+      const originalMessageSection = `### Original Message\n${originalMessage}`;
+      
+      // Only add modified message section if it was selected and is different from original
+      const showModifiedMessage = messageChoice === 'modified' && modifiedQuestion !== originalMessage;
+      const modifiedMessageSection = showModifiedMessage 
+        ? `\n\n### Modified Message\n${modifiedQuestion}` 
+        : '';
+      
+      // Plan details section
+      const planDetailsSection = `\n\n### Plan Details\n${planContent}`;
+      
+      // Selected agents section
+      const selectedAgentsSection = selectedAgents.length > 0 
         ? `\n\n### Selected Agents\n${selectedAgents.map(agent => `- ${agent}`).join('\n')}` 
         : '';
       
-      const messageTypeInfo = messageChoice === 'original' 
-        ? '(Original user message)' 
-        : '(AI-modified message)';
-      
+      // Plan notes section
       const notesSection = planNotes 
         ? `\n\n### Plan Notes\n${planNotes}` 
         : '';
       
-      const messageText = `## Execution Plan ${messageTypeInfo}\n\n### Question\n${messageToSend}${selectedAgentsText}\n\n### Plan Details\n${planContent}${notesSection}`;
+      const planText = `## Execution Plan\n\n${originalMessageSection}${modifiedMessageSection}${planDetailsSection}${selectedAgentsSection}${notesSection}`;
       
       // Add the plan to the chat as a system message
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: uuidv4(),
-          text: messageText, 
+          text: planText, 
           sender: 'system', 
+          role: 'system',
           timestamp: new Date(),
-          sessionId: currentSession.id
+          sessionId: currentSession.id,
+          originalText: originalMessage,
+          modifiedText: showModifiedMessage ? modifiedQuestion : null
         }
       });
     }
