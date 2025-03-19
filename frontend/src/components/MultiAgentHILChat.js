@@ -55,6 +55,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
 import PersonIcon from '@mui/icons-material/Person';
+import LoadingScreen from './LoadingScreen';
 
 // Simple function to replace triple backticks with spaces
 const removeTripleBackticks = (text) => {
@@ -112,41 +113,7 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
     overflowY: 'auto',
     padding: theme.spacing(2),
-    marginBottom: theme.spacing(2),
-    paddingRight: theme.spacing(2),
-    display: 'flex',
-    flexDirection: 'column',
-    gap: theme.spacing(1),
-    textAlign: 'left',
-    fontSize: '0.7rem',
-    scrollBehavior: 'smooth',
-    width: '100%',
-    boxSizing: 'border-box',
-    '&::-webkit-scrollbar': {
-      width: '8px',
-      zIndex: 2,
-    },
-    '&::-webkit-scrollbar-track': {
-      background: 'transparent',
-      zIndex: 2,
-    },
-    '&::-webkit-scrollbar-thumb': {
-      background: theme.palette.grey[300],
-      borderRadius: '4px',
-      zIndex: 2,
-      '&:hover': {
-        background: theme.palette.grey[400],
-      },
-    },
-    // Improve container for handling expanded content
-    '& > div': {
-      width: 'fit-content',
-      maxWidth: '80%',
-      alignSelf: props => props.sender === 'user' ? 'flex-end' : 'flex-start',
-      [theme.breakpoints.down('sm')]: {
-        maxWidth: '95%',
-      },
-    },
+    position: 'relative',
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -264,37 +231,19 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
   },
   typingIndicator: {
-    padding: theme.spacing(2),
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    padding: theme.spacing(1),
     display: 'flex',
-    flexDirection: 'column',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing(1),
-    '& .loading-header': {
-      fontWeight: 600,
-    },
-    '& .loading-text': {
-      color: theme.palette.text.secondary,
-      fontSize: '0.9rem',
-      textAlign: 'center',
-    },
-    '& .dots': {
-      display: 'flex',
-      gap: '8px',
-      marginTop: theme.spacing(1),
-      '& .dot': {
-        width: '8px',
-        height: '8px',
-        backgroundColor: theme.palette.primary.main,
-        borderRadius: '50%',
-        animation: '$bounce 1.4s infinite ease-in-out both',
-        '&:nth-child(1)': {
-          animationDelay: '-0.32s',
-        },
-        '&:nth-child(2)': {
-          animationDelay: '-0.16s',
-        },
-      },
-    },
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: theme.spacing(1),
+    zIndex: 10,
+    maxWidth: '180px',
+    maxHeight: '180px'
   },
   '@keyframes bounce': {
     '0%, 80%, 100%': {
@@ -605,11 +554,15 @@ const useStyles = makeStyles((theme) => ({
   },
   buttonBar: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing(1),
-    borderBottom: `1px solid ${theme.palette.divider}`,
+    padding: theme.spacing(1, 2),
     backgroundColor: theme.palette.background.paper,
-    position: 'relative',
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  buttonBarActions: {
+    display: 'flex',
+    alignItems: 'center',
   },
   sessionName: {
     position: 'absolute',
@@ -619,11 +572,6 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1rem',
     textAlign: 'center',
-  },
-  buttonBarActions: {
-    marginLeft: 'auto',
-    display: 'flex',
-    alignItems: 'center',
   },
   systemMessage: {
     alignSelf: 'center',
@@ -679,6 +627,43 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: '#3f51b5', // Fixed: use direct color instead of theme => theme.palette.primary.main
     color: 'white',
     boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+  },
+  processingButton: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(0.5, 1.5),
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: theme.shape.borderRadius,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    },
+  },
+  processingText: {
+    fontSize: '0.875rem',
+    color: theme.palette.text.secondary,
+    animation: '$pulse 1.5s infinite',
+  },
+  '@keyframes pulse': {
+    '0%': {
+      opacity: 0.6,
+    },
+    '50%': {
+      opacity: 1,
+    },
+    '100%': {
+      opacity: 0.6,
+    }
+  },
+  hiddenIndicator: {
+    opacity: 0,
+    pointerEvents: 'none',
+    transition: 'opacity 0.3s ease',
   },
 }));
 
@@ -1513,16 +1498,18 @@ function MultiAgentHILChat() {
     );
   }, [handleSectionExpanded]);
   
+  // Add state for loading indicator visibility
+  const [loadingIndicatorVisible, setLoadingIndicatorVisible] = useState(true);
+  
+  // Add function to toggle loading indicator visibility
+  const toggleLoadingIndicator = () => {
+    setLoadingIndicatorVisible(prev => !prev);
+  };
+  
   // Loading indicator component
   const TypingIndicator = () => (
-    <div className={classes.typingIndicator}>
-      <Typography className="loading-header">Processing your message</Typography>
-      <Typography className="loading-text">Please wait</Typography>
-      <div className="dots">
-        <div className="dot" />
-        <div className="dot" />
-        <div className="dot" />
-      </div>
+    <div className={`${classes.typingIndicator} ${loadingIndicatorVisible ? '' : classes.hiddenIndicator}`}>
+      <LoadingScreen />
     </div>
   );
 
@@ -2234,6 +2221,14 @@ function MultiAgentHILChat() {
               <Typography className={classes.sessionName}>
                 {state.isFullscreen && state.chatSessions.find(session => session.id === state.currentSessionId)?.name}
               </Typography>
+              
+              {/* Add Processing indicator button in the middle */}
+              {state.isLoading && (
+                <div className={classes.processingButton} onClick={toggleLoadingIndicator}>
+                  <span className={classes.processingText}>Processing...</span>
+                </div>
+              )}
+              
               <div className={classes.buttonBarActions}>
                 <Typography 
                   className={classes.fullscreenText}
