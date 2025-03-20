@@ -524,6 +524,33 @@ const useStyles = makeStyles((theme) => ({
     boxSizing: 'border-box',
     overflow: 'hidden',
     textAlign: 'left', // Ensure analysis content is left-aligned
+    // Add markdown styling for consistent formatting
+    '& p, & h1, & h2, & h3, & h4, & h5, & h6': {
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
+      overflowWrap: 'break-word',
+      wordBreak: 'break-word', 
+      maxWidth: '100%',
+      textAlign: 'inherit',
+    },
+    // Remove margin from first child and last child
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    // Remove empty paragraphs that often result from blank lines
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
+    },
+    // Reduce spacing between consecutive elements
+    '& p + p, & ul + p, & ol + p, & p + ul, & p + ol': {
+      marginTop: '0.5em',
+    },
   },
   // Hidden content for collapsed sections
   collapsedContent: {
@@ -580,6 +607,13 @@ const useStyles = makeStyles((theme) => ({
       maxHeight: '6000px', // Slightly smaller for nested sections
       width: '100%',
       textAlign: 'left', // Ensure nested expanded content is left-aligned
+    },
+    // Make sure empty paragraphs are removed in expanded content too
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
     },
   },
   messageTimestamp: {
@@ -1203,7 +1237,10 @@ const Message = memo(({ message, onSectionExpanded }) => {
           onClick={(e) => e.stopPropagation()}
           style={isExpanded ? { height: 'auto' } : {}} // Ensure height is auto when expanded
         >
-          {filteredContent}
+          {/* Wrap content in a div with markdown class to ensure consistent styling */}
+          <div className={classes.markdown}>
+            {filteredContent}
+          </div>
           
           {/* If a think tag follows this details section, add an AI Reasoning section */}
           {associatedThinkContent && (
