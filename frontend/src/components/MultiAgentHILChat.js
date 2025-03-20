@@ -664,6 +664,7 @@ const useStyles = makeStyles((theme) => ({
   buttonBarActions: {
     display: 'flex',
     alignItems: 'center',
+    marginLeft: 'auto', // Push to the right
   },
   sessionName: {
     position: 'absolute',
@@ -673,6 +674,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1rem',
     textAlign: 'center',
+    pointerEvents: 'none', // Prevent it from interfering with clicks
   },
   systemMessage: {
     alignSelf: 'center',
