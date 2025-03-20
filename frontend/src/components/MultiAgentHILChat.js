@@ -402,17 +402,32 @@ const useStyles = makeStyles((theme) => ({
     wordBreak: 'break-word',
     // Add text alignment based on parent - by default left-align
     textAlign: 'left',
-    '& details': {
-      margin: '1em 0',
-      padding: '0.5em',
-      backgroundColor: 'rgba(0, 0, 0, 0.03)',
-      textAlign: 'left',
-    },
-    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+    // Reduce spacing between elements
+    '& p, & h1, & h2, & h3, & h4, & h5, & h6': {
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
       overflowWrap: 'break-word',
       wordBreak: 'break-word', 
       maxWidth: '100%',
       textAlign: 'inherit', // Inherit text alignment from parent
+    },
+    // Remove margin from first child and last child
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    // Remove empty paragraphs that often result from blank lines
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
+    },
+    // Reduce spacing between consecutive elements
+    '& p + p, & ul + p, & ol + p, & p + ul, & p + ol': {
+      marginTop: '0.5em',
     },
     '& img': {
       maxWidth: '100%',
@@ -423,6 +438,17 @@ const useStyles = makeStyles((theme) => ({
       overflow: 'auto',
       display: 'block',
       textAlign: 'inherit', // Inherit text alignment from parent
+    },
+    '& details': {
+      margin: '0.75em 0',
+      padding: '0.5em',
+      backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      textAlign: 'left',
+    },
+    '& ul, & ol': {
+      paddingLeft: '1.5em',
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
     },
   },
   markdownDetails: {
