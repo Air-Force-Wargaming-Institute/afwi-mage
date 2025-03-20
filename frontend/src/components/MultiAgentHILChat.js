@@ -60,7 +60,10 @@ import LoadingScreen from './LoadingScreen';
 // Simple function to replace triple backticks with spaces
 const removeTripleBackticks = (text) => {
   if (!text) return '';
-  return text.replace(/```/g, ' ');
+  // Replace triple backticks followed by markdown
+  let processedText = text.replace(/```markdown/g, ' ');
+  // Replace any remaining triple backticks
+  return processedText.replace(/```/g, ' ');
 };
 
 const useStyles = makeStyles((theme) => ({
