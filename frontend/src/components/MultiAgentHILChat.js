@@ -60,7 +60,10 @@ import LoadingScreen from './LoadingScreen';
 // Simple function to replace triple backticks with spaces
 const removeTripleBackticks = (text) => {
   if (!text) return '';
-  return text.replace(/```/g, ' ');
+  // Replace triple backticks followed by markdown
+  let processedText = text.replace(/```markdown/g, ' ');
+  // Replace any remaining triple backticks
+  return processedText.replace(/```/g, ' ');
 };
 
 const useStyles = makeStyles((theme) => ({
@@ -114,6 +117,8 @@ const useStyles = makeStyles((theme) => ({
     overflowY: 'auto',
     padding: theme.spacing(2),
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -123,8 +128,6 @@ const useStyles = makeStyles((theme) => ({
     border: '1px solid #e0e0e0',
     maxWidth: '80%',
     wordBreak: 'break-word',
-    display: 'inline-block',
-    whiteSpace: 'pre-wrap',
     position: 'relative',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.3s ease',
@@ -145,14 +148,46 @@ const useStyles = makeStyles((theme) => ({
   userMessage: {
     backgroundColor: theme.palette.primary.main,
     color: '#ffffff',
-    marginLeft: 'auto',
+    marginLeft: 'auto', // Push to the right side
+    marginRight: '0', // Ensure it stays on the right
     borderRadius: '20px 20px 0 20px',
+    textAlign: 'right', // Set base text alignment for user messages
+    alignSelf: 'flex-end', // Align to the end of the flex container
     '& $messageContent': {
       color: '#ffffff',
     },
-    '& p, & div': {
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
       color: '#ffffff !important',
+      textAlign: 'right !important', // Force right-align with !important
     },
+    '& .ReactMarkdown': {
+      textAlign: 'right !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'right !important', // Force right-align for code and lists
+    },
+    '& .$messageTimestamp': {
+      textAlign: 'right !important', // Force right-align for timestamp
+      marginLeft: 'auto',
+    }
+  },
+  // Add specific classes for user message markdown and timestamp
+  '& .user-markdown': {
+    textAlign: 'right !important',
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      textAlign: 'right !important',
+    },
+    '& code, & pre': {
+      textAlign: 'right !important',
+    },
+    '& table': {
+      marginLeft: 'auto',
+    },
+  },
+  '& .user-timestamp': {
+    textAlign: 'right !important',
+    width: '100%',
+    display: 'block',
   },
   aiMessage: {
     alignSelf: 'flex-start',
@@ -164,6 +199,15 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',          // Add flex display to ensure proper content alignment
     flexDirection: 'column',  // Stack children vertically
     alignItems: 'flex-start', // Align children at the start
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
+      textAlign: 'left !important', // Force left-align text for AI messages
+    },
+    '& .ReactMarkdown': {
+      textAlign: 'left !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'left !important', // Force left-align for code and lists
+    },
     '& pre': {
       margin: '8px 0',
       borderRadius: '4px',
@@ -353,40 +397,40 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(2),
   },
   markdown: {
-    width: '100%', // Ensure markdown takes full width of parent 
-    textAlign: 'left', // Explicitly set left alignment for markdown content
-    '& details': {
-      margin: '1em 0',
-      padding: '0.5em',
-      backgroundColor: theme.palette.background.paper,
-      borderRadius: theme.shape.borderRadius,
-      boxShadow: theme.shadows[1],
-      textAlign: 'left', // Ensure details are left-aligned
-      
-      '& summary': {
-        cursor: 'pointer',
-        fontWeight: 500,
-        marginBottom: '0.5em',
-        padding: '0.5em',
-        textAlign: 'left', // Ensure summaries are left-aligned
-        
-        '&:hover': {
-          color: theme.palette.primary.main,
-        },
-      },
-      
-      '& details': {
-        margin: '0.5em 0',
-        padding: '0.5em',
-        backgroundColor: 'rgba(0, 0, 0, 0.03)',
-        textAlign: 'left', // Ensure nested details are left-aligned
-      },
-    },
-    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+    fontFamily: theme.typography.fontFamily,
+    fontSize: theme.typography.body1.fontSize,
+    lineHeight: '1.5',
+    width: '100%',
+    overflowX: 'hidden',
+    wordBreak: 'break-word',
+    // Add text alignment based on parent - by default left-align
+    textAlign: 'left',
+    // Reduce spacing between elements
+    '& p, & h1, & h2, & h3, & h4, & h5, & h6': {
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
       overflowWrap: 'break-word',
       wordBreak: 'break-word', 
       maxWidth: '100%',
-      textAlign: 'left', // Ensure all text elements are left-aligned
+      textAlign: 'inherit', // Inherit text alignment from parent
+    },
+    // Remove margin from first child and last child
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    // Remove empty paragraphs that often result from blank lines
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
+    },
+    // Reduce spacing between consecutive elements
+    '& p + p, & ul + p, & ol + p, & p + ul, & p + ol': {
+      marginTop: '0.5em',
     },
     '& img': {
       maxWidth: '100%',
@@ -396,7 +440,18 @@ const useStyles = makeStyles((theme) => ({
       maxWidth: '100%',
       overflow: 'auto',
       display: 'block',
-      textAlign: 'left', // Ensure tables are left-aligned
+      textAlign: 'inherit', // Inherit text alignment from parent
+    },
+    '& details': {
+      margin: '0.75em 0',
+      padding: '0.5em',
+      backgroundColor: 'rgba(0, 0, 0, 0.03)',
+      textAlign: 'left',
+    },
+    '& ul, & ol': {
+      paddingLeft: '1.5em',
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
     },
   },
   markdownDetails: {
@@ -421,6 +476,7 @@ const useStyles = makeStyles((theme) => ({
     minWidth: '250px',
     flexGrow: 1,
     alignSelf: 'stretch',
+    textAlign: 'left', // Ensure details content is left-aligned
     // Better handle multiple expanded sections
     '&:not(:last-child)': {
       marginBottom: theme.spacing(2),
@@ -471,6 +527,33 @@ const useStyles = makeStyles((theme) => ({
     boxSizing: 'border-box',
     overflow: 'hidden',
     textAlign: 'left', // Ensure analysis content is left-aligned
+    // Add markdown styling for consistent formatting
+    '& p, & h1, & h2, & h3, & h4, & h5, & h6': {
+      marginTop: '0.5em',
+      marginBottom: '0.5em',
+      overflowWrap: 'break-word',
+      wordBreak: 'break-word', 
+      maxWidth: '100%',
+      textAlign: 'inherit',
+    },
+    // Remove margin from first child and last child
+    '& > *:first-child': {
+      marginTop: 0,
+    },
+    '& > *:last-child': {
+      marginBottom: 0,
+    },
+    // Remove empty paragraphs that often result from blank lines
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
+    },
+    // Reduce spacing between consecutive elements
+    '& p + p, & ul + p, & ol + p, & p + ul, & p + ol': {
+      marginTop: '0.5em',
+    },
   },
   // Hidden content for collapsed sections
   collapsedContent: {
@@ -490,7 +573,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
-    textAlign: 'left', // Ensure expanded content is left-aligned
+    textAlign: 'left', // Ensure expanded content is left-aligned by default
     '& img, & video': {
       maxWidth: '100%',
       height: 'auto',
@@ -528,12 +611,21 @@ const useStyles = makeStyles((theme) => ({
       width: '100%',
       textAlign: 'left', // Ensure nested expanded content is left-aligned
     },
+    // Make sure empty paragraphs are removed in expanded content too
+    '& p:empty': {
+      display: 'none',
+      margin: 0,
+      padding: 0,
+      height: 0,
+    },
   },
   messageTimestamp: {
     fontSize: '0.75rem',
     color: theme.palette.text.secondary,
     opacity: 0.8,
     marginTop: theme.spacing(1),
+    display: 'block',
+    width: '100%',
   },
   fullscreenButton: {
     color: theme.palette.text.secondary,
@@ -575,6 +667,7 @@ const useStyles = makeStyles((theme) => ({
   buttonBarActions: {
     display: 'flex',
     alignItems: 'center',
+    marginLeft: 'auto', // Push to the right
   },
   sessionName: {
     position: 'absolute',
@@ -584,6 +677,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: '1rem',
     textAlign: 'center',
+    pointerEvents: 'none', // Prevent it from interfering with clicks
   },
   systemMessage: {
     alignSelf: 'center',
@@ -591,8 +685,15 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: '#f5f5f5',
     border: `1px solid ${theme.palette.primary.light}`,
     borderRadius: '8px',
-    '& p, & li': {
+    '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
       margin: '4px 0',
+      textAlign: 'left !important', // Force left-align text for system messages
+    },
+    '& .ReactMarkdown': {
+      textAlign: 'left !important', // Target the ReactMarkdown component
+    },
+    '& code, & pre, & table, & ul, & ol': {
+      textAlign: 'left !important', // Force left-align for code and lists
     },
     '& strong': {
       color: theme.palette.primary.dark,
@@ -619,6 +720,7 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     transition: 'max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease, padding 0.3s ease',
     overflow: 'hidden',
+    textAlign: 'left', // Left-align plan content text
   },
   planCollapsed: {
     maxHeight: 0,
@@ -676,6 +778,23 @@ const useStyles = makeStyles((theme) => ({
     opacity: 0,
     pointerEvents: 'none',
     transition: 'opacity 0.3s ease',
+  },
+  userMarkdown: {
+    textAlign: 'right !important',
+    '& p, & li, & h1, & h2, & h3, & h4, & h5, & h6': {
+      textAlign: 'right !important',
+    },
+    '& code, & pre': {
+      textAlign: 'right !important',
+    },
+    '& table': {
+      marginLeft: 'auto',
+    },
+  },
+  userTimestamp: {
+    textAlign: 'right !important',
+    width: '100%',
+    display: 'block',
   },
 }));
 
@@ -1123,7 +1242,10 @@ const Message = memo(({ message, onSectionExpanded }) => {
           onClick={(e) => e.stopPropagation()}
           style={isExpanded ? { height: 'auto' } : {}} // Ensure height is auto when expanded
         >
-          {filteredContent}
+          {/* Wrap content in a div with markdown class to ensure consistent styling */}
+          <div className={classes.markdown}>
+            {filteredContent}
+          </div>
           
           {/* If a think tag follows this details section, add an AI Reasoning section */}
           {associatedThinkContent && (
@@ -1166,15 +1288,12 @@ const Message = memo(({ message, onSectionExpanded }) => {
 
   // Determine message class based on sender
   const getMessageClass = () => {
-    switch(message.sender) {
-      case 'user':
-        return classes.userMessage;
-      case 'ai':
-        return classes.aiMessage;
-      case 'system':
-        return classes.systemMessage;
-      default:
-        return classes.aiMessage;
+    if (message.role === 'user') {
+      return classes.userMessage;
+    } else if (message.role === 'system') {
+      return classes.systemMessage;
+    } else {
+      return classes.aiMessage;
     }
   };
 
@@ -1384,13 +1503,13 @@ const Message = memo(({ message, onSectionExpanded }) => {
             code: CodeBlock,
             details: renderEnhancedDetails,
           }}
-          className={classes.markdown}
+          className={`${classes.markdown} ${message.role === 'user' ? classes.userMarkdown : ''}`}
         >
           {message.text}
         </ReactMarkdown>
       )}
       
-      <Typography variant="caption" className={classes.messageTimestamp}>
+      <Typography variant="caption" className={`${classes.messageTimestamp} ${message.role === 'user' ? classes.userTimestamp : ''}`}>
         {new Date(message.timestamp).toLocaleTimeString()}
       </Typography>
     </div>
@@ -1589,14 +1708,8 @@ function MultiAgentHILChat() {
   const handleSessionClick = async (sessionId) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+      const response = await axios.get(`${getApiUrl('CHAT', `/sessions/${sessionId}`)}`);
       
-      // Fetch session data from the backend
-      const response = await axios.get(getApiUrl('CHAT', `/sessions/${sessionId}`));
-      
-      // Update current session
-      dispatch({ type: ACTIONS.SET_CURRENT_SESSION, payload: sessionId });
-      
-      // If the session has a conversation history, format and set the messages
       if (response.data && response.data.conversation_history) {
         const formattedMessages = response.data.conversation_history.flatMap(entry => {
           const messages = [];
@@ -1607,8 +1720,50 @@ function MultiAgentHILChat() {
               id: uuidv4(),
               text: entry.question,
               sender: 'user',
+              role: 'user',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
+            });
+          }
+          
+          // Add plan as system message if it exists and is accepted
+          if (entry.plan && entry.plan.accepted) {
+            // Determine if modified message is different from original
+            const showModifiedMessage = entry.plan.modified_message !== entry.plan.original_message;
+            
+            // Original message section
+            const originalMessageSection = `### Original Message\n${entry.plan.original_message}`;
+            
+            // Modified message section (only if different from original)
+            const modifiedMessageSection = showModifiedMessage 
+              ? `\n\n### Modified Message\n${entry.plan.modified_message}` 
+              : '';
+            
+            // Plan details section
+            const planDetailsSection = `\n\n### Plan Details\n${entry.plan.content}`;
+            
+            // Selected agents section
+            const selectedAgentsSection = entry.plan.selected_agents && entry.plan.selected_agents.length > 0 
+              ? `\n\n### Selected Agents\n${entry.plan.selected_agents.map(agent => `- ${agent}`).join('\n')}` 
+              : '';
+            
+            // Plan notes section
+            const notesSection = entry.plan.notes
+              ? `\n\n### Plan Notes\n${entry.plan.notes}` 
+              : '';
+            
+            // Construct full plan text with all sections in the requested order
+            const planText = `## Execution Plan\n\n${originalMessageSection}${modifiedMessageSection}${planDetailsSection}${selectedAgentsSection}${notesSection}`;
+            
+            messages.push({
+              id: uuidv4(),
+              text: planText,
+              sender: 'system',
+              role: 'system',
+              timestamp: new Date(entry.timestamp),
+              sessionId: sessionId,
+              originalText: entry.plan.original_message,
+              modifiedText: showModifiedMessage ? entry.plan.modified_message : null
             });
           }
           
@@ -1618,6 +1773,7 @@ function MultiAgentHILChat() {
               id: uuidv4(),
               text: removeTripleBackticks(entry.response),
               sender: 'ai',
+              role: 'assistant',
               timestamp: new Date(entry.timestamp),
               sessionId: sessionId
             });
@@ -1627,16 +1783,27 @@ function MultiAgentHILChat() {
         });
         
         dispatch({ type: ACTIONS.SET_MESSAGES, payload: formattedMessages });
-      } else {
-        // If no conversation history, clear messages
-        dispatch({ type: ACTIONS.SET_MESSAGES, payload: [] });
       }
-
+      
+      // Update active session
+      dispatch({ 
+        type: ACTIONS.SET_CURRENT_SESSION, 
+        payload: sessionId 
+      });
+      
+      // Update session name if available
+      if (response.data && response.data.session_name) {
+        dispatch({
+          type: ACTIONS.SET_SESSION_NAME,
+          payload: response.data.session_name
+        });
+      }
+      
       // Focus on input field after state updates
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
-
+      
     } catch (error) {
       console.error('Error fetching session messages:', error);
       dispatch({ 
@@ -2015,7 +2182,9 @@ function MultiAgentHILChat() {
       team_id: currentSession.teamId,
       selected_agents: selectedAgents,
       agents: selectedAgents, // Add this field as well for compatibility
-      comments: rejectionText.trim()
+      comments: rejectionText.trim(),
+      is_plan_accepted: planChoice === 'accept', // Add explicit flag for plan acceptance
+      message_choice: messageChoice // Track whether original or modified message was used
     };
 
     // Close dialog and show loading first
@@ -2046,29 +2215,41 @@ function MultiAgentHILChat() {
       }
       
       // Create a formatted version of the plan for the chat
-      const selectedAgentsText = selectedAgents.length > 0 
+      const originalMessageSection = `### Original Message\n${originalMessage}`;
+      
+      // Only add modified message section if it was selected and is different from original
+      const showModifiedMessage = messageChoice === 'modified' && modifiedQuestion !== originalMessage;
+      const modifiedMessageSection = showModifiedMessage 
+        ? `\n\n### Modified Message\n${modifiedQuestion}` 
+        : '';
+      
+      // Plan details section
+      const planDetailsSection = `\n\n### Plan Details\n${planContent}`;
+      
+      // Selected agents section
+      const selectedAgentsSection = selectedAgents.length > 0 
         ? `\n\n### Selected Agents\n${selectedAgents.map(agent => `- ${agent}`).join('\n')}` 
         : '';
       
-      const messageTypeInfo = messageChoice === 'original' 
-        ? '(Original user message)' 
-        : '(AI-modified message)';
-      
+      // Plan notes section
       const notesSection = planNotes 
         ? `\n\n### Plan Notes\n${planNotes}` 
         : '';
       
-      const messageText = `## Execution Plan ${messageTypeInfo}\n\n### Question\n${messageToSend}${selectedAgentsText}\n\n### Plan Details\n${planContent}${notesSection}`;
+      const planText = `## Execution Plan\n\n${originalMessageSection}${modifiedMessageSection}${planDetailsSection}${selectedAgentsSection}${notesSection}`;
       
       // Add the plan to the chat as a system message
       dispatch({ 
         type: ACTIONS.ADD_MESSAGE, 
         payload: { 
           id: uuidv4(),
-          text: messageText, 
+          text: planText, 
           sender: 'system', 
+          role: 'system',
           timestamp: new Date(),
-          sessionId: currentSession.id
+          sessionId: currentSession.id,
+          originalText: originalMessage,
+          modifiedText: showModifiedMessage ? modifiedQuestion : null
         }
       });
     }

@@ -138,6 +138,42 @@ class SessionManager:
                     logger.warning(f"Session {session_id} not found")
                     return False
                 
+                # Validate message structure
+                if not isinstance(message, dict):
+                    logger.error("Message must be a dictionary")
+                    return False
+                
+                # Determine message type and validate accordingly
+                if 'plan' in message:
+                    # This is a plan message or combined message
+                    plan = message['plan']
+                    if not isinstance(plan, dict):
+                        logger.error("Plan must be a dictionary")
+                        return False
+                    
+                    # Required fields for plan
+                    if 'content' not in plan:
+                        logger.error("Plan must contain 'content' field")
+                        return False
+                    if 'accepted' not in plan:
+                        logger.error("Plan must contain 'accepted' field")
+                        return False
+                    
+                    # Optional fields - add with defaults if missing
+                    if 'notes' not in plan:
+                        plan['notes'] = ""
+                    if 'selected_agents' not in plan:
+                        plan['selected_agents'] = []
+                    if 'original_message' not in plan:
+                        plan['original_message'] = message.get('question', '')
+                    if 'modified_message' not in plan:
+                        plan['modified_message'] = message.get('question', '')
+                
+                # For normal Q&A messages, ensure required fields are present
+                if 'plan' not in message and ('question' not in message or 'response' not in message):
+                    logger.error("Regular messages must contain 'question' and 'response' fields")
+                    return False
+                
                 # Update the session
                 session['conversation_history'].append(message)
                 session['updated_at'] = datetime.now(timezone.utc).isoformat()
@@ -226,6 +262,14 @@ class SessionManager:
                 'role': 'user',
                 'content': interaction['question']
             })
+            
+            # Add plan as system message if it exists and is accepted
+            if 'plan' in interaction and interaction['plan'].get('accepted', False):
+                formatted_history.append({
+                    'role': 'system',
+                    'content': interaction['plan']['content']
+                })
+                
             formatted_history.append({
                 'role': 'assistant',
                 'content': interaction['response']
