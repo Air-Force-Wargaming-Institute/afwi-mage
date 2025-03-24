@@ -404,6 +404,29 @@ services:
   #   #   retries: 5
   #   #   start_period: 10s
 
+  # vLLM service - see ./vLLM/docker-compose.vllm.yml for details
+  # Run: cd vLLM && ./deploy_airgapped_vllm.ps1 to start the service
+  # This service is maintained separately to support airgapped deployments
+
+  model_service:
+    build: ./model_service
+    ports:
+      - "8008:8008"
+    environment:
+      - PYTHONPATH=/app
+      - VLLM_API_URL=http://host.docker.internal:8007/v1
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+    volumes:
+      - ../data:/app/data
+      - ./model_service:/app
+    restart: unless-stopped
+    networks:
+      - app-network
+    depends_on:
+      - init-data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres_data:
   nltk_data_volume:
