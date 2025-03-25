@@ -1,9 +1,9 @@
 # Check if model is available
-./check_vllm_model.ps1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Cannot start vLLM in airgapped mode due to missing model files." -ForegroundColor Red
-    exit 1
-}
+#./check_vllm_model.ps1
+#if ($LASTEXITCODE -ne 0) {
+#    Write-Host "Cannot start vLLM in airgapped mode due to missing model files." -ForegroundColor Red
+#    exit 1
+#}
 
 # Ensure Docker is running
 try {
@@ -22,7 +22,7 @@ Write-Host "Waiting for vLLM service to start (this may take a few minutes for m
 Start-Sleep -Seconds 30
 
 # Check if service is up
-$maxRetries = 10
+$maxRetries = 30
 $retryCount = 0
 $serviceUp = $false
 

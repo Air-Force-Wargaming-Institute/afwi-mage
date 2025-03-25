@@ -1,4 +1,4 @@
-$MODEL_DIR = "../../models/Llama-3.2-1B-Instruct-abliterated"
+$MODEL_DIR = "../../models/DeepSeek-R1-Distill-Qwen-14B-abliterated-v2"
 
 if (-not (Test-Path -Path $MODEL_DIR -PathType Container)) {
     Write-Host "ERROR: Model directory $MODEL_DIR does not exist." -ForegroundColor Red
@@ -6,7 +6,7 @@ if (-not (Test-Path -Path $MODEL_DIR -PathType Container)) {
     Write-Host "Run the following commands when internet access is available:" -ForegroundColor Yellow
     Write-Host "  mkdir -p $MODEL_DIR" -ForegroundColor Yellow
     Write-Host "  git lfs install" -ForegroundColor Yellow
-    Write-Host "  git clone https://huggingface.co/huihui-ai/Llama-3.2-1B-Instruct-abliterated/ $MODEL_DIR" -ForegroundColor Yellow
+    Write-Host "  git clone https://huggingface.co/DeepSeek-R1-Distill-Qwen-14B-abliterated-v2 $MODEL_DIR" -ForegroundColor Yellow
     exit 1
 }
 

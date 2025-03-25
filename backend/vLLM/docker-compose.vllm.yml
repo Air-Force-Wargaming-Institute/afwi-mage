@@ -16,6 +16,8 @@ services:
       - HF_DATASETS_OFFLINE=1
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
+      - TENSOR_PARALLEL_SIZE=2
+      - GPU_MEMORY_UTILIZATION=0.5
     volumes:
       - ../../models:/models
       - ../../data:/data
@@ -29,4 +31,4 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     ipc: host
-    command: --model /models/Llama-3.2-1B-Instruct-abliterated --tokenizer /models/Llama-3.2-1B-Instruct-abliterated --dtype=half
+    command: --model /models/Llama-3.2-1B-Instruct-abliterated --tokenizer /models/Llama-3.2-1B-Instruct-abliterated --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.5

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MODEL_DIR="../../models/Llama-3.2-1B-Instruct-abliterated"
+MODEL_DIR="../../models/DeepSeek-R1-Distill-Qwen-14B-abliterated-v2"
 
 if [ ! -d "$MODEL_DIR" ]; then
   echo "ERROR: Model directory $MODEL_DIR does not exist."
@@ -8,7 +8,7 @@ if [ ! -d "$MODEL_DIR" ]; then
   echo "Run the following commands when internet access is available:"
   echo "  mkdir -p $MODEL_DIR"
   echo "  git lfs install"
-  echo "  git clone https://huggingface.co/google/Llama-3.2-1B-Instruct-abliterated $MODEL_DIR"
+  echo "  git clone https://huggingface.co/huihui-ai/DeepSeek-R1-Distill-Qwen-14B-abliterated-v2 $MODEL_DIR"
   exit 1
 fi
 

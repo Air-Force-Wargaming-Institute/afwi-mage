@@ -86,17 +86,50 @@ def test_chat(base_url="http://localhost:8008", message="Write a short story abo
         # Save the full response to a file for inspection
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"chat_response_{timestamp}.txt"
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(f"PROMPT: {message}\n\n")
-            f.write(f"RESPONSE:\n{response_text}\n\n")
-            f.write(f"MODEL: {data.get('model')}\n")
-            f.write(f"TIMESTAMP: {data.get('timestamp')}\n")
-            f.write(f"STATS:\n")
-            f.write(f"- Characters: {char_count:,}\n")
-            f.write(f"- Words: {word_count:,}\n")
-            f.write(f"- Estimated tokens: ~{token_estimate:,}\n")
-            f.write(f"- Response time: {elapsed_time:.2f} seconds\n")
-        print(f"\nFull response saved to {filename}")
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                # Write prompt
+                f.write(f"PROMPT: {message}\n\n")
+                
+                # Clean up formatting issues in the response
+                clean_response = response_text
+                if clean_response.startswith(" "):
+                    print("\nℹ️ Response had leading whitespace that was cleaned up for the saved file")
+                    clean_response = clean_response.lstrip()
+                
+                # Remove trailing whitespace
+                clean_response = clean_response.rstrip()
+                
+                # Write the response header
+                f.write("RESPONSE:\n")
+                
+                # Write the actual response with proper line handling
+                # Split lines to handle them individually
+                lines = clean_response.split("\n")
+                for i, line in enumerate(lines):
+                    # Remove any non-printable control characters that might cause display issues
+                    clean_line = ''.join(c for c in line if c.isprintable() or c == '\n')
+                    # Write each line with proper indentation
+                    f.write(clean_line)
+                    # Add line break except for the last line
+                    if i < len(lines) - 1:
+                        f.write("\n")
+                
+                # Add spacing after response
+                f.write("\n\n")
+                
+                # Write metadata
+                f.write(f"MODEL: {data.get('model')}\n")
+                f.write(f"TIMESTAMP: {data.get('timestamp')}\n")
+                f.write(f"STATS:\n")
+                f.write(f"- Characters: {char_count:,}\n")
+                f.write(f"- Words: {word_count:,}\n")
+                f.write(f"- Estimated tokens: ~{token_estimate:,}\n")
+                f.write(f"- Response time: {elapsed_time:.2f} seconds\n")
+            
+            print(f"\nFull response saved to {filename}")
+        except Exception as e:
+            print(f"\n⚠️ Error saving response to file: {str(e)}")
         
         return True
     except requests.Timeout:

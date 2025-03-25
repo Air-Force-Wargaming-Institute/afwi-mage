@@ -176,7 +176,11 @@ async def call_llm_api(message: str, model: str = None, max_tokens: int = None,
                 if response.status_code == 200:
                     response_data = response.json()
                     logger.info(f"Successfully received response from completions endpoint, length: {len(response_data['choices'][0]['text'])}")
-                    return response_data["choices"][0]["text"]
+                    # Aggressively strip all leading/trailing whitespace
+                    text_response = response_data["choices"][0]["text"]
+                    if text_response and text_response[0].isspace():
+                        logger.warning(f"Response contained leading whitespace, stripping it: '{text_response[:10]}...'")
+                    return text_response.strip()
                 else:
                     logger.warning(f"Completions endpoint failed with status {response.status_code}, trying chat endpoint")
         except Exception as compl_err:
@@ -224,7 +228,12 @@ async def call_llm_api(message: str, model: str = None, max_tokens: int = None,
             response_data = response.json()
             result = response_data["choices"][0]["message"]["content"]
             logger.info(f"Successfully received response from chat endpoint, length: {len(result)}")
-            return result
+            
+            # Check for and log any whitespace issues
+            if result and result[0].isspace():
+                logger.warning(f"Chat response contained leading whitespace, stripping it: '{result[:10]}...'")
+            
+            return result.strip()
             
     except httpx.RequestError as e:
         logger.error(f"Error calling vLLM API: {str(e)}")
