@@ -10,13 +10,6 @@ import httpx
 import json
 from typing import List, Optional, Dict, Any
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 # Load configuration
 def load_config():
     """Load configuration from config.yaml file"""
@@ -35,8 +28,23 @@ def load_config():
 config = load_config()
 
 # Ensure log directory exists
-log_dir = Path(config.get('LOG_PATH', '/app/data/logs'))
+log_dir = Path(config['LOG_PATH'])
 log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=os.path.join(config['LOG_PATH'], 'model_service.log'),
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Add console handler for development
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -63,9 +71,38 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(None, description="Temperature for generation")
     system_prompt: Optional[str] = Field(None, description="Optional system prompt")
 
+class StructuredOutputRequest(BaseModel):
+    """Model for structured output requests"""
+    message: str = Field(..., description="The user's message/question")
+    model: Optional[str] = Field(None, description="Model to use for generation")
+    max_tokens: Optional[int] = Field(None, description="Maximum number of tokens to generate")
+    temperature: Optional[float] = Field(None, description="Temperature for generation")
+    system_prompt: Optional[str] = Field(None, description="Optional system prompt")
+    output_schema: Dict[str, Any] = Field(..., description="JSON schema for the expected output structure")
+
+class ChatCompletionRequest(BaseModel):
+    """Model for chat completion requests with system prompt"""
+    messages: List[Dict[str, str]] = Field(..., description="List of messages including system and user messages")
+    model: Optional[str] = Field(None, description="Model to use for generation")
+    max_tokens: Optional[int] = Field(None, description="Maximum number of tokens to generate")
+    temperature: Optional[float] = Field(None, description="Temperature for generation")
+
 class ChatResponse(BaseModel):
     """Model for chat responses"""
     response: str = Field(..., description="Generated response")
+    model: str = Field(..., description="Model used for generation")
+    timestamp: str = Field(..., description="Timestamp of the response")
+
+class ChatCompletionResponse(BaseModel):
+    """Model for chat completion responses"""
+    response: str = Field(..., description="Generated response")
+    model: str = Field(..., description="Model used for generation")
+    timestamp: str = Field(..., description="Timestamp of the response")
+    usage: Dict[str, int] = Field(..., description="Token usage statistics")
+
+class StructuredOutputResponse(BaseModel):
+    """Model for structured output responses"""
+    response: Dict[str, Any] = Field(..., description="Structured response matching the schema")
     model: str = Field(..., description="Model used for generation")
     timestamp: str = Field(..., description="Timestamp of the response")
 
@@ -293,6 +330,223 @@ async def chat(request: ChatRequest):
         logger.error(f"Error in chat endpoint after {elapsed:.2f} seconds: {str(e)}")
         logger.exception("Full exception details:")
         raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+
+# Chat completion endpoint
+@app.post("/chat/completion", response_model=ChatCompletionResponse)
+async def chat_completion(request: ChatCompletionRequest):
+    """Chat completion endpoint that processes messages with system prompts"""
+    start_time = datetime.now()
+    try:
+        # Log request details
+        msg_count = len(request.messages)
+        logger.info(f"Received chat completion request with {msg_count} messages")
+        logger.info(f"Request parameters: model={request.model}, max_tokens={request.max_tokens}, temperature={request.temperature}")
+        
+        # Extract system prompt and user message
+        system_prompt = next((msg["content"] for msg in request.messages if msg["role"] == "system"), None)
+        user_message = next((msg["content"] for msg in request.messages if msg["role"] == "user"), None)
+        
+        if not user_message:
+            raise HTTPException(status_code=400, detail="No user message found in messages list")
+            
+        # Call the LLM API to generate a response
+        logger.info("Calling LLM API for chat completion...")
+        response_text = await call_llm_api(
+            message=user_message,
+            model=request.model,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            system_prompt=system_prompt
+        )
+        
+        # Create and return the response
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        response_length = len(response_text)
+        word_count = len(response_text.split())
+        estimated_tokens = int(word_count * 1.3)  # Rough estimate
+        
+        logger.info(f"Generated response in {elapsed:.2f} seconds")
+        logger.info(f"Response length: {response_length} chars, ~{estimated_tokens} tokens")
+        logger.info(f"Generation speed: ~{estimated_tokens/elapsed:.1f} tokens/sec")
+        
+        response = ChatCompletionResponse(
+            response=response_text,
+            model=request.model or config.get("DEFAULT_MODEL"),
+            timestamp=end_time.isoformat(),
+            usage={
+                "prompt_tokens": estimated_tokens // 2,  # Rough estimate
+                "completion_tokens": estimated_tokens,
+                "total_tokens": estimated_tokens * 2
+            }
+        )
+        
+        return response
+        
+    except HTTPException as http_err:
+        # Just re-raise HTTP exceptions
+        logger.error(f"HTTP error in chat completion endpoint: {str(http_err)}")
+        raise
+    except Exception as e:
+        elapsed = (datetime.now() - start_time).total_seconds()
+        logger.error(f"Error in chat completion endpoint after {elapsed:.2f} seconds: {str(e)}")
+        logger.exception("Full exception details:")
+        raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+
+# Structured output endpoint
+@app.post("/chat/structured", response_model=StructuredOutputResponse)
+async def chat_structured(request: StructuredOutputRequest):
+    """Chat endpoint that returns structured output based on a provided schema"""
+    start_time = datetime.now()
+    try:
+        # Log request details
+        logger.info(f"Received structured output request")
+        logger.info(f"Request parameters: model={request.model}, max_tokens={request.max_tokens}, temperature={request.temperature}")
+        logger.info(f"Output schema: {json.dumps(request.output_schema, indent=2)}")
+        
+        # Use default values from config if parameters not provided
+        model = request.model or config.get("DEFAULT_MODEL")
+        max_tokens = request.max_tokens or config.get("MAX_TOKENS", 1024)
+        temperature = request.temperature or config.get("DEFAULT_TEMPERATURE", 0.7)
+        
+        # Prepare messages for the chat API
+        messages = []
+        
+        # Add system prompt to enforce JSON output format
+        system_prompt = f"""You are a JSON-only response assistant. Your task is to generate a response that matches this schema:
+        {json.dumps(request.output_schema, indent=2)}
+        
+        CRITICAL INSTRUCTIONS:
+        1. Your response MUST be valid JSON
+        2. If the schema requires an object with an "agents" field, you can return either:
+           - A JSON object with an "agents" field containing an array
+           - OR just the array of agents directly
+        3. Do not include any text outside of the JSON structure
+        4. Do not include any explanations or markdown formatting
+        5. Do not repeat or echo back the input message
+        6. Do not include any additional fields not specified in the schema
+        
+        Example valid responses for a schema requiring an "agents" field:
+        Valid object format:
+        {{
+            "agents": ["Agent 1", "Agent 2"]
+        }}
+        
+        Valid array format:
+        ["Agent 1", "Agent 2"]
+        
+        Invalid responses (DO NOT DO THESE):
+        ❌ "Here are the selected agents: ["Agent 1"]"
+        ❌ "The agents are: ["Agent 1"]"
+        ❌ "Based on the input, I selected: ["Agent 1"]"
+        ❌ "Here's the JSON response: ["Agent 1"]"
+        ❌ "Selected agents: ["Agent 1"]"
+        ❌ "Agents: ["Agent 1"]"
+        ❌ "["Agent 1"] (selected based on expertise)"
+        ❌ "["Agent 1"] - chosen for their knowledge"
+        """
+        messages.append({"role": "system", "content": system_prompt})
+        
+        # Add user's system prompt if provided
+        if request.system_prompt:
+            messages.append({"role": "system", "content": request.system_prompt})
+            
+        # Add user's message
+        messages.append({"role": "user", "content": request.message})
+        
+        # Call the vLLM API
+        vllm_url = os.environ.get("VLLM_API_URL", config.get("VLLM_API_URL", "http://localhost:8007/v1"))
+        chat_url = f"{vllm_url}/chat/completions"
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "response_format": {"type": "json_object"},
+            "stream": False,
+        }
+        
+        logger.info(f"Sending request to {chat_url}")
+        logger.info(f"Request payload: {json.dumps({k: v for k, v in payload.items() if k != 'messages'})}")
+        
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(chat_url, json=payload)
+            
+            if response.status_code != 200:
+                logger.error(f"vLLM API error: {response.status_code}, {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"LLM API error: {response.text}"
+                )
+            
+            response_data = response.json()
+            logger.info(f"Received response: {json.dumps(response_data, indent=2)}")
+            
+            # Extract the response content
+            if "choices" in response_data and len(response_data["choices"]) > 0:
+                content = response_data["choices"][0].get("message", {}).get("content", "")
+                logger.info(f"Response content: {content}")
+                
+                try:
+                    # Try to parse the content as JSON
+                    parsed_content = json.loads(content)
+                    
+                    # If we got an array and the schema expects an object with "agents" field,
+                    # wrap it appropriately
+                    if isinstance(parsed_content, list) and "agents" in request.output_schema.get("required", []):
+                        structured_response = {"agents": parsed_content}
+                    else:
+                        structured_response = parsed_content
+                    
+                    # Validate against the schema
+                    if not isinstance(structured_response, dict):
+                        raise ValueError("Response must be a JSON object")
+                        
+                    # Check required fields from the schema
+                    for field in request.output_schema.get("required", []):
+                        if field not in structured_response:
+                            raise ValueError(f"Missing required field: {field}")
+                            
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing JSON response: {str(e)}")
+                    logger.error(f"Raw content: {content}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error parsing JSON response: {str(e)}"
+                    )
+                except ValueError as e:
+                    logger.error(f"Validation error: {str(e)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Invalid response format: {str(e)}"
+                    )
+            else:
+                logger.error(f"Invalid response format: {json.dumps(response_data)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Invalid response format from LLM"
+                )
+        
+        # Create and return the response
+        end_time = datetime.now()
+        response = StructuredOutputResponse(
+            response=structured_response,
+            model=model,
+            timestamp=end_time.isoformat()
+        )
+        
+        return response
+        
+    except HTTPException as http_err:
+        # Just re-raise HTTP exceptions
+        logger.error(f"HTTP error in structured output endpoint: {str(http_err)}")
+        raise
+    except Exception as e:
+        elapsed = (datetime.now() - start_time).total_seconds()
+        logger.error(f"Error in structured output endpoint after {elapsed:.2f} seconds: {str(e)}")
+        logger.exception("Full exception details:")
+        raise HTTPException(status_code=500, detail=f"Error generating structured response: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")

@@ -6,6 +6,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create necessary directories
+RUN mkdir -p /app/data/logs && \
+    chmod -R 777 /app/data/logs
+
 # Copy service-specific files
 COPY . .
 

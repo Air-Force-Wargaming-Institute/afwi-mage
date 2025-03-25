@@ -5,7 +5,7 @@ PORT: 8008
 HOST: "0.0.0.0"
 
 # Logging
-LOG_PATH: "/app/data/logs"
+LOG_PATH: "data/logs"  # Relative path that works in both dev and container
 LOG_LEVEL: "INFO"
 
 # Model configuration
