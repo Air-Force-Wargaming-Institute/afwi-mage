@@ -1,3 +1,14 @@
+## License
+
+This software is distributed under **Government Purpose Rights** as defined in DFARS 252.227-7014.
+
+Use, modification, and redistribution are authorized for official U.S. Government purposes only. Any use outside of these bounds requires written permission from the Air Force Wargaming Institute.
+
+For questions regarding licensing or distribution, please contact:
+
+**LeMay Center, Air University**  
+Maxwell Air Force Base, Alabama
+
 # AFWI Multi-Agent Generative Engine
 
 ## Prerequisites
