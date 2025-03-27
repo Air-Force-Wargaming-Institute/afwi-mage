@@ -40,6 +40,11 @@ app.include_router(upload_router, prefix="/api/upload")
 async def root():
     return {"message": "Welcome to AFWI MAGE Upload Service API"}
 
+@app.get("/api/upload/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
+
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting Upload Service")

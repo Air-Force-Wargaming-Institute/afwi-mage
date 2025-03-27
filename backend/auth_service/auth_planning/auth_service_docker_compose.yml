@@ -1,0 +1,38 @@
+# Auth Service Configuration for docker-compose.yml
+
+  auth:
+    build: ./auth_service
+    volumes:
+      - ./auth_service:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+      - SECRET_KEY=${AUTH_SECRET_KEY:-your-secret-key-here-change-in-production}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      - DISABLE_AUTH=${DISABLE_AUTH:-false}
+      - PUBLIC_PATHS=/api/health,/api/users/token,/api/users/login,/docs,/
+      - DEV_MODE=${DEV_MODE:-false}
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost
+      - PORT=8010
+      - HOST=0.0.0.0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8010:8010"
+    restart: always
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/users`)"
+      - "traefik.http.services.auth.loadbalancer.server.port=8010"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.middlewares=cors" 

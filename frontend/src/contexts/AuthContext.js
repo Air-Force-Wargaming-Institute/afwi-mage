@@ -107,7 +107,7 @@ export const AuthProvider = ({ children }) => {
   user: {
     id: 1,
     username: 'admin',
-    permissions: 'admin'
+    permission: 'admin'
   },
 
   token: 'dummy_token',

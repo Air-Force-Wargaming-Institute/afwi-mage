@@ -20,6 +20,11 @@ app.include_router(generate_router, prefix="/api/generate")
 async def root():
     return {"message": "Welcome to AFWI MAGE FineTune Generation Service API"}
 
+@app.get("/api/generation/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8003)

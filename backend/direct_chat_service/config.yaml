@@ -9,7 +9,7 @@ ollama:
   base_url: http://host.docker.internal:11434
   
   # Model identifier for Ollama
-  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest  
+  ollama_model: huihui_ai/qwq-abliterated:latest  
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused
@@ -43,7 +43,7 @@ ollama:
 
 api:
   core_service_url: http://core:8000
-  prefix: /api/v1
+  prefix: /api/direct_chat
 
 cors:
   allowed_origins:

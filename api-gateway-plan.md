@@ -4,8 +4,8 @@
 
 | Phase | Description | Status | Estimated Time |
 |-------|-------------|--------|---------------|
-| 1️⃣ | Analysis & Design | ⬜ Not Started | 1-2 weeks |
-| 2️⃣ | Gateway Service Implementation | ⬜ Not Started | 1-2 weeks |
+| 1️⃣ | Analysis & Design | ✅ Completed | 1-2 weeks |
+| 2️⃣ | Gateway Service Implementation | 🔄 In Progress | 1-2 weeks |
 | 3️⃣ | Auth Service Integration | ⬜ Not Started | 1-2 weeks |
 | 4️⃣ | Advanced Features | ⬜ Not Started | 2-3 weeks |
 | 5️⃣ | Production Optimization | ⬜ Not Started | 1-2 weeks |
@@ -13,35 +13,35 @@
 ## Phase 1: Analysis & Design
 
 ### Tasks
-- [ ] **1.1 Service Mapping**
-  - [ ] Document all backend service endpoints
-  - [ ] Identify usage patterns and traffic distribution
-  - [ ] Define routing rules for each service
-  - [ ] Create service mapping documentation
+- [x] **1.1 Service Mapping** ✅ Completed
+  - [x] Document all backend service endpoints
+  - [x] Identify usage patterns and traffic distribution
+  - [x] Define routing rules for each service
+  - [x] Create service mapping documentation
 
-- [ ] **1.2 Authentication Planning**
-  - [ ] Design authentication flow with toggle capability
-  - [ ] Map out JWT validation requirements
-  - [ ] Determine auth bypass mechanisms for development
-  - [ ] Document authentication design decisions
+- [x] **1.2 Authentication Planning** ✅ Completed
+  - [x] Design authentication flow with toggle capability
+  - [x] Map out JWT validation requirements
+  - [x] Determine auth bypass mechanisms for development
+  - [x] Document authentication design decisions
 
-- [ ] **1.3 Gateway Architecture Design**
-  - [ ] Create high-level architecture diagram
-  - [ ] Define configuration structure (YAML)
-  - [ ] Plan for scaling considerations
-  - [ ] Document architecture and design patterns
+- [x] **1.3 Gateway Architecture Design** ✅ Completed
+  - [x] Create high-level architecture diagram
+  - [x] Define configuration structure (YAML)
+  - [x] Plan for scaling considerations
+  - [x] Document architecture and design patterns
 
-- [ ] **1.4 Logging Strategy**
-  - [ ] Determine logging format and content
-  - [ ] Select logging storage mechanism
-  - [ ] Define log rotation policy
-  - [ ] Document logging approach
+- [x] **1.4 Logging Strategy** ✅ Completed
+  - [x] Determine logging format and content
+  - [x] Select logging storage mechanism
+  - [x] Define log rotation policy
+  - [x] Document logging approach
 
-- [ ] **1.5 Testing Strategy**
-  - [ ] Define unit testing approach for gateway service
-  - [ ] Plan integration testing between services
-  - [ ] Create load testing methodology
-  - [ ] Document testing strategies and acceptance criteria
+- [x] **1.5 Testing Strategy** ✅ Completed
+  - [x] Define unit testing approach for gateway service
+  - [x] Plan integration testing between services
+  - [x] Create load testing methodology
+  - [x] Document testing strategies and acceptance criteria
 
 ### Deliverables
 - Service endpoint mapping document
@@ -53,11 +53,11 @@
 ## Phase 2: Gateway Service Implementation
 
 ### Tasks
-- [ ] **2.1 Traefik Gateway Service Setup**
-  - [ ] Create new Traefik service in docker-compose.yml
-  - [ ] Configure basic health checks
-  - [ ] Set up Docker provider
-  - [ ] Write installation documentation
+- [x] **2.1 Traefik Gateway Service Setup** ✅ Completed
+  - [x] Create new Traefik service in docker-compose.yml
+  - [x] Configure basic health checks
+  - [x] Set up Docker provider
+  - [x] Write installation documentation
 
 - [ ] **2.2 Service Routing Rules**
   - [ ] Implement routes for all services
@@ -87,6 +87,7 @@
 - Initial logging setup
 - Gateway service documentation
 - Unit and integration tests
+- Updated documentation to reflect current project functionality
 
 ## Phase 3: Auth Service Integration
 
@@ -94,6 +95,10 @@
 - [ ] **3.1 Re-enable Authentication Service**
   - [ ] Uncomment auth service in docker-compose.yml
   - [ ] Reactivate PostgreSQL database service
+  - [ ] Implement token validation endpoint in auth service
+  - [ ] Add `/api/auth/validate` endpoint for Traefik ForwardAuth
+  - [ ] Add user info propagation via HTTP headers
+  - [ ] Ensure database migration scripts are compatible with existing schema
   - [ ] Test auth service functionality
   - [ ] Document auth service setup
   - [ ] Write unit tests for auth service endpoints
@@ -101,6 +106,8 @@
 - [ ] **3.2 JWT Validation Middleware**
   - [ ] Create JWT validation in Traefik
   - [ ] Implement auth bypass toggle
+  - [ ] Add environment variables for auth toggle (DISABLE_AUTH, PUBLIC_PATHS, DEV_MODE)
+  - [ ] Create configuration script for toggling authentication modes
   - [ ] Configure secure cookie handling
   - [ ] Document JWT validation approach
   - [ ] Write tests for JWT validation
@@ -119,13 +126,26 @@
   - [ ] Document security headers
   - [ ] Test security header implementation
 
+- [ ] **3.5 Codebase Integration Verification**
+  - [ ] Review existing auth service code to ensure compatibility with gateway design
+  - [ ] Verify db migration scripts match current schema
+  - [ ] Test auth service with the actual frontend application
+  - [ ] Validate that existing API calls continue to work through the gateway
+  - [ ] Create integration tests for the complete authentication flow
+  - [ ] Document any required changes to existing code
+
 ### Deliverables
 - Authentication service implementation
 - JWT validation middleware
+- Authentication toggle script
+- Token validation endpoint
+- Environment variables configuration template
 - Rate limiting configuration
 - Security headers configuration
 - Authentication documentation
 - Security tests
+- Integration verification report
+- Updated documentation to reflect current project functionality
 
 ## Phase 4: Advanced Features
 
@@ -165,6 +185,7 @@
 - File upload handling configuration
 - Advanced features documentation
 - Feature-specific tests
+- Updated documentation to reflect current project functionality
 
 ## Phase 5: Production Optimization
 
@@ -215,28 +236,67 @@
 
 ### Traefik Gateway Service Configuration
 ```yaml
-# In docker-compose.yml
+# In backend/docker-compose.yml
 api_gateway:
   image: traefik:v2.9
   container_name: mage_api_gateway
   command:
-    - "--api.insecure=true"
-    - "--providers.docker=true"
-    - "--providers.docker.exposedbydefault=false"
-    - "--entrypoints.web.address=:80"
-    - "--accesslog=true"
-    - "--accesslog.filePath=/var/log/traefik/access.log"
-    - "--accesslog.format=json"
-    - "--log.level=INFO"
+    - "--configFile=/etc/traefik/traefik.yaml"
   ports:
     - "80:80"
     - "8080:8080"  # Dashboard
+    - "8082:8082"  # Metrics
   volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-    - traefik_logs:/var/log/traefik
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./api_gateway/traefik.yaml:/etc/traefik/traefik.yaml:ro
+    - ./api_gateway/dynamic_conf.yaml:/etc/traefik/dynamic/dynamic_conf.yaml
+    - ../data/logs/traefik:/var/log/traefik
   networks:
     - app-network
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 5s
+```
+
+### Traefik Configuration
+```yaml
+# Static configuration (traefik.yaml)
+api:
+  dashboard: true
+  insecure: true  # Set to false in production
+
+entryPoints:
+  web:
+    address: ":80"
+  metrics:
+    address: ":8082"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: "app-network"
+  
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+
+log:
+  level: "INFO"
+  format: "json"
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  format: "json"
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addServicesLabels: true
+    addEntryPointsLabels: true
 ```
 
 ### Auth Service Configuration
@@ -252,7 +312,10 @@ auth:
   environment:
     - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
     - SECRET_KEY=your-secret-key-here-change-in-production
+    - ALGORITHM=HS256
     - DISABLE_AUTH=false
+    - PUBLIC_PATHS=/api/health,/api/docs,/api/openapi.json
+    - DEV_MODE=false
     - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     - ACCESS_TOKEN_EXPIRE_MINUTES=60
     - PORT=8010
@@ -273,6 +336,8 @@ auth:
     - "traefik.enable=true"
     - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
     - "traefik.http.services.auth.loadbalancer.server.port=8010"
+    - "traefik.http.routers.auth.middlewares=auth-strip-prefix"
+    - "traefik.http.middlewares.auth-strip-prefix.stripprefix.prefixes=/api/auth"
 ```
 
 ### Database Service Configuration

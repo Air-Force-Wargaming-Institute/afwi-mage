@@ -91,11 +91,10 @@ app.add_middleware(
 # Include the main API router
 app.include_router(main_router)
 
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
+@app.get("/api/embedding/health")
+async def api_health_check():
     return {"status": "healthy"}
+
 
 
 @app.get("/api/embedding/system/status")

@@ -693,6 +693,11 @@ async def get_conversations_by_session(session_id: str):
         logger.error(f"Error getting conversations by session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/chat/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8009)

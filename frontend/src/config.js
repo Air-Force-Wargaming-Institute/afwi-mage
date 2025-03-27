@@ -18,10 +18,8 @@ export const getApiUrl = (service, endpoint) => {
   // Ensure endpoint starts with / if it doesn't already
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   
-  // For DIRECT_CHAT, we prepend /api/v1, for other services we use the endpoint as is
-  const url = service === 'DIRECT_CHAT' ? 
-    `${baseUrl}/api/v1${formattedEndpoint}` : 
-    `${baseUrl}${formattedEndpoint}`;
+  // Use standardized path format for all services
+  const url = `${baseUrl}${formattedEndpoint}`;
   
   console.log('API URL:', url); // Debug log
   return url;

@@ -5,7 +5,7 @@ import { getApiUrl } from '../config';
 export const sendMessage = async (message, sessionId) => {
   try {
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', '/chat/message'),
+      getApiUrl('DIRECT_CHAT', '/api/direct_chat/chat/message'),
       { message, session_id: sessionId }
     );
     return response.data;
@@ -19,7 +19,7 @@ export const sendMessage = async (message, sessionId) => {
 export const getChatHistory = async (sessionId) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/history/${sessionId}`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/history/${sessionId}`)
     );
     return response.data;
   } catch (error) {
@@ -32,7 +32,7 @@ export const getChatHistory = async (sessionId) => {
 export const createChatSession = async () => {
   try {
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', '/chat/session')
+      getApiUrl('DIRECT_CHAT', '/api/direct_chat/chat/session')
     );
     return response.data;
   } catch (error) {
@@ -45,7 +45,7 @@ export const createChatSession = async () => {
 export const deleteChatSession = async (sessionId) => {
   try {
     await axios.delete(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}`)
     );
   } catch (error) {
     console.error('Error deleting chat session:', error);
@@ -57,7 +57,7 @@ export const deleteChatSession = async (sessionId) => {
 export const getAllChatSessions = async () => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', '/chat/sessions')
+      getApiUrl('DIRECT_CHAT', '/api/direct_chat/chat/sessions')
     );
     return response.data;
   } catch (error) {
@@ -73,7 +73,7 @@ export const uploadDocument = async (sessionId, file) => {
     formData.append('file', file);
     
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/upload`),
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/upload`),
       formData,
       {
         headers: {
@@ -92,7 +92,7 @@ export const uploadDocument = async (sessionId, file) => {
 export const getDocumentStates = async (sessionId) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/states`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/states`)
     );
     return response.data;
   } catch (error) {
@@ -105,7 +105,7 @@ export const getDocumentStates = async (sessionId) => {
 export const getDocumentStatus = async (sessionId, docId) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/status`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/${docId}/status`)
     );
     return response.data;
   } catch (error) {
@@ -118,7 +118,7 @@ export const getDocumentStatus = async (sessionId, docId) => {
 export const deleteDocument = async (sessionId, docId) => {
   try {
     await axios.delete(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/${docId}`)
     );
   } catch (error) {
     console.error('Error deleting document:', error);
@@ -130,7 +130,7 @@ export const deleteDocument = async (sessionId, docId) => {
 export const toggleDocumentState = async (sessionId, docId) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/toggle`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/${docId}/toggle`)
     );
     return response.data;
   } catch (error) {
@@ -143,7 +143,7 @@ export const toggleDocumentState = async (sessionId, docId) => {
 export const updateSessionName = async (sessionId, newName) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/name`),
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/name`),
       { new_name: newName }
     );
     return response.data;
@@ -156,7 +156,7 @@ export const updateSessionName = async (sessionId, newName) => {
 export const updateDocumentClassification = async (sessionId, docId, classification) => {
   try {
     const response = await fetch(
-      `${getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/classification`)}`,
+      `${getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/documents/${docId}/classification`)}`,
       {
         method: 'PUT',
         headers: {
@@ -194,7 +194,7 @@ export const getVectorstores = async () => {
 export const getChatSessionMetadata = async (sessionId) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/metadata`)
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/metadata`)
     );
     return response.data;
   } catch (error) {
@@ -207,7 +207,7 @@ export const getChatSessionMetadata = async (sessionId) => {
 export const setSessionVectorstore = async (sessionId, vectorstore) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/vectorstore`),
+      getApiUrl('DIRECT_CHAT', `/api/direct_chat/chat/session/${sessionId}/vectorstore`),
       { vectorstore }
     );
     return response.data;

@@ -1,0 +1,62 @@
+# Static Traefik Configuration
+
+# API and Dashboard Configuration
+api:
+  dashboard: true
+  insecure: true  # Set to false in production
+
+# Entry Points Configuration
+entryPoints:
+  web:
+    address: ":80"
+  metrics:
+    address: ":8082" #localhost:8082/metrics
+  healthcheck:
+    address: ":8083" # New health check entry point
+
+# Providers Configuration
+providers:
+  # Docker Provider - Enables Traefik to automatically discover services running in Docker
+  docker:
+    exposedByDefault: false
+    network: "app-network"
+  
+  # File Provider - Enables configurations from files
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+
+# Logging Configuration
+log:
+  level: "INFO"  # Changed from INFO to DEBUG for more detailed logs
+  format: "json"
+
+# Access Logs
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  format: "json"
+  fields:
+    headers:
+      defaultMode: "keep"
+    names:
+      HealthCheck: "keep"  # Explicitly keep health check information
+
+# Metrics Configuration (Prometheus)
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addServicesLabels: true
+    addEntryPointsLabels: true
+
+# Ping Configuration
+ping:
+  entryPoint: "healthcheck"  # Changed from web to healthcheck
+  terminatingStatusCode: 200  # Changed from 204 to 200 for better visibility
+
+# Health Check Configuration - global settings
+serversTransport:
+  maxIdleConnsPerHost: 10
+  forwardingTimeouts:
+    dialTimeout: 10s
+    responseHeaderTimeout: 10s
+    idleConnTimeout: 10s 
