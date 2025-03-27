@@ -24,6 +24,7 @@ services:
       - AGENT_SERVICE_URL=http://agent:8001
       - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - WORKBENCH_SERVICE_URL=http://workbench:8020
       - DEBUG=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -175,6 +176,30 @@ services:
       - init-data
     networks:
       - app-network
+
+  workbench:
+    build: ./workbench_service
+    ports:
+      - "8020:8020"
+    volumes:
+      - ../data:/app/data
+      - ./models:/app/models
+      - ./workbench_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - DEBUG=1
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+      - core
+      - embedding
+    networks:
+      - app-network
+    command: uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
 
   # auth:
   #  build: ./auth_service

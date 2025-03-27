@@ -25,6 +25,10 @@ import { ChatProvider } from './contexts/ChatContext';
 import { HILChatProvider } from './contexts/HILChatContext';
 import DirectChat from './components/DirectChat';
 import { DirectChatProvider } from './contexts/DirectChatContext';
+import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
+import { WorkbenchProvider } from './contexts/WorkbenchContext';
+import TeamChatContainer from './components/TeamChatContainer';
+import AFWIMageCoin from './assets/AFWI_MAGE_COIN.png';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -43,13 +47,23 @@ const AuthenticatedRoutes = () => {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
           <Route exact path="/multi-agent">
-            <Redirect to="/multi-agent/chat" />
+            <Redirect to="/multi-agent/team-chat" />
           </Route>
           <Route path="/multi-agent/guide" component={UserGuide} />
-          <Route path="/multi-agent/builder" component={MultiAgentBuilder} />
-          <Route exact path="/multi-agent/builder/llm-library" component={MultiAgentBuilder} />
-          <Route path="/multi-agent/chat" component={MultiAgentHILChat} />
+          
+          {/* New Team Chat Container with nested routes */}
+          <Route path="/multi-agent/team-chat" component={TeamChatContainer} />
+          
+          {/* Redirect old routes to new structure */}
+          <Route path="/multi-agent/builder">
+            <Redirect to="/multi-agent/team-chat/builder" />
+          </Route>
+          <Route path="/multi-agent/chat">
+            <Redirect to="/multi-agent/team-chat/chat" />
+          </Route>
+          
           <Route path="/multi-agent/direct-chat" component={DirectChat} />
+          <Route path="/multi-agent/workbench" component={WorkbenchDashboard} />
           <Route exact path="/fine-tuning" component={FineTuneGuide} />
           <Route path="/fine-tuning/extract" component={ExtractComponent} />
           <Route path="/fine-tuning/generate" component={GenerateDataset} />
@@ -70,6 +84,8 @@ const AuthenticatedRoutes = () => {
           The application was developed by the LeMay Center's Air Force Wargaming Institute, Maxwell AFB, Alabama.
         </footer>
       )}
+      {/* AFWI MAGE Coin Logo */}
+      <img src={AFWIMageCoin} alt="AFWI MAGE Coin" className="afwi-mage-coin" />
     </div>
   );
 };
@@ -83,9 +99,11 @@ function App() {
             <ChatProvider>
               <HILChatProvider>
                 <AuthProvider>
-                  <Router>
-                    <AuthenticatedRoutes />
-                  </Router>
+                  <WorkbenchProvider>
+                    <Router>
+                      <AuthenticatedRoutes />
+                    </Router>
+                  </WorkbenchProvider>
                 </AuthProvider>
               </HILChatProvider>
             </ChatProvider>

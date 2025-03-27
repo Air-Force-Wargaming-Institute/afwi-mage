@@ -102,3 +102,43 @@ html {
     font-size: 22px;
   }
 }
+
+/* Nested Navigation Styles */
+.nested-tabs {
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 16px;
+}
+
+.nested-tabs .MuiTabs-indicator {
+  height: 3px;
+}
+
+.nested-tab {
+  min-width: 120px;
+  font-weight: 500;
+}
+
+.nested-tab-selected {
+  font-weight: 600;
+}
+
+.nested-tab-content {
+  padding-top: 8px;
+}
+
+/* Make tabs more responsive */
+@media (max-width: 768px) {
+  .nested-tab {
+    min-width: 80px;
+    font-size: 0.85rem;
+  }
+  
+  .nested-tab .MuiTab-wrapper {
+    flex-direction: column;
+  }
+  
+  .nested-tab .MuiSvgIcon-root {
+    margin-bottom: 4px;
+    margin-right: 0;
+  }
+}

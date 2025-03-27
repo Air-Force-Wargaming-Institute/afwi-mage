@@ -38,7 +38,7 @@ cd afwi-multi-agent-generative-engine
 
 ### 3. Build the source container image
 
-- If it's the first time running the app, you need to install the backend dependencies with:
+- If it's the first time running the app, you need to install the backend dependencies from the root directory with:
 ```bash
 docker build -t mage-base:latest -f Dockerfile.base .
 ```

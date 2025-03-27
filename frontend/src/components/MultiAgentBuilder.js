@@ -30,21 +30,21 @@ function MultiAgentBuilder() {
     {
       id: 'llm-library',
       label: 'LLM Library',
-      path: '/multi-agent/builder/llm-library',
+      path: '/multi-agent/team-chat/builder/llm-library',
       icon: <StorageIcon />,
       component: LLMLibrary
     },
     {
       id: 'agent-portfolio',
       label: 'Agent Portfolio',
-      path: '/multi-agent/builder/agent-portfolio',
+      path: '/multi-agent/team-chat/builder/agent-portfolio',
       icon: <img 
         src={robotIcon} 
         alt="Robot Icon" 
         style={{ 
           width: '20px', 
           height: '26px',
-          filter: location.pathname === '/multi-agent/builder/agent-portfolio' ? 'none' : 'invert(1)'
+          filter: location.pathname === '/multi-agent/team-chat/builder/agent-portfolio' ? 'none' : 'invert(1)'
         }} 
       />,
       component: AgentPortfolio
@@ -52,14 +52,14 @@ function MultiAgentBuilder() {
     {
       id: 'agent-teams',
       label: 'Agent Teams',
-      path: '/multi-agent/builder/agent-teams',
+      path: '/multi-agent/team-chat/builder/agent-teams',
       icon: <img 
         src={agentTeamIcon} 
         alt="Agent Team Icon" 
         style={{ 
           width: '24px', 
           height: '24px',
-          filter: location.pathname === '/multi-agent/builder/agent-teams' ? 'invert(1)' : 'none'
+          filter: location.pathname === '/multi-agent/team-chat/builder/agent-teams' ? 'invert(1)' : 'none'
         }} 
       />,
       component: AgentTeams
@@ -67,14 +67,14 @@ function MultiAgentBuilder() {
     {
       id: 'system-prompts',
       label: 'System Prompts',
-      path: '/multi-agent/builder/system-prompts',
+      path: '/multi-agent/team-chat/builder/system-prompts',
       icon: <TextFieldsIcon />,
       component: SystemPrompts
     },
     {
       id: 'conversation-tree',
       label: 'Conversation Tree',
-      path: '/multi-agent/builder/conversation-tree',
+      path: '/multi-agent/team-chat/builder/conversation-tree',
       icon: <AccountTreeIcon />,
       component: ConversationTree
     }
@@ -112,13 +112,13 @@ function MultiAgentBuilder() {
       {/* Main Content */}
       <Paper className="main-content">
         <Switch>
-          <Route exact path="/multi-agent/builder/llm-library" component={LLMLibrary} />
-          <Route exact path="/multi-agent/builder/agent-portfolio" component={AgentPortfolio} />
-          <Route exact path="/multi-agent/builder/agent-teams" component={AgentTeams} />
-          <Route exact path="/multi-agent/builder/system-prompts" component={SystemPrompts} />
-          <Route exact path="/multi-agent/builder/conversation-tree" component={ConversationTree} />
-          <Route path="/multi-agent/builder">
-            <Redirect to="/multi-agent/builder/llm-library" />
+          <Route exact path="/multi-agent/team-chat/builder/llm-library" component={LLMLibrary} />
+          <Route exact path="/multi-agent/team-chat/builder/agent-portfolio" component={AgentPortfolio} />
+          <Route exact path="/multi-agent/team-chat/builder/agent-teams" component={AgentTeams} />
+          <Route exact path="/multi-agent/team-chat/builder/system-prompts" component={SystemPrompts} />
+          <Route exact path="/multi-agent/team-chat/builder/conversation-tree" component={ConversationTree} />
+          <Route path="/multi-agent/team-chat/builder">
+            <Redirect to="/multi-agent/team-chat/builder/agent-portfolio" />
           </Route>
         </Switch>
       </Paper>

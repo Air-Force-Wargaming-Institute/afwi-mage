@@ -39,6 +39,18 @@ body {
   background-attachment: fixed;
 }
 
+/* AFWI MAGE Coin Logo - Positioned in the lower left corner */
+.afwi-mage-coin {
+  position: fixed;
+  bottom: 40px;
+  left: 40px;
+  width: 300px;
+  height: auto;
+  z-index: 1; /* Low positive value to sit above background but below UI components */
+  opacity: 0.9;
+  pointer-events: none; /* Allows clicking through the image */
+}
+
 .App {
   display: flex;
   flex-direction: column;
@@ -227,6 +239,8 @@ main {
   margin: 0 auto;
   overflow-y: auto;
   background-color: rgba(255, 255, 255, 0.03);
+  position: relative;
+  z-index: 2;
 }
 
 /* Container Styles */
@@ -240,6 +254,8 @@ main {
   box-shadow: var(--box-shadow);
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 5;
 }
 
 /* Typography Styles */
@@ -688,6 +704,9 @@ tr:hover {
   margin-bottom: 1rem;
   font-size: 1.5rem;
   font-weight: 500;
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: var(--border-radius);
 }
 
 .section-subtitle {
@@ -1012,6 +1031,12 @@ tr:hover {
 .nav-item.active:hover .nav-icon,
 .nav-item.active:hover .MuiListItemIcon-root {
   color: white !important;
+}
+
+/* Make sure secondary text (description) is white on active items */
+.nav-item.active .MuiListItemText-secondary,
+.nav-item.active:hover .MuiListItemText-secondary {
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 /* Add the same underline effect for main navigation */
