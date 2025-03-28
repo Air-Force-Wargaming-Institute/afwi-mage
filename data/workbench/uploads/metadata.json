@@ -1,0 +1,112 @@
+{
+  "3eb485c1-85c8-48a7-9573-e53ee02fe830": {
+    "filename": "1617fedschoolcodelist.xls",
+    "size_bytes": 569667,
+    "sheet_count": 1,
+    "sheets": [
+      "3rd Quarter FSC"
+    ],
+    "columns": [
+      "SchoolCode",
+      "SchoolName",
+      "Address",
+      "City",
+      "StateCode",
+      "ZipCode",
+      "Province",
+      "Country",
+      "PostalCode"
+    ],
+    "row_count": 6980,
+    "id": "3eb485c1-85c8-48a7-9573-e53ee02fe830",
+    "description": null,
+    "upload_date": "2025-03-28T22:14:53.444790",
+    "storage_path": "/app/data/workbench/uploads/3eb485c1-85c8-48a7-9573-e53ee02fe830.xls"
+  },
+  "8cec604b-9609-4b51-8b22-38d4f3e3efc6": {
+    "filename": "PortfolioSummary.xls",
+    "size_bytes": 62464,
+    "sheet_count": 1,
+    "sheets": [
+      "PortfolioSummary"
+    ],
+    "columns": [
+      "Federal Student Aid Portfolio Summary",
+      "Unnamed: 1",
+      "Unnamed: 2",
+      "Unnamed: 3",
+      "Unnamed: 4",
+      "Unnamed: 5",
+      "Unnamed: 6",
+      "Unnamed: 7",
+      "Unnamed: 8",
+      "Unnamed: 9"
+    ],
+    "row_count": 64,
+    "id": "8cec604b-9609-4b51-8b22-38d4f3e3efc6",
+    "description": null,
+    "upload_date": "2025-03-28T22:28:09.945658",
+    "storage_path": "/app/data/workbench/uploads/8cec604b-9609-4b51-8b22-38d4f3e3efc6.xls"
+  },
+  "6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b": {
+    "filename": "Call-Center-Sentiment-Sample-Data.xlsx",
+    "size_bytes": 16207,
+    "sheet_count": 1,
+    "sheets": [
+      "Call Center Data"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2",
+      "Unnamed: 3",
+      "Unnamed: 4",
+      "Unnamed: 5",
+      "Unnamed: 6",
+      "Unnamed: 7",
+      "Unnamed: 8",
+      "Unnamed: 9",
+      "Unnamed: 10",
+      "Unnamed: 11",
+      "Unnamed: 12"
+    ],
+    "row_count": 75,
+    "id": "6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b",
+    "description": null,
+    "upload_date": "2025-03-28T22:34:06.889345",
+    "storage_path": "/app/data/workbench/uploads/6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b.xlsx"
+  },
+  "c32150c7-9bba-4ee4-a4d9-02115e6d4584": {
+    "filename": "Hardware Software Training Plan.xlsx",
+    "size_bytes": 17500,
+    "sheet_count": 1,
+    "sheets": [
+      "Sheet1"
+    ],
+    "columns": [
+      "Networking"
+    ],
+    "row_count": 107,
+    "id": "c32150c7-9bba-4ee4-a4d9-02115e6d4584",
+    "description": null,
+    "upload_date": "2025-03-28T22:34:42.706075",
+    "storage_path": "/app/data/workbench/uploads/c32150c7-9bba-4ee4-a4d9-02115e6d4584.xlsx"
+  },
+  "8fca093f-4c8a-4e95-bf9b-e2e8ef20351f": {
+    "filename": "Network Troubleshooting Tools.xlsx",
+    "size_bytes": 15321,
+    "sheet_count": 1,
+    "sheets": [
+      "Sheet1"
+    ],
+    "columns": [
+      "Ethernet",
+      "Unnamed: 1"
+    ],
+    "row_count": 24,
+    "id": "8fca093f-4c8a-4e95-bf9b-e2e8ef20351f",
+    "description": null,
+    "upload_date": "2025-03-28T22:35:09.454518",
+    "storage_path": "/app/data/workbench/uploads/8fca093f-4c8a-4e95-bf9b-e2e8ef20351f.xlsx"
+  }
+}

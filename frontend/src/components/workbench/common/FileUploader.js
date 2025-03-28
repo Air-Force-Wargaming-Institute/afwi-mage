@@ -20,389 +20,258 @@ import ArticleIcon from '@mui/icons-material/Article';
 import '../../../App.css'; // Import global styles
 
 /**
- * Reusable File Uploader component
+ * FileUploader Component
  * 
- * Features:
- * - Drag and drop file upload
- * - File selection via browser dialog
- * - Optional description field
- * - File type validation
- * - Upload progress tracking
- * - Success/error state handling
- * - File size display
+ * A reusable file upload component with drag-and-drop capability.
  * 
- * @param {Object} props - Component props
- * @param {Function} props.onUpload - Callback function when upload is initiated
- * @param {string[]} props.acceptedFileTypes - Array of accepted file extensions (.xlsx, .csv, etc.)
- * @param {string} props.uploadButtonText - Text for the upload button
- * @param {boolean} props.showDescription - Whether to show the description field
- * @param {string} props.descriptionLabel - Label for the description field
- * @param {number} props.maxFileSizeMB - Maximum file size in MB
- * @param {boolean} props.disabled - Whether the uploader is disabled
- * @param {boolean} props.developmentMode - Whether in development mode
+ * @param {Object} props Component props
+ * @param {Function} props.onUpload Callback function when file is uploaded
+ * @param {Array<string>} props.allowedFileTypes Array of allowed file extensions (e.g. ['.xlsx', '.csv'])
+ * @param {number} props.maxFileSizeMB Maximum file size in MB
+ * @param {string} props.description Optional description of the file uploader
+ * @param {boolean} props.disabled Whether the uploader is disabled
+ * @param {Function} props.onError Callback function when error occurs
  */
 const FileUploader = ({
   onUpload,
-  acceptedFileTypes = ['.xlsx', '.xls', '.csv'],
-  uploadButtonText = 'Upload File',
-  showDescription = true,
-  descriptionLabel = 'Description (optional)',
-  maxFileSizeMB = 50,
+  allowedFileTypes = ['.xlsx', '.csv', '.xls'],
+  maxFileSizeMB = 10,
+  description,
   disabled = false,
-  developmentMode = false
+  onError
 }) => {
-  // File input ref for programmatic access
+  const [file, setFile] = useState(null);
+  const [fileDescription, setFileDescription] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
   
-  // Component state
-  const [file, setFile] = useState(null);
-  const [description, setDescription] = useState('');
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  
-  // Get accepted file types string for the file input
-  const acceptString = acceptedFileTypes.join(',');
-  
-  // Helper function to format file size
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  // Reset the component state
+  const resetState = () => {
+    setFile(null);
+    setFileDescription('');
+    setUploading(false);
+    setUploadProgress(0);
+    setError(null);
   };
-  
-  // Helper function to check if file type is valid
-  const isFileTypeValid = (file) => {
-    const fileName = file.name || '';
-    const fileExtension = '.' + fileName.split('.').pop().toLowerCase();
-    return acceptedFileTypes.includes(fileExtension);
-  };
-  
-  // Helper function to check if file size is valid
-  const isFileSizeValid = (file) => {
-    return file.size <= maxFileSizeMB * 1024 * 1024;
-  };
-  
-  // Handle file selection
+
+  // Handle file selection from input
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     validateAndSetFile(selectedFile);
   };
   
-  // Handle file drag events
-  const handleDrag = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  // Handle drag events
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    setIsDragging(true);
+  };
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (disabled) return;
     
-    if (event.type === 'dragenter' || event.type === 'dragover') {
-      setDragActive(true);
-    } else if (event.type === 'dragleave') {
-      setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      validateAndSetFile(e.dataTransfer.files[0]);
     }
   };
   
-  // Handle file drop
-  const handleDrop = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setDragActive(false);
-    
-    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-      validateAndSetFile(event.dataTransfer.files[0]);
-    }
-  };
-  
-  // Handle file validation and setting
+  // Validate file type and size
   const validateAndSetFile = (selectedFile) => {
+    setError(null);
+    
+    // Check if file exists
     if (!selectedFile) return;
     
-    // Reset states
-    setUploadError(null);
-    setUploadSuccess(false);
-    
     // Check file type
-    if (!isFileTypeValid(selectedFile)) {
-      setUploadError(`Invalid file type. Accepted types: ${acceptedFileTypes.join(', ')}`);
+    const fileExt = `.${selectedFile.name.split('.').pop().toLowerCase()}`;
+    if (allowedFileTypes.length > 0 && !allowedFileTypes.includes(fileExt)) {
+      const errMsg = `Invalid file type. Allowed types: ${allowedFileTypes.join(', ')}`;
+      setError(errMsg);
+      onError && onError(errMsg);
       return;
     }
     
     // Check file size
-    if (!isFileSizeValid(selectedFile)) {
-      setUploadError(`File size exceeds the maximum limit of ${maxFileSizeMB} MB`);
+    if (maxFileSizeMB > 0 && selectedFile.size > maxFileSizeMB * 1024 * 1024) {
+      const errMsg = `File too large. Maximum size: ${maxFileSizeMB}MB`;
+      setError(errMsg);
+      onError && onError(errMsg);
       return;
     }
     
-    // Set file if all validations pass
+    // Set the validated file
     setFile(selectedFile);
   };
   
-  // Handle form reset
-  const handleReset = () => {
-    setFile(null);
-    setDescription('');
-    setUploadProgress(0);
-    setUploadError(null);
-    setUploadSuccess(false);
-    
-    // Also reset the file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-  
-  // Handle file upload
+  // Handle upload button click
   const handleUpload = async () => {
-    if (!file || disabled || isUploading) return;
+    if (!file) return;
     
-    setIsUploading(true);
+    setUploading(true);
     setUploadProgress(0);
-    setUploadError(null);
+    setError(null);
     
     try {
-      // Simulate progress in dev mode
-      if (developmentMode) {
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prevProgress) => {
-            const newProgress = prevProgress + 10;
-            if (newProgress >= 100) {
-              clearInterval(interval);
-              
-              // Wait a bit before completing
-              setTimeout(() => {
-                setIsUploading(false);
-                setUploadSuccess(true);
-                
-                // Call the onUpload callback
-                onUpload && onUpload(file, description);
-                
-                // Reset form after 3 seconds
-                setTimeout(() => {
-                  handleReset();
-                }, 3000);
-              }, 500);
-              
-              return 100;
-            }
-            return newProgress;
-          });
-        }, 300);
-      } else {
-        // Create a FormData object for the actual upload
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        if (description) {
-          formData.append('description', description);
-        }
-        
-        // Call the onUpload callback with progress tracking
-        onUpload && onUpload(
-          file, 
-          description, 
-          (progress) => setUploadProgress(progress),
-          () => {
-            setIsUploading(false);
-            setUploadSuccess(true);
-            
-            // Reset form after success (after 3 seconds)
-            setTimeout(() => {
-              handleReset();
-            }, 3000);
-          },
-          (error) => {
-            setIsUploading(false);
-            setUploadError(error.message || 'Upload failed');
-          }
-        );
-      }
+      // Call the onUpload callback with the file and description
+      await onUpload(file, fileDescription, (progress) => {
+        setUploadProgress(progress);
+      }, () => {
+        // Success callback
+        resetState();
+      }, (error) => {
+        // Error callback
+        setUploading(false);
+        setError(error.message || 'Upload failed');
+        onError && onError(error);
+      });
     } catch (error) {
-      console.error('Error during upload:', error);
-      setUploadError(error.message || 'Upload failed');
-      setIsUploading(false);
+      console.error('Error uploading file:', error);
+      setUploading(false);
+      setError(error.message || 'Upload failed');
+      onError && onError(error);
     }
   };
   
-  // Handle manual file selection click
-  const handleSelectFile = () => {
-    fileInputRef.current?.click();
+  // Handle clicking "Choose File" button
+  const handleChooseFileClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
   
-  // Determine if the upload button should be disabled
-  const isUploadDisabled = !file || isUploading || disabled || uploadSuccess;
-  
   return (
-    <Box className="file-uploader-container">
-      {/* File drop area */}
+    <Box>
+      {/* Drop Zone */}
       <Paper
-        elevation={0}
         variant="outlined"
-        className={`file-drop-area ${dragActive ? 'drag-active' : ''} ${disabled ? 'disabled' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={disabled ? null : handleDrop}
-        onClick={disabled ? null : handleSelectFile}
-        style={{
-          padding: '24px',
-          marginBottom: '16px',
+        sx={{
+          backgroundColor: isDragging ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+          border: isDragging ? '2px dashed #1976d2' : '2px dashed #cccccc',
           borderRadius: '8px',
-          borderStyle: 'dashed',
-          borderWidth: '2px',
-          borderColor: dragActive ? '#1976d2' : '#ccc',
-          backgroundColor: dragActive ? 'rgba(25, 118, 210, 0.05)' : 'transparent',
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          padding: '24px',
           textAlign: 'center',
-          position: 'relative',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
           transition: 'all 0.2s ease'
         }}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={disabled ? undefined : handleChooseFileClick}
       >
-        {/* Hidden file input */}
         <input
           type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
           onChange={handleFileChange}
-          accept={acceptString}
+          style={{ display: 'none' }}
+          accept={allowedFileTypes.join(',')}
+          ref={fileInputRef}
           disabled={disabled}
         />
         
-        {/* Upload icon */}
-        <CloudUploadIcon
-          style={{
-            fontSize: '48px',
-            color: disabled ? '#ccc' : '#1976d2',
-            marginBottom: '16px'
-          }}
-        />
+        <CloudUploadIcon style={{ fontSize: 48, color: '#1976d2', marginBottom: '16px' }} />
         
-        {/* Upload instructions */}
-        <Typography variant="h6" component="div" gutterBottom>
-          Drag & Drop or Click to Select
-        </Typography>
-        
-        <Typography variant="body2" color="textSecondary">
-          Accepted file types: {acceptedFileTypes.join(', ')}
-        </Typography>
-        
-        <Typography variant="body2" color="textSecondary">
-          Maximum file size: {maxFileSizeMB} MB
-        </Typography>
-        
-        {/* Selected file info */}
-        {file && (
-          <Box
-            mt={2}
-            p={2}
-            borderRadius="4px"
-            bgcolor="rgba(0, 0, 0, 0.05)"
-            display="flex"
-            alignItems="center"
-            justifyContent="space-between"
-          >
-            <Box display="flex" alignItems="center">
-              <ArticleIcon style={{ marginRight: '8px', color: '#1976d2' }} />
-              <Box>
-                <Typography variant="body2" component="div">
-                  {file.name}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  {formatFileSize(file.size)}
-                </Typography>
-              </Box>
-            </Box>
-            
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReset();
-              }}
-              disabled={isUploading}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Box>
+        {!file ? (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Drag & Drop File Here
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              or {disabled ? '(Disabled)' : 'click to browse files'}
+            </Typography>
+            <Typography variant="caption" display="block" style={{ marginTop: '8px' }}>
+              Allowed file types: {allowedFileTypes.join(', ')}
+            </Typography>
+            {maxFileSizeMB > 0 && (
+              <Typography variant="caption" display="block">
+                Maximum file size: {maxFileSizeMB}MB
+              </Typography>
+            )}
+          </>
+        ) : (
+          <>
+            <Typography variant="h6" gutterBottom>
+              {file.name}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              {(file.size / (1024 * 1024)).toFixed(2)}MB
+            </Typography>
+          </>
         )}
       </Paper>
       
-      {/* Description field */}
-      {showDescription && (
+      {/* File Description */}
+      {file && (
         <TextField
-          label={descriptionLabel}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          variant="outlined"
           fullWidth
-          multiline
-          rows={2}
-          disabled={disabled || isUploading || uploadSuccess}
-          style={{ marginBottom: '16px' }}
+          label="File Description (Optional)"
+          variant="outlined"
+          value={fileDescription}
+          onChange={(e) => setFileDescription(e.target.value)}
+          margin="normal"
+          disabled={uploading || disabled}
         />
       )}
       
-      {/* Upload button */}
-      <Box display="flex" alignItems="center">
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
-          onClick={handleUpload}
-          disabled={isUploadDisabled}
-          style={{ marginRight: '8px' }}
-        >
-          {isUploading ? 'Uploading...' : uploadButtonText}
-        </Button>
-        
-        {developmentMode && (
-          <Tooltip title="Development Mode - Upload simulation">
-            <Chip
-              icon={<InfoIcon />}
-              label="Dev Mode"
-              variant="outlined"
-              size="small"
-              color="primary"
-            />
-          </Tooltip>
-        )}
-      </Box>
+      {/* Error Message */}
+      {error && (
+        <Alert severity="error" style={{ marginTop: '16px' }}>
+          {error}
+        </Alert>
+      )}
       
-      {/* Upload progress */}
-      {isUploading && (
-        <Box mt={2}>
-          <LinearProgress variant="determinate" value={uploadProgress} />
-          <Typography variant="caption" align="right" style={{ display: 'block', marginTop: '4px' }}>
-            {Math.round(uploadProgress)}%
-          </Typography>
+      {/* Action Buttons */}
+      {file && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          marginTop: '16px' 
+        }}>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={resetState}
+            disabled={uploading || disabled}
+          >
+            Clear
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleUpload}
+            disabled={uploading || disabled}
+            startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+          >
+            {uploading ? `Uploading (${uploadProgress}%)` : 'Upload'}
+          </Button>
         </Box>
       )}
       
-      {/* Success message */}
-      {uploadSuccess && (
-        <Alert
-          icon={<CheckCircleIcon fontSize="inherit" />}
-          severity="success"
-          style={{ marginTop: '16px' }}
-        >
-          File uploaded successfully!
-        </Alert>
-      )}
-      
-      {/* Error message */}
-      {uploadError && (
-        <Alert
-          severity="error"
-          style={{ marginTop: '16px' }}
-          onClose={() => setUploadError(null)}
-        >
-          {uploadError}
-        </Alert>
+      {/* Upload Progress */}
+      {uploading && (
+        <Box sx={{ width: '100%', marginTop: '16px' }}>
+          <LinearProgress variant="determinate" value={uploadProgress} />
+        </Box>
       )}
     </Box>
   );

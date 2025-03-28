@@ -16,6 +16,30 @@ const API_URLS = {
 
 export const getApiUrl = (service, endpoint) => {
   const baseUrl = API_URLS[service];
+  
+  // Special handling for empty endpoints to avoid double slashes
+  if (endpoint === '') {
+    return baseUrl; // Return the base URL without adding any slashes
+  }
+  
+  // Special handling for WORKBENCH service to ensure proper URL formation
+  if (service === 'WORKBENCH') {
+    // For local development, ensure we point to the correct port
+    const localWorkbenchUrl = `http://localhost:${process.env.REACT_APP_WORKBENCH_SERVICE_PORT || '8020'}`;
+    
+    // Only use baseUrl if it's properly defined, otherwise fallback to local
+    const workbenchBaseUrl = (API_BASE_URL && process.env.REACT_APP_WORKBENCH_SERVICE_PORT) 
+      ? baseUrl 
+      : localWorkbenchUrl;
+    
+    console.log('WORKBENCH service baseUrl:', workbenchBaseUrl);
+    
+    // Ensure endpoint starts with / if it doesn't already
+    const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${workbenchBaseUrl}${formattedEndpoint}`;
+  }
+  
+  // For other services, use the original logic
   // Ensure endpoint starts with / if it doesn't already
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   

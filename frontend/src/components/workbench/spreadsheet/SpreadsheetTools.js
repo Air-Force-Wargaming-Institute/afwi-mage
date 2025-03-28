@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { WorkbenchContext } from '../../../contexts/WorkbenchContext';
 import {
   Box,
@@ -41,6 +41,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CodeIcon from '@mui/icons-material/Code';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TableContainer from '@mui/material/TableContainer';
 import Table from '@mui/material/Table';
 import TableHead from '@mui/material/TableHead';
@@ -61,13 +62,15 @@ const SpreadsheetTools = () => {
   const {
     spreadsheets,
     selectedSpreadsheet,
-    isLoading,
-    error,
-    developmentMode,
-    apiBaseUrl,
     getSpreadsheetSheets,
     getSpreadsheetSummary,
-    performCellOperation
+    performCellOperation,
+    isLoading,
+    connectionError,
+    apiBaseUrl,
+    uploadSpreadsheet,
+    fetchSpreadsheets,
+    transformSpreadsheet
   } = useContext(WorkbenchContext);
 
   // State for selected spreadsheet and column information
@@ -76,6 +79,10 @@ const SpreadsheetTools = () => {
   const [selectedSheet, setSelectedSheet] = useState('');
   const [columns, setColumns] = useState([]);
   const [activeStep, setActiveStep] = useState(0);
+  
+  // File upload ref and state
+  const fileInputRef = useRef(null);
+  const [uploadError, setUploadError] = useState(null);
 
   // State for transformation configuration
   const [selectedInputColumns, setSelectedInputColumns] = useState([]);
@@ -88,9 +95,6 @@ const SpreadsheetTools = () => {
   // State for advanced options
   const [advancedOptions, setAdvancedOptions] = useState({
     includeHeaders: true,
-    includeAdjacentRows: false,
-    adjacentRowCount: 1,
-    batchSize: 10,
     errorHandling: 'continue' // 'continue', 'stop', or 'retry'
   });
 
@@ -99,9 +103,65 @@ const SpreadsheetTools = () => {
   const [transformationError, setTransformationError] = useState(null);
   const [transformationProgress, setTransformationProgress] = useState(0);
   const [transformationResults, setTransformationResults] = useState(null);
+  
+  // AbortController for canceling pending requests
+  const abortControllerRef = useRef(null);
+  // Track component mounted state
+  const isMountedRef = useRef(true);
+
+  // Fetch spreadsheets when component mounts and handle cleanup
+  useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true;
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchSpreadsheets();
+    
+    // Cleanup function
+    return () => {
+      // Set unmounted flag
+      isMountedRef.current = false;
+      
+      // Cancel any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Check if current spreadsheet ID is still valid when spreadsheets list changes
+  useEffect(() => {
+    if (activeSpreadsheetId && spreadsheets.length > 0) {
+      // Check if the active spreadsheet still exists in the list
+      const spreadsheetExists = spreadsheets.some(sheet => sheet.id === activeSpreadsheetId);
+      
+      if (!spreadsheetExists) {
+        console.log('Selected spreadsheet no longer exists in list, clearing selection');
+        setActiveSpreadsheetId('');
+        setSelectedSheet('');
+        setSheetNames([]);
+        setUploadError('The previously selected spreadsheet is no longer available. Please select another one.');
+      }
+    }
+  }, [spreadsheets, activeSpreadsheetId]);
+
+  // Safe setState functions that check if component is still mounted
+  const safeSetState = (stateSetter) => (value) => {
+    if (isMountedRef.current) {
+      stateSetter(value);
+    }
+  };
 
   // Handle spreadsheet selection
   const handleSpreadsheetChange = async (spreadsheetId) => {
+    // Special case for upload option
+    if (spreadsheetId === 'upload_new') {
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+      return;
+    }
+    
     setActiveSpreadsheetId(spreadsheetId);
     setSelectedSheet('');
     setColumns([]);
@@ -111,19 +171,77 @@ const SpreadsheetTools = () => {
     setPreviewData([]);
     setOutputPreview([]);
     
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
     // Fetch sheet names for the selected spreadsheet
     try {
-      if (!developmentMode) {
-        const sheetsData = await getSpreadsheetSheets(spreadsheetId);
+      const sheetsData = await getSpreadsheetSheets(spreadsheetId, { signal: abortControllerRef.current.signal });
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
         setSheetNames(sheetsData.sheets || []);
-      } else {
-        // Mock sheet names for development mode
-        const mockSheetNames = ['Sheet1', 'Sheet2', 'Sheet3'];
-        setSheetNames(mockSheetNames);
+        setActiveStep(0);
       }
-      setActiveStep(0);
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Request was aborted');
+        return;
+      }
+      
       console.error('Error fetching sheet names:', err);
+      
+      // If we get a 404 error, it means the spreadsheet doesn't exist
+      if (err.response && (err.response.status === 404 || err.response.status === 400)) {
+        console.log('Spreadsheet not found, clearing selection');
+        setActiveSpreadsheetId('');
+        
+        // Show an error message
+        setUploadError(`The selected spreadsheet was not found. It may have been deleted or the backend service was restarted.`);
+        
+        // Refresh the spreadsheet list
+        fetchSpreadsheets();
+      }
+    }
+  };
+
+  // Handle file selection for upload
+  const handleFileSelect = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExt = `.${file.name.split('.').pop().toLowerCase()}`;
+    
+    if (!validExtensions.includes(fileExt)) {
+      setUploadError(`Invalid file type. Allowed: ${validExtensions.join(', ')}`);
+      return;
+    }
+    
+    try {
+      setUploadError(null);
+      // Upload the file
+      const response = await uploadSpreadsheet(file);
+      
+      // Refresh spreadsheet list
+      await fetchSpreadsheets();
+      
+      // Select the newly uploaded spreadsheet
+      if (response && response.id) {
+        handleSpreadsheetChange(response.id);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setUploadError('Failed to upload file. Please try again.');
+    } finally {
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -135,73 +253,18 @@ const SpreadsheetTools = () => {
     
     // Fetch column information and preview data
     try {
-      if (!developmentMode) {
-        const summaryData = await getSpreadsheetSummary(activeSpreadsheetId, sheetName);
-        setColumns(summaryData.column_summaries || []);
+      const summaryData = await getSpreadsheetSummary(activeSpreadsheetId, sheetName);
+      setColumns(summaryData.column_summaries || []);
 
-        // Fetch preview data
-        const previewResult = await performCellOperation(activeSpreadsheetId, {
-          operation: 'read',
-          sheet_name: sheetName,
-          cell_range: 'A1:Z10' // Get first 10 rows for preview
-        });
+      // Fetch preview data
+      const previewResult = await performCellOperation(activeSpreadsheetId, {
+        operation: 'read',
+        sheet_name: sheetName,
+        cell_range: 'A1:Z10' // Get first 10 rows for preview
+      });
 
-        if (previewResult.success) {
-          setPreviewData(previewResult.data.values);
-        }
-      } else {
-        // Mock column information for development mode
-        const mockColumns = [
-          {
-            name: 'Date',
-            dtype: 'datetime64[ns]',
-            count: 1250,
-            null_count: 0,
-            unique_count: 180,
-            sample_values: ['2023-01-15', '2023-02-05', '2023-03-10']
-          },
-          {
-            name: 'Region',
-            dtype: 'object',
-            count: 1250,
-            null_count: 5,
-            unique_count: 4,
-            sample_values: ['North', 'South', 'East', 'West']
-          },
-          {
-            name: 'Product',
-            dtype: 'object',
-            count: 1250,
-            null_count: 2,
-            unique_count: 10,
-            sample_values: ['Widget A', 'Widget B', 'Widget C']
-          },
-          {
-            name: 'Sales',
-            dtype: 'float64',
-            count: 1250,
-            null_count: 0,
-            unique_count: 875,
-            min: 5000,
-            max: 250000,
-            mean: 85450,
-            median: 75000,
-            std: 35000,
-            sample_values: [12500, 18200, 9800]
-          }
-        ];
-        setColumns(mockColumns);
-
-        // Mock preview data
-        const mockPreviewData = [
-          ['Date', 'Region', 'Product', 'Sales'],
-          ['2023-01-15', 'North', 'Widget A', 12500],
-          ['2023-02-05', 'South', 'Widget B', 18200],
-          ['2023-01-27', 'East', 'Widget A', 9800],
-          ['2023-02-12', 'West', 'Widget C', 22300],
-          ['2023-03-03', 'North', 'Widget B', 15700]
-        ];
-        setPreviewData(mockPreviewData);
+      if (previewResult.success) {
+        setPreviewData(previewResult.data.values);
       }
     } catch (err) {
       console.error('Error fetching column information:', err);
@@ -243,34 +306,87 @@ const SpreadsheetTools = () => {
   };
 
   // Generate output column previews
-  const generateOutputPreview = () => {
-    if (developmentMode) {
-      // In development mode, create sample outputs
-      setIsTransforming(true);
-      setTimeout(() => {
-        const mockOutputs = [
-          ['Transformed_Sales', 'Region_Category', 'Performance_Score'],
-          ['$12,500.00', 'Northern Territory', '78'],
-          ['$18,200.00', 'Southern Territory', '92'],
-          ['$9,800.00', 'Eastern Territory', '65'],
-          ['$22,300.00', 'Western Territory', '98'],
-          ['$15,700.00', 'Northern Territory', '83']
-        ];
-        setOutputPreview(mockOutputs);
-        setIsTransforming(false);
-        setTransformationProgress(100);
-      }, 2000);
-    } else {
-      // In production mode, call the API
-      // This would be implemented when the backend is available
-      console.log('Backend API would be called here with:', {
-        spreadsheetId: activeSpreadsheetId,
-        sheetName: selectedSheet,
-        inputColumns: selectedInputColumns,
-        outputColumns: outputColumns.map(col => col.name),
+  const generateOutputPreview = async () => {
+    if (!isMountedRef.current) return;
+    
+    setIsTransforming(true);
+    setTransformationProgress(0);
+    setOutputPreview([]);
+    setTransformationError(null);
+    
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
+    try {
+      // Prepare transformation parameters
+      const transformationParams = {
+        sheet_name: selectedSheet,
+        input_columns: selectedInputColumns,
+        output_columns: outputColumns.map(col => ({
+          name: col.name,
+          description: col.description
+        })),
         instructions: transformationInstructions,
-        options: advancedOptions
-      });
+        include_headers: advancedOptions.includeHeaders,
+        processing_mode: processingMode,
+        error_handling: advancedOptions.errorHandling
+      };
+      
+      console.log('Calling transformSpreadsheet with params:', JSON.stringify(transformationParams));
+      
+      // Check if the function exists
+      if (typeof transformSpreadsheet !== 'function') {
+        throw new Error('transformSpreadsheet function is not available. This may indicate a configuration issue.');
+      }
+      
+      // Call the transform API
+      const result = await transformSpreadsheet(
+        activeSpreadsheetId, 
+        transformationParams,
+        { signal: abortControllerRef.current.signal }
+      );
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsTransforming(false);
+        
+        if (result.success) {
+          if (result.preview) {
+            setOutputPreview(result.preview);
+          } else if (result.job_id) {
+            setTransformationResults({
+              job_id: result.job_id,
+              status: 'submitted'
+            });
+          }
+        } else {
+          setTransformationError(result.error || 'Unknown error occurred during transformation');
+        }
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was aborted');
+        return;
+      }
+      
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        console.error('Error generating preview:', error);
+        setIsTransforming(false);
+        
+        // More detailed error message
+        let errorMessage = 'Failed to generate preview';
+        if (error.response && error.response.data) {
+          errorMessage += `: ${error.response.data.detail || error.response.data.error || JSON.stringify(error.response.data)}`;
+        } else if (error.message) {
+          errorMessage += `: ${error.message}`;
+        }
+        
+        setTransformationError(errorMessage);
+      }
     }
   };
 
@@ -510,45 +626,6 @@ const SpreadsheetTools = () => {
                         label="Include column headers in context"
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={advancedOptions.includeAdjacentRows}
-                            onChange={(e) => handleAdvancedOptionChange('includeAdjacentRows', e.target.checked)}
-                            color="primary"
-                          />
-                        }
-                        label="Include adjacent rows in context"
-                      />
-                    </Grid>
-                    
-                    {advancedOptions.includeAdjacentRows && (
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Adjacent Row Count"
-                          type="number"
-                          InputProps={{ inputProps: { min: 1, max: 5 } }}
-                          value={advancedOptions.adjacentRowCount}
-                          onChange={(e) => handleAdvancedOptionChange('adjacentRowCount', parseInt(e.target.value))}
-                          variant="outlined"
-                        />
-                      </Grid>
-                    )}
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Batch Size"
-                        type="number"
-                        InputProps={{ inputProps: { min: 1, max: 50 } }}
-                        value={advancedOptions.batchSize}
-                        onChange={(e) => handleAdvancedOptionChange('batchSize', parseInt(e.target.value))}
-                        variant="outlined"
-                        helperText="Number of rows to process in each batch"
-                      />
-                    </Grid>
                     
                     <Grid item xs={12} sm={6}>
                       <FormControl fullWidth variant="outlined">
@@ -762,15 +839,20 @@ const SpreadsheetTools = () => {
         based on your requirements.
       </Typography>
       
+      {/* Hidden file input for upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleFileSelect}
+        accept=".xlsx,.xls,.csv"
+      />
+      
       <Paper elevation={0} style={{ marginTop: '24px', padding: '24px' }}>
-        {developmentMode && (
-          <Chip 
-            icon={<CodeIcon />}
-            label="Development Mode" 
-            color="primary" 
-            variant="outlined" 
-            style={{ marginBottom: '16px' }} 
-          />
+        {uploadError && (
+          <Alert severity="error" style={{ marginBottom: '16px' }} onClose={() => setUploadError(null)}>
+            {uploadError}
+          </Alert>
         )}
         
         <Grid container spacing={3}>
@@ -785,6 +867,11 @@ const SpreadsheetTools = () => {
                 <MenuItem value="" disabled>
                   <em>Select a spreadsheet</em>
                 </MenuItem>
+                <MenuItem value="upload_new" style={{ color: '#1976d2' }}>
+                  <CloudUploadIcon style={{ marginRight: '8px' }} />
+                  Upload new spreadsheet...
+                </MenuItem>
+                <Divider />
                 {spreadsheets.map((sheet) => (
                   <MenuItem key={sheet.id} value={sheet.id}>
                     {sheet.filename}

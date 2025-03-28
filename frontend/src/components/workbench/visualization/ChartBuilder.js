@@ -85,83 +85,61 @@ const CodeEditor = ({ code, setCode, readOnly }) => {
 };
 
 const ChartBuilder = () => {
-  const { 
-    visualizations, 
-    isLoading, 
+  const {
+    spreadsheets,
+    fetchSpreadsheets,
     connectionError,
-    developmentMode,
+    isLoading,
+    error,
+    apiBaseUrl,
+    visualizations,
+    extractDataContext,
     generateVisualization,
-    executeVisualizationCode,
-    extractDataContext
+    executeVisualizationCode
   } = useContext(WorkbenchContext);
   
   const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState('');
-  const [chartType, setChartType] = useState('line');
+  const [selectedChartType, setSelectedChartType] = useState('line');
   const [dataContext, setDataContext] = useState(null);
   const [vizRequest, setVizRequest] = useState('');
   const [visualizationCode, setVisualizationCode] = useState(SAMPLE_VISUALIZATION_CODE);
   const [codeResult, setCodeResult] = useState({ status: 'idle', error: null });
+  const [localError, setLocalError] = useState(null);
+  const [useSeaborn, setUseSeaborn] = useState(true);
+  const [selectedStyle, setSelectedStyle] = useState('default');
+  const [selectedPalette, setSelectedPalette] = useState('Set1');
   const [sampleFiles, setSampleFiles] = useState([
     { id: 'sample-1', name: 'sales_data_2023.xlsx', description: 'Q1-Q4 Sales by Region' },
     { id: 'sample-2', name: 'inventory_2023.csv', description: 'Inventory levels by warehouse' },
     { id: 'sample-3', name: 'financial_metrics.xlsx', description: 'Financial performance metrics' }
   ]);
   
-  // Ensure we have visualizations data when in development mode
+  // Fetch data on component mount
   useEffect(() => {
-    if (developmentMode && visualizations.length === 0) {
-      // This will be caught by the context's useEffect to initialize mock data
-      extractDataContext('sample-id');
+    // Fetch spreadsheets only once when component mounts
+    fetchSpreadsheets();
+    // Empty dependency array means this only runs once on mount
+    // DO NOT add fetchSpreadsheets to dependencies or it will cause infinite loops
+  }, []);
+  
+  // Extract data context when selected file changes
+  useEffect(() => {
+    if (selectedFile) {
+      extractDataContext(selectedFile)
+        .then(context => setDataContext(context))
+        .catch(err => {
+          console.error('Error extracting data context:', err);
+          setLocalError('Failed to extract data context: ' + err.message);
+        });
     }
-  }, [developmentMode, visualizations.length, extractDataContext]);
+  }, [selectedFile, extractDataContext]);
   
   // Handle file selection
-  const handleFileSelect = async (fileId) => {
+  const handleFileSelected = async (fileId) => {
     setSelectedFile(fileId);
-    
-    if (!fileId) return;
-    
-    // In a real implementation, this would fetch the data context from the backend
-    try {
-      setDataContext({ loading: true });
-      
-      if (developmentMode) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Example data context that would be returned from backend
-        setDataContext({
-          loading: false,
-          schema: [
-            { name: 'Date', type: 'datetime', missing: false },
-            { name: 'Region', type: 'categorical', missing: false },
-            { name: 'Sales', type: 'numeric', missing: false },
-            { name: 'Profit', type: 'numeric', missing: true },
-          ],
-          statistics: {
-            'Sales': { min: 1000, max: 50000, mean: 15000, median: 12500 },
-            'Profit': { min: 100, max: 15000, mean: 4500, median: 3800 },
-          },
-          sample: [
-            ['2023-01-01', 'North', 12500, 3700],
-            ['2023-01-02', 'South', 18000, 5400],
-            ['2023-01-03', 'East', 9800, 2200],
-            ['2023-01-04', 'West', 22000, 7800],
-          ],
-          row_count: 1200,
-          file_info: {
-            name: 'sales_data_2023.xlsx',
-            sheets: ['Q1', 'Q2', 'Q3', 'Q4']
-          }
-        });
-      } else {
-        // Real API call would go here
-        // ...
-      }
-    } catch (error) {
-      setDataContext({ loading: false, error: 'Failed to analyze file' });
-    }
+    setCodeResult({status: 'idle', data: null});
+    // Data context will be extracted by the useEffect that depends on selectedFile
   };
   
   // Handle tab change
@@ -171,81 +149,57 @@ const ChartBuilder = () => {
   
   // Handle visualization generation
   const handleGenerateVisualization = async () => {
-    if (!selectedFile || !vizRequest) return;
+    setLocalError(null);
+    setCodeResult({status: 'loading', data: null});
+    
+    const request = {
+      spreadsheet_id: selectedFile,
+      visualization_type: selectedChartType,
+      description: vizRequest,
+      preferences: {
+        use_seaborn: useSeaborn,
+        style: selectedStyle,
+        color_palette: selectedPalette
+      }
+    };
     
     try {
-      setCodeResult({ status: 'loading', error: null });
-      
-      // This would be an actual API call in the real implementation
-      const result = await generateVisualization({
-        spreadsheet_id: selectedFile,
-        prompt: vizRequest,
-        use_seaborn: true,
-        data_context: dataContext
+      const result = await generateVisualization(request);
+      setVisualizationCode(result.code);
+      setCodeResult({
+        status: 'success',
+        data: result
       });
-      
-      // If in development mode, we'll get mock data back, otherwise real data
-      if (result) {
-        // Update the visualization code
-        setVisualizationCode(result.code || SAMPLE_VISUALIZATION_CODE);
-        setCodeResult({ status: 'success', error: null });
-      }
-      
-      setTabValue(1); // Switch to the visualization tab
-    } catch (error) {
-      setCodeResult({ 
-        status: 'error', 
-        error: error.message || 'Failed to generate visualization'
-      });
+    } catch (err) {
+      console.error('Error generating visualization:', err);
+      setLocalError('Failed to generate visualization: ' + err.message);
+      setCodeResult({status: 'error', data: null});
     }
   };
   
   // Handle code execution after manual edits
-  const handleExecuteCode = async () => {
-    // In a real implementation, this would send the code to the backend for execution
+  const handleRunCode = async () => {
+    if (!codeResult.data || !visualizationCode) return;
+    
+    setCodeResult({...codeResult, status: 'loading'});
+    
     try {
-      setCodeResult({ status: 'loading', error: null });
+      const result = await executeVisualizationCode(
+        codeResult.data.id, 
+        visualizationCode
+      );
       
-      if (developmentMode) {
-        // Simulate execution delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Update the visualization image with the FakePlot image
-        setDataContext({
-          loading: false,
-          schema: [
-            { name: 'Date', type: 'datetime', missing: false },
-            { name: 'Region', type: 'categorical', missing: false },
-            { name: 'Sales', type: 'numeric', missing: false },
-            { name: 'Profit', type: 'numeric', missing: true },
-          ],
-          statistics: {
-            'Sales': { min: 1000, max: 50000, mean: 15000, median: 12500 },
-            'Profit': { min: 100, max: 15000, mean: 4500, median: 3800 },
-          },
-          sample: [
-            ['2023-01-01', 'North', 12500, 3700],
-            ['2023-01-02', 'South', 18000, 5400],
-            ['2023-01-03', 'East', 9800, 2200],
-            ['2023-01-04', 'West', 22000, 7800],
-          ],
-          row_count: 1200,
-          file_info: {
-            name: 'sales_data_2023.xlsx',
-            sheets: ['Q1', 'Q2', 'Q3', 'Q4']
-          }
-        });
-      } else {
-        // Real backend call would go here
-        // ...
-      }
-      
-      setCodeResult({ status: 'success', error: null });
-    } catch (error) {
-      setCodeResult({ 
-        status: 'error', 
-        error: error.message || 'Failed to execute code'
+      setCodeResult({
+        status: 'success',
+        data: {
+          ...codeResult.data,
+          image_url: result.image_url
+        }
       });
+    } catch (err) {
+      console.error('Error executing code:', err);
+      setLocalError('Failed to execute code: ' + err.message);
+      setCodeResult({...codeResult, status: 'error'});
     }
   };
   
@@ -257,17 +211,6 @@ const ChartBuilder = () => {
     
     return (
       <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-        {developmentMode && (
-          <Chip 
-            icon={<CodeIcon />} 
-            label="Mock Data" 
-            color="primary" 
-            variant="outlined" 
-            size="small"
-            style={{ marginBottom: '8px' }} 
-          />
-        )}
-        
         <Typography variant="subtitle2" gutterBottom>
           File Analysis Summary
         </Typography>
@@ -283,7 +226,7 @@ const ChartBuilder = () => {
 
   // Render connection error message
   const renderConnectionError = () => {
-    if (!connectionError || developmentMode) return null;
+    if (!connectionError) return null;
     
     return (
       <Alert 
@@ -323,16 +266,6 @@ const ChartBuilder = () => {
               Visualization Request
             </Typography>
             
-            {developmentMode && (
-              <Chip 
-                icon={<CodeIcon />} 
-                label="Development Mode" 
-                color="primary" 
-                variant="outlined" 
-                style={{ marginBottom: '16px' }} 
-              />
-            )}
-            
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <FormControl fullWidth>
@@ -340,8 +273,8 @@ const ChartBuilder = () => {
                   <Select
                     value={selectedFile}
                     label="Data Source"
-                    onChange={(e) => handleFileSelect(e.target.value)}
-                    disabled={connectionError && !developmentMode}
+                    onChange={(e) => handleFileSelected(e.target.value)}
+                    disabled={connectionError}
                   >
                     <MenuItem value="">
                       <em>Select a file</em>
@@ -358,23 +291,93 @@ const ChartBuilder = () => {
                 <TextField
                   fullWidth
                   label="Describe the visualization you want"
-                  placeholder={connectionError && !developmentMode ? 
+                  placeholder={connectionError ? 
                     "Backend connection required for visualization generation" : 
                     "E.g., Create a line chart showing sales by product across months"}
                   multiline
                   rows={4}
                   value={vizRequest}
                   onChange={(e) => setVizRequest(e.target.value)}
-                  disabled={connectionError && !developmentMode}
+                  disabled={connectionError}
                 />
               </Grid>
+              
+              <Grid item xs={12}>
+                <FormControl fullWidth style={{ marginBottom: '16px' }}>
+                  <InputLabel>Chart Type</InputLabel>
+                  <Select
+                    value={selectedChartType}
+                    label="Chart Type"
+                    onChange={(e) => setSelectedChartType(e.target.value)}
+                    disabled={connectionError}
+                  >
+                    <MenuItem value="line">Line Chart</MenuItem>
+                    <MenuItem value="bar">Bar Chart</MenuItem>
+                    <MenuItem value="scatter">Scatter Plot</MenuItem>
+                    <MenuItem value="pie">Pie Chart</MenuItem>
+                    <MenuItem value="heatmap">Heatmap</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={useSeaborn}
+                      onChange={(e) => setUseSeaborn(e.target.checked)}
+                      disabled={connectionError}
+                    />
+                  }
+                  label="Use Seaborn (enhanced styling)"
+                />
+              </Grid>
+              
+              {useSeaborn && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Style</InputLabel>
+                      <Select
+                        value={selectedStyle}
+                        label="Style"
+                        onChange={(e) => setSelectedStyle(e.target.value)}
+                        disabled={connectionError}
+                      >
+                        <MenuItem value="default">Default</MenuItem>
+                        <MenuItem value="whitegrid">White Grid</MenuItem>
+                        <MenuItem value="darkgrid">Dark Grid</MenuItem>
+                        <MenuItem value="ticks">Ticks</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Color Palette</InputLabel>
+                      <Select
+                        value={selectedPalette}
+                        label="Color Palette"
+                        onChange={(e) => setSelectedPalette(e.target.value)}
+                        disabled={connectionError}
+                      >
+                        <MenuItem value="Set1">Set1</MenuItem>
+                        <MenuItem value="Set2">Set2</MenuItem>
+                        <MenuItem value="viridis">Viridis</MenuItem>
+                        <MenuItem value="plasma">Plasma</MenuItem>
+                        <MenuItem value="coolwarm">Coolwarm</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </>
+              )}
               
               <Grid item xs={12}>
                 <Button
                   variant="contained"
                   fullWidth
                   className="upload-button"
-                  disabled={(!selectedFile || !vizRequest || isLoading || codeResult.status === 'loading') && !developmentMode}
+                  disabled={!selectedFile || !vizRequest || isLoading || codeResult.status === 'loading'}
                   onClick={handleGenerateVisualization}
                 >
                   {isLoading || codeResult.status === 'loading' ? (
@@ -401,6 +404,12 @@ const ChartBuilder = () => {
               <Tab icon={<VisibilityIcon />} label="Visualization" />
             </Tabs>
             
+            {localError && (
+              <Alert severity="error" style={{ marginBottom: '16px' }} onClose={() => setLocalError(null)}>
+                {localError}
+              </Alert>
+            )}
+            
             {codeResult && codeResult.error && (
               <Alert severity="error" style={{ marginBottom: '16px' }}>
                 {codeResult.error}
@@ -418,18 +427,18 @@ const ChartBuilder = () => {
                     size="small" 
                     startIcon={<RefreshIcon />}
                     className="action-button"
-                    onClick={handleExecuteCode}
-                    disabled={(!visualizationCode || codeResult.status === 'loading') && !developmentMode}
+                    onClick={handleRunCode}
+                    disabled={!visualizationCode || codeResult.status === 'loading'}
                   >
                     Run Code
                   </Button>
                 </div>
                 <CodeEditor 
-                  code={visualizationCode || (connectionError && !developmentMode ? 
+                  code={visualizationCode || (connectionError ? 
                     "# Backend connection required to generate visualization code\n# Please start the backend services and reload this page" : 
                     "")} 
                   setCode={setVisualizationCode}
-                  readOnly={connectionError && !developmentMode}
+                  readOnly={connectionError}
                 />
               </div>
             )}
@@ -445,7 +454,7 @@ const ChartBuilder = () => {
                     startIcon={<SaveAltIcon />}
                     size="small"
                     className="action-button"
-                    disabled={(!dataContext || connectionError) && !developmentMode}
+                    disabled={(!dataContext || connectionError)}
                   >
                     Export
                   </Button>
@@ -462,7 +471,7 @@ const ChartBuilder = () => {
                       size="small" 
                       startIcon={<SaveAltIcon />}
                       className="action-button"
-                      disabled={(!dataContext || connectionError) && !developmentMode}
+                      disabled={(!dataContext || connectionError)}
                     >
                       Export
                     </Button>
@@ -474,16 +483,6 @@ const ChartBuilder = () => {
                     <Alert severity="error">{dataContext.error}</Alert>
                   ) : (
                     <Card>
-                      {developmentMode && (
-                        <Chip 
-                          icon={<CodeIcon />} 
-                          label="Mock Visualization" 
-                          color="primary" 
-                          variant="outlined" 
-                          size="small"
-                          style={{ margin: '8px' }} 
-                        />
-                      )}
                       <img
                         src={FakePlotImage}
                         alt="Generated visualization"

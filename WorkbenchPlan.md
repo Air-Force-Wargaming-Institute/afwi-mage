@@ -296,25 +296,41 @@ frontend/src/components/workbench/
   - SpreadsheetManager for file operations
   - SpreadsheetProcessor for data reading & analysis
   - API endpoints for basic operations
+  - ⚠️ Missing LLM transformation implementation for column operations
 
-- **Frontend Implementation**: Substantial (85%)
+- **Frontend Implementation**: Substantial (90%)
   - SpreadsheetViewer connected to backend APIs
   - Upload UI with proper error handling and drag-and-drop
   - Data preview with pagination
   - Library view of spreadsheets
-  - Column Transformation UI implemented
+  - Column Transformation UI implemented and completed
   - Step-by-step transformation workflow
-  - File download functionality added
+  - File upload and download functionality added
   - Reusable FileUploader component created
+  - ⚠️ Missing real backend connection for transformation operations
 
-- **Next Steps Without Backend**:
-  1. ✅ Fix syntax errors in WorkbenchContext.js (generateVisualization and executeVisualizationCode)
-  2. ✅ Implement SpreadsheetTools.js component for column transformation UI
-  3. ✅ Create column mapping interface
-  4. ✅ Enhance development mode with more comprehensive mocking
-  5. ✅ Implement FileUploader.js component
-  6. ✅ Add download functionality in the UI
-  7. ✅ Create UI for transformation instruction configuration
-  8. Implement ChartGallery.js component for visualization management
-  9. Create PromptBuilder.js component for LLM interactions
-  10. Implement JobMonitor.js for tracking long-running operations
+- **Current Column Transformation Status**:
+  - ✅ UI workflow completed with all steps
+  - ✅ Spreadsheet selection and upload working
+  - ✅ Input column selection functional
+  - ✅ Output column definition UI complete
+  - ✅ Transformation instructions interface completed
+  - ✅ Advanced options simplified to required settings
+  - ✅ Review and execute UI implemented
+  - ⚠️ Execution currently returns mock data
+  - ⚠️ No actual LLM processing happening
+
+- **Next Steps - Column Transformation Implementation**:
+  1. Create backend transformation API endpoint (`/api/workbench/spreadsheets/{id}/transform`)
+  2. Implement row-by-row LLM processing engine in SpreadsheetProcessor
+  3. Build LLM integration for parsing rows and instructions
+  4. Add transformation function to WorkbenchContext.js
+  5. Update SpreadsheetTools.js to use real API instead of mock data
+  6. Implement progress tracking for transformation operations
+  7. Add error handling for LLM processing failures
+  8. Test with real spreadsheet data
+
+- **Other Next Steps**:
+  1. Implement ChartGallery.js component for visualization management
+  2. Create PromptBuilder.js component for LLM interactions
+  3. Implement JobMonitor.js for tracking long-running operations

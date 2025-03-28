@@ -44,20 +44,209 @@ class SpreadsheetManager:
         # Create directory if it doesn't exist
         os.makedirs(self.upload_dir, exist_ok=True)
         
+        # Log detailed path information
+        logger.info(f"SpreadsheetManager initialized with uploads directory: {self.upload_dir} (absolute: {os.path.abspath(self.upload_dir)})")
+        logger.info(f"Looking for metadata file at: {self.metadata_file} (absolute: {os.path.abspath(self.metadata_file)})")
+        
         # Load metadata if exists, otherwise initialize empty
         self.metadata = self._load_metadata()
+        logger.info(f"Loaded {len(self.metadata)} spreadsheet records from metadata")
+        
+        # Validate metadata against actual files
+        self._validate_metadata_against_files()
+    
+    def _validate_metadata_against_files(self):
+        """Validate metadata against actual files in the directory."""
+        logger.info("Validating metadata against actual files in the upload directory")
+        
+        # Get all valid spreadsheet files in the upload directory
+        actual_files = []
+        for filename in os.listdir(self.upload_dir):
+            file_path = os.path.join(self.upload_dir, filename)
+            if os.path.isfile(file_path):
+                # Check if it's a valid spreadsheet file
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in ['.xlsx', '.xls', '.csv']:
+                    actual_files.append(filename)
+        
+        logger.info(f"Found {len(actual_files)} valid spreadsheet files in upload directory")
+        
+        # Check for files in directory but not in metadata
+        files_not_in_metadata = []
+        for filename in actual_files:
+            # Skip metadata.json itself
+            if filename == "metadata.json":
+                continue
+                
+            # Check if file exists in metadata
+            file_id = None
+            for id, info in self.metadata.items():
+                if os.path.basename(info.get("storage_path", "")) == filename:
+                    file_id = id
+                    break
+            
+            if not file_id:
+                files_not_in_metadata.append(filename)
+        
+        logger.info(f"Found {len(files_not_in_metadata)} files not in metadata: {', '.join(files_not_in_metadata) if files_not_in_metadata else 'none'}")
+        
+        # Check for metadata entries without files
+        missing_files = []
+        for id, info in self.metadata.items():
+            storage_path = info.get("storage_path")
+            if storage_path:
+                if not os.path.exists(storage_path):
+                    missing_files.append((id, storage_path))
+        
+        logger.info(f"Found {len(missing_files)} metadata entries without files: {', '.join([id for id, _ in missing_files]) if missing_files else 'none'}")
     
     def _load_metadata(self) -> Dict[str, Dict[str, Any]]:
         """Load metadata from file or initialize if not exists."""
         if not os.path.exists(self.metadata_file):
-            return {}
+            logger.warning(f"Metadata file does not exist at {self.metadata_file}, looking in alternative locations")
+            
+            # Try looking for metadata.json in common alternative locations
+            alt_locations = [
+                # Docker default path
+                Path("/app/data/workbench/uploads/metadata.json"),
+                # Local development paths
+                Path("./data/workbench/uploads/metadata.json"),
+                Path("../data/workbench/uploads/metadata.json"),
+                # Absolute paths from environment
+                Path(os.environ.get("WORKBENCH_UPLOADS_DIR", "")).joinpath("metadata.json") if os.environ.get("WORKBENCH_UPLOADS_DIR") else None
+            ]
+            
+            # Filter out None values
+            alt_locations = [loc for loc in alt_locations if loc is not None]
+            
+            logger.info(f"Checking alternative locations: {[str(loc) for loc in alt_locations]}")
+            
+            metadata_found = False
+            for alt_path in alt_locations:
+                if os.path.exists(alt_path):
+                    logger.info(f"Found metadata at alternative location: {alt_path}")
+                    try:
+                        with open(alt_path, 'r') as f:
+                            metadata = json.load(f)
+                            # Copy the metadata file to the current location
+                            self._save_metadata_to_path(metadata, self.metadata_file)
+                            logger.info(f"Copied metadata from {alt_path} to {self.metadata_file}")
+                            metadata_found = True
+                            return metadata
+                    except Exception as e:
+                        logger.warning(f"Error reading alternative metadata file: {str(e)}")
+            
+            # Last attempt: check if uploads directory has any spreadsheet files we can scan
+            if not metadata_found:
+                try:
+                    logger.info(f"No metadata file found, scanning uploads directory for spreadsheet files")
+                    metadata = self._scan_directory_for_metadata()
+                    if metadata:
+                        logger.info(f"Created metadata from directory scan with {len(metadata)} entries")
+                        self._save_metadata_to_path(metadata, self.metadata_file)
+                        return metadata
+                except Exception as e:
+                    logger.warning(f"Error scanning directory for metadata: {str(e)}")
+            
+            # If we still didn't find any metadata, create an empty metadata file
+            if not metadata_found:
+                logger.warning("No metadata file found in any location, initializing empty file")
+                empty_metadata = {}
+                self._save_metadata_to_path(empty_metadata, self.metadata_file)
+                return empty_metadata
         
         try:
             with open(self.metadata_file, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            logger.warning(f"Could not load metadata file, initializing empty")
-            return {}
+                metadata = json.load(f)
+                logger.info(f"Successfully loaded metadata with {len(metadata)} records")
+                return metadata
+        except json.JSONDecodeError as e:
+            logger.warning(f"Invalid JSON in metadata file: {str(e)}, initializing empty")
+            empty_metadata = {}
+            self._save_metadata_to_path(empty_metadata, self.metadata_file)
+            return empty_metadata
+        except FileNotFoundError as e:
+            # This shouldn't happen since we checked above, but just in case
+            logger.warning(f"Metadata file suddenly disappeared: {str(e)}, initializing empty")
+            empty_metadata = {}
+            self._save_metadata_to_path(empty_metadata, self.metadata_file)
+            return empty_metadata
+    
+    def _scan_directory_for_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Scan the uploads directory for spreadsheet files and create metadata."""
+        metadata = {}
+        
+        try:
+            # Get all files in the directory
+            files = os.listdir(self.upload_dir)
+            
+            # Filter for valid spreadsheet files
+            for filename in files:
+                file_path = os.path.join(self.upload_dir, filename)
+                if os.path.isfile(file_path) and self._is_valid_spreadsheet(filename):
+                    # Generate a unique ID
+                    file_id = str(uuid.uuid4())
+                    
+                    # Get file info
+                    file_info = {
+                        "id": file_id,
+                        "filename": filename,
+                        "size_bytes": os.path.getsize(file_path),
+                        "upload_date": datetime.fromtimestamp(os.path.getctime(file_path)).isoformat(),
+                        "storage_path": str(file_path)
+                    }
+                    
+                    # Try to extract additional info
+                    try:
+                        if filename.lower().endswith('.csv'):
+                            # For CSV, we just have one sheet
+                            file_info["sheet_count"] = 1
+                            file_info["sheets"] = ["Sheet1"]
+                        else:  # Excel files
+                            # For Excel, get sheet names
+                            excel_file = pd.ExcelFile(file_path)
+                            sheets = excel_file.sheet_names
+                            
+                            file_info["sheet_count"] = len(sheets)
+                            file_info["sheets"] = sheets
+                    except Exception as e:
+                        logger.warning(f"Error extracting info from {filename}: {str(e)}")
+                        file_info["sheet_count"] = 0
+                        file_info["sheets"] = []
+                    
+                    # Add to metadata
+                    metadata[file_id] = file_info
+            
+            logger.info(f"Scanned directory and found {len(metadata)} spreadsheet files")
+        except Exception as e:
+            logger.error(f"Error scanning directory: {str(e)}")
+        
+        return metadata
+    
+    def _save_metadata_to_path(self, metadata: Dict[str, Dict[str, Any]], path: Path) -> None:
+        """Save metadata to a specific path."""
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        # Log the absolute path
+        logger.info(f"Saving metadata to path: {path} (absolute: {os.path.abspath(path)})")
+        
+        # Save the metadata
+        try:
+            with open(path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            logger.info(f"Successfully saved metadata with {len(metadata)} entries")
+        except Exception as e:
+            logger.error(f"Error saving metadata to {path}: {str(e)}")
+            # Try to save to an alternative location
+            try:
+                alt_path = os.path.join(os.getcwd(), "metadata.json")
+                logger.info(f"Attempting to save metadata to alternative location: {alt_path}")
+                with open(alt_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                logger.info(f"Successfully saved metadata to alternative location: {alt_path}")
+            except Exception as alt_e:
+                logger.error(f"Failed to save metadata to alternative location: {str(alt_e)}")
     
     def _save_metadata(self) -> None:
         """Save metadata to file."""
@@ -174,11 +363,20 @@ class SpreadsheetManager:
     def _is_valid_spreadsheet(self, filename: str) -> bool:
         """Check if the file has a valid spreadsheet extension."""
         if not filename:
+            logger.warning("Empty filename provided for validation")
             return False
         
         valid_extensions = ['.xlsx', '.xls', '.csv']
         file_ext = os.path.splitext(filename)[1].lower()
-        return file_ext in valid_extensions
+        
+        logger.info(f"Validating file: {filename}")
+        logger.info(f"File extension: {file_ext}")
+        logger.info(f"Valid extensions: {valid_extensions}")
+        
+        is_valid = file_ext.lower() in valid_extensions
+        logger.info(f"Validation result: {is_valid}")
+        
+        return is_valid
     
     def list_spreadsheets(self) -> List[Dict[str, Any]]:
         """
@@ -187,6 +385,27 @@ class SpreadsheetManager:
         Returns:
             List of spreadsheet metadata
         """
+        # If metadata is empty, try importing from provided metadata file
+        if not self.metadata:
+            logger.warning("Metadata is empty, attempting to re-initialize from default locations")
+            
+            # Try each of these potential locations
+            potential_paths = [
+                "data/workbench/uploads/metadata.json",
+                "/app/data/workbench/uploads/metadata.json",
+                "./data/workbench/uploads/metadata.json",
+                "../data/workbench/uploads/metadata.json"
+            ]
+            
+            for path in potential_paths:
+                if self.import_metadata_from_path(path):
+                    break
+            
+            # If still empty, ensure we have at least an empty metadata file
+            if not self.metadata and not os.path.exists(self.metadata_file):
+                logger.warning(f"Still no metadata found, creating empty metadata file at {self.metadata_file}")
+                self._save_metadata_to_path({}, self.metadata_file)
+
         return [
             {
                 "id": file_id,
@@ -197,6 +416,45 @@ class SpreadsheetManager:
             }
             for file_id, info in self.metadata.items()
         ]
+    
+    def import_metadata_from_path(self, metadata_path: str) -> bool:
+        """
+        Import metadata from a specific file path.
+        
+        Args:
+            metadata_path: Path to the metadata.json file
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            logger.info(f"Attempting to import metadata from {metadata_path}")
+            
+            # Check if the file exists
+            if not os.path.exists(metadata_path):
+                logger.warning(f"Metadata file not found at {metadata_path}")
+                return False
+                
+            # Load the metadata
+            with open(metadata_path, 'r') as f:
+                imported_metadata = json.load(f)
+                
+            if not imported_metadata:
+                logger.warning(f"No metadata found in {metadata_path}")
+                return False
+                
+            # Update our metadata
+            self.metadata.update(imported_metadata)
+            
+            # Save to our location
+            self._save_metadata()
+            
+            logger.info(f"Successfully imported {len(imported_metadata)} records from {metadata_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error importing metadata from {metadata_path}: {str(e)}")
+            return False
     
     def get_spreadsheet_info(self, spreadsheet_id: str) -> Dict[str, Any]:
         """

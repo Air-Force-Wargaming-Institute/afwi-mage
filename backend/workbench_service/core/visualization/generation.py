@@ -92,14 +92,14 @@ The data is in an Excel file with ID: {spreadsheet_id}
     
     # Build a detailed prompt with comprehensive data context
     file_info = data_context.get('file_info', {})
-    schema = data_context.get('schema', [])
+    column_schema = data_context.get('column_schema', [])
     statistics = data_context.get('statistics', {})
     sample_rows = data_context.get('sample_rows', [])
     row_count = data_context.get('row_count', 0)
     
     # Format schema information
     schema_str = "Column information:\n"
-    for col in schema:
+    for col in column_schema:
         schema_str += f"- {col['name']} ({col['type']})"
         if col.get('missing'):
             schema_str += " (contains missing values)"
@@ -115,9 +115,9 @@ The data is in an Excel file with ID: {spreadsheet_id}
     
     # Format sample data
     sample_str = "Sample data rows:\n"
-    if schema and sample_rows:
+    if column_schema and sample_rows:
         # Create a header row with column names
-        header = [col['name'] for col in schema]
+        header = [col['name'] for col in column_schema]
         sample_str += "| " + " | ".join(header) + " |\n"
         sample_str += "| " + " | ".join(["---" for _ in header]) + " |\n"
         
@@ -153,8 +153,8 @@ def _generate_example_code(
     
     # Extract column names from data context if available
     columns = []
-    if data_context and 'schema' in data_context:
-        columns = [col['name'] for col in data_context['schema']]
+    if data_context and 'column_schema' in data_context:
+        columns = [col['name'] for col in data_context['column_schema']]
     else:
         columns = ['Date', 'Region', 'Sales', 'Profit']
     
@@ -162,8 +162,8 @@ def _generate_example_code(
     numeric_cols = []
     categorical_cols = []
     
-    if data_context and 'schema' in data_context:
-        for col in data_context['schema']:
+    if data_context and 'column_schema' in data_context:
+        for col in data_context['column_schema']:
             if col['type'] == 'numeric':
                 numeric_cols.append(col['name'])
             elif col['type'] in ('categorical', 'string'):

@@ -47,8 +47,6 @@ const SpreadsheetViewer = () => {
     isLoading,
     error,
     connectionError,
-    developmentMode,
-    apiBaseUrl,
     uploadSpreadsheet
   } = useContext(WorkbenchContext);
   
@@ -66,12 +64,11 @@ const SpreadsheetViewer = () => {
   
   // Fetch spreadsheets when component mounts
   useEffect(() => {
-    // Only fetch spreadsheets if we're not in development mode
-    // or if spreadsheets array is empty
-    if (!developmentMode || spreadsheets.length === 0) {
-      fetchSpreadsheets();
-    }
-  }, [fetchSpreadsheets, developmentMode, spreadsheets.length]);
+    // Only fetch once when component mounts
+    fetchSpreadsheets();
+    // Empty dependency array means this only runs once on mount
+    // DO NOT add fetchSpreadsheets to dependencies or it will cause infinite loops
+  }, []);
   
   // Handle file selection
   const handleFileChange = (event) => {
@@ -104,43 +101,27 @@ const SpreadsheetViewer = () => {
       }
       
       // Send API request
-      if (!developmentMode) {
-        const response = await fetch(`${apiBaseUrl}/api/workbench/spreadsheets/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
-        
-        // Refresh spreadsheet list
-        fetchSpreadsheets();
-        
-        // Reset form
-        setFile(null);
-        setDescription('');
-        setUploadSuccess(true);
-        
-        // Switch to library tab
-        setTabValue(1);
-      } else {
-        // Simulate upload in development mode
-        console.log('Development mode: Simulating file upload');
-        
-        // Wait 1 second to simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Reset form
-        setFile(null);
-        setDescription('');
-        setUploadSuccess(true);
-        
-        // Switch to library tab
-        setTabValue(1);
+      const response = await fetch(`/api/workbench/spreadsheets/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
       }
+      
+      const result = await response.json();
+      
+      // Refresh spreadsheet list
+      fetchSpreadsheets();
+      
+      // Reset form
+      setFile(null);
+      setDescription('');
+      setUploadSuccess(true);
+      
+      // Switch to library tab
+      setTabValue(1);
     } catch (err) {
       console.error('Error uploading file:', err);
       setUploadError(err.message);
@@ -154,76 +135,49 @@ const SpreadsheetViewer = () => {
     setIsPreviewLoading(true);
     
     try {
-      if (!developmentMode) {
-        // Get spreadsheet info to find out sheet names
-        const infoResponse = await fetch(`${apiBaseUrl}/api/workbench/spreadsheets/${spreadsheetId}/sheets`);
-        
-        if (!infoResponse.ok) {
-          throw new Error(`Failed to get spreadsheet info: ${infoResponse.statusText}`);
-        }
-        
-        const infoData = await infoResponse.json();
-        const sheetName = infoData.sheets && infoData.sheets.length > 0 ? infoData.sheets[0] : null;
-        
-        if (!sheetName) {
-          throw new Error('No sheets found in spreadsheet');
-        }
-        
-        // Get preview data using the operate endpoint
-        const previewResponse = await fetch(`${apiBaseUrl}/api/workbench/spreadsheets/${spreadsheetId}/operate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            operation: 'read',
-            sheet_name: sheetName,
-            cell_range: 'A1:Z20' // Get first 20 rows for preview
-          }),
-        });
-        
-        if (!previewResponse.ok) {
-          throw new Error(`Failed to get preview data: ${previewResponse.statusText}`);
-        }
-        
-        const previewResult = await previewResponse.json();
-        
-        if (!previewResult.success) {
-          throw new Error(previewResult.error || 'Failed to read spreadsheet data');
-        }
-        
-        // Set active spreadsheet and preview data
-        setActiveSpreadsheet(spreadsheetId);
-        setPreviewData(previewResult.data.values);
-        
-        // Switch to process tab
-        setTabValue(2);
-      } else {
-        // Use mock data in development mode
-        console.log('Development mode: Using mock data for preview');
-        
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Sample data for preview
-        const mockPreviewData = [
-          ['Date', 'Region', 'Product', 'Sales', 'Profit', 'Units', 'Customer'],
-          ['2023-01-15', 'North', 'Widget A', '$12,500', '$3,750', 125, 'Acme Inc'],
-          ['2023-02-05', 'South', 'Widget B', '$18,200', '$5,460', 182, 'Global Corp'],
-          ['2023-01-27', 'East', 'Widget A', '$9,800', '$2,940', 98, 'Tech Solutions'],
-          ['2023-02-12', 'West', 'Widget C', '$22,300', '$6,690', 223, 'MegaCorp'],
-          ['2023-03-03', 'North', 'Widget B', '$15,700', '$4,710', 157, 'Acme Inc'],
-          ['2023-03-18', 'South', 'Widget A', '$11,600', '$3,480', 116, 'Small Business Ltd'],
-          ['2023-04-02', 'East', 'Widget C', '$19,400', '$5,820', 194, 'Global Corp'],
-          ['2023-04-20', 'West', 'Widget B', '$17,800', '$5,340', 178, 'Tech Innovators']
-        ];
-        
-        setActiveSpreadsheet('mock-id');
-        setPreviewData(mockPreviewData);
-        
-        // Switch to process tab
-        setTabValue(2);
+      // Get spreadsheet info to find out sheet names
+      const infoResponse = await fetch(`/api/workbench/spreadsheets/${spreadsheetId}/sheets`);
+      
+      if (!infoResponse.ok) {
+        throw new Error(`Failed to get spreadsheet info: ${infoResponse.statusText}`);
       }
+      
+      const infoData = await infoResponse.json();
+      const sheetName = infoData.sheets && infoData.sheets.length > 0 ? infoData.sheets[0] : null;
+      
+      if (!sheetName) {
+        throw new Error('No sheets found in spreadsheet');
+      }
+      
+      // Get preview data using the operate endpoint
+      const previewResponse = await fetch(`/api/workbench/spreadsheets/${spreadsheetId}/operate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'read',
+          sheet_name: sheetName,
+          cell_range: 'A1:Z20' // Get first 20 rows for preview
+        }),
+      });
+      
+      if (!previewResponse.ok) {
+        throw new Error(`Failed to get preview data: ${previewResponse.statusText}`);
+      }
+      
+      const previewResult = await previewResponse.json();
+      
+      if (!previewResult.success) {
+        throw new Error(previewResult.error || 'Failed to read spreadsheet data');
+      }
+      
+      // Set active spreadsheet and preview data
+      setActiveSpreadsheet(spreadsheetId);
+      setPreviewData(previewResult.data.values);
+      
+      // Switch to process tab
+      setTabValue(2);
     } catch (err) {
       console.error('Error getting spreadsheet preview:', err);
       setUploadError(err.message);
@@ -262,20 +216,6 @@ const SpreadsheetViewer = () => {
   // Add a handleUploadFile function to use with FileUploader  
   const handleUploadFile = async (file, description, onProgress, onSuccess, onError) => {
     try {
-      // If we're in dev mode, let the FileUploader component handle mock behavior
-      if (developmentMode) {
-        // Wait a bit to simulate upload
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Call upload spreadsheet in workbench context
-        await uploadSpreadsheet(file, description);
-        
-        // Success callback
-        onSuccess && onSuccess();
-        return;
-      }
-      
-      // For non-dev mode, handle with actual API
       const formData = new FormData();
       formData.append('file', file);
       if (description) {
@@ -288,73 +228,50 @@ const SpreadsheetViewer = () => {
       // Track progress
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          onProgress && onProgress(progress);
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          onProgress && onProgress(percentComplete);
         }
       });
       
-      // Return a promise that resolves when the upload is complete
-      await new Promise((resolve, reject) => {
-        xhr.open('POST', `${apiBaseUrl}/api/workbench/spreadsheets/upload`);
+      // Return promise for upload completion
+      return new Promise((resolve, reject) => {
+        xhr.open('POST', `/api/workbench/spreadsheets/upload`);
         
-        // Handle completion
-        xhr.onload = async () => {
+        xhr.onload = function() {
           if (xhr.status >= 200 && xhr.status < 300) {
-            // Refresh spreadsheet list
-            await fetchSpreadsheets();
-            onSuccess && onSuccess();
-            resolve();
+            // Success
+            const response = JSON.parse(xhr.responseText);
+            fetchSpreadsheets(); // Refresh the list
+            onSuccess && onSuccess(response);
+            resolve(response);
           } else {
-            const error = new Error(`Upload failed with status ${xhr.status}`);
+            // Error
+            const error = new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`);
             onError && onError(error);
             reject(error);
           }
         };
         
-        // Handle network errors
-        xhr.onerror = () => {
-          const error = new Error('Network error occurred during upload');
+        xhr.onerror = function() {
+          const error = new Error('Network error during upload');
           onError && onError(error);
           reject(error);
         };
         
-        // Send the request
         xhr.send(formData);
       });
-    } catch (error) {
-      console.error('Error in handleUploadFile:', error);
-      onError && onError(error);
+    } catch (err) {
+      console.error('Error in file upload:', err);
+      onError && onError(err);
+      throw err;
     }
   };
   
   // Add download functionality
   const handleDownloadSpreadsheet = async (spreadsheetId, filename) => {
     try {
-      if (developmentMode) {
-        console.log('Development mode: Simulating file download for', filename);
-        
-        // Create a mock download (just an empty file with the correct name)
-        const blob = new Blob(['Mock spreadsheet content'], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        
-        // Create a temporary link and click it to download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 100);
-        
-        return;
-      }
-      
       // For actual backend, make a GET request to download endpoint
-      const response = await fetch(`${apiBaseUrl}/api/workbench/spreadsheets/${spreadsheetId}/download`, {
+      const response = await fetch(`/api/workbench/spreadsheets/${spreadsheetId}/download`, {
         method: 'GET',
         headers: {
           'Accept': 'application/octet-stream'
@@ -399,16 +316,6 @@ const SpreadsheetViewer = () => {
               Upload a Spreadsheet
             </Typography>
             
-            {developmentMode && (
-              <Chip 
-                icon={<CodeIcon />} 
-                label="Development Mode" 
-                color="primary" 
-                variant="outlined" 
-                style={{ marginBottom: '16px' }} 
-              />
-            )}
-            
             <FileUploader
               onUpload={handleUploadFile}
               acceptedFileTypes={['.xlsx', '.xls', '.csv']}
@@ -417,7 +324,6 @@ const SpreadsheetViewer = () => {
               descriptionLabel="Description (optional)"
               maxFileSizeMB={50}
               disabled={isLoading}
-              developmentMode={developmentMode}
             />
           </div>
         );
@@ -428,16 +334,6 @@ const SpreadsheetViewer = () => {
             <Typography variant="h6" gutterBottom className="section-subtitle">
               Spreadsheet Library
             </Typography>
-            
-            {developmentMode && (
-              <Chip 
-                icon={<CodeIcon />} 
-                label="Using Mock Data" 
-                color="primary" 
-                variant="outlined" 
-                style={{ marginBottom: '16px' }} 
-              />
-            )}
             
             {isLoading ? (
               <Box display="flex" justifyContent="center" my={4}>
@@ -514,16 +410,6 @@ const SpreadsheetViewer = () => {
             <Typography variant="h6" gutterBottom className="section-subtitle">
               Process & Analyze Data
             </Typography>
-            
-            {developmentMode && (
-              <Chip 
-                icon={<CodeIcon />} 
-                label="Using Mock Data" 
-                color="primary" 
-                variant="outlined" 
-                style={{ marginBottom: '16px' }} 
-              />
-            )}
             
             <Grid container spacing={3}>
               <Grid item xs={12}>

@@ -19,8 +19,22 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 CORS_ORIGINS_STR = os.environ.get("CORS_ORIGINS", "*")
 CORS_ORIGINS: List[str] = [origin.strip() for origin in CORS_ORIGINS_STR.split(",")]
 
+# Check if running in Docker
+IN_DOCKER = os.path.exists('/.dockerenv')
+if IN_DOCKER:
+    logging.info("Running in Docker container")
+else:
+    logging.info("Running outside of Docker container")
+
 # Define data directories
-BASE_DIR = Path(os.environ.get("BASE_DIR", "/app/data"))
+# If running in Docker, use /app/data as base dir, otherwise use relative path
+if IN_DOCKER:
+    BASE_DIR = Path('/app/data')
+else:
+    BASE_DIR = Path(os.environ.get("BASE_DIR", os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))))
+
+# Ensure paths are absolute
+BASE_DIR = BASE_DIR.absolute()
 WORKBENCH_DIR = BASE_DIR / "workbench"
 WORKBENCH_UPLOADS_DIR = WORKBENCH_DIR / "uploads"
 WORKBENCH_OUTPUTS_DIR = WORKBENCH_DIR / "outputs"
@@ -31,7 +45,7 @@ EMBEDDING_SERVICE_URL = os.environ.get("EMBEDDING_SERVICE_URL", "http://embeddin
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "mistral")
+DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "llama3.2:latest")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
 
 # Job configuration
@@ -57,6 +71,7 @@ def get_config() -> Dict[str, Any]:
         "DEFAULT_EMBEDDING_MODEL": DEFAULT_EMBEDDING_MODEL,
         "MAX_CONCURRENT_JOBS": MAX_CONCURRENT_JOBS,
         "JOB_TIMEOUT_SECONDS": JOB_TIMEOUT_SECONDS,
+        "IN_DOCKER": IN_DOCKER,
     }
 
 def validate_config() -> None:
@@ -65,11 +80,26 @@ def validate_config() -> None:
     
     # Log configuration
     logger.info(f"Service configuration: HOST={HOST}, PORT={PORT}, DEBUG={DEBUG}")
-    logger.info(f"Data directories: WORKBENCH_DIR={WORKBENCH_DIR}")
+    logger.info(f"Running in Docker: {IN_DOCKER}")
+    logger.info(f"Data directories (absolute paths):")
+    logger.info(f"  BASE_DIR: {BASE_DIR.absolute()}")
+    logger.info(f"  WORKBENCH_DIR: {WORKBENCH_DIR.absolute()}")
+    logger.info(f"  WORKBENCH_UPLOADS_DIR: {WORKBENCH_UPLOADS_DIR.absolute()}")
+    logger.info(f"  WORKBENCH_OUTPUTS_DIR: {WORKBENCH_OUTPUTS_DIR.absolute()}")
     
     # Check critical directories
     os.makedirs(WORKBENCH_UPLOADS_DIR, exist_ok=True)
     os.makedirs(WORKBENCH_OUTPUTS_DIR, exist_ok=True)
+    
+    # Check if directories are writeable
+    try:
+        test_file = WORKBENCH_UPLOADS_DIR / ".write_test"
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        logger.info(f"WORKBENCH_UPLOADS_DIR is writable")
+    except Exception as e:
+        logger.error(f"WORKBENCH_UPLOADS_DIR is not writable: {str(e)}")
     
     # Validate external service URLs
     logger.info(f"External services: CORE_SERVICE_URL={CORE_SERVICE_URL}")

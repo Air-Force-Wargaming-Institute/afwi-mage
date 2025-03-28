@@ -10,7 +10,13 @@ services:
     volumes:
       - ../data:/data
     command: >
-      sh -c "mkdir -p /data/uploads && chmod -R 777 /data/uploads"
+      sh -c "
+        mkdir -p /data/uploads && chmod -R 777 /data/uploads &&
+        mkdir -p /data/workbench/uploads /data/workbench/outputs && 
+        chmod -R 777 /data/workbench &&
+        touch /data/workbench/uploads/.gitkeep /data/workbench/outputs/.gitkeep &&
+        echo 'Initialized data directories successfully'
+      "
 
   core:
     build: ./core_service
@@ -183,6 +189,7 @@ services:
       - "8020:8020"
     volumes:
       - ../data:/app/data
+      - ../data/workbench:/app/data/workbench
       - ./models:/app/models
       - ./workbench_service:/app
     environment:
@@ -191,6 +198,8 @@ services:
       - DEBUG=1
       - PYTHONPATH=/app
       - LOG_LEVEL=INFO
+      - WORKBENCH_UPLOADS_DIR=/app/data/workbench/uploads
+      - WORKBENCH_OUTPUTS_DIR=/app/data/workbench/outputs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -199,7 +208,14 @@ services:
       - embedding
     networks:
       - app-network
-    command: uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
+    command: >
+      sh -c "
+        mkdir -p /app/data/workbench/uploads /app/data/workbench/outputs && 
+        chmod -R 777 /app/data/workbench && 
+        ls -la /app/data/workbench && 
+        ls -la /app/data/workbench/uploads && 
+        uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
+      "
 
   # auth:
   #  build: ./auth_service

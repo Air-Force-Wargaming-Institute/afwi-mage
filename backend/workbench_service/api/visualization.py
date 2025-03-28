@@ -48,7 +48,7 @@ class FileInfo(BaseModel):
 
 class DataContext(BaseModel):
     """Comprehensive data context from a spreadsheet."""
-    schema: List[ColumnSchema]
+    column_schema: List[ColumnSchema]
     statistics: Dict[str, Statistics] = {}
     sample_rows: List[List[Any]] = []
     row_count: int
@@ -76,8 +76,8 @@ class Visualization(BaseModel):
     image_url: str
     image_data: Optional[str] = None  # Base64 encoded image
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "id": "vis123",
                 "spreadsheet_id": "spread123",
@@ -88,6 +88,7 @@ class Visualization(BaseModel):
                 "image_url": "/api/workbench/visualizations/vis123/image"
             }
         }
+    }
 
 @router.post("/generate", response_model=Visualization)
 async def generate_visualization(request: VisualizationRequest, background_tasks: BackgroundTasks):

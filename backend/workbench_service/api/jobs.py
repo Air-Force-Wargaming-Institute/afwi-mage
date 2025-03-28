@@ -35,8 +35,8 @@ class JobInfo(BaseModel):
     completed_at: Optional[str] = None
     result_url: Optional[str] = None
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "id": "job456",
                 "status": "running",
@@ -47,6 +47,7 @@ class JobInfo(BaseModel):
                 "result_url": None
             }
         }
+    }
 
 @router.get("/{job_id}", response_model=JobInfo)
 async def get_job_status(job_id: str):

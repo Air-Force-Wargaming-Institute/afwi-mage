@@ -21,11 +21,19 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p /app/data/workbench/uploads /app/data/workbench/outputs
 
+# Create a Docker environment marker file
+RUN touch /.dockerenv
+
+# Ensure proper permissions for data directories
+RUN chmod -R 777 /app/data
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=8020
 ENV DEBUG=1
+ENV WORKBENCH_UPLOADS_DIR=/app/data/workbench/uploads
+ENV WORKBENCH_OUTPUTS_DIR=/app/data/workbench/outputs
 
 # Expose port
 EXPOSE 8020

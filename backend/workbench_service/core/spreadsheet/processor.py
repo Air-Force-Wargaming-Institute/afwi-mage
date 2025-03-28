@@ -247,13 +247,13 @@ class SpreadsheetProcessor:
                 # Get data type
                 dtype = str(col_data.dtype)
                 
-                # Basic info for all columns
+                # Basic info for all columns - Convert numpy types to Python native types
                 summary = {
-                    "name": col_name,
+                    "name": str(col_name),
                     "dtype": dtype,
-                    "count": len(col_data),
-                    "null_count": col_data.isna().sum(),
-                    "unique_count": col_data.nunique()
+                    "count": int(len(col_data)),
+                    "null_count": int(col_data.isna().sum()),
+                    "unique_count": int(col_data.nunique())
                 }
                 
                 # Add statistical info for numeric columns
@@ -266,9 +266,21 @@ class SpreadsheetProcessor:
                         "std": float(col_data.std()) if not pd.isna(col_data.std()) else None
                     })
                 
-                # Add sample values
+                # Add sample values - Convert each sample value to appropriate Python native type
                 non_null_values = col_data.dropna()
-                summary["sample_values"] = non_null_values.sample(min(5, len(non_null_values))).tolist() if len(non_null_values) > 0 else []
+                if len(non_null_values) > 0:
+                    sample_data = non_null_values.sample(min(5, len(non_null_values)))
+                    sample_values = []
+                    for val in sample_data:
+                        if isinstance(val, (np.integer, np.int64)):
+                            sample_values.append(int(val))
+                        elif isinstance(val, (np.floating, np.float64)):
+                            sample_values.append(float(val))
+                        else:
+                            sample_values.append(str(val) if val is not None else None)
+                    summary["sample_values"] = sample_values
+                else:
+                    summary["sample_values"] = []
                 
                 summaries.append(summary)
             
@@ -279,4 +291,223 @@ class SpreadsheetProcessor:
             raise HTTPException(
                 status_code=500,
                 detail=f"Error analyzing spreadsheet: {str(e)}"
-            ) 
+            )
+            
+    def transform_spreadsheet(
+        self,
+        file_path: Path,
+        sheet_name: str,
+        input_columns: List[str],
+        output_columns: List[Dict[str, str]],
+        instructions: str,
+        include_headers: bool = True,
+        processing_mode: str = "all",
+        error_handling: str = "continue"
+    ) -> Dict[str, Any]:
+        """
+        Transform spreadsheet columns using LLM processing.
+        
+        Args:
+            file_path: Path to the spreadsheet file
+            sheet_name: Name of the sheet to process
+            input_columns: List of input column names
+            output_columns: List of output column definitions
+            instructions: Transformation instructions for LLM
+            include_headers: Whether to include column headers in context
+            processing_mode: "all" or "sample"
+            error_handling: "continue", "stop", or "retry"
+            
+        Returns:
+            Dict with transformation results or error
+        """
+        try:
+            import asyncio
+            from ..llm import RowTransformer, BatchProcessor
+            
+            logger.info(f"Starting spreadsheet transformation with LLM for {file_path}, sheet: {sheet_name}")
+            
+            # Read the spreadsheet data
+            if file_path.suffix.lower() == '.csv':
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+            
+            # Validate input columns
+            missing_columns = [col for col in input_columns if col not in df.columns]
+            if missing_columns:
+                return {
+                    "error": f"Missing input columns: {', '.join(missing_columns)}"
+                }
+            
+            # Prepare the LLM transformer
+            transformer = RowTransformer(
+                instructions=instructions,
+                input_columns=input_columns,
+                output_columns=output_columns,
+                include_headers=include_headers,
+                error_handling=error_handling
+            )
+            
+            # Process only a sample for preview
+            if processing_mode == "sample":
+                # Get sample rows (limited to first 10)
+                sample_size = min(10, len(df))
+                sample_df = df.head(sample_size)
+                
+                # Create processor but don't run it yet - delegate to the caller
+                processor = BatchProcessor(transformer=transformer, max_concurrent=5)
+                
+                # Don't use asyncio.run() since we're already in an event loop
+                # Return a special response that the API route handler will handle
+                return {
+                    "requires_async": True,
+                    "sample_df": sample_df,
+                    "processor": processor,
+                    "input_columns": input_columns,
+                    "output_columns": output_columns,
+                    "sample_size": sample_size
+                }
+                
+            # For full processing in a background task, just return confirmation
+            return {
+                "success": True,
+                "message": "Transformation task initialized"
+            }
+        
+        except Exception as e:
+            logger.error(f"Error in transform_spreadsheet: {str(e)}", exc_info=True)
+            return {
+                "error": f"Error transforming spreadsheet: {str(e)}"
+            }
+    
+    async def transform_spreadsheet_background(
+        self,
+        job_id: str,
+        file_path: Path,
+        sheet_name: str,
+        input_columns: List[str],
+        output_columns: List[Dict[str, str]],
+        instructions: str,
+        include_headers: bool = True,
+        error_handling: str = "continue"
+    ) -> None:
+        """
+        Background task for spreadsheet transformation.
+        
+        Args:
+            job_id: Unique job identifier
+            file_path: Path to the spreadsheet file
+            sheet_name: Name of the sheet to process
+            input_columns: List of input column names
+            output_columns: List of output column definitions
+            instructions: Transformation instructions for LLM
+            include_headers: Whether to include column headers in context
+            error_handling: "continue", "stop", or "retry"
+        """
+        from ..llm import RowTransformer, BatchProcessor
+        
+        logger.info(f"Starting background transformation job {job_id}")
+        
+        try:
+            # Update job status
+            self._update_job_status(job_id, status="running", progress=0, message="Starting transformation")
+            
+            # Read the spreadsheet data
+            if file_path.suffix.lower() == '.csv':
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+            
+            # Validate input columns
+            missing_columns = [col for col in input_columns if col not in df.columns]
+            if missing_columns:
+                self._update_job_status(
+                    job_id, 
+                    status="failed", 
+                    progress=0, 
+                    message=f"Missing input columns: {', '.join(missing_columns)}"
+                )
+                return
+            
+            # Prepare the LLM transformer
+            transformer = RowTransformer(
+                instructions=instructions,
+                input_columns=input_columns,
+                output_columns=output_columns,
+                include_headers=include_headers,
+                error_handling=error_handling
+            )
+            
+            # Progress callback
+            def on_progress(percent):
+                self._update_job_status(job_id, status="running", progress=percent, message="Processing rows")
+            
+            # Process the dataframe
+            processor = BatchProcessor(transformer=transformer, max_concurrent=5)
+            result_df = await processor.process_dataframe(df, on_progress=on_progress)
+            
+            # Save the results
+            output_path = self._save_transformed_spreadsheet(file_path, sheet_name, result_df)
+            
+            # Update job status to completed
+            self._update_job_status(
+                job_id, 
+                status="completed", 
+                progress=100, 
+                message="Transformation completed",
+                result_url=str(output_path)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in background transformation job {job_id}: {str(e)}", exc_info=True)
+            self._update_job_status(job_id, status="failed", progress=0, message=f"Error: {str(e)}")
+    
+    def _update_job_status(self, job_id: str, status: str, progress: float, message: str, result_url: Optional[str] = None) -> None:
+        """
+        Update the status of a background job. This is a placeholder that should be replaced
+        with a proper job tracking system in a production environment.
+        
+        Args:
+            job_id: Unique job identifier
+            status: Job status ("running", "completed", "failed")
+            progress: Progress percentage (0-100)
+            message: Status message
+            result_url: Optional URL to results
+        """
+        # This would typically update a database or cache with job status
+        logger.info(f"Job {job_id} status update: {status}, {progress}%, {message}")
+    
+    def _save_transformed_spreadsheet(self, original_path: Path, sheet_name: str, df: pd.DataFrame) -> Path:
+        """
+        Save the transformed spreadsheet data.
+        
+        Args:
+            original_path: Path to the original spreadsheet
+            sheet_name: Name of the sheet that was processed
+            df: Transformed DataFrame
+            
+        Returns:
+            Path to the saved output file
+        """
+        from pathlib import Path
+        import os
+        from config import WORKBENCH_OUTPUTS_DIR
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(WORKBENCH_OUTPUTS_DIR, exist_ok=True)
+        
+        # Generate output filename
+        timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+        original_name = original_path.stem
+        output_filename = f"{original_name}_transformed_{timestamp}"
+        
+        # Determine output format based on original file
+        if original_path.suffix.lower() == '.csv':
+            output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.csv"
+            df.to_csv(output_path, index=False)
+        else:
+            output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.xlsx"
+            df.to_excel(output_path, sheet_name=sheet_name, index=False)
+        
+        logger.info(f"Saved transformed spreadsheet to {output_path}")
+        return output_path 
