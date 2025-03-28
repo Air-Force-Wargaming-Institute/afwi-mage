@@ -98,12 +98,14 @@ for dir_path in [DATASET_DIR, EXTRACTION_DIR, UPLOAD_DIR, OUTPUT_DIR, LOG_DIR,
 # External service configuration
 CORE_SERVICE_URL = get_env("CORE_SERVICE_URL", "http://core:8000")
 OLLAMA_BASE_URL = get_env("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+VLLM_BASE_URL = get_env("VLLM_BASE_URL", "http://host.docker.internal:8007/v1")
+VLLM_EMBEDDINGS_BASE_URL = get_env("VLLM_EMBEDDINGS_BASE_URL", "http://host.docker.internal:8012/v1")
 LLM_API_KEY = get_env("LLM_API_KEY", "")
 LLM_BASE_URL = get_env("LLM_BASE_URL", "")
 
 # Embedding model configurations
-DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
-EMBEDDING_MODEL_VERSION = get_env("EMBEDDING_MODEL_VERSION", "latest")
+DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "/models/bge-base-en-v1.5")
+EMBEDDING_MODEL_VERSION = get_env("EMBEDDING_MODEL_VERSION", "")
 EMBEDDING_DIMENSION = get_env_int("EMBEDDING_DIMENSION", 768)
 
 # Chunking default parameters
@@ -138,23 +140,61 @@ def validate_config():
     if "*" in CORS_ORIGINS:
         logger.warning("CORS is configured to allow all origins ('*'), consider restricting this in production")
     
-    # Log Ollama configuration clearly
-    logger.info(f"Ollama API URL configured as: {OLLAMA_BASE_URL}")
+    # Log vLLM configuration clearly
+    logger.info(f"vLLM API URL configured as: {VLLM_BASE_URL}")
+    logger.info(f"vLLM Embeddings API URL configured as: {VLLM_EMBEDDINGS_BASE_URL}")
     
-    if not LLM_API_KEY and (not OLLAMA_BASE_URL or "localhost" in OLLAMA_BASE_URL or "host.docker.internal" in OLLAMA_BASE_URL):
-        logger.warning("Using local LLM setup, ensure Ollama is running if needed")
-        # Check if Ollama is accessible
+    if not LLM_API_KEY:
+        logger.warning("Using local LLM setup, ensure vLLM is running if needed")
+        # Check if vLLM is accessible
         try:
-            response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2)
+            response = requests.get(f"{VLLM_BASE_URL}/models", timeout=2)
             if response.status_code == 200:
-                logger.info("Successfully connected to Ollama API")
-                models = response.json().get("models", [])
-                logger.info(f"Available Ollama models: {[m.get('name') for m in models if 'name' in m]}")
+                logger.info("Successfully connected to vLLM API")
+                models = response.json()
+                logger.info(f"Available vLLM models: {models}")
             else:
-                logger.warning(f"Ollama API responded with status code {response.status_code}")
+                logger.warning(f"vLLM API responded with status code {response.status_code}")
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Could not connect to Ollama API: {str(e)}")
-            logger.info("If using Docker, make sure 'host.docker.internal' resolves to your host machine")
+            logger.warning(f"Could not connect to vLLM API: {str(e)}")
+            logger.info("If using Docker, make sure 'host.docker.internal' resolves correctly")
+        
+        # Check if vLLM Embeddings API is accessible
+        try:
+            response = requests.get(f"{VLLM_EMBEDDINGS_BASE_URL}/models", timeout=2)
+            if response.status_code == 200:
+                logger.info("Successfully connected to vLLM Embeddings API")
+                models = response.json()
+                logger.info(f"Available vLLM embedding models: {models}")
+                
+                # Extract and log the exact model IDs to use
+                if "data" in models:
+                    available_models = [model.get("id") for model in models.get("data", [])]
+                    logger.info(f"Available model IDs: {available_models}")
+                    
+                    # If we find a BGE model in the list, update the DEFAULT_EMBEDDING_MODEL
+                    bge_models = []
+                    for model_id in available_models:
+                        if "bge" in model_id.lower():
+                            bge_models.append(model_id)
+                    
+                    if bge_models:
+                        # Sort by length to prioritize full paths over shortened names
+                        bge_models.sort(key=len, reverse=True)
+                        global DEFAULT_EMBEDDING_MODEL
+                        DEFAULT_EMBEDDING_MODEL = bge_models[0]
+                        logger.info(f"Automatically selected embedding model: {DEFAULT_EMBEDDING_MODEL}")
+                        
+                        # Log all BGE models for reference
+                        if len(bge_models) > 1:
+                            logger.info(f"Other BGE models available: {bge_models[1:]}")
+                    else:
+                        logger.warning("No BGE embedding models found. Using default model which may not work.")
+            else:
+                logger.warning(f"vLLM Embeddings API responded with status code {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Could not connect to vLLM Embeddings API: {str(e)}")
+            logger.info("If using Docker, make sure 'host.docker.internal' resolves correctly")
     
     logger.info(f"Embedding service configured with model: {DEFAULT_EMBEDDING_MODEL}")
     logger.info(f"Vector store directory: {VECTORSTORE_DIR}")

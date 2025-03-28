@@ -173,30 +173,10 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - init-data
-      - model_service
       - embedding
     networks:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-
-  model_service:
-    build: ./model_service
-    ports:
-      - "8008:8008"
-    environment:
-      - PYTHONPATH=/app
-      - VLLM_API_URL=http://host.docker.internal:8007/v1
-      - EMBEDDING_SERVICE_URL=http://embedding:8006
-    volumes:
-      - ../data:/app/data
-      - ./model_service:/app
-    restart: unless-stopped
-    networks:
-      - app-network
-    depends_on:
-      - init-data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   vllm:
     image: vllm/vllm-openai:latest
@@ -214,7 +194,7 @@ services:
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
       - TENSOR_PARALLEL_SIZE=2
-      - GPU_MEMORY_UTILIZATION=0.95
+      - GPU_MEMORY_UTILIZATION=0.85
       - OMP_NUM_THREADS=12
     volumes:
       - ../models:/models
@@ -246,7 +226,7 @@ services:
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
       - TENSOR_PARALLEL_SIZE=2
-      - GPU_MEMORY_UTILIZATION=0.95
+      - GPU_MEMORY_UTILIZATION=0.10
       - OMP_NUM_THREADS=12
     volumes:
       - ../models:/models
@@ -260,7 +240,7 @@ services:
               count: all
               capabilities: [gpu]
     ipc: host
-    command: --model /models/nomic-embed-text-v1.5 --tokenizer /models/nomic-embed-text-v1.5 --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.1 --max-model-len=65536
+    command: --model /models/bge-base-en-v1.5 --tokenizer /models/bge-base-en-v1.5 --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.10
 
 
 volumes:

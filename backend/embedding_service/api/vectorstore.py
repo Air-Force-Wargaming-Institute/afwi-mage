@@ -12,64 +12,27 @@ import os
 import logging
 import json
 import uuid
+import re
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, Request
 from pydantic import BaseModel, Field
 import numpy as np
 from datetime import datetime
-
-# Import job management functions
-try:
-    from ..core.job import register_job, update_job_progress, fail_job, complete_job
-except ImportError:
-    from core.job import register_job, update_job_progress, fail_job, complete_job
-
-# Import configuration
-try:
-    from ..config import VECTORSTORE_DIR, DOC_STAGING_DIR, UPLOAD_DIR
-except ImportError:
-    try:
-        from config import VECTORSTORE_DIR, DOC_STAGING_DIR, UPLOAD_DIR
-    except ImportError:
-        import os
-        VECTORSTORE_DIR = os.environ.get("VECTORSTORE_DIR", "/app/data/vectorstores")
-        DOC_STAGING_DIR = os.environ.get("DOC_STAGING_DIR", "/app/doc_staging")
-        UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/app/data/uploads")
-        print(f"Using environment variables for paths: VECTORSTORE_DIR={VECTORSTORE_DIR}, DOC_STAGING_DIR={DOC_STAGING_DIR}, UPLOAD_DIR={UPLOAD_DIR}")
-
-# Import document utilities
-try:
-    from ..core.document import copy_files_to_staging, load_documents
-except ImportError:
-    try:
-        from core.document import copy_files_to_staging, load_documents
-    except ImportError:
-        print("Unable to import document utilities - vector store operations will fail")
-
-# Import embedding utilities
-try:
-    from ..core.embedding import get_embedding_model
-except ImportError:
-    try:
-        from core.embedding import get_embedding_model
-    except ImportError:
-        print("Unable to import embedding utilities - vector store operations will fail")
-
-# Switch to absolute import for Docker compatibility
-# This will work both in development and in Docker
-try:
-    # First try relative import (for development)
-    from ..core.vectorstore import VectorStoreManager
-except ImportError:
-    # Fall back to absolute import (for Docker)
-    from core.vectorstore import VectorStoreManager
-
-from core.job import JobStatus
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from core.job import register_job, update_job_progress, fail_job, complete_job, JobStatus
+from config import get_config
+from core.document import copy_files_to_staging, load_documents
+from core.embedding import get_embedding_model
+from core.vectorstore import load_metadata, save_metadata, VectorStoreManager
+import traceback
+from core.llm import generate_with_best_model
+from api.llm import generate_query_prompt, get_llm_response
+from helpers import get_vectorstore_manager
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
+config = get_config()
 # Create router
 router = APIRouter(prefix="/vectorstores", tags=["Vector Stores"])
 
@@ -116,7 +79,7 @@ class CreateVectorStoreRequest(BaseModel):
     name: str
     description: str = ""
     files: List[str]
-    embedding_model: str = "nomic-embed-text"
+    embedding_model: str = "/models/bge-base-en-v1.5"
     use_paragraph_chunking: bool = True
     max_paragraph_length: int = 1500
     min_paragraph_length: int = 50
@@ -310,56 +273,7 @@ class UpdateVectorStoreMetadataResponse(BaseModel):
     }
 
 
-def get_vectorstore_manager():
-    """
-    Get a vector store manager instance.
-    
-    Returns:
-        VectorStoreManager: Vector store manager instance
-    """
-    # Initialize with default value
-    VECTORSTORE_DIR = None
-    
-    # Try different import approaches
-    try:
-        # First try relative import
-        from ..config import VECTORSTORE_DIR
-        logger.info("Successfully imported VECTORSTORE_DIR with relative import")
-    except ImportError as e:
-        logger.error(f"Relative config import failed in vectorstore.py: {str(e)}")
-        try:
-            # Try direct import
-            from config import VECTORSTORE_DIR
-            logger.info("Successfully imported VECTORSTORE_DIR with direct import")
-        except ImportError:
-            # Fallback to environment variable or default
-            import os
-            VECTORSTORE_DIR = os.environ.get("VECTORSTORE_DIR", "/app/data/vectorstores")
-            logger.info(f"Using fallback VECTORSTORE_DIR: {VECTORSTORE_DIR}")
-    
-    # Try to import VectorStoreManager
-    try:
-        # First try relative import
-        from ..core.vectorstore import VectorStoreManager
-        logger.info("Successfully imported VectorStoreManager with relative import")
-    except ImportError as e:
-        logger.error(f"Relative import of VectorStoreManager failed: {str(e)}")
-        try:
-            # Try direct import
-            from core.vectorstore import VectorStoreManager
-            logger.info("Successfully imported VectorStoreManager with direct import")
-        except ImportError as e:
-            # Try another import path
-            try:
-                import sys
-                logger.info(f"Current sys.path: {sys.path}")
-                from vectorstore import VectorStoreManager
-                logger.info("Successfully imported VectorStoreManager from vectorstore")
-            except ImportError as e:
-                logger.error(f"All VectorStoreManager import attempts failed: {str(e)}")
-                raise ImportError("Could not import VectorStoreManager")
-    
-    return VectorStoreManager(VECTORSTORE_DIR)
+
 
 
 @router.get("", response_model=List[VectorStoreInfo])
@@ -663,7 +577,7 @@ async def query_vectorstore(
                         "embedding_info": {
                             "timestamp": result['metadata'].get('timestamp', ''),
                             "version": result['metadata'].get('version', '1.0'),
-                            "model": result['metadata'].get('model', 'nomic-embed-text')
+                            "model": result['metadata'].get('model', '/models/bge-base-en-v1.5')
                         }
                     }
                     logger.info(f"DEBUGGING: First result formatted metadata: {json.dumps(formatted_metadata)}")
@@ -706,7 +620,6 @@ async def remove_documents_from_vectorstore(
         raise HTTPException(status_code=400, detail="At least one document ID is required")
     
     # Create a job for document removal
-    from core.job import register_job
     job_id = register_job("remove_documents", details={"vectorstore_id": vectorstore_id})
     
     # Start the document removal process in the background
@@ -741,8 +654,7 @@ async def process_document_removal(
         document_ids: List of document IDs to remove
         manager: Vector store manager instance
     """
-    from core.job import update_job_progress, complete_job, fail_job, JobStatus
-    from core.vectorstore import load_metadata, save_metadata
+
     
     try:
         # Update job progress
@@ -804,7 +716,7 @@ async def process_document_removal(
         
     except Exception as e:
         logger.error(f"Error in document removal: {str(e)}")
-        import traceback
+
         logger.error(f"Error details: {traceback.format_exc()}")
         
         try:
@@ -842,7 +754,6 @@ async def batch_update_vectorstore(
         raise HTTPException(status_code=400, detail="No update operations specified")
     
     # Create a job for the batch update
-    from core.job import register_job
     job_id = register_job("batch_update", details={"vectorstore_id": vectorstore_id})
     
     # Start the batch update process in the background
@@ -880,8 +791,6 @@ async def process_batch_update(
         manager: Vector store manager instance
         vs_info: Vector store info
     """
-    from core.job import update_job_progress, complete_job, fail_job
-    from core.vectorstore import load_metadata, save_metadata
 
     try:
         # Update job progress
@@ -924,10 +833,10 @@ async def process_batch_update(
         # Process document additions if any
         if request.add and len(request.add) > 0:
             # Get upload directory
-            upload_dir = Path(os.environ.get("UPLOAD_DIR", "data/uploads"))
+            upload_dir = Path(config['UPLOAD_DIR'])
             
             # Get staging directory
-            staging_dir = Path(os.environ.get("STAGING_DIR", "doc_staging"))
+            staging_dir = Path(config['DOC_STAGING_DIR'])
             staging_dir.mkdir(exist_ok=True)
             
             # Copy files to staging
@@ -945,7 +854,6 @@ async def process_batch_update(
                 raise Exception(f"Upload directory {upload_dir} does not exist")
             
             # Copy files to staging
-            from core.document import copy_files_to_staging
             staged_files = copy_files_to_staging(request.add, upload_dir, staging_dir)
             
             # Get staging file paths
@@ -961,8 +869,7 @@ async def process_batch_update(
                 current_file=f"Processing {len(staging_file_paths)} files for chunking"
             )
             
-            from core.document import load_documents
-            from core.embedding import get_embedding_model
+
             
             # Get chunking parameters from vector store metadata
             chunk_size = vs_info.get("chunk_size", 1000)
@@ -1033,7 +940,7 @@ async def process_batch_update(
             )
             
             # Get embedding model
-            embedding_model = get_embedding_model(vs_info.get("embedding_model", "nomic-embed-text"))
+            embedding_model = get_embedding_model(vs_info.get("embedding_model", "/models/bge-base-en-v1.5"))
             
             # Update vector store
             if documents and embedding_model:
@@ -1043,7 +950,7 @@ async def process_batch_update(
                     45, 
                     status=JobStatus.PROCESSING,
                     current_operation="Starting document embedding process",
-                    current_file=f"Using model: {vs_info.get('embedding_model', 'nomic-embed-text')}"
+                    current_file=f"Using model: {vs_info.get('embedding_model', '/models/bge-base-en-v1.5')}"
                 )
                 
                 # Update vector store - this will add its own progress updates
@@ -1088,7 +995,7 @@ async def process_batch_update(
                         current_file="Skipping embedding phase"
                     )
                 if not embedding_model:
-                    logger.error(f"Could not get embedding model: {vs_info.get('embedding_model', 'nomic-embed-text')}")
+                    logger.error(f"Could not get embedding model: {vs_info.get('embedding_model', '/models/bge-base-en-v1.5')}")
         
         # Process document removals if any
         if request.remove and len(request.remove) > 0:
@@ -1141,7 +1048,6 @@ async def process_batch_update(
         
     except Exception as e:
         logger.error(f"Error in batch update: {str(e)}")
-        import traceback
         logger.error(f"Error details: {traceback.format_exc()}")
         
         try:
@@ -1476,89 +1382,15 @@ def get_llm_analysis(prompt: str) -> str:
         # Log the LLM request
         logger.info("Sending analysis request to LLM")
         
-        # Import the LLM module
-        try:
-            from ..core.llm import generate_with_best_model
-            
             # Use the LLM module to generate a response
-            options = {
-                "temperature": 0.7,
-                "max_tokens": 1500,
-                "top_p": 0.9
-            }
+        options = {
+            "temperature": 0.7,
+            "max_tokens": 1500,
+            "top_p": 0.9
+        }
             
-            llm_response = generate_with_best_model(prompt, options)
-            return llm_response
-            
-        except ImportError:
-            # If the LLM module is not available, fall back to direct Ollama API call
-            logger.warning("LLM module not found, falling back to direct Ollama API call")
-            
-            # Get Ollama URL from config
-            try:
-                from ..config import OLLAMA_BASE_URL
-            except ImportError:
-                try:
-                    from config import OLLAMA_BASE_URL
-                except ImportError:
-                    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-            
-            # Prepare Ollama API request
-            base_url = OLLAMA_BASE_URL.rstrip('/')
-            url = f"{base_url}/api/generate"
-            
-            # Use llama3.2 as a reasonable default model if available
-            # Models like llama3.2, mistral, or gemma are good choices for this task
-            model = "llama3.2:latest"
-            
-            # Log the model and URL being used
-            logger.info(f"Using Ollama API at {url} with model {model}")
-            
-            payload = {
-                "model": model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "max_tokens": 1000
-                }
-            }
-            
-            # Make the API request
-            import requests
-            response = requests.post(url, json=payload, timeout=60)
-            
-            # Check for successful response
-            if response.status_code == 200:
-                result = response.json()
-                llm_response = result.get("response", "")
-                
-                # Log success and response length
-                logger.info(f"Successfully received response from Ollama ({len(llm_response)} chars)")
-                
-                return llm_response
-            else:
-                # Log error and try fallback
-                logger.error(f"Error from Ollama API: Status {response.status_code}, message: {response.text}")
-                
-                # Try alternate model if the first one failed
-                if model == "llama3.2:latest":
-                    logger.info("Trying fallback to mistral model")
-                    payload["model"] = "mistral"
-                    response = requests.post(url, json=payload, timeout=60)
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        llm_response = result.get("response", "")
-                        logger.info(f"Successfully received response from fallback model ({len(llm_response)} chars)")
-                        return llm_response
-                
-                # If all real LLM attempts failed, return the placeholder response with a warning
-                logger.warning("All LLM attempts failed, returning placeholder response")
-                return """
-                FAILED TO GENERATE ANALYSIS
-                """
+        llm_response = generate_with_best_model(prompt, options)
+        return llm_response
     
     except Exception as e:
         # Log the error and return an error message
@@ -1602,7 +1434,6 @@ def parse_llm_analysis(response: str) -> Dict[str, Any]:
             queries = []
             
             # Try to extract numbered queries
-            import re
             query_matches = re.findall(r'\d+\.\s+(.*?)(?=\d+\.|$)', queries_text, re.DOTALL)
             
             if query_matches:
@@ -1674,8 +1505,8 @@ async def process_vectorstore_creation(
         # Copy files to staging
         staged_files = copy_files_to_staging(
             files=request.files,
-            upload_dir=Path(UPLOAD_DIR),
-            staging_dir=Path(DOC_STAGING_DIR)
+            upload_dir=Path(config['UPLOAD_DIR']),
+            staging_dir=Path(config['DOC_STAGING_DIR'])
         )
         
         # Load documents
@@ -1686,7 +1517,7 @@ async def process_vectorstore_creation(
         
         # Load documents with appropriate chunking
         # First, get the text splitter
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
+
         
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=request.chunk_size,
@@ -1804,7 +1635,6 @@ async def process_vectorstore_creation(
         
     except Exception as e:
         logger.error(f"Error in process_vectorstore_creation: {str(e)}")
-        import traceback
         logger.error(traceback.format_exc())
         fail_job(job_id, str(e))
 
@@ -1833,7 +1663,7 @@ async def process_vectorstore_update(
         vs_info: Vector store information
     """
     try:
-        from ..config import DOC_STAGING_DIR, UPLOAD_DIR
+      
         
         # Update job progress
         update_job_progress(job_id, 0, "Preparing files", "copying_files")
@@ -1841,8 +1671,8 @@ async def process_vectorstore_update(
         # Copy files to staging
         staged_files = copy_files_to_staging(
             file_paths=request.files,
-            upload_dir=Path(UPLOAD_DIR),
-            staging_dir=Path(DOC_STAGING_DIR),
+            upload_dir=Path(config['UPLOAD_DIR']),
+            staging_dir=Path(config['DOC_STAGING_DIR']),
             preserve_filenames=True  # Preserve original filenames
         )
         
@@ -1859,7 +1689,7 @@ async def process_vectorstore_update(
         # Load documents with appropriate chunking
         documents, file_infos = load_documents(
             file_paths=staged_files,
-            upload_dir=Path(UPLOAD_DIR),
+            upload_dir=Path(config['UPLOAD_DIR']),
             chunking_method=chunking_method,
             max_paragraph_length=max_paragraph_length,
             min_paragraph_length=min_paragraph_length,
@@ -1904,7 +1734,6 @@ async def process_vectorstore_update(
         
     except Exception as e:
         logger.error(f"Error in process_vectorstore_update: {str(e)}")
-        import traceback
         logger.error(traceback.format_exc())
         fail_job(job_id, str(e))
 
@@ -1987,7 +1816,7 @@ async def llm_query_vectorstore(
         # Generate a response using the LLM
         if query_request.use_llm:
             # Import LLM-related functions
-            from .llm import generate_query_prompt, get_llm_response
+
             
             # Generate prompt for the LLM
             prompt = generate_query_prompt(
@@ -2013,6 +1842,5 @@ async def llm_query_vectorstore(
         
     except Exception as e:
         logger.error(f"Error in LLM query: {str(e)}")
-        import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing LLM query: {str(e)}")
