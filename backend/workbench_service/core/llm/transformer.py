@@ -73,7 +73,12 @@ class RowTransformer:
             user_prompt = self._create_prompt(row)
             system_prompt = self._create_system_prompt()
             
+            # Log input row for debugging
+            row_summary = {k: str(v)[:30] + ('...' if len(str(v)) > 30 else '') for k, v in row.items()}
+            logger.info(f"Transforming row: {row_summary}")
+            
             # Call LLM
+            logger.info(f"Sending request to LLM with prompt length: {len(user_prompt)}")
             response = await self.llm_client.generate(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -83,6 +88,7 @@ class RowTransformer:
             
             # Parse response
             parsed_result = self._parse_response(response)
+            logger.info(f"Received transformed values: {parsed_result}")
             
             return parsed_result
             
@@ -107,6 +113,7 @@ class RowTransformer:
                     
                     # Parse response
                     parsed_result = self._parse_response(response)
+                    logger.info(f"Retry succeeded, transformed values: {parsed_result}")
                     
                     return parsed_result
                     
@@ -117,7 +124,9 @@ class RowTransformer:
                         raise
             
             # Return empty values for all output columns
-            return {col: "" for col in self.output_column_names}
+            empty_result = {col: "" for col in self.output_column_names}
+            logger.warning(f"Returning empty values due to error: {empty_result}")
+            return empty_result
     
     def _create_system_prompt(self) -> str:
         """

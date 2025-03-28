@@ -190,6 +190,8 @@ services:
     volumes:
       - ../data:/app/data
       - ../data/workbench:/app/data/workbench
+      - ../data/workbench/uploads:/app/data/workbench/uploads
+      - ../data/workbench/outputs:/app/data/workbench/outputs
       - ./models:/app/models
       - ./workbench_service:/app
     environment:
@@ -214,6 +216,8 @@ services:
         chmod -R 777 /app/data/workbench && 
         ls -la /app/data/workbench && 
         ls -la /app/data/workbench/uploads && 
+        ls -la /app/data/workbench/outputs &&
+        echo 'Directory structure verified!' &&
         uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
       "
 

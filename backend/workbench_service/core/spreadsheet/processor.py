@@ -407,6 +407,9 @@ class SpreadsheetProcessor:
         from ..llm import RowTransformer, BatchProcessor
         
         logger.info(f"Starting background transformation job {job_id}")
+        logger.info(f"Processing file: {file_path} (absolute: {os.path.abspath(file_path)})")
+        logger.info(f"Input columns: {input_columns}")
+        logger.info(f"Output columns: {[col['name'] for col in output_columns]}")
         
         try:
             # Update job status
@@ -418,14 +421,21 @@ class SpreadsheetProcessor:
             else:
                 df = pd.read_excel(file_path, sheet_name=sheet_name)
             
+            # Store a copy of the original DataFrame
+            original_df = df.copy()
+            
+            logger.info(f"Read spreadsheet data: {len(df)} rows, {list(df.columns)} columns")
+            
             # Validate input columns
             missing_columns = [col for col in input_columns if col not in df.columns]
             if missing_columns:
+                error_msg = f"Missing input columns: {', '.join(missing_columns)}"
+                logger.error(error_msg)
                 self._update_job_status(
                     job_id, 
                     status="failed", 
                     progress=0, 
-                    message=f"Missing input columns: {', '.join(missing_columns)}"
+                    message=error_msg
                 )
                 return
             
@@ -440,22 +450,89 @@ class SpreadsheetProcessor:
             
             # Progress callback
             def on_progress(percent):
+                logger.info(f"Transformation progress: {percent}%")
                 self._update_job_status(job_id, status="running", progress=percent, message="Processing rows")
             
             # Process the dataframe
             processor = BatchProcessor(transformer=transformer, max_concurrent=5)
             result_df = await processor.process_dataframe(df, on_progress=on_progress)
             
-            # Save the results
-            output_path = self._save_transformed_spreadsheet(file_path, sheet_name, result_df)
+            # Log the transformation results
+            result_columns = [col for col in result_df.columns if col not in original_df.columns]
+            logger.info(f"Transformation complete. New columns added: {result_columns}")
+            logger.info(f"Result dataframe shape: {result_df.shape}")
             
-            # Update job status to completed
+            # Save the results using multiple approaches to ensure it works
+            output_paths = []
+            
+            # 1. Standard save path
+            try:
+                output_path = self._save_transformed_spreadsheet(file_path, sheet_name, result_df)
+                output_paths.append(output_path)
+            except Exception as e:
+                logger.error(f"Error saving using standard method: {str(e)}")
+                
+            # 2. Save directly to data directory using absolute path
+            try:
+                from config import BASE_DIR
+                # Generate a more distinctive filename 
+                timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+                alt_filename = f"{file_path.stem}_transformed_{timestamp}_ALT{file_path.suffix}"
+                
+                # Try both relative and absolute paths
+                alt_path1 = Path(BASE_DIR) / "workbench" / "outputs" / alt_filename
+                alt_path2 = Path(os.path.join(os.getcwd(), "data", "workbench", "outputs", alt_filename))
+                
+                logger.info(f"Attempting to save to alternate path 1: {alt_path1}")
+                if file_path.suffix.lower() == '.csv':
+                    result_df.to_csv(alt_path1, index=False)
+                else:
+                    result_df.to_excel(alt_path1, sheet_name=sheet_name, index=False)
+                    
+                if os.path.exists(alt_path1):
+                    logger.info(f"Successfully saved to alternate path: {alt_path1}")
+                    output_paths.append(alt_path1)
+                
+                logger.info(f"Attempting to save to alternate path 2: {alt_path2}")
+                if file_path.suffix.lower() == '.csv':
+                    result_df.to_csv(alt_path2, index=False)
+                else:
+                    result_df.to_excel(alt_path2, sheet_name=sheet_name, index=False)
+                    
+                if os.path.exists(alt_path2):
+                    logger.info(f"Successfully saved to alternate path: {alt_path2}")
+                    output_paths.append(alt_path2)
+                    
+            except Exception as e:
+                logger.error(f"Error saving using alternate methods: {str(e)}")
+                
+            # 3. Also save to the same directory as the original file
+            try:
+                same_dir_path = file_path.parent / f"{file_path.stem}_transformed_{timestamp}{file_path.suffix}"
+                logger.info(f"Attempting to save to same directory as original: {same_dir_path}")
+                
+                if file_path.suffix.lower() == '.csv':
+                    result_df.to_csv(same_dir_path, index=False)
+                else:
+                    result_df.to_excel(same_dir_path, sheet_name=sheet_name, index=False)
+                    
+                if os.path.exists(same_dir_path):
+                    logger.info(f"Successfully saved to same directory: {same_dir_path}")
+                    output_paths.append(same_dir_path)
+            except Exception as e:
+                logger.error(f"Error saving to same directory: {str(e)}")
+            
+            # Update job status to completed - list all successful paths
+            success_msg = "Transformation completed successfully!"
+            if output_paths:
+                success_msg += f" Files saved to: {', '.join([str(p) for p in output_paths])}"
+                
             self._update_job_status(
                 job_id, 
                 status="completed", 
                 progress=100, 
-                message="Transformation completed",
-                result_url=str(output_path)
+                message=success_msg,
+                result_url=str(output_paths[0]) if output_paths else None
             )
             
         except Exception as e:
@@ -494,20 +571,49 @@ class SpreadsheetProcessor:
         from config import WORKBENCH_OUTPUTS_DIR
         
         # Create output directory if it doesn't exist
+        logger.info(f"Saving transformed spreadsheet. Output directory: {WORKBENCH_OUTPUTS_DIR} (absolute: {os.path.abspath(WORKBENCH_OUTPUTS_DIR)})")
         os.makedirs(WORKBENCH_OUTPUTS_DIR, exist_ok=True)
         
         # Generate output filename
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
         original_name = original_path.stem
         output_filename = f"{original_name}_transformed_{timestamp}"
+        logger.info(f"Generated output filename: {output_filename}")
         
         # Determine output format based on original file
         if original_path.suffix.lower() == '.csv':
             output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.csv"
+            logger.info(f"Saving CSV to: {output_path} (absolute: {os.path.abspath(output_path)})")
             df.to_csv(output_path, index=False)
         else:
             output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.xlsx"
+            logger.info(f"Saving Excel to: {output_path} (absolute: {os.path.abspath(output_path)})")
+            # Log DataFrame info for debugging
+            logger.info(f"DataFrame info: {len(df)} rows, {len(df.columns)} columns")
+            logger.info(f"Column names: {list(df.columns)}")
             df.to_excel(output_path, sheet_name=sheet_name, index=False)
         
-        logger.info(f"Saved transformed spreadsheet to {output_path}")
+        # Verify file was created
+        if os.path.exists(output_path):
+            logger.info(f"Successfully saved transformed spreadsheet to {output_path}")
+            try:
+                file_size = os.path.getsize(output_path)
+                logger.info(f"File size: {file_size} bytes")
+            except Exception as e:
+                logger.error(f"Could not get file size: {str(e)}")
+        else:
+            logger.error(f"Failed to save file! Path does not exist: {output_path}")
+            
+            # Try saving to an alternate location
+            alt_path = Path(os.getcwd()) / f"{output_filename}{original_path.suffix}"
+            logger.info(f"Attempting to save to alternate location: {alt_path}")
+            if original_path.suffix.lower() == '.csv':
+                df.to_csv(alt_path, index=False)
+            else:
+                df.to_excel(alt_path, sheet_name=sheet_name, index=False)
+            
+            if os.path.exists(alt_path):
+                logger.info(f"Successfully saved to alternate location: {alt_path}")
+                return alt_path
+            
         return output_path 
