@@ -3,6 +3,7 @@ import yaml
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
+
 class OllamaConfig(BaseModel):
     base_url: str
     ollama_model: str
@@ -19,6 +20,16 @@ class OllamaConfig(BaseModel):
     model_config = {
         'protected_namespaces': ()
     }
+
+class ModelServiceConfig(BaseModel):
+    default_model: str
+    max_tokens: int = Field(gt=0, default=4096)
+    temperature: float = Field(ge=0.0, le=1.0, default=0.4)
+    timeout: int = Field(ge=30, default=300)  # Timeout in seconds
+    top_p: float = Field(ge=0.0, le=1.0, default=0.9)
+    top_k: int = Field(ge=1, le=100, default=10)
+    context_window: int = Field(gt=0, default=8000)
+    stop: List[str] = Field(default=["<|endoftext|>"])
 
 class ServiceConfig(BaseModel):
     name: str
@@ -43,10 +54,11 @@ class ChatLoggingConfig(BaseModel):
 
 class Config(BaseModel):
     service: ServiceConfig
-    ollama: OllamaConfig
+    model_service: ModelServiceConfig
     api: ApiConfig
     cors: CorsConfig
     chat_logging: ChatLoggingConfig
+    ollama: OllamaConfig
 
 def load_config() -> Config:
     config_path = os.getenv('CONFIG_PATH', 'config.yaml')

@@ -156,7 +156,7 @@ services:
     networks:
       - app-network
 
-  direct_chat_service1:
+  direct_chat:
     build: ./direct_chat_service
     ports:
       - "8011:8011"
@@ -165,12 +165,16 @@ services:
       - ./direct_chat_service:/app
     environment:
       - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - MODEL_SERVICE_URL=http://model_service:8008
       - PYTHONPATH=/app
       - SERVICE_PORT=8011
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - init-data
+      - model_service
+      - embedding
     networks:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
@@ -210,7 +214,8 @@ services:
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
       - TENSOR_PARALLEL_SIZE=2
-      - GPU_MEMORY_UTILIZATION=0.5
+      - GPU_MEMORY_UTILIZATION=0.95
+      - OMP_NUM_THREADS=12
     volumes:
       - ../models:/models
       - ../data:/data
@@ -222,9 +227,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    restart: unless-stopped
     ipc: host
-    command: --model /models/Llama-3.2-1B-Instruct-abliterated --tokenizer /models/Llama-3.2-1B-Instruct-abliterated --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.5
+    command: --model /models/DeepHermes-3-Llama-3-8B-Preview --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.95 --max-model-len=65536
 
 
 volumes:

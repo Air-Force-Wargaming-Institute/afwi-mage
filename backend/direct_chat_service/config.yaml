@@ -4,6 +4,13 @@ service:
   port: 8011
   debug: true
 
+model_service:
+  url: http://model_service:8008
+  default_model: /models/DeepHermes-3-Llama-3-8B-Preview
+  max_tokens: 4096
+  temperature: 0.4
+  timeout: 300
+
 ollama:
   # Base URL for Ollama API
   base_url: http://host.docker.internal:11434
@@ -39,7 +46,6 @@ ollama:
   # Sequences where the model should stop generating
   # Useful for maintaining conversation format
   stop: ["Human:", "Assistant:"]
-
 
 api:
   core_service_url: http://core:8000

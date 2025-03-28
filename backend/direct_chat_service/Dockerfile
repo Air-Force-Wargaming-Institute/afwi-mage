@@ -1,6 +1,8 @@
 FROM mage-base:latest
 
-# No need to install dependencies as they're in the base image
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service-specific files
 COPY . .

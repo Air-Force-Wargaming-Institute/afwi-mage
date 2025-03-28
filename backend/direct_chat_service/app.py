@@ -6,6 +6,7 @@ from datetime import datetime
 from config import config
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
+from langchain_community.llms.vllm import VLLMOpenAI
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -125,18 +126,14 @@ chat_sessions: Dict[str, ChatSession] = {}
 document_metadata: Dict[str, Dict[str, DocumentMetadata]] = {}  # session_id -> {doc_id -> metadata}
 
 # Initialize LangChain components
-llm = ChatOllama(
-    base_url=config.ollama.base_url,
-    model=config.ollama.ollama_model,
-    temperature=config.ollama.temperature,
-    context_window=config.ollama.context_window,
-    top_k=config.ollama.top_k,
-    top_p=config.ollama.top_p,
-    repeat_penalty=config.ollama.repeat_penalty,
-    stop=config.ollama.stop,
-    num_gpu=config.ollama.num_gpu,
-    num_thread=config.ollama.num_thread,
-    f16=config.ollama.f16
+llm = VLLMOpenAI(
+    openai_api_base="http://host.docker.internal:8007/v1", # Connect to local vLLM server running on port 8000
+    openai_api_key="dummy-key",  # Required by the wrapper but not actually verified by vLLM
+    model_name=config.model_service.default_model,
+    temperature=config.model_service.temperature,
+    top_p=config.model_service.top_p,
+    max_tokens=config.model_service.context_window,  # Using context_window as max_tokens
+    stop=config.model_service.stop
 )
 
 # Create chat prompt template
