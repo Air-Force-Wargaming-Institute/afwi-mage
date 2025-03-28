@@ -101,7 +101,7 @@ function SystemPrompts() {
 
   const fetchPrompts = async () => {
     try {
-      const response = await axios.get(getApiUrl('CHAT', '/api/prompts/list'));
+      const response = await axios.get(getApiUrl('CHAT', '/api/chat/prompts/list'));
       setPrompts(response.data);
     } catch (error) {
       console.error('Error fetching prompts:', error);
@@ -116,7 +116,7 @@ function SystemPrompts() {
   const fetchAvailableVariables = async (promptId) => {
     if (!promptId) return;
     try {
-      const response = await axios.get(getApiUrl('CHAT', `/api/prompts/${promptId}/variables`));
+      const response = await axios.get(getApiUrl('CHAT', `/api/chat/prompts/${promptId}/variables`));
       setAvailableVariables(response.data);
     } catch (error) {
       console.error('Error fetching variables:', error);
@@ -125,7 +125,7 @@ function SystemPrompts() {
 
   const fetchAvailableLLMs = async () => {
     try {
-      const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+      const response = await axios.get(getApiUrl('CHAT', '/api/chat/models/ollama'));
       const llms = response.data.models.map(model => ({
         id: model.name,  // Use model name as ID
         name: model.name,
@@ -196,12 +196,12 @@ function SystemPrompts() {
       let response;
       if (editingPrompt.id && editingPrompt.id.trim()) {
         response = await axios.put(
-          getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}`),
+          getApiUrl('CHAT', `/api/chat/prompts/${editingPrompt.id}`),
           promptData
         );
       } else {
         response = await axios.post(
-          getApiUrl('CHAT', '/api/prompts'),
+          getApiUrl('CHAT', '/api/chat/prompts'),
           promptData
         );
       }
@@ -225,7 +225,7 @@ function SystemPrompts() {
 
   const handleDeletePrompt = async (promptId) => {
     try {
-      await axios.delete(getApiUrl('CHAT', `/api/prompts/${promptId}`));
+      await axios.delete(getApiUrl('CHAT', `/api/chat/prompts/${promptId}`));
       setSnackbar({
         open: true,
         message: 'Prompt deleted successfully',
@@ -262,7 +262,7 @@ function SystemPrompts() {
     
     try {
       await axios.post(
-        getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}/variables`),
+        getApiUrl('CHAT', `/api/chat/prompts/${editingPrompt.id}/variables`),
         {},
         { 
           params: { 
@@ -294,7 +294,7 @@ function SystemPrompts() {
     
     try {
       await axios.delete(
-        getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}/variables/${variable}`)
+        getApiUrl('CHAT', `/api/chat/prompts/${editingPrompt.id}/variables/${variable}`)
       );
       
       setSnackbar({

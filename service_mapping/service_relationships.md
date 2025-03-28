@@ -5,12 +5,12 @@ graph TD
     Client[Frontend Client] -->|HTTP| Gateway[API Gateway]
     
     %% Core Connections
-    Gateway -->|/api/documents/| Core[Core Service :8000]
+    Gateway -->|/api/core/documents/| Core[Core Service :8000]
     Gateway -->|/api/users/| Auth[Auth Service :8010]
     Gateway -->|/chat/| Chat[Chat Service :8009]
     Gateway -->|/api/v1/chat/| DirectChat[Direct Chat Service :8011+]
     Gateway -->|/api/upload/| Upload[Upload Service :8005]
-    Gateway -->|/api/agents/| Agent[Agent Service :8001]
+    Gateway -->|/api/agent/| Agent[Agent Service :8001]
     Gateway -->|/api/embed/| Embedding[Embedding Service :8006]
     Gateway -->|/api/extract/| Extraction[Extraction Service :8002]
     Gateway -->|/api/generate/| Generation[Generation Service :8003]

@@ -34,7 +34,9 @@ app.add_middleware(
 
 logger.info("Configuring routes")
 # Include routers
-app.include_router(upload_router, prefix="/api/upload")
+# app.include_router(upload_router, prefix="/api/upload")
+app.include_router(upload_router)
+
 
 @app.get("/")
 async def root():

@@ -22,7 +22,7 @@
 | Endpoint                 | Method | Description                            | Usage Pattern  |
 |--------------------------|--------|----------------------------------------|----------------|
 | `/`                      | GET    | Health check                           | Monitoring     |
-| `/api/documents/*`       | Various| Document library management            | Regular access |
+| `/api/core/documents/*`       | Various| Document library management            | Regular access |
 
 ### Chat Service (Port 8009)
 
@@ -65,10 +65,10 @@
 | Endpoint                 | Method | Description                            | Usage Pattern  |
 |--------------------------|--------|----------------------------------------|----------------|
 | `/`                      | GET    | Welcome message                        | Rare           |
-| `/api/health`            | GET    | Health check endpoint                  | Monitoring     |
-| `/api/users/register`    | POST   | Register new user                      | Occasional     |
-| `/api/users/login`       | POST   | User login                             | Heavy usage    |
-| `/api/users/me`          | GET    | Get current user info                  | Regular access |
+| `/api/auth/health`            | GET    | Health check endpoint                  | Monitoring     |
+| `/api/auth/users/register`    | POST   | Register new user                      | Occasional     |
+| `/api/auth/users/login`       | POST   | User login                             | Heavy usage    |
+| `/api/auth/users/me`          | GET    | Get current user info                  | Regular access |
 
 ### Upload Service (Port 8005)
 
@@ -82,9 +82,9 @@
 
 | Endpoint                 | Method | Description                            | Usage Pattern  |
 |--------------------------|--------|----------------------------------------|----------------|
-| `/api/agents/teams`      | GET    | List agent teams                       | Regular access |
-| `/api/agents/team/{id}`  | GET    | Get specific team                      | Regular access |
-| `/api/agents/create`     | POST   | Create new agent                       | Occasional     |
+| `/api/agent/teams`      | GET    | List agent teams                       | Regular access |
+| `/api/agent/team/{id}`  | GET    | Get specific team                      | Regular access |
+| `/api/agent/create`     | POST   | Create new agent                       | Occasional     |
 
 ### Embedding Service (Port 8006)
 
@@ -120,7 +120,7 @@ Based on the service mapping, here are the suggested routing rules for the API G
 
 ```yaml
 # Core Service Routes
-- match: Path(`/api/documents`)
+- match: Path(`/api/core/documents`)
   kind: PathPrefix
   services:
     - name: core
@@ -155,7 +155,7 @@ Based on the service mapping, here are the suggested routing rules for the API G
       port: 8005
 
 # Agent Service Routes
-- match: PathPrefix(`/api/agents`)
+- match: PathPrefix(`/api/agent`)
   kind: PathPrefix
   services:
     - name: agent

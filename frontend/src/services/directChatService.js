@@ -181,7 +181,7 @@ export const updateDocumentClassification = async (sessionId, docId, classificat
 export const getVectorstores = async () => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', '/vectorstores')
+      getApiUrl('DIRECT_CHAT', '/api/direct_chat/vectorstores')
     );
     return response.data.vectorstores;
   } catch (error) {

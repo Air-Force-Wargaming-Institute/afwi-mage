@@ -9,18 +9,6 @@ router = APIRouter()
 #     if response.status_code != 200:
 #         raise HTTPException(status_code=401, detail="Invalid token")
 #     return response.json()
-
-@router.get("/health")
-async def health_check():
-    services = {
-        "upload": UPLOAD_SERVICE_URL,
-        "extraction": EXTRACTION_SERVICE_URL,
-        "generation": GENERATION_SERVICE_URL,
-        "agent": AGENT_SERVICE_URL,
-        "review": REVIEW_SERVICE_URL,
-        "embedding": EMBEDDING_SERVICE_URL,
-        "auth": AUTH_SERVICE_URL
-    }
     
     # status = {}
     # for service, url in services.items():

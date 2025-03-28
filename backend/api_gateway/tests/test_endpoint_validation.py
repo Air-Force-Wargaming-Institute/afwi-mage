@@ -29,7 +29,7 @@ def login():
         print("Authentication disabled, skipping login")
         return
 
-    login_url = urljoin(BASE_URL, "/api/users/login")
+    login_url = urljoin(BASE_URL, "/api/auth/users/login")
     login_data = {
         "email": TEST_USERNAME,
         "password": TEST_PASSWORD
@@ -113,7 +113,7 @@ class TestAgentService:
     
     def test_list_teams(self):
         """Test listing agent teams endpoint"""
-        url = urljoin(BASE_URL, "/api/agents/teams")
+        url = urljoin(BASE_URL, "/api/agent/teams")
         response = requests.get(url, headers=get_headers())
         assert response.status_code == 200, "List agent teams failed"
 

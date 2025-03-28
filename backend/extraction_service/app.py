@@ -14,7 +14,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(extraction_router, prefix="/api/extraction")
+# app.include_router(extraction_router, prefix="/api/extraction")
+app.include_router(extraction_router)
+
 
 @app.get("/")
 async def root():

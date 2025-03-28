@@ -221,7 +221,7 @@ function AgentTeams() {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      const response = await axios.get(getApiUrl('AGENT', '/api/agent/list_teams/'));
       console.log("Teams received from backend:", response.data.teams);
       setTeams(response.data.teams);
     } catch (error) {
@@ -236,7 +236,7 @@ function AgentTeams() {
 
   const fetchAvailableAgents = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const response = await axios.get(getApiUrl('AGENT', '/api/agent/list_agents/'));
       setAvailableAgents(response.data.agents);
       setAllAgents(response.data.agents);
       
@@ -258,7 +258,7 @@ function AgentTeams() {
 
   const fetchVectorstores = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_vs/'));
+      const response = await axios.get(getApiUrl('AGENT', '/api/agent/list_vs/'));
       console.log("Vectorstores received from backend:", response.data.vectorstores);
       setVectorstores(response.data.vectorstores);
     } catch (error) {
@@ -388,7 +388,7 @@ function AgentTeams() {
         vectorstore: newTeam.vectorstore || []
       };
 
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), submissionData);
+      const response = await axios.post(getApiUrl('AGENT', '/api/agent/create_team/'), submissionData);
       setTeams([...teams, response.data]);
       setOpen(false);
       setSnackbar({
@@ -430,7 +430,7 @@ function AgentTeams() {
       };
 
       console.log("Submitting team update with data:", submissionData);
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.unique_id}`), submissionData);
+      await axios.put(getApiUrl('AGENT', `/api/agent/update_team/${editingTeam.unique_id}`), submissionData);
       setEditOpen(false);
       setSnackbar({
         open: true,
@@ -476,7 +476,7 @@ function AgentTeams() {
   const handleDeleteConfirm = async () => {
     try {
       // Delete from agent and chat service TODO: do we need to delete from chat service?
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.unique_id}`));
+      await axios.delete(getApiUrl('AGENT', `/api/agent/delete_team/${teamToDelete.unique_id}`));
       //await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
       
       setDeleteConfirmOpen(false);
@@ -531,7 +531,7 @@ function AgentTeams() {
         vectorstore: team.vectorstore || []
       };
 
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
+      const response = await axios.post(getApiUrl('AGENT', '/api/agent/create_team/'), duplicateTeam);
       setSnackbar({
         open: true,
         message: 'Team duplicated successfully!',
@@ -558,7 +558,7 @@ function AgentTeams() {
   // Add this new function to fetch agent descriptions
   const fetchAgentDescriptions = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const response = await axios.get(getApiUrl('AGENT', '/api/agent/list_agents/'));
       const descriptions = {};
       response.data.agents.forEach(agent => {
         descriptions[agent.name] = agent.description;

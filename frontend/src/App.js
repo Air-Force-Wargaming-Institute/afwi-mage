@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Switch, Redirect, useLocation } from 'r
 import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import Home from './components/Home';
+import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import FineTuneGuide from './components/FineTuneGuide';
 import ExtractComponent from './components/ExtractComponent';
@@ -36,9 +37,7 @@ const AuthenticatedRoutes = () => {
       {!isLoginPage && <Header />}
       <main>
         <Switch>
-          <Route exact path="/login">
-            <Redirect to="/home" />
-          </Route>
+          <Route exact path="/login" component={Login} />
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
@@ -60,9 +59,9 @@ const AuthenticatedRoutes = () => {
           <Route path="/retrieval/manage-databases" component={ManageVectorStores} />
           <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
           <Route exact path="/">
-            <Redirect to="/home" />
+            <Redirect to="/login" />
           </Route>
-          <Redirect to="/home" />
+          <Redirect to="/login" />
         </Switch>
       </main>
       {!isLoginPage && (

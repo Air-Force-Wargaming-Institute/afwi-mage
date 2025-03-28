@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/review/{filename}")
+@router.get("/api/review/file/{filename}")
 async def get_extracted_content(filename: str):
     try:
         file_path = Path(DATASET_DIR) / f"{filename}_dataset.json"
@@ -31,7 +31,7 @@ async def get_extracted_content(filename: str):
         logger.error(f"Error getting extracted content for {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/review/{filename}")
+@router.post("/api/review/file/{filename}")
 async def update_extracted_content(filename: str, content: list):
     try:
         file_path = Path(DATASET_DIR) / f"{filename}_dataset.json"

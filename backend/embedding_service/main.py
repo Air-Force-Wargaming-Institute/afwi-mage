@@ -236,6 +236,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+# TODO: Stop using deprecated on_event
 @app.on_event("startup")
 async def startup_event():
     """Run tasks on application startup."""
@@ -281,6 +282,7 @@ async def startup_event():
         logger.warning(f"Error checking FAISS GPU support: {str(e)}")
 
 
+# TODO: Stop using deprecated on_event
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run tasks on application shutdown."""

@@ -583,7 +583,7 @@ function DocumentLibrary() {
         total_items: files.length
       });
 
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/upload/'), {
+      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/'), {
         method: 'POST',
         body: formData,
       });

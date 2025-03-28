@@ -122,7 +122,7 @@ def extract_sentences_with_context(paragraph):
 
 router = APIRouter()
 
-@router.get("/files/")
+@router.get("/api/extraction/files/")
 async def list_files(folder: str = ""):
     try:
         target_dir = UPLOAD_DIR / folder if folder else UPLOAD_DIR
@@ -777,7 +777,7 @@ def extract_portion_marking(text):
         logger.error(f"Error extracting portion marking: {str(e)}")
         return None, text
 
-@router.post("/extract/")
+@router.post("/api/extraction/extract/")
 async def extract_file_content(request_data: ExtractionRequest):
     logger.info("=== Starting new extraction process ===")
     logger.info(f"Files to process: {request_data.filenames}")
@@ -956,7 +956,7 @@ async def extract_file_content(request_data: ExtractionRequest):
         "extracted_items_count": len(extracted_content)
     }
 
-@router.get("/csv-files/")
+@router.get("/api/extraction/csv-files/")
 async def get_csv_files():
     try:
         csv_files = []
@@ -984,7 +984,7 @@ async def get_csv_files():
         logger.error(f"Error fetching CSV files: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching CSV files: {str(e)}")
 
-@router.get("/csv-preview/{filename}")
+@router.get("/api/extraction/csv-preview/{filename}")
 async def get_csv_preview(filename: str, rows: int = 1000):  # Default to 1000 rows, but allow it to be configurable
     try:
         file_path = EXTRACTION_DIR / filename
@@ -1000,7 +1000,7 @@ async def get_csv_preview(filename: str, rows: int = 1000):  # Default to 1000 r
         logger.error(f"Error fetching CSV preview for {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching CSV preview: {str(e)}")
 
-@router.post("/rename-csv/")
+@router.post("/api/extraction/rename-csv/")
 async def rename_csv_file(request: dict = Body(...)):
     old_name = request.get("old_name")
     new_name = request.get("new_name")
@@ -1047,7 +1047,7 @@ async def rename_csv_file(request: dict = Body(...)):
         logger.error(f"Error renaming CSV file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error renaming CSV file: {str(e)}")
 
-@router.delete("/delete-csv/{filename}")
+@router.delete("/api/extraction/delete-csv/{filename}")
 async def delete_csv_file(filename: str):
     file_path = EXTRACTION_DIR / filename
     metadata_path = EXTRACTION_DIR / f"{filename}.metadata"
@@ -1071,7 +1071,7 @@ async def delete_csv_file(filename: str):
         logger.error(f"Error deleting CSV file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting CSV file: {str(e)}")
 
-@router.post("/update-csv/{filename}")
+@router.post("/api/extraction/update-csv/{filename}")
 async def update_csv_file(filename: str, data: dict = Body(...)):
     try:
         csv_path = EXTRACTION_DIR / filename

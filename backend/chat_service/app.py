@@ -114,7 +114,7 @@ executor = ThreadPoolExecutor(max_workers=20)
 MAX_CONCURRENT_REQUESTS = 10
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
-@app.post("/chat/refine")
+@app.post("/api/chat/refine")
 async def refine_chat(request_data: ChatMessage):
     try:
         async with semaphore:
@@ -337,7 +337,7 @@ def _process_refine_chat(request_data: ChatMessage):
         "selected_agents": selected_agents
     }
 
-@app.post("/chat/process")
+@app.post("/api/chat/process")
 async def chat_endpoint(request_data: ChatMessage):
     try:
         logger.info(f"Received chat message: {request_data.message}")
@@ -383,7 +383,7 @@ async def chat_endpoint(request_data: ChatMessage):
         logger.error(f"Error processing chat request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/chat/generate_session_id/")
+@app.post("/api/chat/generate_session_id/")
 async def generate_session_id(request_data: SessionCreate):
     try:
         async with semaphore:
@@ -404,7 +404,7 @@ async def generate_session_id(request_data: SessionCreate):
 async def root():
     return {"message": "Welcome to AFWI MAGE Chat Service API"}
 
-@app.get("/sessions/{session_id}")
+@app.get("/api/chat/sessions/{session_id}")
 async def get_session(session_id: str):
     try:
         async with semaphore:
@@ -420,7 +420,7 @@ async def get_session(session_id: str):
         logger.error(f"Error retrieving session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/sessions")
+@app.get("/api/chat/sessions")
 async def list_sessions():
     try:
         async with semaphore:
@@ -433,7 +433,7 @@ async def list_sessions():
         logger.error(f"Error listing sessions: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/sessions/{session_id}")
+@app.delete("/api/chat/sessions/{session_id}")
 async def delete_session(session_id: str):
     try:
         async with semaphore:
@@ -449,7 +449,7 @@ async def delete_session(session_id: str):
         logger.error(f"Error deleting session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/sessions/{session_id}")
+@app.put("/api/chat/sessions/{session_id}")
 async def update_session(session_id: str, update_data: SessionUpdate):
     try:
         async with semaphore:
@@ -493,7 +493,7 @@ def _process_update_session(session_id: str, update_data: SessionUpdate):
         return session_manager.get_session(session_id)
     return False
 
-@app.get("/models/ollama")
+@app.get("/api/chat/models/ollama")
 async def list_ollama_models():
     """
     Get a list of available Ollama models
@@ -512,7 +512,7 @@ async def list_ollama_models():
         logger.error(f"Error listing Ollama models: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/prompts/list")
+@app.get("/api/chat/prompts/list")
 async def list_prompts():
     """Get all system prompts"""
     try:
@@ -527,7 +527,7 @@ async def list_prompts():
         logger.error(f"Error listing prompts: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/prompts/{prompt_id}")
+@app.get("/api/chat/prompts/{prompt_id}")
 async def get_prompt(prompt_id: str):
     """Get a specific prompt by ID"""
     try:
@@ -544,7 +544,7 @@ async def get_prompt(prompt_id: str):
         logger.error(f"Error getting prompt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/prompts")
+@app.post("/api/chat/prompts")
 async def create_prompt(prompt_data: PromptData):
     """Create a new system prompt"""
     try:
@@ -572,7 +572,7 @@ async def create_prompt(prompt_data: PromptData):
         logger.exception("Full traceback:")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/prompts/{prompt_id}")
+@app.put("/api/chat/prompts/{prompt_id}")
 async def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
     """Update an existing system prompt"""
     try:
@@ -589,7 +589,7 @@ async def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
         logger.error(f"Error updating prompt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/prompts/{prompt_id}")
+@app.delete("/api/chat/prompts/{prompt_id}")
 async def delete_prompt(prompt_id: str):
     """Delete a system prompt"""
     try:
@@ -606,7 +606,7 @@ async def delete_prompt(prompt_id: str):
         logger.error(f"Error deleting prompt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/prompts/{prompt_id}/variables")
+@app.get("/api/chat/prompts/{prompt_id}/variables")
 async def get_prompt_variables(prompt_id: str):
     """Get variables for a specific prompt"""
     try:
@@ -621,7 +621,7 @@ async def get_prompt_variables(prompt_id: str):
         logger.error(f"Error getting prompt variables: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/prompts/{prompt_id}/variables")
+@app.post("/api/chat/prompts/{prompt_id}/variables")
 async def add_prompt_variable(
     prompt_id: str,
     variable_name: str = Query(..., description="Name of the variable to add")
@@ -641,7 +641,7 @@ async def add_prompt_variable(
         logger.error(f"Error adding prompt variable: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/prompts/{prompt_id}/variables/{variable_name}")
+@app.delete("/api/chat/prompts/{prompt_id}/variables/{variable_name}")
 async def remove_prompt_variable(prompt_id: str, variable_name: str):
     """Remove a variable from a prompt"""
     try:
@@ -658,7 +658,7 @@ async def remove_prompt_variable(prompt_id: str, variable_name: str):
         logger.error(f"Error removing prompt variable: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/conversations/list")
+@app.get("/api/chat/conversations/list")
 async def list_conversations():
     """Get a list of all conversations"""
     try:
@@ -669,7 +669,7 @@ async def list_conversations():
         logger.error(f"Error listing conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/conversations/{conversation_id}")
+@app.get("/api/chat/conversations/{conversation_id}")
 async def get_conversation(conversation_id: str):
     """Get details of a specific conversation"""
     try:
@@ -682,7 +682,7 @@ async def get_conversation(conversation_id: str):
         logger.error(f"Error getting conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/conversations/by-session/{session_id}")
+@app.get("/api/chat/conversations/by-session/{session_id}")
 async def get_conversations_by_session(session_id: str):
     """Get all conversations for a specific session"""
     try:

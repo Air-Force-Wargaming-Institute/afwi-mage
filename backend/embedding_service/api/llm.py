@@ -29,8 +29,8 @@ except ImportError:
 logger = logging.getLogger("embedding_service")
 
 # Create router
-router = APIRouter(prefix="/llm", tags=["LLM Integration"])
-
+# router = APIRouter(prefix="/llm", tags=["LLM Integration"])
+router = APIRouter(tags=["LLM Integration"])
 
 class VectorStoreAnalysisRequest(BaseModel):
     """Request to analyze a vector store's content using an LLM."""
@@ -98,7 +98,7 @@ class VectorStoreLLMQueryResponse(BaseModel):
     }
 
 
-@router.post("/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
+@router.post("/api/embedding/llm/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
 async def analyze_vectorstore(
     vectorstore_id: str,
     request: VectorStoreAnalysisRequest,
@@ -179,7 +179,7 @@ async def analyze_vectorstore(
         raise HTTPException(status_code=500, detail=f"Error analyzing vector store: {str(e)}")
 
 
-@router.post("/vectorstores/{vectorstore_id}/query", response_model=VectorStoreLLMQueryResponse)
+@router.post("/api/embedding/llm/vectorstores/{vectorstore_id}/query", response_model=VectorStoreLLMQueryResponse)
 async def llm_query_vectorstore(
     vectorstore_id: str,
     query_request: VectorStoreLLMQueryRequest,

@@ -1677,7 +1677,7 @@ function MultiAgentHILChat() {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const response = await axios.get(getApiUrl('CHAT', '/sessions'));
+        const response = await axios.get(getApiUrl('CHAT', '/api/chat/sessions'));
         if (response.data && Array.isArray(response.data)) {
           // Transform the sessions data to include only necessary fields
           const formattedSessions = response.data.map(session => ({
@@ -1708,7 +1708,7 @@ function MultiAgentHILChat() {
   const handleSessionClick = async (sessionId) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      const response = await axios.get(`${getApiUrl('CHAT', `/sessions/${sessionId}`)}`);
+      const response = await axios.get(`${getApiUrl('CHAT', `/api/chat/sessions/${sessionId}`)}`);
       
       if (response.data && response.data.conversation_history) {
         const formattedMessages = response.data.conversation_history.flatMap(entry => {
@@ -1828,7 +1828,7 @@ function MultiAgentHILChat() {
     // Reset selectedAgents when starting a new chat
     setSelectedAgents([]);
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+      const response = await axios.get(getApiUrl('AGENT', '/api/agent/available_teams/'));
       setAvailableTeams(response.data.teams);
       setDialogOpen(true);
       
@@ -1913,7 +1913,7 @@ function MultiAgentHILChat() {
     try {
       const currentSession = state.chatSessions.find(s => s.id === editSessionId);
       
-      await axios.put(getApiUrl('CHAT', `/sessions/${editSessionId}`), {
+      await axios.put(getApiUrl('CHAT', `/api/chat/sessions/${editSessionId}`), {
         session_name: editSessionName.trim(),
         team_id: currentSession.teamId,
         team_name: currentSession.team
@@ -1960,7 +1960,7 @@ function MultiAgentHILChat() {
       console.log(`Attempting to delete session: ${deleteSessionId}`);
       
       // Send delete request to backend
-      await axios.delete(getApiUrl('CHAT', `/sessions/${deleteSessionId}`));
+      await axios.delete(getApiUrl('CHAT', `/api/chat/sessions/${deleteSessionId}`));
       
       console.log(`Successfully deleted session: ${deleteSessionId}`);
       
@@ -2065,7 +2065,7 @@ function MultiAgentHILChat() {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
       
       // First, send to init endpoint
-      let response = await axios.post(getApiUrl('CHAT', '/chat/refine'), messageData);
+      let response = await axios.post(getApiUrl('CHAT', '/api/chat/refine'), messageData);
 
       // Handle any errors
       if (response.data.error) {
@@ -2118,7 +2118,7 @@ function MultiAgentHILChat() {
   const fetchTeamAgents = async (teamId) => {
     try {
       // First, get the complete team details with agent names using list_teams
-      const teamsListResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      const teamsListResponse = await axios.get(getApiUrl('AGENT', '/api/agent/list_teams/'));
       if (!teamsListResponse.data || !teamsListResponse.data.teams) {
         throw new Error('Failed to retrieve teams data');
       }
@@ -2135,7 +2135,7 @@ function MultiAgentHILChat() {
       console.log(`Team ${teamDetails.name} has ${teamAgentNames.length} agents:`, teamAgentNames);
       
       // Fetch all available agents
-      const agentsResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const agentsResponse = await axios.get(getApiUrl('AGENT', '/api/agent/list_agents/'));
       if (!agentsResponse.data || !agentsResponse.data.agents) {
         throw new Error('Failed to retrieve agents data');
       }
@@ -2255,7 +2255,7 @@ function MultiAgentHILChat() {
     }
 
     try {
-      const endpoint = planChoice === 'accept' ? '/chat/process' : '/chat/refine';
+      const endpoint = planChoice === 'accept' ? '/api/chat/process' : '/api/chat/refine';
       const response = await axios.post(getApiUrl('CHAT', endpoint), messageData);
 
       if (response.data.error) {
@@ -2332,7 +2332,7 @@ function MultiAgentHILChat() {
 
   const generateSessionId = async (teamId, sessionName) => {
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat/generate_session_id'), {
+      const response = await axios.post(getApiUrl('CHAT', '/api/chat/generate_session_id'), {
         team_id: teamId,
         session_name: sessionName
       });

@@ -9,7 +9,7 @@ import { getApiUrl } from '../config';
 export const getDocuments = async (path = '') => {
   try {
     const response = await axios.get(
-      getApiUrl('CORE', `/api/documents?path=${encodeURIComponent(path)}`)
+      getApiUrl('CORE', `/api/core/documents?path=${encodeURIComponent(path)}`)
     );
     return response.data;
   } catch (error) {
@@ -30,7 +30,7 @@ export const downloadDocument = async (path) => {
       .join('/');
     
     const response = await axios.get(
-      getApiUrl('CORE', `/api/documents/${encodedPath}/download`),
+      getApiUrl('CORE', `/api/core/documents/${encodedPath}/download`),
       { responseType: 'blob' }
     );
     return response.data;

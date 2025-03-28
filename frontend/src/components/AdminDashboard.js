@@ -159,7 +159,7 @@ function AdminDashboard() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(getApiUrl('AUTH', '/api/users'), {
+      const response = await fetch(getApiUrl('AUTH', '/api/auth/users'), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -269,8 +269,8 @@ function AdminDashboard() {
 
     try {
       const endpoint = editingUser 
-        ? `/api/users/${editingUser.id}` 
-        : '/api/users';
+        ? `/api/auth/users/${editingUser.id}` 
+        : '/api/auth/users';
       
       const method = editingUser ? 'PUT' : 'POST';
       
@@ -323,7 +323,7 @@ function AdminDashboard() {
 
   const handleDeleteUser = async (userId) => {
     try {
-      const response = await fetch(getApiUrl('AUTH', `/api/users/${userId}`), {
+      const response = await fetch(getApiUrl('AUTH', `/api/auth/users/${userId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

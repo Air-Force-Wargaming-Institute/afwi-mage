@@ -45,20 +45,20 @@ UPLOAD_DIR = BASE_DIR / 'data' / 'uploads'
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"Ensuring upload directory exists: {UPLOAD_DIR}")
 
-# Import core routes
-try:
-    from core_routes import router as core_router
-    app.include_router(core_router, prefix="/api/core", tags=["core"])
-    logger.info("Successfully mounted core routes at /api/core")
-except Exception as e:
-    logger.error(f"Error loading core_routes router: {str(e)}")
-    logger.warning("Core routes not available - this may be expected if they're not used")
+# # Import core routes
+# try:
+#     from core_routes import router as core_router
+#     app.include_router(core_router, prefix="/api/core", tags=["core"])
+#     logger.info("Successfully mounted core routes at /api/core")
+# except Exception as e:
+#     logger.error(f"Error loading core_routes router: {str(e)}")
+#     logger.warning("Core routes not available - this may be expected if they're not used")
 
 # Import document routes
 try:
     from routes.document_library import router as document_router
-    app.include_router(document_router, prefix="/api", tags=["documents"])
-    logger.info("Successfully mounted document routes at /api")
+    app.include_router(document_router, tags=["documents"])
+    logger.info("Successfully mounted document routes")
 except Exception as e:
     logger.error(f"Error loading document_library router: {str(e)}")
     raise

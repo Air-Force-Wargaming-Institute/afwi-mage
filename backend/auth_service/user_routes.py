@@ -12,7 +12,7 @@ from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/users/token")
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -54,7 +54,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return user
 
-@router.post("/token", response_model=Token)
+@router.post("/api/auth/users/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if user is False:
@@ -69,7 +69,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/", response_model=UserOut)
+@router.post("/api/auth/users/", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.permission != UserPermission.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized to create users")
@@ -79,18 +79,18 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), current_user: U
     db.refresh(db_user)
     return db_user
 
-@router.get("/", response_model=List[UserOut])
+@router.get("/api/auth/users/", response_model=List[UserOut])
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.permission not in [UserPermission.ADMIN, UserPermission.DATA_SCIENTIST]:
         raise HTTPException(status_code=403, detail="Not authorized to view all users")
     users = db.query(User).offset(skip).limit(limit).all()
     return users
 
-@router.get("/me", response_model=UserOut)
+@router.get("/api/auth/users/me", response_model=UserOut)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
-@router.put("/{user_id}", response_model=UserOut)
+@router.put("/api/auth/users/{user_id}", response_model=UserOut)
 def update_user(
     user_id: int,
     user_update: UserCreate,
@@ -116,7 +116,7 @@ def update_user(
     db.refresh(db_user)
     return db_user
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/auth/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -141,4 +141,17 @@ def delete_user(
     db.delete(db_user)
     db.commit()
     return None
+
+@router.get("/api/auth/users/validate-token")
+async def validate_token(current_user: User = Depends(get_current_user)):
+    """
+    Endpoint for API Gateway ForwardAuth middleware to validate tokens.
+    Returns 200 if token is valid, 401 if invalid.
+    """
+    return {
+        "status": "valid",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "permission": current_user.permission
+    }
 

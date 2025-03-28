@@ -13,7 +13,7 @@
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       - DISABLE_AUTH=${DISABLE_AUTH:-false}
-      - PUBLIC_PATHS=/api/health,/api/users/token,/api/users/login,/docs,/
+      - PUBLIC_PATHS=/api/health,/api/auth/users/token,/api/auth/users/login,/docs,/
       - DEV_MODE=${DEV_MODE:-false}
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost
       - PORT=8010
@@ -32,7 +32,7 @@
       start_period: 10s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=PathPrefix(`/api/users`)"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth/users`)"
       - "traefik.http.services.auth.loadbalancer.server.port=8010"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.middlewares=cors" 

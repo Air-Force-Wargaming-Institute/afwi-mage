@@ -42,7 +42,7 @@ http:
     # Authentication Middleware
     auth-jwt:
       forwardAuth:
-        address: "http://auth:8010/api/users/validate-token"
+        address: "http://auth:8010/api/auth/users/validate-token"
         trustForwardHeader: true
     
     # Compression Middleware
@@ -100,7 +100,7 @@ http:
   routers:
     # Core Service Routes
     core-router:
-      rule: "PathPrefix(`/api/documents`) || Path(`/`)"
+      rule: "PathPrefix(`/api/core/documents`) || Path(`/`)"
       service: core
       middlewares:
         - auth-jwt
@@ -136,7 +136,7 @@ http:
     
     # Auth Service Routes
     auth-router:
-      rule: "PathPrefix(`/api/users`) || Path(`/api/health`)"
+      rule: "PathPrefix(`/api/auth`) || Path(`/api/auth/health`)"
       service: auth
       middlewares:
         - compress
@@ -159,7 +159,7 @@ http:
     
     # Agent Service Routes
     agent-router:
-      rule: "PathPrefix(`/api/agents`)"
+      rule: "PathPrefix(`/api/agent`)"
       service: agent
       middlewares:
         - auth-jwt

@@ -155,7 +155,7 @@ def create_metadata(
 
     return metadata
 
-@router.post("/create_folder/")
+@router.post("/api/upload/create_folder/")
 async def create_folder(folder_data: FolderCreate):
     folder_path = Path(UPLOAD_DIR) / (folder_data.parent_folder or "") / folder_data.name
     if folder_path.exists():
@@ -163,7 +163,7 @@ async def create_folder(folder_data: FolderCreate):
     folder_path.mkdir(parents=True, exist_ok=True)
     return {"message": f"Folder '{folder_data.name}' created successfully"}
 
-@router.post("/rename_folder/")
+@router.post("/api/upload/rename_folder/")
 async def rename_folder(folder_data: FolderRename):
     old_path = Path(UPLOAD_DIR) / (folder_data.parent_folder or "") / folder_data.old_name
     new_path = Path(UPLOAD_DIR) / (folder_data.parent_folder or "") / folder_data.new_name
@@ -174,7 +174,7 @@ async def rename_folder(folder_data: FolderRename):
     old_path.rename(new_path)
     return {"message": f"Folder renamed from '{folder_data.old_name}' to '{folder_data.new_name}' successfully"}
 
-@router.post("/rename_file/")
+@router.post("/api/upload/rename_file/")
 async def rename_file(file_rename: FileRename):
     logger.info(f"Received rename request: {file_rename}")
     logger.info(f"UPLOAD_DIR: {UPLOAD_DIR}")
@@ -251,7 +251,7 @@ async def rename_file(file_rename: FileRename):
         logger.error(f"Error renaming file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An error occurred while renaming the file: {str(e)}")
 
-@router.delete("/delete_folder/{folder_path:path}")
+@router.delete("/api/upload/delete_folder/{folder_path:path}")
 async def delete_folder(folder_path: str):
     full_path = Path(UPLOAD_DIR) / folder_path
     if not full_path.exists():
@@ -259,7 +259,7 @@ async def delete_folder(folder_path: str):
     shutil.rmtree(full_path)
     return {"message": f"Folder '{folder_path}' deleted successfully"}
 
-@router.get("/files/")
+@router.get("/api/upload/files/")
 async def list_files(folder: Optional[str] = "", recursive: bool = False):
     base_folder = Path(UPLOAD_DIR) / folder if folder else Path(UPLOAD_DIR)
     if not base_folder.exists():
@@ -323,7 +323,7 @@ def get_file_type(file_name: str) -> str:
     else:
         return 'Unknown'
 
-@router.post("/upload/")
+@router.post("/api/upload/")
 async def upload_files(files: List[UploadFile] = File(...), folder: Optional[str] = ""):
     uploaded_files = []
     errors = []
@@ -416,7 +416,7 @@ async def upload_files(files: List[UploadFile] = File(...), folder: Optional[str
             }
         )
 
-@router.delete("/files/{filename:path}")
+@router.delete("/api/upload/files/{filename:path}")
 async def delete_file(filename: str):
     try:
         file_path = Path(UPLOAD_DIR) / filename
@@ -459,7 +459,7 @@ async def delete_file(filename: str):
         logger.error(f"Error deleting file {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An error occurred while deleting the file: {str(e)}")
 
-@router.post("/bulk-delete/")
+@router.post("/api/upload/bulk-delete/")
 async def bulk_delete(request: BulkDeleteRequest):
     logger.info(f"Received request to delete files: {request.filenames}")
     deleted_items = []
@@ -514,7 +514,7 @@ async def bulk_delete(request: BulkDeleteRequest):
     logger.info(f"Successfully deleted {len(deleted_items)} items")
     return response_data
 
-@router.post("/bulk-download/")
+@router.post("/api/upload/bulk-download/")
 async def bulk_download(request: BulkDownloadRequest):
     logger.info(f"Received request to download files: {request.filenames}")
     logger.info(f"Current folder: {request.current_folder}")
@@ -553,7 +553,7 @@ async def bulk_download(request: BulkDownloadRequest):
         logger.error(f"Error creating zip file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating zip file: {str(e)}")
 
-@router.post("/move-file/")
+@router.post("/api/upload/move-file/")
 async def move_file(request: FileMoveRequest):
     target_path = Path(UPLOAD_DIR) / request.target_folder.lstrip('/')
     
@@ -649,7 +649,7 @@ async def move_file(request: FileMoveRequest):
             "results": results
         })
 
-@router.post("/update-security/")
+@router.post("/api/upload/update-security/")
 async def update_security_classification(request: SecurityUpdateRequest):
     file_path = Path(UPLOAD_DIR) / request.filename
     metadata_path = file_path.with_suffix('.metadata')
@@ -695,14 +695,14 @@ async def update_security_classification(request: SecurityUpdateRequest):
         logger.error(f"Error updating security classification: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating security classification: {str(e)}")
 
-@router.get("/files/{file_path:path}")
+@router.get("/api/upload/files/{file_path:path}")
 async def get_file(file_path: str):
     full_path = Path(UPLOAD_DIR) / file_path
     if not full_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(full_path)
 
-@router.post("/delete-pdf-page/")
+@router.post("/api/upload/delete-pdf-page/")
 async def delete_pdf_page(request: dict):
     file_path = request.get("file_path")
     page_number = request.get("page_number")
@@ -742,7 +742,7 @@ async def delete_pdf_page(request: dict):
             temp_path.unlink()
         raise HTTPException(status_code=500, detail=f"Failed to delete page: {str(e)}")
 
-@router.get("/preview-docx/{file_path:path}")
+@router.get("/api/upload/preview-docx/{file_path:path}")
 async def preview_docx(file_path: str):
     try:
         full_path = Path(UPLOAD_DIR) / file_path
@@ -794,7 +794,7 @@ async def preview_docx(file_path: str):
         logger.error(f"Error previewing DOCX file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/preview-txt/{file_path:path}")
+@router.get("/api/upload/preview-txt/{file_path:path}")
 async def preview_txt(file_path: str):
     full_path = Path(UPLOAD_DIR) / file_path
     if not full_path.is_file():
@@ -808,7 +808,7 @@ async def preview_txt(file_path: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error previewing TXT: {str(e)}")
 
-@router.get("/pdf-info/{file_path:path}")
+@router.get("/api/upload/pdf-info/{file_path:path}")
 async def get_pdf_info(file_path: str):
     full_path = Path(UPLOAD_DIR) / file_path
     if not full_path.is_file():
@@ -823,7 +823,7 @@ async def get_pdf_info(file_path: str):
         logger.error(f"Error getting PDF info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting PDF info: {str(e)}")
 
-@router.get("/preview-tabular/{file_path:path}", response_model=TabularPreviewResponse)
+@router.get("/api/upload/preview-tabular/{file_path:path}", response_model=TabularPreviewResponse)
 async def preview_tabular_file(file_path: str, max_rows: int = 5):
     """Preview Excel (.xlsx, .xls) or CSV files"""
     try:

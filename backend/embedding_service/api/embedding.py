@@ -35,7 +35,8 @@ except ImportError as e:
             raise
 
 # Set up router
-router = APIRouter(prefix="/models", tags=["embedding models"])
+# router = APIRouter(prefix="/models", tags=["embedding models"])
+router = APIRouter(tags=["embedding models"])
 
 
 class EmbeddingModelInfo(BaseModel):
@@ -58,7 +59,7 @@ class EmbeddingModelInfo(BaseModel):
     }
 
 
-@router.get("", response_model=List[EmbeddingModelInfo])
+@router.get("/api/embedding/models", response_model=List[EmbeddingModelInfo])
 async def get_models():
     """
     Get a list of available embedding models.

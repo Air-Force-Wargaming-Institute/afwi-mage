@@ -6,7 +6,7 @@ http:
     # Authentication middleware using ForwardAuth
     auth-middleware:
       forwardAuth:
-        address: "http://localhost:8010/api/users/validate-token"
+        address: "http://auth:8010/api/auth/users/validate-token"
         trustForwardHeader: true
         authResponseHeaders:
           - "X-User-ID"
@@ -79,7 +79,7 @@ http:
 
     # Auth Service Router
     auth-router:
-      rule: "PathPrefix(`/api/users`) || Path(`/api/auth/health`)"
+      rule: "PathPrefix(`/api/auth`) || Path(`/api/auth/health`)"
       service: "auth-service"
       entryPoints:
         - "web"
@@ -115,7 +115,7 @@ http:
       
     # Core Service Router
     core-router:
-      rule: "PathPrefix(`/api/documents`) || Path(`/`) || Path(`/api/core/health`)"
+      rule: "PathPrefix(`/api/core/documents`) || Path(`/`) || Path(`/api/core/health`)"
       service: "core-service"
       entryPoints:
         - "web"
@@ -165,7 +165,7 @@ http:
         
     # Agent Service Router
     agent-router:
-      rule: "PathPrefix(`/api/agents`) || Path(`/api/agent/health`)"
+      rule: "PathPrefix(`/api/agent`) || Path(`/api/agent/health`)"
       service: "agent-service"
       entryPoints:
         - "web"

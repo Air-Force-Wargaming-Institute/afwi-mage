@@ -157,7 +157,7 @@ function ConversationTree() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get('http://localhost:8009/conversations/list');
+      const response = await axios.get('http://localhost:8009/api/chat/conversations/list');
       setConversations(response.data);
     } catch (error) {
       console.error('Error fetching conversations:', error);

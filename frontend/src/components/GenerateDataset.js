@@ -77,7 +77,7 @@ function GenerateDataset() {
 
   const handleCreateDataset = async () => {
     try {
-      const response = await axios.post(getApiUrl('GENERATION', '/api/generate/dataset/'), {
+      const response = await axios.post(getApiUrl('GENERATION', '/api/generate/generate-dataset/'), {
         sourceFile: selectedCsv,
         datasetName: finalDatasetName
       });
