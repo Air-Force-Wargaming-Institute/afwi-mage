@@ -4,9 +4,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Set, Tuple, Any
 from datetime import datetime
 from config import config
-from langchain_ollama import ChatOllama
-from langchain_ollama import OllamaEmbeddings
-from langchain_community.llms.vllm import VLLMOpenAI
+from vllm_chat import VLLMOpenAIChat
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -23,12 +21,16 @@ import logging
 # Add these imports for vectorstore functionality and fallback loading
 from langchain_community.vectorstores import FAISS
 
+log_dir = Path('/app/data/logs')
+log_dir.mkdir(parents=True, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
+    filename=log_dir / 'direct_chat_service.log',
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("direct_chat_service")
+logger = logging.getLogger(__name__)
 
 # Define constants for paths
 SESSIONS_DIR = Path("sessions")
@@ -126,7 +128,7 @@ chat_sessions: Dict[str, ChatSession] = {}
 document_metadata: Dict[str, Dict[str, DocumentMetadata]] = {}  # session_id -> {doc_id -> metadata}
 
 # Initialize LangChain components
-llm = VLLMOpenAI(
+llm = VLLMOpenAIChat(
     openai_api_base="http://host.docker.internal:8007/v1", # Connect to local vLLM server running on port 8000
     openai_api_key="dummy-key",  # Required by the wrapper but not actually verified by vLLM
     model_name=config.model_service.default_model,
@@ -134,6 +136,7 @@ llm = VLLMOpenAI(
     top_p=config.model_service.top_p,
     max_tokens=config.model_service.context_window,  # Using context_window as max_tokens
     stop=config.model_service.stop
+
 )
 
 # Create chat prompt template
