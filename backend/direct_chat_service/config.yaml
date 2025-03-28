@@ -4,9 +4,11 @@ service:
   port: 8011
   debug: true
 
-model_service:
-  url: http://model_service:8008
-  default_model: /models/DeepHermes-3-Llama-3-8B-Preview
+vllm:
+  chat_completion_url: http://host.docker.internal:8007/v1
+  embedding_url: http://host.docker.internal:8007/v1
+  chat_model: /models/DeepHermes-3-Llama-3-8B-Preview
+  embedding_model: /models/DeepHermes-3-Llama-3-8B-Preview
   max_tokens: 4096
   temperature: 0.4
   timeout: 300

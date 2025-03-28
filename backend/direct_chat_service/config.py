@@ -21,8 +21,11 @@ class OllamaConfig(BaseModel):
         'protected_namespaces': ()
     }
 
-class ModelServiceConfig(BaseModel):
-    default_model: str
+class vLLMConfig(BaseModel):
+    chat_completion_url: str
+    embedding_url: str
+    chat_model: str
+    embedding_model: str
     max_tokens: int = Field(gt=0, default=4096)
     temperature: float = Field(ge=0.0, le=1.0, default=0.4)
     timeout: int = Field(ge=30, default=300)  # Timeout in seconds
@@ -54,7 +57,7 @@ class ChatLoggingConfig(BaseModel):
 
 class Config(BaseModel):
     service: ServiceConfig
-    model_service: ModelServiceConfig
+    vllm: vLLMConfig
     api: ApiConfig
     cors: CorsConfig
     chat_logging: ChatLoggingConfig

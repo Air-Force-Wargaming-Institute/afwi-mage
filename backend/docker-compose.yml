@@ -228,7 +228,39 @@ services:
               count: all
               capabilities: [gpu]
     ipc: host
-    command: --model /models/DeepHermes-3-Llama-3-8B-Preview --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.95 --max-model-len=65536
+    command: --model /models/DeepHermes-3-Llama-3-8B-Preview --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.85 --max-model-len=65536
+
+  vllm_embeddings:
+    image: vllm/vllm-openai:latest
+    ports:
+      - "8012:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1
+      - MAX_NUM_BATCHED_TOKENS=4096
+      - MAX_NUM_SEQS=256
+      - MAX_PADDING_LENGTH=256
+      - MAX_MODEL_LEN=4096
+      - QUANTIZATION=awq
+      - TRUST_REMOTE_CODE=true
+      - HF_DATASETS_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+      - TENSOR_PARALLEL_SIZE=2
+      - GPU_MEMORY_UTILIZATION=0.95
+      - OMP_NUM_THREADS=12
+    volumes:
+      - ../models:/models
+      - ../data:/data
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    command: --model /models/nomic-embed-text-v1.5 --tokenizer /models/nomic-embed-text-v1.5 --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.1 --max-model-len=65536
 
 
 volumes:

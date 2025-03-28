@@ -21,6 +21,9 @@ import logging
 # Add these imports for vectorstore functionality and fallback loading
 from langchain_community.vectorstores import FAISS
 
+# Add this import at the top with other imports
+from langchain_openai import OpenAIEmbeddings
+
 log_dir = Path('/app/data/logs')
 log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,13 +132,13 @@ document_metadata: Dict[str, Dict[str, DocumentMetadata]] = {}  # session_id -> 
 
 # Initialize LangChain components
 llm = VLLMOpenAIChat(
-    openai_api_base="http://host.docker.internal:8007/v1", # Connect to local vLLM server running on port 8000
+    openai_api_base=config.vllm.chat_completion_url, # Connect to local vLLM server running on port 8000
     openai_api_key="dummy-key",  # Required by the wrapper but not actually verified by vLLM
-    model_name=config.model_service.default_model,
-    temperature=config.model_service.temperature,
-    top_p=config.model_service.top_p,
-    max_tokens=config.model_service.context_window,  # Using context_window as max_tokens
-    stop=config.model_service.stop
+    model_name=config.vllm.chat_model,
+    temperature=config.vllm.temperature,
+    top_p=config.vllm.top_p,
+    max_tokens=config.vllm.context_window,  # Using context_window as max_tokens
+    stop=config.vllm.stop
 
 )
 
@@ -750,12 +753,13 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
                 logger.info(f"Session {request.session_id}: Attempting to load vectorstore from path: {vectorstore_path}")
                 logger.info(f"Session {request.session_id}: Path exists: {vectorstore_path.exists()}")
                 
-                # Initialize embeddings using Ollama's API instead of a separate embedding service
-                # This approach is similar to what chat_service uses
-                logger.info(f"Session {request.session_id}: Initializing embeddings with Ollama at: {config.ollama.base_url}")
-                embeddings = OllamaEmbeddings(
-                    base_url=config.ollama.base_url,
-                    model="nomic-embed-text"  # Use specific embedding model that's available
+                # Initialize embeddings using vLLM's OpenAI-compatible API instead of Ollama
+                logger.info(f"Session {request.session_id}: Initializing embeddings with vLLM at {config.vllm.embedding_url}")
+                embeddings = OpenAIEmbeddings(
+                    model=config.vllm.embedding_model,
+                    openai_api_base=config.vllm.embedding_url,
+                    openai_api_key="EMPTY",  # Not used by vLLM but required by the wrapper
+                    dimensions=768  # Specify the embedding dimensions for nomic-embed-text
                 )
                 
                 # Load the FAISS vectorstore using the correct method for these versions
