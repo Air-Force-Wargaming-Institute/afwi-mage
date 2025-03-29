@@ -18,6 +18,8 @@ export const WorkbenchProvider = ({ children }) => {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [visualizations, setVisualizations] = useState([]);
   const [apiBaseUrl, setApiBaseUrl] = useState('');
+  const [jobs, setJobs] = useState([]);
+  const [activeJobId, setActiveJobId] = useState(null);
 
   // Setup axios headers with authentication token
   useEffect(() => {
@@ -110,7 +112,22 @@ export const WorkbenchProvider = ({ children }) => {
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/transform`);
       console.log('Transforming spreadsheet with URL:', url);
-      console.log('Transformation parameters:', transformationParams);
+      console.log('Transformation parameters:', JSON.stringify(transformationParams, null, 2));
+      
+      // Log additional details about the enhanced transformation for debugging
+      if (transformationParams.output_columns) {
+        console.log('Enhanced output column configuration:');
+        transformationParams.output_columns.forEach((col, index) => {
+          console.log(`Column ${index + 1}: ${col.name} (${col.is_new ? 'New' : 'Existing'})`);
+          console.log(`  Type: ${col.output_type || 'text'}`);
+          console.log(`  Type Options:`, col.type_options || {});
+          console.log(`  Instructions: ${col.description}`);
+        });
+      }
+      
+      if (transformationParams.create_duplicate !== undefined) {
+        console.log('Creating duplicate spreadsheet:', transformationParams.create_duplicate);
+      }
       
       const response = await axios.post(url, transformationParams, options);
       console.log('Transformation response:', response.data);
@@ -139,6 +156,178 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
+  };
+
+  // Job management functions
+  
+  // Fetch job status from API
+  const getJobStatus = async (jobId, options = {}) => {
+    setError(null);
+    
+    try {
+      const url = joinPaths(apiBaseUrl, `api/workbench/jobs/${jobId}`);
+      console.log('Fetching job status from URL:', url);
+      const response = await axios.get(url, options);
+      
+      // Update job in the jobs array
+      setJobs(prevJobs => 
+        prevJobs.map(job => 
+          job.id === jobId ? { ...job, ...response.data } : job
+        )
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching job status for job ${jobId}:`, error);
+      
+      // If backend connection not available, use mock data for development
+      if (connectionError || error.message === 'Network Error') {
+        console.log('Using mock data for job status due to connection issue');
+        
+        // Find the job in our local state
+        const job = jobs.find(j => j.id === jobId);
+        if (job) {
+          // Simulate progress update
+          const updatedJob = { 
+            ...job, 
+            progress: Math.min(100, job.progress + 10),
+            status: job.progress + 10 >= 100 ? 'completed' : 'running',
+            completed_at: job.progress + 10 >= 100 ? new Date().toISOString() : null,
+            message: job.progress + 10 >= 100 ? 'Successfully completed job' : 'Processing data...'
+          };
+          
+          // Update local state
+          setJobs(prevJobs => prevJobs.map(j => j.id === jobId ? updatedJob : j));
+          
+          return updatedJob;
+        }
+      } else {
+        setError(`Failed to fetch job status: ${error.message}`);
+        throw error;
+      }
+    }
+  };
+
+  // List all jobs
+  const listJobs = async (filter = {}, options = {}) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const url = joinPaths(apiBaseUrl, 'api/workbench/jobs/list');
+      console.log('Listing jobs from URL:', url);
+      const response = await axios.get(url, { params: filter, ...options });
+      setJobs(response.data);
+      setIsLoading(false);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      
+      // If backend connection not available, use mock data for development
+      if (connectionError || error.message === 'Network Error') {
+        console.log('Using mock data for jobs due to connection issue');
+        
+        // Create mock data for development
+        const mockJobs = [
+          {
+            id: '123456',
+            type: 'column_transformation',
+            status: 'running',
+            progress: 30,
+            created_at: new Date(Date.now() - 240000).toISOString(), // 4 minutes ago
+            parameters: { sheet_name: 'Sheet1' },
+            message: 'Processing data...'
+          },
+          {
+            id: '123455',
+            type: 'column_transformation',
+            status: 'completed',
+            progress: 100,
+            created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+            completed_at: new Date(Date.now() - 3540000).toISOString(), // 59 minutes ago
+            parameters: { sheet_name: 'Sheet2' },
+            message: 'Successfully completed job',
+            result_url: '#/sample-result.xlsx'
+          }
+        ];
+        
+        setJobs(mockJobs);
+        setIsLoading(false);
+        
+        // Set the first job as active if not already set
+        if (!activeJobId && mockJobs.length > 0) {
+          setActiveJobId(mockJobs[0].id);
+        }
+        
+        return mockJobs;
+      } else {
+        setError('Failed to fetch jobs. Please try again.');
+        setIsLoading(false);
+        throw error;
+      }
+    }
+  };
+
+  // Cancel a job
+  const cancelJob = async (jobId, options = {}) => {
+    setError(null);
+    
+    try {
+      const url = joinPaths(apiBaseUrl, `api/workbench/jobs/${jobId}/cancel`);
+      console.log('Cancelling job at URL:', url);
+      const response = await axios.post(url, {}, options);
+      
+      // Update job in the jobs array
+      setJobs(prevJobs => 
+        prevJobs.map(job => 
+          job.id === jobId ? { ...job, status: 'cancelled', message: 'Job cancelled by user' } : job
+        )
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Error cancelling job ${jobId}:`, error);
+      
+      // If backend connection not available, update local state for development
+      if (connectionError || error.message === 'Network Error') {
+        console.log('Using mock update for job cancellation due to connection issue');
+        
+        // Update job status in local state
+        setJobs(prevJobs => 
+          prevJobs.map(job => 
+            job.id === jobId ? { ...job, status: 'cancelled', message: 'Job cancelled by user' } : job
+          )
+        );
+        
+        return { success: true, message: 'Job cancelled' };
+      } else {
+        setError(`Failed to cancel job: ${error.message}`);
+        throw error;
+      }
+    }
+  };
+
+  // Track a transformation job
+  const trackTransformationJob = (jobId, parameters) => {
+    // Create a new job object for tracking
+    const newJob = {
+      id: jobId,
+      type: 'column_transformation',
+      status: 'submitted',
+      progress: 0,
+      created_at: new Date().toISOString(),
+      parameters,
+      message: 'Job submitted, waiting to start processing'
+    };
+    
+    // Add to jobs list
+    setJobs(prevJobs => [...prevJobs, newJob]);
+    
+    // Set as active job
+    setActiveJobId(jobId);
+    
+    console.log(`Tracking new transformation job: ${jobId}`);
+    return newJob;
   };
 
   // Upload a new spreadsheet
@@ -435,6 +624,8 @@ export const WorkbenchProvider = ({ children }) => {
       apiBaseUrl,
       analysisResults,
       visualizations,
+      jobs,
+      activeJobId,
       setSelectedTool,
       setActiveView,
       fetchSpreadsheets,
@@ -450,7 +641,12 @@ export const WorkbenchProvider = ({ children }) => {
       deleteSpreadsheet,
       updateSpreadsheet,
       clearError,
-      transformSpreadsheet
+      transformSpreadsheet,
+      getJobStatus,
+      listJobs,
+      cancelJob,
+      trackTransformationJob,
+      setActiveJobId
     }}>
       {children}
     </WorkbenchContext.Provider>

@@ -65,12 +65,25 @@ const WorkbenchDashboard = () => {
   };
 
   return (
-    <div className="root-container" style={{ display: 'flex', minHeight: '80vh' }}>
+    <div style={{ 
+      height: '100%',
+      width: '100%', 
+      display: 'flex',
+      overflow: 'hidden'
+    }}>
       {/* Left sidebar */}
       <Sidebar />
       
       {/* Main content area */}
-      <Paper className="main-content" style={{ flexGrow: 1, overflow: 'auto' }}>
+      <div style={{ 
+        flexGrow: 1, 
+        height: '100%',
+        minHeight: 'calc(100vh - 200px)',
+        display: 'flex', 
+        flexDirection: 'column',
+        overflowY: 'auto',
+        padding: '16px'
+      }}>
         {/* Regular error notification */}
         {error && (
           <Alert 
@@ -99,8 +112,17 @@ const WorkbenchDashboard = () => {
         )}
         
         {/* Content - always visible */}
-        {renderToolComponent()}
-      </Paper>
+        <div style={{ 
+          flexGrow: 1,
+          width: '100%',
+          backgroundColor: 'var(--container-bg-color)',
+          borderRadius: 'var(--border-radius)',
+          boxShadow: 'var(--box-shadow)',
+          padding: '24px'
+        }}>
+          {renderToolComponent()}
+        </div>
+      </div>
     </div>
   );
 };
