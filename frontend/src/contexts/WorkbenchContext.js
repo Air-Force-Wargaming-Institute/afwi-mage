@@ -348,6 +348,76 @@ export const WorkbenchProvider = ({ children }) => {
     }
   };
 
+  // Delete a spreadsheet
+  const deleteSpreadsheet = async (spreadsheetId) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}`);
+      const response = await axios.delete(url);
+      
+      // Remove the spreadsheet from the local state
+      setSpreadsheets(prev => prev.filter(sheet => sheet.id !== spreadsheetId));
+      
+      // If this was the selected spreadsheet, clear the selection
+      if (selectedSpreadsheet && selectedSpreadsheet.id === spreadsheetId) {
+        setSelectedSpreadsheet(null);
+      }
+      
+      setIsLoading(false);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting spreadsheet:', error);
+      if (error.message === 'Network Error') {
+        setConnectionError(true);
+        setError('Cannot connect to backend services. Please ensure the backend is running.');
+      } else {
+        setError('Failed to delete spreadsheet. Please try again.');
+      }
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Update spreadsheet metadata (like filename)
+  const updateSpreadsheet = async (spreadsheetId, updates) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}`);
+      const response = await axios.patch(url, updates);
+      
+      // Update the spreadsheet in the local state
+      setSpreadsheets(prev => 
+        prev.map(sheet => 
+          sheet.id === spreadsheetId 
+            ? { ...sheet, ...response.data } 
+            : sheet
+        )
+      );
+      
+      // If this was the selected spreadsheet, update it
+      if (selectedSpreadsheet && selectedSpreadsheet.id === spreadsheetId) {
+        setSelectedSpreadsheet(prev => ({ ...prev, ...response.data }));
+      }
+      
+      setIsLoading(false);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating spreadsheet:', error);
+      if (error.message === 'Network Error') {
+        setConnectionError(true);
+        setError('Cannot connect to backend services. Please ensure the backend is running.');
+      } else {
+        setError('Failed to update spreadsheet. Please try again.');
+      }
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
   // Clear error state
   const clearError = () => {
     setError(null);
@@ -377,6 +447,8 @@ export const WorkbenchProvider = ({ children }) => {
       generateVisualization,
       executeVisualizationCode,
       extractDataContext,
+      deleteSpreadsheet,
+      updateSpreadsheet,
       clearError,
       transformSpreadsheet
     }}>

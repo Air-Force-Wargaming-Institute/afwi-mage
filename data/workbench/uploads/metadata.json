@@ -1,112 +1,253 @@
 {
-  "3eb485c1-85c8-48a7-9573-e53ee02fe830": {
-    "filename": "1617fedschoolcodelist.xls",
-    "size_bytes": 569667,
-    "sheet_count": 1,
+  "fd1eb63e-b69a-4ea7-8065-8b37b55bac6a": {
+    "filename": "SampleData.xlsx",
+    "size_bytes": 36046,
+    "sheet_count": 3,
     "sheets": [
-      "3rd Quarter FSC"
-    ],
-    "columns": [
-      "SchoolCode",
-      "SchoolName",
-      "Address",
-      "City",
-      "StateCode",
-      "ZipCode",
-      "Province",
-      "Country",
-      "PostalCode"
-    ],
-    "row_count": 6980,
-    "id": "3eb485c1-85c8-48a7-9573-e53ee02fe830",
-    "description": null,
-    "upload_date": "2025-03-28T22:14:53.444790",
-    "storage_path": "/app/data/workbench/uploads/3eb485c1-85c8-48a7-9573-e53ee02fe830.xls"
-  },
-  "8cec604b-9609-4b51-8b22-38d4f3e3efc6": {
-    "filename": "PortfolioSummary.xls",
-    "size_bytes": 62464,
-    "sheet_count": 1,
-    "sheets": [
-      "PortfolioSummary"
-    ],
-    "columns": [
-      "Federal Student Aid Portfolio Summary",
-      "Unnamed: 1",
-      "Unnamed: 2",
-      "Unnamed: 3",
-      "Unnamed: 4",
-      "Unnamed: 5",
-      "Unnamed: 6",
-      "Unnamed: 7",
-      "Unnamed: 8",
-      "Unnamed: 9"
-    ],
-    "row_count": 64,
-    "id": "8cec604b-9609-4b51-8b22-38d4f3e3efc6",
-    "description": null,
-    "upload_date": "2025-03-28T22:28:09.945658",
-    "storage_path": "/app/data/workbench/uploads/8cec604b-9609-4b51-8b22-38d4f3e3efc6.xls"
-  },
-  "6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b": {
-    "filename": "Call-Center-Sentiment-Sample-Data.xlsx",
-    "size_bytes": 16207,
-    "sheet_count": 1,
-    "sheets": [
-      "Call Center Data"
+      "Instructions",
+      "SalesOrders",
+      "MyLinks"
     ],
     "columns": [
       "Unnamed: 0",
       "Unnamed: 1",
-      "Unnamed: 2",
-      "Unnamed: 3",
-      "Unnamed: 4",
-      "Unnamed: 5",
-      "Unnamed: 6",
-      "Unnamed: 7",
-      "Unnamed: 8",
-      "Unnamed: 9",
-      "Unnamed: 10",
-      "Unnamed: 11",
-      "Unnamed: 12"
+      "Unnamed: 2"
     ],
-    "row_count": 75,
-    "id": "6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b",
+    "row_count": 26,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 26
+      },
+      "SalesOrders": {
+        "columns": [
+          "OrderDate",
+          "Region",
+          "Rep",
+          "Item",
+          "Units",
+          "Unit Cost",
+          "Total"
+        ],
+        "row_count": 43
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "fd1eb63e-b69a-4ea7-8065-8b37b55bac6a",
     "description": null,
-    "upload_date": "2025-03-28T22:34:06.889345",
-    "storage_path": "/app/data/workbench/uploads/6c2e2ce7-a06e-4d79-a851-e4ae6358ba6b.xlsx"
+    "upload_date": "2025-03-29T01:38:50.743524",
+    "storage_path": "/app/data/workbench/uploads/fd1eb63e-b69a-4ea7-8065-8b37b55bac6a.xlsx",
+    "modified_filename": "SampleD.xlsx",
+    "modified_date": "2025-03-29T01:53:47.350250"
   },
-  "c32150c7-9bba-4ee4-a4d9-02115e6d4584": {
-    "filename": "Hardware Software Training Plan.xlsx",
-    "size_bytes": 17500,
-    "sheet_count": 1,
+  "db849153-a7c9-4563-9582-d1b8ca818f21": {
+    "filename": "sampledatasafety.xlsx",
+    "size_bytes": 73294,
+    "sheet_count": 3,
     "sheets": [
-      "Sheet1"
+      "Instructions",
+      "SafetyData",
+      "MyLinks"
     ],
     "columns": [
-      "Networking"
-    ],
-    "row_count": 107,
-    "id": "c32150c7-9bba-4ee4-a4d9-02115e6d4584",
-    "description": null,
-    "upload_date": "2025-03-28T22:34:42.706075",
-    "storage_path": "/app/data/workbench/uploads/c32150c7-9bba-4ee4-a4d9-02115e6d4584.xlsx"
-  },
-  "8fca093f-4c8a-4e95-bf9b-e2e8ef20351f": {
-    "filename": "Network Troubleshooting Tools.xlsx",
-    "size_bytes": 15321,
-    "sheet_count": 1,
-    "sheets": [
-      "Sheet1"
-    ],
-    "columns": [
-      "Ethernet",
-      "Unnamed: 1"
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
     ],
     "row_count": 24,
-    "id": "8fca093f-4c8a-4e95-bf9b-e2e8ef20351f",
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 24
+      },
+      "SafetyData": {
+        "columns": [
+          "Date",
+          "Injury Location",
+          "Gender",
+          "Age Group",
+          "Incident Type",
+          "Days Lost",
+          "Plant",
+          "Report Type",
+          "Shift",
+          "Department",
+          "Incident Cost",
+          "WkDay",
+          "Month",
+          "Year"
+        ],
+        "row_count": 514
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "db849153-a7c9-4563-9582-d1b8ca818f21",
     "description": null,
-    "upload_date": "2025-03-28T22:35:09.454518",
-    "storage_path": "/app/data/workbench/uploads/8fca093f-4c8a-4e95-bf9b-e2e8ef20351f.xlsx"
+    "original_filename": "sampledatasafety.xlsx",
+    "modified_filename": "sampledatasafety.xlsx",
+    "upload_date": "2025-03-29T01:55:04.645434",
+    "modified_date": "2025-03-29T01:55:04.645434",
+    "storage_path": "/app/data/workbench/uploads/db849153-a7c9-4563-9582-d1b8ca818f21.xlsx"
+  },
+  "63f658aa-ffaf-4c56-acd3-a784f1a20db1": {
+    "filename": "sampledatainsurance.xlsx",
+    "size_bytes": 61520,
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 23,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "63f658aa-ffaf-4c56-acd3-a784f1a20db1",
+    "description": null,
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance.xlsx",
+    "upload_date": "2025-03-29T01:55:10.533519",
+    "modified_date": "2025-03-29T01:55:10.533519",
+    "storage_path": "/app/data/workbench/uploads/63f658aa-ffaf-4c56-acd3-a784f1a20db1.xlsx"
+  },
+  "24abf25b-dfb4-4ec3-bd67-d12717ff3831": {
+    "filename": "sampledataworkorders.xlsx",
+    "size_bytes": 217306,
+    "sheet_count": 4,
+    "sheets": [
+      "Instructions",
+      "WOs",
+      "AdminLists",
+      "MyLinks"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 24,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 24
+      },
+      "WOs": {
+        "columns": [
+          "WO",
+          "District",
+          "LeadTech",
+          "Service",
+          "Rush",
+          "ReqDate",
+          "WorkDate",
+          "Techs",
+          "WtyLbr",
+          "WtyParts",
+          "LbrHrs",
+          "PartsCost",
+          "Payment",
+          "Wait",
+          "LbrRate",
+          "LbrCost",
+          "LbrFee",
+          "PartsFee",
+          "TotalCost",
+          "TotalFee",
+          "ReqDay",
+          "WorkDay"
+        ],
+        "row_count": 1000
+      },
+      "AdminLists": {
+        "columns": [
+          "Unnamed: 0",
+          "Techs",
+          "LbrRate",
+          "Unnamed: 3",
+          "Payment",
+          "Unnamed: 5",
+          "LeadTech",
+          "Unnamed: 7",
+          "Service"
+        ],
+        "row_count": 6
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "24abf25b-dfb4-4ec3-bd67-d12717ff3831",
+    "description": null,
+    "original_filename": "sampledataworkorders.xlsx",
+    "modified_filename": "sampledataworkorders.xlsx",
+    "upload_date": "2025-03-29T01:55:15.426982",
+    "modified_date": "2025-03-29T01:55:15.426982",
+    "storage_path": "/app/data/workbench/uploads/24abf25b-dfb4-4ec3-bd67-d12717ff3831.xlsx"
   }
 }

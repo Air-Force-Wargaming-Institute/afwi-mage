@@ -13,6 +13,7 @@ import os
 import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends
+from fastapi.responses import FileResponse
 
 # Import Pydantic models
 from pydantic import BaseModel, Field
@@ -33,7 +34,9 @@ class SpreadsheetInfo(BaseModel):
     """Basic spreadsheet information."""
     id: str
     filename: str
+    original_filename: str
     upload_date: str
+    modified_date: str
     sheet_count: int
     size_bytes: int
     
@@ -41,8 +44,10 @@ class SpreadsheetInfo(BaseModel):
         "json_schema_extra": {
             "example": {
                 "id": "abc123",
-                "filename": "data_analysis.xlsx",
+                "filename": "renamed_data_analysis.xlsx",
+                "original_filename": "data_analysis.xlsx",
                 "upload_date": "2023-07-15T14:30:00Z",
+                "modified_date": "2023-07-16T09:15:00Z",
                 "sheet_count": 3,
                 "size_bytes": 45678
             }
@@ -100,6 +105,19 @@ class TransformationResult(BaseModel):
     job_id: Optional[str] = None
     preview: Optional[List[List[Any]]] = None
     error: Optional[str] = None
+
+class SpreadsheetUpdateRequest(BaseModel):
+    """Request to update spreadsheet metadata."""
+    filename: Optional[str] = None
+    description: Optional[str] = None
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "filename": "renamed_file.xlsx"
+            }
+        }
+    }
 
 @router.get("/list", response_model=List[SpreadsheetInfo])
 async def list_spreadsheets():
@@ -221,7 +239,9 @@ async def get_spreadsheet_info(spreadsheet_id: str):
         return {
             "id": info["id"],
             "filename": info["filename"],
+            "original_filename": info["original_filename"],
             "upload_date": info["upload_date"],
+            "modified_date": info["modified_date"],
             "sheet_count": info.get("sheet_count", 0),
             "size_bytes": info.get("size_bytes", 0)
         }
@@ -237,14 +257,35 @@ async def get_spreadsheet_sheets(spreadsheet_id: str):
         spreadsheet_id: ID of the spreadsheet
         
     Returns:
-        List of sheet names
+        List of sheet names with their metadata
     """
     logger.info(f"Get spreadsheet sheets endpoint called for ID: {spreadsheet_id}")
     
     try:
         info = spreadsheet_manager.get_spreadsheet_info(spreadsheet_id)
+        
+        # Create a response with sheets array and their metadata
+        sheet_details = []
+        sheets = info.get("sheets", [])
+        sheets_metadata = info.get("sheets_metadata", {})
+        
+        for sheet in sheets:
+            sheet_info = {
+                "name": sheet,
+                "row_count": 0,
+                "columns": []
+            }
+            
+            # Add metadata if available
+            if sheets_metadata and sheet in sheets_metadata:
+                sheet_info["row_count"] = sheets_metadata[sheet].get("row_count", 0)
+                sheet_info["columns"] = sheets_metadata[sheet].get("columns", [])
+            
+            sheet_details.append(sheet_info)
+        
         return {
-            "sheets": info.get("sheets", []),
+            "sheets": sheets,
+            "sheet_details": sheet_details,
             "spreadsheet_id": spreadsheet_id
         }
     except HTTPException as e:
@@ -292,6 +333,149 @@ async def get_spreadsheet_summary(
         raise HTTPException(
             status_code=500,
             detail=f"Error analyzing spreadsheet: {str(e)}"
+        )
+
+@router.delete("/{spreadsheet_id}")
+async def delete_spreadsheet(spreadsheet_id: str):
+    """
+    Delete a spreadsheet and its metadata.
+    
+    Args:
+        spreadsheet_id: ID of the spreadsheet to delete
+        
+    Returns:
+        Status message
+    """
+    logger.info(f"Delete spreadsheet endpoint called for ID: {spreadsheet_id}")
+    
+    try:
+        # Delete the spreadsheet using the manager
+        result = spreadsheet_manager.delete_spreadsheet(spreadsheet_id)
+        return {
+            "success": True,
+            "id": result["id"],
+            "filename": result["filename"],
+            "message": result["message"]
+        }
+    except HTTPException as e:
+        logger.error(f"HTTP error deleting spreadsheet: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Error deleting spreadsheet: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting spreadsheet: {str(e)}"
+        )
+
+@router.get("/{spreadsheet_id}/download")
+async def download_spreadsheet(spreadsheet_id: str):
+    """
+    Download a spreadsheet file.
+    
+    Args:
+        spreadsheet_id: ID of the spreadsheet to download
+        
+    Returns:
+        The spreadsheet file for download
+    """
+    logger.info(f"Download spreadsheet endpoint called for ID: {spreadsheet_id}")
+    
+    try:
+        # Get the file info
+        info = spreadsheet_manager.get_spreadsheet_info(spreadsheet_id)
+        
+        # Get the file path
+        file_path = spreadsheet_manager.get_spreadsheet_path(spreadsheet_id)
+        
+        # Determine the content type based on file extension
+        original_filename = info["original_filename"]
+        display_filename = info.get("modified_filename", original_filename)
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"  # Default for .xlsx
+        
+        if original_filename.lower().endswith(".csv"):
+            content_type = "text/csv"
+        elif original_filename.lower().endswith(".xls"):
+            content_type = "application/vnd.ms-excel"
+        
+        # Return the file as a streaming response
+        return FileResponse(
+            path=file_path,
+            filename=display_filename,
+            media_type=content_type
+        )
+        
+    except HTTPException as e:
+        logger.error(f"HTTP error downloading spreadsheet: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Error downloading spreadsheet: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error downloading spreadsheet: {str(e)}"
+        )
+
+@router.patch("/{spreadsheet_id}")
+async def update_spreadsheet(spreadsheet_id: str, request: SpreadsheetUpdateRequest):
+    """
+    Update spreadsheet metadata.
+    
+    Args:
+        spreadsheet_id: ID of the spreadsheet to update
+        request: Update request containing the new metadata
+        
+    Returns:
+        Updated spreadsheet information
+    """
+    logger.info(f"Update spreadsheet endpoint called for ID: {spreadsheet_id}")
+    
+    try:
+        # Get current info to check file extension
+        current_info = spreadsheet_manager.get_spreadsheet_info(spreadsheet_id)
+        
+        # Prepare updates
+        updates = {}
+        
+        # Handle filename update - preserve the original extension
+        if request.filename is not None:
+            original_filename = current_info.get("original_filename", current_info.get("filename", ""))
+            _, original_ext = os.path.splitext(original_filename)
+            
+            # Make sure the new filename has the same extension
+            new_filename, new_ext = os.path.splitext(request.filename)
+            if not new_ext:
+                # User didn't provide extension, add the original
+                updates["modified_filename"] = f"{request.filename}{original_ext}"
+            elif new_ext.lower() != original_ext.lower():
+                # User provided wrong extension, replace with original
+                updates["modified_filename"] = f"{new_filename}{original_ext}"
+            else:
+                # User provided correct extension
+                updates["modified_filename"] = request.filename
+        
+        # Handle description update
+        if request.description is not None:
+            updates["description"] = request.description
+        
+        # Update the metadata
+        updated_info = spreadsheet_manager.update_spreadsheet_metadata(spreadsheet_id, updates)
+        
+        return {
+            "success": True,
+            "id": updated_info["id"],
+            "filename": updated_info.get("modified_filename", updated_info.get("filename", "")),
+            "original_filename": updated_info.get("original_filename", ""),
+            "upload_date": updated_info.get("upload_date", ""),
+            "modified_date": updated_info.get("modified_date", ""),
+            "message": "Spreadsheet updated successfully"
+        }
+    except HTTPException as e:
+        logger.error(f"HTTP error updating spreadsheet: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Error updating spreadsheet: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating spreadsheet: {str(e)}"
         )
 
 @router.post("/{spreadsheet_id}/transform", response_model=TransformationResult)

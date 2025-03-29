@@ -93,12 +93,33 @@ class SpreadsheetProcessor:
                             status_code=400, 
                             detail=f"Cell range {cell_range} is invalid for this file"
                         )
+                
+                # Get total row count for the sheet (minus header)
+                total_row_count = sum(1 for _ in open(file_path)) - 1
+                
             else:
                 # For Excel files
                 # Get the sheet name if not specified
                 if sheet_name is None:
                     excel_file = pd.ExcelFile(file_path)
                     sheet_name = excel_file.sheet_names[0]
+                
+                # Get the full sheet once to determine total row count
+                full_sheet_df = None
+                try:
+                    # This is faster than reading the entire sheet for large files
+                    full_sheet_df = pd.read_excel(file_path, sheet_name=sheet_name, header=0, nrows=0)
+                    # Use the Excel sheet dimensions directly
+                    if hasattr(full_sheet_df, 'shape'):
+                        # This will get the number of rows if shape attribute exists
+                        total_row_count = pd.read_excel(file_path, sheet_name=sheet_name).shape[0]
+                    else:
+                        # Fallback
+                        total_row_count = len(pd.read_excel(file_path, sheet_name=sheet_name))
+                except Exception as e:
+                    logger.warning(f"Error getting row count for sheet {sheet_name}: {str(e)}")
+                    # Fallback to a default value
+                    total_row_count = 1000
                 
                 # Handle cell range for Excel
                 if cell_range:
@@ -137,27 +158,33 @@ class SpreadsheetProcessor:
             
             # Convert to list of lists for consistent output
             values = df.values.tolist()
+            
+            # Add header row if it exists
             header = df.columns.tolist()
+            if header:
+                values.insert(0, header)
             
-            # Insert header as first row
-            values.insert(0, header)
-            
-            return {
+            # Create result structure
+            result = {
                 "success": True,
                 "data": {
                     "values": values,
-                    "sheet_name": sheet_name,
-                    "range": cell_range,
-                    "row_count": len(df),
-                    "column_count": len(df.columns)
+                    "row_count": total_row_count,
+                    "column_count": len(df.columns),
+                    "sheet_name": sheet_name
                 }
             }
+            
+            return result
         
+        except HTTPException as e:
+            # Re-raise HTTP exceptions
+            raise e
         except Exception as e:
             logger.error(f"Error reading spreadsheet: {str(e)}")
             return {
                 "success": False,
-                "error": str(e)
+                "error": f"Failed to read spreadsheet: {str(e)}"
             }
     
     def _parse_cell_range(self, cell_range: str) -> Tuple[int, int, int, int]:

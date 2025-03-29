@@ -295,10 +295,16 @@ class SpreadsheetManager:
         # Get info about the file
         file_info = await self._extract_file_info(file_path, filename)
         
+        # Get current time for timestamps
+        current_time = datetime.now().isoformat()
+        
         # Add additional metadata
         file_info["id"] = file_id
         file_info["description"] = description
-        file_info["upload_date"] = datetime.now().isoformat()
+        file_info["original_filename"] = filename
+        file_info["modified_filename"] = filename  # Initially same as original filename
+        file_info["upload_date"] = current_time
+        file_info["modified_date"] = current_time  # Initially same as upload date
         file_info["storage_path"] = str(file_path)
         
         # Save to metadata
@@ -334,6 +340,14 @@ class SpreadsheetManager:
                 file_info["columns"] = df.columns.tolist()
                 file_info["row_count"] = sum(1 for _ in open(file_path)) - 1  # Subtract header
                 
+                # Store sheet-specific data in a sheets_metadata dictionary
+                file_info["sheets_metadata"] = {
+                    "Sheet1": {
+                        "columns": df.columns.tolist(),
+                        "row_count": file_info["row_count"]
+                    }
+                }
+                
             else:  # Excel files
                 # For Excel, get sheet names
                 excel_file = pd.ExcelFile(file_path)
@@ -342,14 +356,44 @@ class SpreadsheetManager:
                 file_info["sheet_count"] = len(sheets)
                 file_info["sheets"] = sheets
                 
-                # Get sample data from first sheet
-                if sheets:
-                    df = pd.read_excel(file_path, sheet_name=sheets[0], nrows=5)
-                    file_info["columns"] = df.columns.tolist()
-                    
-                    # Count rows (a bit expensive for large files, might want to optimize)
-                    full_df = pd.read_excel(file_path, sheet_name=sheets[0])
-                    file_info["row_count"] = len(full_df)
+                # Store sheet-specific metadata
+                sheets_metadata = {}
+                total_rows = 0
+                
+                # Process each sheet to get its metadata
+                for sheet_name in sheets:
+                    try:
+                        # Get sample data from sheet
+                        df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=5)
+                        
+                        # Count rows for this sheet
+                        full_df = pd.read_excel(file_path, sheet_name=sheet_name)
+                        sheet_row_count = len(full_df)
+                        
+                        # Store sheet-specific metadata
+                        sheets_metadata[sheet_name] = {
+                            "columns": df.columns.tolist(),
+                            "row_count": sheet_row_count
+                        }
+                        
+                        # Add to total row count
+                        total_rows += sheet_row_count
+                        
+                        # For the first sheet, also store in the top-level for backward compatibility
+                        if sheet_name == sheets[0]:
+                            file_info["columns"] = df.columns.tolist()
+                            file_info["row_count"] = sheet_row_count
+                    except Exception as e:
+                        logger.warning(f"Error extracting data from sheet {sheet_name}: {str(e)}")
+                        sheets_metadata[sheet_name] = {
+                            "columns": [],
+                            "row_count": 0,
+                            "error": str(e)
+                        }
+                
+                # Store the full sheets metadata
+                file_info["sheets_metadata"] = sheets_metadata
+                
         except Exception as e:
             logger.error(f"Error extracting file info: {str(e)}")
             file_info["error"] = str(e)
@@ -357,6 +401,7 @@ class SpreadsheetManager:
             file_info["sheets"] = []
             file_info["columns"] = []
             file_info["row_count"] = 0
+            file_info["sheets_metadata"] = {}
         
         return file_info
     
@@ -409,8 +454,10 @@ class SpreadsheetManager:
         return [
             {
                 "id": file_id,
-                "filename": info["filename"],
-                "upload_date": info["upload_date"],
+                "filename": info.get("modified_filename", info.get("filename", "")),  # Use modified_filename if available
+                "original_filename": info.get("original_filename", info.get("filename", "")),  # Include original filename
+                "upload_date": info.get("upload_date", ""),
+                "modified_date": info.get("modified_date", info.get("upload_date", "")),  # Include modified date
                 "sheet_count": info.get("sheet_count", 0),
                 "size_bytes": info.get("size_bytes", 0)
             }
@@ -494,4 +541,87 @@ class SpreadsheetManager:
         if not path.exists():
             raise HTTPException(status_code=404, detail=f"Spreadsheet file not found on disk")
         
-        return path 
+        return path
+        
+    def delete_spreadsheet(self, spreadsheet_id: str) -> Dict[str, Any]:
+        """
+        Delete a spreadsheet file and remove its metadata.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet to delete
+            
+        Returns:
+            Deleted spreadsheet information
+            
+        Raises:
+            HTTPException: If the spreadsheet is not found
+        """
+        logger.info(f"Deleting spreadsheet with ID: {spreadsheet_id}")
+        
+        # Check if spreadsheet exists in metadata
+        if spreadsheet_id not in self.metadata:
+            raise HTTPException(status_code=404, detail=f"Spreadsheet with ID {spreadsheet_id} not found")
+        
+        # Get info about spreadsheet before deletion
+        spreadsheet_info = self.metadata[spreadsheet_id].copy()
+        
+        # Get path to file
+        file_path = Path(spreadsheet_info["storage_path"])
+        
+        # Delete the file from disk
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+                logger.info(f"Successfully deleted file: {file_path}")
+            except Exception as e:
+                logger.error(f"Error deleting file {file_path}: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+        else:
+            logger.warning(f"File does not exist on disk: {file_path}")
+        
+        # Remove spreadsheet from metadata
+        del self.metadata[spreadsheet_id]
+        
+        # Save updated metadata
+        self._save_metadata()
+        logger.info(f"Removed spreadsheet {spreadsheet_id} from metadata")
+        
+        return {
+            "id": spreadsheet_id,
+            "filename": spreadsheet_info.get("filename", "unknown"),
+            "message": "Spreadsheet deleted successfully"
+        }
+    
+    def update_spreadsheet_metadata(self, spreadsheet_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update metadata for a spreadsheet.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet to update
+            updates: Dictionary of metadata fields to update
+            
+        Returns:
+            Updated spreadsheet information
+        """
+        if spreadsheet_id not in self.metadata:
+            raise HTTPException(status_code=404, detail=f"Spreadsheet with ID {spreadsheet_id} not found")
+        
+        # Get the current metadata
+        spreadsheet_info = self.metadata[spreadsheet_id]
+        
+        # Update metadata fields
+        for key, value in updates.items():
+            # Don't allow changing certain fields
+            if key in ["id", "storage_path", "original_filename", "upload_date"]:
+                continue
+                
+            spreadsheet_info[key] = value
+        
+        # Always update modified_date when metadata is changed
+        spreadsheet_info["modified_date"] = datetime.now().isoformat()
+        
+        # Save the updated metadata
+        self.metadata[spreadsheet_id] = spreadsheet_info
+        self._save_metadata()
+        
+        return spreadsheet_info 
