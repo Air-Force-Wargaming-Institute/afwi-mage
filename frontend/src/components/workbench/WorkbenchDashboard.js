@@ -43,7 +43,7 @@ const WorkbenchDashboard = () => {
               Select a tool from the sidebar to begin
             </Typography>
             <Typography variant="body1" className="text-secondary">
-              The Analysis Workbench helps you work with data, create visualizations, and process document-based content using AI assistance.
+              The Analysis Workbench helps you upload and manage spreadsheets, transform data columns, and create visualizations using AI assistance.
             </Typography>
             {connectionError && (
               <Alert 
@@ -65,12 +65,12 @@ const WorkbenchDashboard = () => {
   };
 
   return (
-    <div className="root-container" style={{ height: 'calc(100vh - 200px)' }}>
+    <div className="root-container" style={{ display: 'flex', minHeight: '80vh' }}>
       {/* Left sidebar */}
       <Sidebar />
       
       {/* Main content area */}
-      <Paper className="main-content" style={{ flexGrow: 1, overflowY: 'auto' }}>
+      <Paper className="main-content" style={{ flexGrow: 1, overflow: 'auto' }}>
         {/* Regular error notification */}
         {error && (
           <Alert 

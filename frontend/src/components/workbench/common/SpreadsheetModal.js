@@ -121,6 +121,9 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
   
+  // Text wrapping functionality
+  const [textWrapEnabled, setTextWrapEnabled] = useState(false);
+  
   // Zoom functionality
   const [zoomLevel, setZoomLevel] = useState(100); // 100% is default zoom
   const [zoomPopoverOpen, setZoomPopoverOpen] = useState(false);
@@ -193,10 +196,13 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     if (sheets.length > 0 && activeSheetIndex >= 0) {
       const currentSheet = sheets[activeSheetIndex];
       
-      // If we don't have any data for this sheet yet or we're changing pages
-      if (!sheetData[currentSheet] || 
-          !sheetData[currentSheet][currentPage] || 
-          !sheetData[currentSheet][currentPage].length === 0) {
+      // Always reload when rowsPerPage changes to ensure we have the correct number of rows
+      const needsReload = 
+        !sheetData[currentSheet] || 
+        !sheetData[currentSheet][currentPage] || 
+        Object.keys(sheetData[currentSheet]).length === 0;
+      
+      if (needsReload) {
         loadSheetData(currentSheet, currentPage, rowsPerPage);
       }
       
@@ -423,12 +429,16 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     const startRow = (page - 1) * pageSize + 1; // 1-indexed
     const endRow = startRow + pageSize - 1;
     
+    // Use dynamic column range (A-Z) - we'll use more columns (A-ZZ) to ensure we get all data
+    // This is a more reliable approach than just A-Z which might miss columns
+    const columnRange = 'A-ZZ';
+    
     // We need to include the header row (A1) in the first page
     if (page === 1) {
-      return `A1:Z${endRow}`;
+      return `A1:${columnRange}${endRow}`;
     } else {
       // For subsequent pages, we need to start from A{startRow}
-      return `A${startRow}:Z${endRow}`;
+      return `A${startRow}:${columnRange}${endRow}`;
     }
   };
   
@@ -437,8 +447,9 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     setLocalLoading(true);
     
     try {
-      // Calculate range based on pagination
+      // Calculate range based on pagination - use current rowsPerPage state, not the default parameter
       const cellRange = getPageCellRange(page, pageSize);
+      console.log(`Loading sheet data for ${sheetName}, page ${page}, with ${pageSize} rows per page. Range: ${cellRange}`);
       
       const result = await performCellOperation(spreadsheetId, {
         operation: 'read',
@@ -565,8 +576,26 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
   // Handle rows per page change
   const handleRowsPerPageChange = (event) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
+    
+    // Calculate the first row index of the current page
+    const currentFirstRow = (currentPage - 1) * rowsPerPage + 1;
+    
+    // Calculate which page this row would be on with the new page size
+    const newPage = Math.floor((currentFirstRow - 1) / newRowsPerPage) + 1;
+    
+    // Update state
     setRowsPerPage(newRowsPerPage);
-    setCurrentPage(1); // Reset to first page when changing page size
+    setCurrentPage(newPage);
+    
+    // Force reload data with new page size
+    if (sheets.length > 0 && activeSheetIndex >= 0) {
+      const sheet = sheets[activeSheetIndex];
+      // Clear existing data for this sheet to force reload
+      setSheetData(prev => ({
+        ...prev,
+        [sheet]: {}
+      }));
+    }
   };
   
   // Handle sheet tab change
@@ -809,6 +838,28 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     };
   }, [sheets, activeSheetIndex, columnWidths]);
   
+  // Handle toggle text wrapping
+  const toggleTextWrap = () => {
+    setTextWrapEnabled(prev => {
+      const newValue = !prev;
+      
+      // If enabling text wrap, we need to ensure the table layout is updated
+      if (newValue) {
+        // Use setTimeout to let React render the UI change first
+        setTimeout(() => {
+          // Force a small scroll to trigger layout recalculation
+          if (tableContainerRef.current) {
+            const currentScroll = tableContainerRef.current.scrollTop;
+            tableContainerRef.current.scrollTop = currentScroll + 1;
+            tableContainerRef.current.scrollTop = currentScroll;
+          }
+        }, 50);
+      }
+      
+      return newValue;
+    });
+  };
+  
   // Initialize column widths for a sheet
   const initializeColumnWidths = (sheet, data) => {
     if (!data || data.length === 0 || !data[0] || data[0].length === 0) return;
@@ -849,7 +900,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     // Set widths based on content length, with reasonable bounds
     Object.keys(contentLengths).forEach(index => {
       const minWidth = 60; // Minimum column width in pixels
-      const maxWidth = 300; // Maximum column width in pixels
+      const maxWidth = 500; // Increased maximum column width from 300px to 500px
       const charWidth = 8; // Estimated width per character in pixels
       
       // Calculate width based on content length
@@ -870,6 +921,59 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     }));
   };
   
+  // Handle auto-fit column width on double-click of resize handle
+  const handleDoubleClickResize = (e, columnIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!sheets.length || activeSheetIndex < 0) return;
+    const currentSheet = sheets[activeSheetIndex];
+    
+    if (!sheetData[currentSheet] || !sheetData[currentSheet][currentPage]) return;
+    
+    const data = sheetData[currentSheet][currentPage];
+    if (!data || data.length <= 1) return;
+    
+    // Analyze all visible rows for this column to find the maximum content length
+    let maxLength = 0;
+    const headerText = data[0][columnIndex] ? String(data[0][columnIndex]).length : 0;
+    maxLength = Math.max(maxLength, headerText);
+    
+    // Check content length in all visible rows
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] && Array.isArray(data[i]) && data[i][columnIndex]) {
+        const cellLength = String(data[i][columnIndex]).length;
+        maxLength = Math.max(maxLength, cellLength);
+      }
+    }
+    
+    // Calculate optimal width with some padding
+    const charWidth = 9; // Slightly wider for better readability
+    const padding = 24; // Extra padding to ensure full visibility
+    const optimalWidth = Math.max(80, (maxLength * charWidth) + padding);
+    
+    // Update column width
+    setColumnWidths(prev => ({
+      ...prev,
+      [columnIndex]: optimalWidth
+    }));
+    
+    // Save in sheet metadata
+    if (sheets.length > 0 && activeSheetIndex >= 0) {
+      const currentSheet = sheets[activeSheetIndex];
+      setSheetMetadata(prev => ({
+        ...prev,
+        [currentSheet]: {
+          ...prev[currentSheet],
+          columnWidths: {
+            ...prev[currentSheet]?.columnWidths,
+            [columnIndex]: optimalWidth
+          }
+        }
+      }));
+    }
+  };
+  
   // Handle start of column resize
   const handleResizeStart = (e, columnIndex) => {
     e.preventDefault(); // Prevent default behavior
@@ -888,14 +992,34 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     if (resizingColumn === null) return;
     
     const diff = e.clientX - startX;
-    const newWidth = Math.max(50, startWidth + diff); // Minimum 50px width
+    const newWidth = Math.max(50, startWidth + diff); // Minimum 50px width, no maximum limit
     
     console.log(`Resizing column ${resizingColumn}: startWidth=${startWidth}, diff=${diff}, newWidth=${newWidth}`);
     
+    // Update column width in state
     setColumnWidths(prev => ({
       ...prev,
       [resizingColumn]: newWidth
     }));
+    
+    // Apply width directly to column for immediate visual feedback during drag
+    try {
+      const headerCells = document.querySelectorAll('#spreadsheet-table-container .MuiTableHead-root .MuiTableCell-root');
+      const columnCells = document.querySelectorAll(`#spreadsheet-table-container .MuiTableBody-root .MuiTableRow-root td:nth-child(${Number(resizingColumn) + 2})`);
+      
+      if (headerCells[Number(resizingColumn) + 1]) {
+        headerCells[Number(resizingColumn) + 1].style.width = `${newWidth}px`;
+        headerCells[Number(resizingColumn) + 1].style.minWidth = `${newWidth}px`;
+      }
+      
+      // Update all cells in this column
+      columnCells.forEach(cell => {
+        cell.style.width = `${newWidth}px`;
+        cell.style.minWidth = `${newWidth}px`;
+      });
+    } catch (err) {
+      console.error('Error updating cell width during resize:', err);
+    }
   }, [resizingColumn, startX, startWidth]);
   
   // Handle end of column resize
@@ -979,22 +1103,46 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
         <TableContainer 
           id="spreadsheet-table-container" 
           ref={tableContainerRef}
-          style={{ maxHeight: '500px', overflow: 'auto' }}
+          style={{ 
+            maxHeight: `calc(100vh - 375px)`, 
+            overflow: 'auto',
+            minHeight: '300px',
+            // Ensure consistent stacking context for sticky elements
+            position: 'relative',
+            zIndex: 0
+          }}
         >
-          <Table stickyHeader size="small" style={{ 
-            fontSize: `${getFontSize(DEFAULT_FONT_SIZES.cellText)}px` 
-          }}>
+          <Table 
+            stickyHeader 
+            size="small" 
+            style={{ 
+              fontSize: `${getFontSize(DEFAULT_FONT_SIZES.cellText)}px`,
+              tableLayout: 'fixed', // Always use fixed layout for consistent column resizing
+              width: '100%'
+            }}
+          >
             <TableHead>
-              <TableRow>
+              <TableRow
+                sx={{
+                  '& th': {
+                    borderBottom: `2px solid ${theme.palette.primary.dark}`,
+                    boxShadow: `0 2px 2px -1px rgba(0,0,0,0.2)`,
+                    backgroundColor: '#0d47a1', // Rich dark blue
+                    color: 'white'
+                  }
+                }}
+              >
                 {/* Row number header cell */}
                 <TableCell 
                   style={{ 
-                    backgroundColor: theme.palette.grey[100], 
+                    backgroundColor: '#0d47a1', // Rich dark blue
+                    color: 'white',
                     width: '50px',
                     maxWidth: '50px',
                     position: 'sticky',
+                    top: 0,
                     left: 0,
-                    zIndex: 2,
+                    zIndex: 3, // Higher z-index to appear above other header cells
                     fontSize: `${getFontSize(DEFAULT_FONT_SIZES.headerText)}px`,
                     padding: `${cellPadding}px`
                   }}
@@ -1011,12 +1159,14 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       cursor: 'pointer',
                       userSelect: 'none',
                       backgroundColor: sortConfig.key === index.toString() ? 
-                        theme.palette.action.selected : 
-                        undefined,
+                        '#1565c0' : // Slightly lighter blue for sorted columns
+                        '#0d47a1', // Rich dark blue
+                      color: 'white',
                       width: columnWidths[index] ? `${columnWidths[index]}px` : undefined,
                       minWidth: columnWidths[index] ? `${columnWidths[index]}px` : '80px',
-                      maxWidth: columnWidths[index] ? `${columnWidths[index]}px` : undefined,
-                      position: 'relative', // For the resize handle
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 2,
                       padding: `${cellPadding}px ${cellPadding + 8}px ${cellPadding}px ${cellPadding}px`, // Extra padding on right for resize handle
                       fontSize: `${getFontSize(DEFAULT_FONT_SIZES.headerText)}px`,
                       whiteSpace: 'nowrap',
@@ -1030,8 +1180,8 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       {sortConfig.key === index.toString() && (
                         <Box sx={{ ml: 1 }}>
                           {sortConfig.direction === 'asc' ? 
-                            <ArrowUpwardIcon fontSize="small" /> : 
-                            <ArrowDownwardIcon fontSize="small" />}
+                            <ArrowUpwardIcon fontSize="small" sx={{ color: 'white', opacity: 0.9 }} /> : 
+                            <ArrowDownwardIcon fontSize="small" sx={{ color: 'white', opacity: 0.9 }} />}
                         </Box>
                       )}
                     </Box>
@@ -1043,24 +1193,43 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: '12px', // Wider handle for easier grabbing
+                        width: '8px', // Slightly narrower but still easy to grab
                         cursor: 'col-resize',
-                        zIndex: 3, // Increase zIndex to ensure it's on top
+                        zIndex: 4, // Higher z-index to ensure it's above sticky header
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         '&:hover': {
-                          backgroundColor: theme.palette.primary.main,
-                          opacity: 0.5,
-                          width: '4px', // Visibly wider on hover
-                          borderRight: `2px solid ${theme.palette.primary.dark}`
+                          backgroundColor: '#64b5f6', // Light blue for hover state
+                          opacity: 0.8,
+                          '&::after': {
+                            backgroundColor: '#bbdefb',
+                            opacity: 1
+                          }
+                        },
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          top: '10%',
+                          bottom: '10%',
+                          width: '2px',
+                          backgroundColor: 'rgba(255,255,255,0.5)',
+                          opacity: 0.5
                         },
                         ...(resizingColumn === index && {
-                          backgroundColor: theme.palette.primary.main,
-                          opacity: 0.7,
-                          width: '4px',
-                          borderRight: `2px solid ${theme.palette.primary.dark}`
+                          backgroundColor: '#64b5f6', // Light blue when resizing
+                          opacity: 0.9,
+                          width: '8px',
+                          '&::after': {
+                            backgroundColor: '#ffffff',
+                            opacity: 1
+                          }
                         })
                       }}
                       onMouseDown={(e) => handleResizeStart(e, index)}
+                      onDoubleClick={(e) => handleDoubleClickResize(e, index)}
                       onClick={(e) => e.stopPropagation()} // Prevent sorting when clicking resize handle
+                      data-column-index={index} // Add data attribute for easier selection
                     />
                   </TableCell>
                 ))}
@@ -1090,6 +1259,13 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       },
                       ...(isCurrentMatch && { 
                         borderLeft: `4px solid ${theme.palette.warning.main}`,
+                      }),
+                      // Add styles for text wrapping mode
+                      ...(textWrapEnabled && {
+                        height: 'auto',
+                        '& td': { 
+                          verticalAlign: 'top'
+                        }
                       })
                     }}
                   >
@@ -1098,7 +1274,8 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       style={{ 
                         backgroundColor: isHighlighted
                           ? (isCurrentMatch ? theme.palette.warning.main : theme.palette.warning.light)
-                          : theme.palette.grey[100],
+                          : '#e3f2fd', // Light blue background for row numbers
+                        color: '#0d47a1', // Match the header blue for text color
                         position: 'sticky',
                         left: 0,
                         zIndex: 1,
@@ -1106,35 +1283,55 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                         maxWidth: '50px',
                         fontWeight: isHighlighted ? 'bold' : 'normal',
                         fontSize: `${getFontSize(DEFAULT_FONT_SIZES.rowNumber)}px`,
-                        padding: `${cellPadding}px`
+                        padding: `${cellPadding}px`,
+                        borderRight: '1px solid #bbdefb' // Light blue border
                       }}
                     >
                       {displayRowNumber}
                     </TableCell>
                     
                     {/* Data cells */}
-                    {row.map((cell, cellIndex) => (
-                      <TableCell 
-                        key={cellIndex}
-                        style={{
-                          fontSize: `${getFontSize(DEFAULT_FONT_SIZES.cellText)}px`,
-                          padding: `${cellPadding}px`,
-                          width: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : undefined,
-                          minWidth: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : '80px',
-                          maxWidth: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : undefined,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {searchText && cell !== null && cell !== undefined && 
-                          typeof String(cell).toLowerCase === 'function' && 
-                          String(cell).toLowerCase().includes(searchText.toLowerCase())
-                            ? highlightSearchMatch(String(cell), searchText)
-                            : cell
-                        }
-                      </TableCell>
-                    ))}
+                    {row.map((cell, cellIndex) => {
+                      // Check if cell has long content that's being truncated
+                      const isLongContent = cell !== null && cell !== undefined && 
+                        String(cell).length > 30;
+                      
+                      return (
+                        <TableCell 
+                          key={cellIndex}
+                          style={{
+                            fontSize: `${getFontSize(DEFAULT_FONT_SIZES.cellText)}px`,
+                            padding: `${cellPadding}px`,
+                            width: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : undefined,
+                            minWidth: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : '80px',
+                            // Remove maxWidth to prevent constraining resizing
+                            // Improved text wrapping styles
+                            whiteSpace: textWrapEnabled ? 'normal' : 'nowrap',
+                            wordWrap: textWrapEnabled ? 'break-word' : 'normal',
+                            wordBreak: textWrapEnabled ? 'break-word' : 'normal',
+                            overflow: textWrapEnabled ? 'visible' : 'hidden',
+                            textOverflow: textWrapEnabled ? 'clip' : 'ellipsis',
+                            height: textWrapEnabled ? 'auto' : undefined,
+                            // Add a max-height when wrapping is enabled to prevent extremely tall cells
+                            ...(textWrapEnabled && {
+                              maxHeight: '200px',
+                              overflow: 'auto'
+                            }),
+                            ...(isLongContent && !textWrapEnabled && {
+                              borderLeft: `2px solid ${theme.palette.info.light}`,
+                            })
+                          }}
+                          title={isLongContent && !textWrapEnabled ? String(cell) : undefined} // Add tooltip only when not wrapping
+                        >
+                          {searchText && cell !== null && cell !== undefined && 
+                            typeof String(cell).toLowerCase === 'function' && 
+                            String(cell).toLowerCase().includes(searchText.toLowerCase())
+                              ? highlightSearchMatch(String(cell), searchText)
+                              : cell
+                          }
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 );
               })}
@@ -1202,6 +1399,17 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
               variant="outlined"
             >
               Reset Columns
+            </Button>
+            
+            {/* Text wrapping toggle button */}
+            <Button
+              size="small"
+              onClick={toggleTextWrap}
+              sx={{ mx: 1 }}
+              color={textWrapEnabled ? "primary" : "secondary"}
+              variant={textWrapEnabled ? "contained" : "outlined"}
+            >
+              {textWrapEnabled ? "Wrap: On" : "Wrap: Off"}
             </Button>
             
             {/* Zoom controls - global zoom applied to all sheets */}

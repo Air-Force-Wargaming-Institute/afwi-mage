@@ -4,9 +4,6 @@ import {
   Box, 
   Typography, 
   Button, 
-  Grid, 
-  TextField, 
-  InputLabel,
   Paper,
   Table,
   TableBody,
@@ -14,32 +11,18 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Tabs,
-  Tab,
-  Chip,
-  Select,
-  MenuItem,
-  FormControl,
-  InputAdornment,
-  Divider,
   CircularProgress,
   Alert,
-  Snackbar,
   Container,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Grid,
+  Divider,
+  TextField
 } from '@mui/material';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import StorageIcon from '@mui/icons-material/Storage';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import CodeIcon from '@mui/icons-material/Code';
-import TransformIcon from '@mui/icons-material/Transform';
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import ShowChartIcon from '@mui/icons-material/ShowChart';
-import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -74,16 +57,6 @@ const SpreadsheetViewer = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
   
-  const [file, setFile] = useState(null);
-  const [description, setDescription] = useState('');
-  const [tabValue, setTabValue] = useState(0);
-  const [processingType, setProcessingType] = useState('analyze');
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [activeSpreadsheet, setActiveSpreadsheet] = useState(null);
-  const [previewData, setPreviewData] = useState([]);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
   const [openModal, setOpenModal] = useState(false);
   const [selectedSpreadsheetId, setSelectedSpreadsheetId] = useState(null);
@@ -107,66 +80,6 @@ const SpreadsheetViewer = () => {
     // DO NOT add fetchSpreadsheets to dependencies or it will cause infinite loops
   }, []);
   
-  // Handle file selection
-  const handleFileChange = (event) => {
-    setFile(event.target.files[0]);
-  };
-  
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-  
-  // Handle processing type change
-  const handleProcessingTypeChange = (event) => {
-    setProcessingType(event.target.value);
-  };
-  
-  // Handle file upload
-  const handleUpload = async () => {
-    if (!file) return;
-    
-    setUploadLoading(true);
-    setUploadError(null);
-    
-    try {
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', file);
-      if (description) {
-        formData.append('description', description);
-      }
-      
-      // Send API request
-      const response = await fetch(`/api/workbench/spreadsheets/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refresh spreadsheet list
-      fetchSpreadsheets();
-      
-      // Reset form
-      setFile(null);
-      setDescription('');
-      setUploadSuccess(true);
-      
-      // Switch to library tab
-      setTabValue(1);
-    } catch (err) {
-      console.error('Error uploading file:', err);
-      setUploadError(err.message);
-    } finally {
-      setUploadLoading(false);
-    }
-  };
-  
   // Handle view spreadsheet
   const handleViewSpreadsheet = async (spreadsheetId, filename) => {
     setSelectedSpreadsheetId(spreadsheetId);
@@ -179,34 +92,7 @@ const SpreadsheetViewer = () => {
     setOpenModal(false);
   };
   
-  // Get placeholder text based on processing type
-  const getPlaceholderText = () => {
-    switch(processingType) {
-      case 'analyze':
-        return "E.g., Calculate the average sales by region, Find trends in profit margins...";
-      case 'transform':
-        return "E.g., Convert all sales values to numbers without currency symbols, Format dates to YYYY-MM-DD...";
-      case 'filter':
-        return "E.g., Show only rows where sales exceeded $15,000, Filter to just North and South regions...";
-      case 'format':
-        return "E.g., Format all currency columns with 2 decimal places, Convert text to proper case...";
-      default:
-        return "Enter your data processing request...";
-    }
-  };
-  
-  // Handle reset upload form
-  const handleResetUpload = () => {
-    setFile(null);
-    setDescription('');
-  };
-  
-  // Handle close success message
-  const handleCloseSnackbar = () => {
-    setUploadSuccess(false);
-  };
-  
-  // Add a handleUploadFile function to use with FileUploader  
+  // Add a handleUploadFile function to use with FileUploader
   const handleUploadFile = async (file, description, onProgress, onSuccess, onError) => {
     try {
       const formData = new FormData();
@@ -401,194 +287,14 @@ const SpreadsheetViewer = () => {
     }
   };
   
-  // Render tabs content
-  const renderTabContent = () => {
-    switch (tabValue) {
-      case 0: // Upload tab
-        return (
-          <div style={{ padding: '24px' }}>
-            <Typography variant="h6" gutterBottom className="section-subtitle">
-              Upload a Spreadsheet
-            </Typography>
-            
-            <FileUploader
-              onUpload={handleUploadFile}
-              acceptedFileTypes={['.xlsx', '.xls', '.csv']}
-              uploadButtonText="Upload Spreadsheet"
-              showDescription={true}
-              descriptionLabel="Description (optional)"
-              maxFileSizeMB={50}
-              disabled={isLoading}
-            />
-          </div>
-        );
-        
-      case 1: // Library tab
-        return (
-          <div style={{ padding: '24px' }}>
-            <Typography variant="h6" gutterBottom className="section-subtitle">
-              Spreadsheet Library
-            </Typography>
-            
-            {renderLibraryTab()}
-          </div>
-        );
-        
-      case 2: // Process & Analyze tab
-        return (
-          <div style={{ padding: '24px' }}>
-            <Typography variant="h6" gutterBottom className="section-subtitle">
-              Process & Analyze Data
-            </Typography>
-            
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Paper variant="outlined" style={{ padding: '16px' }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Data Preview
-                    {isPreviewLoading && (
-                      <CircularProgress size={20} style={{ marginLeft: '10px', verticalAlign: 'middle' }} />
-                    )}
-                  </Typography>
-                  
-                  <TableContainer className="table-container" style={{ maxHeight: '400px' }}>
-                    <Table size="small" className="table" stickyHeader>
-                      {previewData.length > 0 ? (
-                        <>
-                          <TableHead>
-                            <TableRow>
-                              {previewData[0].map((header, index) => (
-                                <TableCell key={index} style={{ fontWeight: 'bold' }}>{header}</TableCell>
-                              ))}
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {previewData.slice(1).map((row, rowIndex) => (
-                              <TableRow key={rowIndex}>
-                                {row.map((cell, cellIndex) => (
-                                  <TableCell key={cellIndex}>{cell}</TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </>
-                      ) : (
-                        <TableBody>
-                          <TableRow>
-                            <TableCell colSpan={6} align="center">
-                              {isPreviewLoading ? 'Loading data...' : 'No data available. Select a spreadsheet from the library.'}
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      )}
-                    </Table>
-                  </TableContainer>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Divider style={{ margin: '12px 0' }}>
-                  <Chip label="Data Processing Options" />
-                </Divider>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <FormControl fullWidth variant="outlined" style={{ marginBottom: '16px' }}>
-                  <InputLabel>Processing Type</InputLabel>
-                  <Select
-                    value={processingType}
-                    onChange={handleProcessingTypeChange}
-                    label="Processing Type"
-                  >
-                    <MenuItem value="analyze">
-                      <Box display="flex" alignItems="center">
-                        <AnalyticsIcon style={{ marginRight: '8px' }} />
-                        Analyze Data
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="transform">
-                      <Box display="flex" alignItems="center">
-                        <TransformIcon style={{ marginRight: '8px' }} />
-                        Transform Data
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="filter">
-                      <Box display="flex" alignItems="center">
-                        <FilterAltIcon style={{ marginRight: '8px' }} />
-                        Filter Data
-                      </Box>
-                    </MenuItem>
-                    <MenuItem value="format">
-                      <Box display="flex" alignItems="center">
-                        <FormatColorTextIcon style={{ marginRight: '8px' }} />
-                        Format Data
-                      </Box>
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Instructions for AI"
-                  fullWidth
-                  placeholder={getPlaceholderText()}
-                  variant="outlined"
-                  InputProps={{
-                    startAdornment: processingType === 'analyze' ? (
-                      <InputAdornment position="start">
-                        <ShowChartIcon />
-                      </InputAdornment>
-                    ) : processingType === 'transform' ? (
-                      <InputAdornment position="start">
-                        <TransformIcon />
-                      </InputAdornment>
-                    ) : processingType === 'filter' ? (
-                      <InputAdornment position="start">
-                        <FilterAltIcon />
-                      </InputAdornment>
-                    ) : (
-                      <InputAdornment position="start">
-                        <FormatColorTextIcon />
-                      </InputAdornment>
-                    )
-                  }}
-                  multiline
-                  rows={3}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Button 
-                  variant="contained" 
-                  startIcon={
-                    processingType === 'analyze' ? <AnalyticsIcon /> : 
-                    processingType === 'transform' ? <TransformIcon /> : 
-                    processingType === 'filter' ? <FilterAltIcon /> : 
-                    <FormatColorTextIcon />
-                  } 
-                  className="upload-button"
-                  disabled={!activeSpreadsheet || previewData.length === 0}
-                >
-                  {processingType === 'analyze' ? 'Analyze Data' : 
-                   processingType === 'transform' ? 'Transform Data' : 
-                   processingType === 'filter' ? 'Filter Data' : 
-                   'Format Data'}
-                </Button>
-              </Grid>
-            </Grid>
-          </div>
-        );
-        
-      default:
-        return null;
-    }
-  };
-  
-  // Render library tab
-  const renderLibraryTab = () => {
+  // Render spreadsheet list
+  const renderSpreadsheetList = () => {
     if (isLoading) {
-      return <CircularProgress />;
+      return (
+        <Box display="flex" justifyContent="center" alignItems="center" p={3}>
+          <CircularProgress />
+        </Box>
+      );
     }
     
     if (error) {
@@ -612,82 +318,75 @@ const SpreadsheetViewer = () => {
     }
     
     return (
-      <Paper elevation={1} style={{ padding: '16px', marginTop: '16px' }}>
-        <Typography variant="h6" gutterBottom>
-          Available Spreadsheets
-        </Typography>
-        
-        <TableContainer component={Paper} variant="outlined">
-          <Table aria-label="spreadsheets table" size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Filename</TableCell>
-                <TableCell>Upload Date</TableCell>
-                <TableCell>Sheets</TableCell>
-                <TableCell>Size</TableCell>
-                <TableCell width="250">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {spreadsheets.map((sheet) => (
-                <TableRow key={sheet.id}>
-                  <TableCell>{sheet.filename}</TableCell>
-                  <TableCell>{new Date(sheet.upload_date).toLocaleString()}</TableCell>
-                  <TableCell>{sheet.sheet_count}</TableCell>
-                  <TableCell>{formatFileSize(sheet.size_bytes)}</TableCell>
-                  <TableCell>
+      <TableContainer component={Paper} variant="outlined" sx={{ height: '100%', overflow: 'auto' }}>
+        <Table aria-label="spreadsheets table" size="small" stickyHeader>
+          <TableHead>
+            <TableRow>
+              <TableCell>Filename</TableCell>
+              <TableCell>Upload Date</TableCell>
+              <TableCell>Sheets</TableCell>
+              <TableCell>Size</TableCell>
+              <TableCell width="280">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {spreadsheets.map((sheet) => (
+              <TableRow key={sheet.id}>
+                <TableCell>{sheet.filename}</TableCell>
+                <TableCell>{new Date(sheet.upload_date).toLocaleString()}</TableCell>
+                <TableCell>{sheet.sheet_count}</TableCell>
+                <TableCell>{formatFileSize(sheet.size_bytes)}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button 
+                      size="small" 
+                      variant="contained" 
+                      color="primary"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => handleViewSpreadsheet(sheet.id, sheet.filename)}
+                    >
+                      View
+                    </Button>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      color="primary"
+                      startIcon={<FileDownloadIcon />}
+                      onClick={() => handleDownloadSpreadsheet(sheet.id, sheet.filename)}
+                    >
+                      Download
+                    </Button>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button 
-                        size="small" 
-                        variant="contained" 
-                        color="primary"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => handleViewSpreadsheet(sheet.id, sheet.filename)}
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="secondary"
+                        onClick={() => handleRenameClick(sheet.id, sheet.filename)}
                       >
-                        View
+                        Rename
                       </Button>
                       <Button 
                         size="small" 
                         variant="outlined" 
-                        color="primary"
-                        startIcon={<FileDownloadIcon />}
-                        onClick={() => handleDownloadSpreadsheet(sheet.id, sheet.filename)}
+                        color="error"
+                        startIcon={<DeleteOutlineIcon />}
+                        onClick={() => handleDeleteClick(sheet.id, sheet.filename)}
                       >
-                        Download
+                        Delete
                       </Button>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="secondary"
-                          onClick={() => handleRenameClick(sheet.id, sheet.filename)}
-                          sx={{ minWidth: 'auto' }}
-                        >
-                          Rename
-                        </Button>
-                        <Button 
-                          size="small" 
-                          variant="outlined" 
-                          color="error"
-                          startIcon={<DeleteOutlineIcon />}
-                          onClick={() => handleDeleteClick(sheet.id, sheet.filename)}
-                        >
-                          Delete
-                        </Button>
-                      </Box>
                     </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     );
   };
   
   return (
-    <Container maxWidth="xl">
+    <Container maxWidth="xl" sx={{ height: 'calc(100vh - 170px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Toast notifications */}
       <Toaster 
         position="top-right"
@@ -714,27 +413,67 @@ const SpreadsheetViewer = () => {
         }}
       />
       
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Spreadsheet Viewer</Typography>
+      <Paper sx={{ p: 2, mb: 2, flex: 'none' }}>
+        <Typography variant="h5" sx={{ mb: 2 }}>Upload/Manage Spreadsheets</Typography>
         
-        <Box sx={{ width: '100%' }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Upload" />
-            <Tab label="Library" />
-          </Tabs>
+        <Grid container spacing={2} sx={{ height: 'calc(100vh - 230px)' }}>
+          {/* Upload Panel - 20% width */}
+          <Grid item xs={12} md={3} lg={2.4}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{ 
+                p: 2, 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                Upload Files
+              </Typography>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Upload your spreadsheet files here. Supported formats: XLSX, XLS, CSV
+              </Typography>
+              
+              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                <FileUploader
+                  onUpload={handleUploadFile}
+                  acceptedFileTypes={['.xlsx', '.xls', '.csv']}
+                  uploadButtonText="Upload Spreadsheet"
+                  showDescription={true}
+                  descriptionLabel="Description (optional)"
+                  maxFileSizeMB={50}
+                  disabled={isLoading}
+                />
+              </Box>
+            </Paper>
+          </Grid>
           
-          <Box mt={2}>
-            {renderTabContent()}
-          </Box>
-        </Box>
+          {/* Spreadsheet List - 80% width */}
+          <Grid item xs={12} md={9} lg={9.6}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{ 
+                p: 2,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                Your Spreadsheets
+              </Typography>
+              <Box sx={{ flex: 1, overflow: 'hidden' }}>
+                {renderSpreadsheetList()}
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
       </Paper>
-      
-      <Snackbar
-        open={uploadSuccess}
-        autoHideDuration={5000}
-        onClose={handleCloseSnackbar}
-        message="Spreadsheet uploaded successfully"
-      />
       
       {/* Spreadsheet Modal */}
       <SpreadsheetModal

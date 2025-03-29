@@ -21,9 +21,9 @@ const Sidebar = () => {
   const tools = [
     { 
       id: 'spreadsheet', 
-      name: 'Spreadsheet/Data Processing', 
+      name: 'Upload/Manage Spreadsheets', 
       icon: <TableChartIcon />, 
-      description: 'Process and analyze data in spreadsheets with AI assistance' 
+      description: 'Upload and manage spreadsheet files' 
     },
     { 
       id: 'column-transform', 
