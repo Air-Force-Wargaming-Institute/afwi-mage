@@ -227,10 +227,10 @@ services:
   frontend:
     build: ../frontend
     ports:
-      - "8080:8080"
+      - "80:80"
     environment:
       - NODE_ENV=production
-      - PORT=8080
+      - PORT=80
     volumes:
       - ../data:/data
       - ../frontend:/app
