@@ -76,40 +76,52 @@ const SpreadsheetTools = () => {
     trackTransformationJob,
     getJobStatus,
     cancelJob,
-    setActiveJobId
+    setActiveJobId,
+    transformationState,
+    updateTransformationState,
+    resetTransformationState
   } = useContext(WorkbenchContext);
 
   // State for selected spreadsheet and column information
-  const [activeSpreadsheetId, setActiveSpreadsheetId] = useState('');
+  const [activeSpreadsheetId, setActiveSpreadsheetId] = useState(() => 
+    transformationState?.activeSpreadsheetId || '');
   const [sheetNames, setSheetNames] = useState([]);
-  const [selectedSheet, setSelectedSheet] = useState('');
+  const [selectedSheet, setSelectedSheet] = useState(() => 
+    transformationState?.selectedSheet || '');
   const [columns, setColumns] = useState([]);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(() => 
+    transformationState?.activeStep || 0);
   
   // File upload ref and state
   const fileInputRef = useRef(null);
   const [uploadError, setUploadError] = useState(null);
 
   // State for transformation configuration
-  const [selectedInputColumns, setSelectedInputColumns] = useState([]);
-  const [outputColumns, setOutputColumns] = useState([{ 
-    name: '', 
-    description: '', 
-    isNew: true,
-    outputType: 'text',
-    typeOptions: {}
-  }]);
-  const [transformationInstructions, setTransformationInstructions] = useState('');
+  const [selectedInputColumns, setSelectedInputColumns] = useState(() => 
+    transformationState?.selectedInputColumns || []);
+  const [outputColumns, setOutputColumns] = useState(() => 
+    transformationState?.outputColumns || [{ 
+      name: '', 
+      description: '', 
+      isNew: true,
+      outputType: 'text',
+      typeOptions: {}
+    }]);
+  const [transformationInstructions, setTransformationInstructions] = useState(() =>
+    transformationState?.transformationInstructions || '');
   const [previewData, setPreviewData] = useState([]);
   const [outputPreview, setOutputPreview] = useState([]);
-  const [processingMode, setProcessingMode] = useState('preview'); // 'all', 'preview'
-  const [createDuplicate, setCreateDuplicate] = useState(true); // Option to create duplicate spreadsheet
+  const [processingMode, setProcessingMode] = useState(() =>
+    transformationState?.processingMode || 'preview');
+  const [createDuplicate, setCreateDuplicate] = useState(() =>
+    transformationState?.createDuplicate !== undefined ? transformationState.createDuplicate : true);
 
   // State for advanced options
-  const [advancedOptions, setAdvancedOptions] = useState({
-    includeHeaders: true,
-    errorHandling: 'continue' // 'continue', 'stop', or 'retry'
-  });
+  const [advancedOptions, setAdvancedOptions] = useState(() =>
+    transformationState?.advancedOptions || {
+      includeHeaders: true,
+      errorHandling: 'continue'
+    });
 
   // State for processing status
   const [isTransforming, setIsTransforming] = useState(false);
@@ -121,6 +133,41 @@ const SpreadsheetTools = () => {
   const abortControllerRef = useRef(null);
   // Track component mounted state
   const isMountedRef = useRef(true);
+
+  // Function to persist state changes to context
+  const persistState = (updates = {}) => {
+    // Create current state snapshot
+    const currentState = {
+      activeSpreadsheetId,
+      selectedSheet,
+      activeStep,
+      selectedInputColumns,
+      outputColumns,
+      transformationInstructions,
+      processingMode,
+      createDuplicate,
+      advancedOptions,
+      ...updates // Apply any updates passed in
+    };
+    
+    // Update the context
+    updateTransformationState(currentState);
+  };
+
+  // Update persistence when key states change
+  useEffect(() => {
+    persistState();
+  }, [
+    activeSpreadsheetId,
+    selectedSheet,
+    activeStep,
+    selectedInputColumns,
+    outputColumns,
+    transformationInstructions,
+    processingMode,
+    createDuplicate,
+    advancedOptions
+  ]);
 
   // Fetch spreadsheets when component mounts and handle cleanup
   useEffect(() => {
@@ -158,6 +205,14 @@ const SpreadsheetTools = () => {
     }
   }, [spreadsheets, activeSpreadsheetId]);
 
+  // Restore state when selected sheet changes and we have stored column data
+  useEffect(() => {
+    if (selectedSheet && transformationState?.selectedSheet === selectedSheet && transformationState?.columns?.length > 0) {
+      // Restore columns data if available
+      setColumns(transformationState.columns);
+    }
+  }, [selectedSheet, transformationState]);
+
   // Safe setState functions that check if component is still mounted
   const safeSetState = (stateSetter) => (value) => {
     if (isMountedRef.current) {
@@ -178,17 +233,21 @@ const SpreadsheetTools = () => {
     setActiveSpreadsheetId(spreadsheetId);
     setSelectedSheet('');
     setColumns([]);
-    setSelectedInputColumns([]);
-    setOutputColumns([{ 
-      name: '', 
-      description: '', 
-      isNew: true,
-      outputType: 'text',
-      typeOptions: {}
-    }]);
-    setTransformationInstructions('');
-    setPreviewData([]);
-    setOutputPreview([]);
+    
+    // Only reset input/output config if switching to a different spreadsheet
+    if (spreadsheetId !== transformationState?.activeSpreadsheetId) {
+      setSelectedInputColumns([]);
+      setOutputColumns([{ 
+        name: '', 
+        description: '', 
+        isNew: true,
+        outputType: 'text',
+        typeOptions: {}
+      }]);
+      setTransformationInstructions('');
+      setPreviewData([]);
+      setOutputPreview([]);
+    }
     
     // Cancel any pending requests
     if (abortControllerRef.current) {
@@ -267,13 +326,20 @@ const SpreadsheetTools = () => {
   // Handle sheet selection
   const handleSheetChange = async (sheetName) => {
     setSelectedSheet(sheetName);
-    setColumns([]);
-    setSelectedInputColumns([]);
+    
+    // Don't clear columns if we're returning to the same sheet with saved data
+    if (sheetName !== transformationState?.selectedSheet) {
+      setColumns([]);
+      setSelectedInputColumns([]);
+    }
     
     // Fetch column information and preview data
     try {
       const summaryData = await getSpreadsheetSummary(activeSpreadsheetId, sheetName);
       setColumns(summaryData.column_summaries || []);
+      
+      // Persist column data for faster future loading
+      persistState({ columns: summaryData.column_summaries || [] });
 
       // Fetch preview data
       const previewResult = await performCellOperation(activeSpreadsheetId, {
@@ -376,8 +442,11 @@ const SpreadsheetTools = () => {
   };
 
   // Generate output column previews
-  const generateOutputPreview = async () => {
+  const generateOutputPreview = async (overrideMode = null) => {
     if (!isMountedRef.current) return;
+    
+    // Determine the mode to use: override first, then state
+    const currentMode = overrideMode || processingMode;
     
     setIsTransforming(true);
     setTransformationProgress(0);
@@ -409,7 +478,7 @@ const SpreadsheetTools = () => {
           type_options: col.typeOptions
         })),
         include_headers: advancedOptions.includeHeaders,
-        processing_mode: processingMode,
+        processing_mode: currentMode,
         error_handling: advancedOptions.errorHandling,
         create_duplicate: createDuplicate
       };
@@ -436,7 +505,7 @@ const SpreadsheetTools = () => {
           if (result.preview) {
             setOutputPreview(result.preview);
             // If we're in preview mode, set a success message
-            if (processingMode === 'preview') {
+            if (currentMode === 'preview') {
               setTransformationResults({
                 status: 'preview_success',
                 previewRows: result.preview.length - 1 // Subtract 1 for header row
@@ -483,10 +552,8 @@ const SpreadsheetTools = () => {
 
   // Continue processing after preview success
   const handleContinueProcessing = async () => {
-    // Switch to processing all data
-    setProcessingMode('all');
-    // Run the transformation again with the full dataset
-    await generateOutputPreview();
+    // Run the transformation again with the full dataset, explicitly passing 'all'
+    await generateOutputPreview('all');
   };
   
   // Return to column configuration for refinement
@@ -513,6 +580,9 @@ const SpreadsheetTools = () => {
     setTransformationProgress(0);
     setTransformationError(null);
     setActiveStep(0);
+    
+    // Clear persisted state
+    resetTransformationState();
   };
 
   // Move to the next step
@@ -1372,7 +1442,7 @@ const SpreadsheetTools = () => {
                       variant="contained"
                       color="primary"
                       startIcon={isTransforming ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-                      onClick={generateOutputPreview}
+                      onClick={() => generateOutputPreview('preview')}
                       disabled={isTransforming}
                       sx={{ 
                         px: 3,

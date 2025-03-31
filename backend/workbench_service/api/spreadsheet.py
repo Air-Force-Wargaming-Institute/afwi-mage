@@ -592,20 +592,27 @@ async def transform_spreadsheet(
                 job_id = str(uuid4())
             else:
                 # Create a job entry in the store
-                job_entry = {
-                    "type": "column_transformation",
-                    "status": "submitted",
-                    "progress": 0,
-                    "created_at": datetime.now().isoformat(),
-                    "parameters": {
-                        "spreadsheet_id": spreadsheet_id,
-                        "sheet_name": request.sheet_name,
-                        "input_columns": request.input_columns,
-                        "output_columns": [col.name for col in request.output_columns],
-                    },
-                    "message": "Job submitted, waiting to start processing"
+                job_params = {
+                    "spreadsheet_id": spreadsheet_id,
+                    "sheet_name": request.sheet_name,
+                    "input_columns": request.input_columns,
+                    "output_columns": [col.model_dump() for col in request.output_columns], # Store full output config
+                    "create_duplicate": request.create_duplicate,
+                    "error_handling": request.error_handling,
+                    "include_headers": request.include_headers
                 }
-                job_id = create_job_entry(job_entry)
+                
+                # Generate a unique Job ID
+                from uuid import uuid4
+                new_job_id = str(uuid4())
+                
+                # Create the job entry using the correct function signature
+                job = create_job_entry(
+                    job_id=new_job_id,
+                    job_type="column_transformation",
+                    parameters=job_params
+                )
+                job_id = job.id # Get the ID from the returned Job model
 
             logger.info(f"Created job {job_id} for full transformation")
             

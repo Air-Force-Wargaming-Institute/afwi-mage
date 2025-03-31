@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { AuthContext } from './AuthContext';
 import { getApiUrl } from '../config';
@@ -20,6 +20,42 @@ export const WorkbenchProvider = ({ children }) => {
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [jobs, setJobs] = useState([]);
   const [activeJobId, setActiveJobId] = useState(null);
+
+  // Column transformation persistent state
+  const [transformationState, setTransformationState] = useState(() => {
+    // Try to load saved state from localStorage on initial render
+    const savedState = localStorage.getItem('workbench_transformation_state');
+    if (savedState) {
+      try {
+        return JSON.parse(savedState);
+      } catch (e) {
+        console.error('Error parsing saved transformation state:', e);
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Save transformation state to localStorage whenever it changes
+  useEffect(() => {
+    if (transformationState) {
+      localStorage.setItem('workbench_transformation_state', JSON.stringify(transformationState));
+    }
+  }, [transformationState]);
+
+  // Update transformation state
+  const updateTransformationState = (updates) => {
+    setTransformationState(prevState => {
+      const newState = { ...(prevState || {}), ...updates };
+      return newState;
+    });
+  };
+
+  // Reset transformation state
+  const resetTransformationState = () => {
+    localStorage.removeItem('workbench_transformation_state');
+    setTransformationState(null);
+  };
 
   // Setup axios headers with authentication token
   useEffect(() => {
@@ -64,7 +100,7 @@ export const WorkbenchProvider = ({ children }) => {
   }, []);
 
   // Fetch spreadsheets from API
-  const fetchSpreadsheets = async () => {
+  const fetchSpreadsheets = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -95,7 +131,7 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       return [];
     }
-  };
+  }, [apiBaseUrl]);
 
   // Helper function to join URL paths correctly
   const joinPaths = (base, path) => {
@@ -626,6 +662,7 @@ export const WorkbenchProvider = ({ children }) => {
       visualizations,
       jobs,
       activeJobId,
+      transformationState,
       setSelectedTool,
       setActiveView,
       fetchSpreadsheets,
@@ -646,7 +683,9 @@ export const WorkbenchProvider = ({ children }) => {
       listJobs,
       cancelJob,
       trackTransformationJob,
-      setActiveJobId
+      setActiveJobId,
+      updateTransformationState,
+      resetTransformationState
     }}>
       {children}
     </WorkbenchContext.Provider>

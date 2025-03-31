@@ -43,7 +43,8 @@ const SpreadsheetViewer = () => {
     getSpreadsheetSheets,
     performCellOperation,
     deleteSpreadsheet,
-    updateSpreadsheet
+    updateSpreadsheet,
+    activeView
   } = useContext(WorkbenchContext);
   
   // Helper function to format file size
@@ -72,13 +73,14 @@ const SpreadsheetViewer = () => {
   const [newFilename, setNewFilename] = useState('');
   const [filenameError, setFilenameError] = useState('');
   
-  // Fetch spreadsheets when component mounts
+  // Fetch spreadsheets when component mounts or view becomes active
   useEffect(() => {
-    // Only fetch once when component mounts
-    fetchSpreadsheets();
-    // Empty dependency array means this only runs once on mount
-    // DO NOT add fetchSpreadsheets to dependencies or it will cause infinite loops
-  }, []);
+    // Only fetch if the library view is active
+    if (activeView === 'library') {
+      fetchSpreadsheets();
+    }
+    // Add fetchSpreadsheets and activeView to dependency array
+  }, [fetchSpreadsheets, activeView]);
   
   // Handle view spreadsheet
   const handleViewSpreadsheet = async (spreadsheetId, filename) => {
@@ -465,7 +467,7 @@ const SpreadsheetViewer = () => {
               }}
             >
               <Typography variant="h6" gutterBottom>
-                Your Spreadsheets
+                Original Uploaded Spreadsheets
               </Typography>
               <Box sx={{ flex: 1, overflow: 'hidden' }}>
                 {renderSpreadsheetList()}

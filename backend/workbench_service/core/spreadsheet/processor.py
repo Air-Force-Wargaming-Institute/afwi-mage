@@ -447,9 +447,17 @@ class SpreadsheetProcessor:
             spreadsheet_id: ID of the spreadsheet to duplicate (if create_duplicate is True)
         """
         from ..llm.transformer import RowTransformer, BatchProcessor
-        from ..spreadsheet.manager import SpreadsheetManager, get_spreadsheet_manager
+        from ..spreadsheet.manager import get_spreadsheet_manager
         import os
         import uuid
+        from pathlib import Path
+        
+        # Convert file_path to Path object if it's not already
+        if not isinstance(file_path, Path):
+            file_path = Path(file_path)
+            
+        # Ensure we're working with absolute paths
+        file_path = file_path.absolute()
         
         # Update job status from api.jobs
         try:
@@ -460,7 +468,7 @@ class SpreadsheetProcessor:
             update_job_status = self._update_job_status
         
         logger.info(f"Starting background transformation job {job_id}")
-        logger.info(f"Processing file: {file_path} (absolute: {os.path.abspath(file_path)})")
+        logger.info(f"Processing file: {file_path}")
         logger.info(f"Input columns: {input_columns}")
         logger.info(f"Output columns: {[col['name'] for col in output_columns]}")
         logger.info(f"Create duplicate: {create_duplicate}")
@@ -492,6 +500,7 @@ class SpreadsheetProcessor:
                         # Create duplicate
                         duplicate_info = spreadsheet_manager.create_duplicate_spreadsheet(spreadsheet_id)
                         target_file_path = Path(duplicate_info["storage_path"])
+                        duplicate_id = duplicate_info["id"]
                         
                         update_job_status(job_id, {
                             "status": "running",
@@ -501,35 +510,14 @@ class SpreadsheetProcessor:
                         
                         logger.info(f"Created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
                     else:
-                        # Fallback to searching metadata by file_path (not recommended)
-                        logger.warning(f"No spreadsheet_id provided, attempting to find by file_path (not reliable)")
-                        search_id = None
-                        metadata = spreadsheet_manager.metadata
-                        for id, info in metadata.items():
-                            if str(info.get("storage_path")) == str(file_path):
-                                search_id = id
-                                break
-                        
-                        if search_id:
-                            update_job_status(job_id, {
-                                "status": "running",
-                                "progress": 5,
-                                "message": f"Creating duplicate of spreadsheet {search_id}"
-                            })
-                            
-                            # Create duplicate
-                            duplicate_info = spreadsheet_manager.create_duplicate_spreadsheet(search_id)
-                            target_file_path = Path(duplicate_info["storage_path"])
-                            
-                            update_job_status(job_id, {
-                                "status": "running",
-                                "progress": 10,
-                                "message": f"Created duplicate spreadsheet {duplicate_info['id']}"
-                            })
-                            
-                            logger.info(f"Created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
-                        else:
-                            logger.warning(f"Could not find spreadsheet ID for {file_path}, proceeding with original file")
+                        # No spreadsheet_id provided, cannot perform duplication
+                        error_msg = "Cannot create duplicate: No spreadsheet_id provided"
+                        logger.error(error_msg)
+                        update_job_status(job_id, {
+                            "status": "running",
+                            "progress": 5,
+                            "message": f"Warning: {error_msg}. Proceeding with original file."
+                        })
                 except Exception as dup_error:
                     logger.error(f"Error creating duplicate spreadsheet: {str(dup_error)}")
                     update_job_status(job_id, {
@@ -596,11 +584,17 @@ class SpreadsheetProcessor:
             processor = BatchProcessor(transformer=transformer, max_concurrent=5)
             result_df = await processor.process_dataframe(df, on_progress=on_progress)
             
+            # Get final structure for metadata update
+            final_columns = result_df.columns.tolist()
+            final_row_count = len(result_df)
+            logger.info(f"Transformation complete. Final structure: {final_row_count} rows, {len(final_columns)} columns.")
+            logger.info(f"Final columns: {final_columns}")
+
             # Log the transformation results
-            result_columns = [col for col in result_df.columns if col not in original_df.columns]
-            logger.info(f"Transformation complete. New columns added: {result_columns}")
-            logger.info(f"Result dataframe shape: {result_df.shape}")
-            
+            # result_columns = [col for col in result_df.columns if col not in original_df.columns]
+            # logger.info(f"Transformation complete. New columns added: {result_columns}")
+            # logger.info(f"Result dataframe shape: {result_df.shape}")
+
             # Save the results
             update_job_status(job_id, {
                 "status": "running",
@@ -608,97 +602,83 @@ class SpreadsheetProcessor:
                 "message": "Saving transformed spreadsheet"
             })
             
-            # Save the results using multiple approaches to ensure it works
-            output_paths = []
+            # Track if any errors occurred during transformation
+            had_transformation_errors = False
+            if 'had_errors' in transformer.__dict__ and transformer.had_errors:
+                had_transformation_errors = True
             
-            # 1. Standard save path
+            # Save the results using our reliable save method
             try:
                 output_path = self._save_transformed_spreadsheet(target_file_path, sheet_name, result_df)
-                output_paths.append(output_path)
-            except Exception as e:
-                logger.error(f"Error saving using standard method: {str(e)}")
-                
-            # 2. Save directly to data directory using absolute path
-            try:
-                from config import BASE_DIR
-                # Generate a more distinctive filename 
-                timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-                alt_filename = f"{target_file_path.stem}_transformed_{timestamp}_ALT{target_file_path.suffix}"
-                
-                # Try both relative and absolute paths
-                alt_path1 = Path(BASE_DIR) / "workbench" / "outputs" / alt_filename
-                alt_path2 = Path(os.path.join(os.getcwd(), "data", "workbench", "outputs", alt_filename))
-                
-                logger.info(f"Attempting to save to alternate path 1: {alt_path1}")
-                os.makedirs(os.path.dirname(alt_path1), exist_ok=True)
-                if target_file_path.suffix.lower() == '.csv':
-                    result_df.to_csv(alt_path1, index=False)
-                else:
-                    result_df.to_excel(alt_path1, sheet_name=sheet_name, index=False)
-                    
-                if os.path.exists(alt_path1):
-                    logger.info(f"Successfully saved to alternate path: {alt_path1}")
-                    output_paths.append(alt_path1)
-                
-                logger.info(f"Attempting to save to alternate path 2: {alt_path2}")
-                os.makedirs(os.path.dirname(alt_path2), exist_ok=True)
-                if target_file_path.suffix.lower() == '.csv':
-                    result_df.to_csv(alt_path2, index=False)
-                else:
-                    result_df.to_excel(alt_path2, sheet_name=sheet_name, index=False)
-                    
-                if os.path.exists(alt_path2):
-                    logger.info(f"Successfully saved to alternate path: {alt_path2}")
-                    output_paths.append(alt_path2)
-                    
-            except Exception as e:
-                logger.error(f"Error saving using alternate methods: {str(e)}")
-                
-            # 3. Also save to the same directory as the original file
-            try:
-                timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-                same_dir_path = target_file_path.parent / f"{target_file_path.stem}_transformed_{timestamp}{target_file_path.suffix}"
-                logger.info(f"Attempting to save to same directory as original: {same_dir_path}")
-                
-                if target_file_path.suffix.lower() == '.csv':
-                    result_df.to_csv(same_dir_path, index=False)
-                else:
-                    result_df.to_excel(same_dir_path, sheet_name=sheet_name, index=False)
-                    
-                if os.path.exists(same_dir_path):
-                    logger.info(f"Successfully saved to same directory: {same_dir_path}")
-                    output_paths.append(same_dir_path)
-            except Exception as e:
-                logger.error(f"Error saving to same directory: {str(e)}")
-            
-            # Update job status to completed - list all successful paths
-            success_msg = "Transformation completed successfully!"
-            if output_paths:
-                success_msg += f" Results saved to: {', '.join([str(p) for p in output_paths])}"
-                
-            # Create a relative URL for the first successful path
-            result_url = None
-            if output_paths:
+                logger.info(f"Successfully saved transformed spreadsheet to {output_path}")
+
+                # --- Create new metadata entry for the transformed file ---
+                new_metadata_id = None
+                try:
+                    new_metadata_id = spreadsheet_manager.create_metadata_for_transformed_file(
+                        original_spreadsheet_id=spreadsheet_id, # Link to the original
+                        new_columns=final_columns,
+                        new_row_count=final_row_count,
+                        new_storage_path=output_path,
+                        sheet_name=sheet_name
+                    )
+                    logger.info(f"Created new metadata entry {new_metadata_id} for transformed file.")
+                except Exception as meta_error:
+                    logger.error(f"Failed to create metadata for transformed file: {meta_error}", exc_info=True)
+                    # Decide if this should fail the job or just log a warning
+                    # For now, log warning and continue with job completion, but without updated metadata link
+                    update_job_status(job_id, {
+                        "status": "running",
+                        "progress": 98,
+                        "message": f"Warning: Saved transformed file but failed to create metadata entry: {meta_error}"
+                    })
+                # --- End metadata creation ---
+
+                # Create a relative URL for the result
                 try:
                     from config import WORKBENCH_OUTPUTS_DIR
-                    # Try to make a relative URL for the frontend to access
-                    if str(output_paths[0]).startswith(str(WORKBENCH_OUTPUTS_DIR)):
-                        # Extract just the filename for a download endpoint
-                        output_filename = os.path.basename(output_paths[0])
-                        result_url = f"/api/workbench/spreadsheets/download/{output_filename}"
-                    else:
-                        # If it's not in the expected directory, use the full path
-                        result_url = str(output_paths[0])
+                    # Ensure both paths are Path objects
+                    outputs_dir = Path(WORKBENCH_OUTPUTS_DIR)
+                    output_path_obj = Path(output_path)
+                    
+                    # Extract just the filename for a download endpoint
+                    output_filename = output_path_obj.name
+                    result_url = f"/api/workbench/spreadsheets/download/{output_filename}"
+                    logger.info(f"Generated result URL: {result_url}")
                 except Exception as url_error:
                     logger.error(f"Error creating result URL: {str(url_error)}")
-                    result_url = str(output_paths[0])
-            
-            update_job_status(job_id, {
-                "status": "completed", 
-                "progress": 100, 
-                "message": success_msg,
-                "result_url": result_url
-            })
+                    result_url = str(output_path)
+                
+                # Set job status based on whether there were errors during transformation
+                if had_transformation_errors:
+                    status_message = "Transformation completed with some errors. Some cells may contain default values."
+                    job_status = "completed_with_errors"
+                else:
+                    status_message = "Transformation completed successfully!"
+                    job_status = "completed"
+
+                # Include the new metadata ID in the success message if created
+                if new_metadata_id:
+                    status_message += f" New data saved with spreadsheet ID: {new_metadata_id}."
+
+                update_job_status(job_id, {
+                    "status": job_status,
+                    "progress": 100,
+                    "message": status_message,
+                    "result": { # Add result section to job info
+                        "output_file_path": str(output_path),
+                        "new_spreadsheet_id": new_metadata_id # Include the new ID if created
+                    }
+                    # "result_url": result_url # Keep or remove based on whether download endpoint is preferred
+                })
+                
+            except Exception as save_error:
+                logger.error(f"Error saving transformed spreadsheet: {str(save_error)}", exc_info=True)
+                update_job_status(job_id, {
+                    "status": "failed", 
+                    "progress": 90, 
+                    "message": f"Error saving transformation results: {str(save_error)}"
+                })
             
         except Exception as e:
             logger.error(f"Error in background transformation job {job_id}: {str(e)}", exc_info=True)
@@ -745,9 +725,16 @@ class SpreadsheetProcessor:
         import os
         from config import WORKBENCH_OUTPUTS_DIR
         
+        # Ensure original_path is a Path object
+        if not isinstance(original_path, Path):
+            original_path = Path(original_path)
+            
+        # Ensure WORKBENCH_OUTPUTS_DIR is a Path object
+        outputs_dir = Path(WORKBENCH_OUTPUTS_DIR)
+        
         # Create output directory if it doesn't exist
-        logger.info(f"Saving transformed spreadsheet. Output directory: {WORKBENCH_OUTPUTS_DIR} (absolute: {os.path.abspath(WORKBENCH_OUTPUTS_DIR)})")
-        os.makedirs(WORKBENCH_OUTPUTS_DIR, exist_ok=True)
+        logger.info(f"Saving transformed spreadsheet. Output directory: {outputs_dir}")
+        outputs_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate output filename
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
@@ -757,38 +744,28 @@ class SpreadsheetProcessor:
         
         # Determine output format based on original file
         if original_path.suffix.lower() == '.csv':
-            output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.csv"
-            logger.info(f"Saving CSV to: {output_path} (absolute: {os.path.abspath(output_path)})")
+            output_path = outputs_dir / f"{output_filename}.csv"
+            logger.info(f"Saving CSV to: {output_path}")
             df.to_csv(output_path, index=False)
         else:
-            output_path = Path(WORKBENCH_OUTPUTS_DIR) / f"{output_filename}.xlsx"
-            logger.info(f"Saving Excel to: {output_path} (absolute: {os.path.abspath(output_path)})")
+            output_path = outputs_dir / f"{output_filename}.xlsx"
+            logger.info(f"Saving Excel to: {output_path}")
             # Log DataFrame info for debugging
             logger.info(f"DataFrame info: {len(df)} rows, {len(df.columns)} columns")
             logger.info(f"Column names: {list(df.columns)}")
             df.to_excel(output_path, sheet_name=sheet_name, index=False)
         
         # Verify file was created
-        if os.path.exists(output_path):
+        if not output_path.exists():
+            error_msg = f"Failed to save file! Path does not exist: {output_path}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        else:
             logger.info(f"Successfully saved transformed spreadsheet to {output_path}")
             try:
-                file_size = os.path.getsize(output_path)
+                file_size = output_path.stat().st_size
                 logger.info(f"File size: {file_size} bytes")
             except Exception as e:
                 logger.error(f"Could not get file size: {str(e)}")
-        else:
-            logger.error(f"Failed to save file! Path does not exist: {output_path}")
-            
-            # Try saving to an alternate location
-            alt_path = Path(os.getcwd()) / f"{output_filename}{original_path.suffix}"
-            logger.info(f"Attempting to save to alternate location: {alt_path}")
-            if original_path.suffix.lower() == '.csv':
-                df.to_csv(alt_path, index=False)
-            else:
-                df.to_excel(alt_path, sheet_name=sheet_name, index=False)
-            
-            if os.path.exists(alt_path):
-                logger.info(f"Successfully saved to alternate location: {alt_path}")
-                return alt_path
             
         return output_path 

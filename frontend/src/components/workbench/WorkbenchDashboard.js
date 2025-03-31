@@ -143,12 +143,12 @@ const WorkbenchDashboard = () => {
                     </ul>
                   </Box>
                 </CardContent>
-                <CardActions sx={{ padding: '16px', justifyContent: 'center' }}>
+                <CardActions sx={{ padding: '8px', justifyContent: 'center' }}>
                   <Button
                     variant="contained"
                     color="primary"
                     onClick={() => setSelectedTool(tool.id)}
-                    sx={{ width: '80%' }}
+                    sx={{ width: '100%' }}
                   >
                     SELECT TOOL
                   </Button>

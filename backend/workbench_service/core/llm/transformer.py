@@ -60,6 +60,15 @@ class RowTransformer:
         # Output column names for reference
         self.output_column_names = [col['name'] for col in output_columns]
         
+        # Track errors
+        self.had_errors = False
+        self.error_count = 0
+        
+        # Error markers
+        self.ERROR_MARKER = "#ERROR!"
+        self.TYPE_ERROR_MARKER = "#TYPE_ERROR!"
+        self.EMPTY_ERROR_MARKER = "#EMPTY!"
+        
         # Validate output column configurations
         self._validate_output_columns()
     
@@ -148,6 +157,8 @@ class RowTransformer:
             
         except Exception as e:
             logger.error(f"Error transforming row: {str(e)}")
+            self.had_errors = True
+            self.error_count += 1
             
             if self.error_handling == "stop":
                 raise
@@ -183,14 +194,15 @@ class RowTransformer:
                     
                 except Exception as retry_error:
                     logger.error(f"Error during retry: {str(retry_error)}")
+                    self.error_count += 1
                     
                     if self.error_handling == "stop":
                         raise
             
-            # Return empty values for all output columns
-            empty_result = {col: "" for col in self.output_column_names}
-            logger.warning(f"Returning empty values due to error: {empty_result}")
-            return empty_result
+            # Return error marker values for all output columns
+            error_result = {col: self.ERROR_MARKER for col in self.output_column_names}
+            logger.warning(f"Returning error markers due to failure: {error_result}")
+            return error_result
     
     def _create_system_prompt(self) -> str:
         """
@@ -386,6 +398,11 @@ class RowTransformer:
         true_val = type_options.get('trueValue', 'Yes')
         false_val = type_options.get('falseValue', 'No')
         
+        # Handle empty values
+        if value is None or str(value).strip() == '':
+            self.had_errors = True
+            return self.EMPTY_ERROR_MARKER
+        
         # Normalize value for comparison
         str_value = str(value).lower().strip()
         
@@ -401,9 +418,10 @@ class RowTransformer:
         if str_value in ['false', 'no', '0', 'f', 'n']:
             return false_val
         
-        # Default to false value if unrecognized
-        logger.warning(f"Unrecognized boolean value '{value}', defaulting to '{false_val}'")
-        return false_val
+        # Default to error marker if unrecognized
+        logger.warning(f"Unrecognized boolean value '{value}', using error marker")
+        self.had_errors = True
+        return self.TYPE_ERROR_MARKER
     
     def _validate_list(self, value: Any, type_options: Dict[str, Any]) -> str:
         """
@@ -422,6 +440,11 @@ class RowTransformer:
         else:
             options = [opt.strip() for opt in options_str.split(',')]
         
+        # Handle empty values
+        if value is None or str(value).strip() == '':
+            self.had_errors = True
+            return self.EMPTY_ERROR_MARKER
+        
         # Normalize value for comparison
         str_value = str(value).strip()
         
@@ -436,12 +459,13 @@ class RowTransformer:
                 logger.warning(f"Partial match for list value '{str_value}', using '{option}'")
                 return option
         
-        # Default to first option if no match
+        # Default to error marker if no match found
         if options:
-            logger.warning(f"Value '{str_value}' not in allowed options {options}, defaulting to '{options[0]}'")
-            return options[0]
+            logger.warning(f"Value '{str_value}' not in allowed options {options}, using error marker")
+            self.had_errors = True
+            return self.TYPE_ERROR_MARKER
         
-        # Return original value if no options
+        # Return original value if no options (shouldn't happen)
         return str_value
     
     def _validate_number(self, value: Any, type_options: Dict[str, Any]) -> str:
@@ -457,6 +481,11 @@ class RowTransformer:
         """
         format_type = type_options.get('format', 'decimal')
         
+        # Handle empty values
+        if value is None or str(value).strip() == '':
+            self.had_errors = True
+            return self.EMPTY_ERROR_MARKER
+        
         # Extract numeric part
         if isinstance(value, (int, float)):
             num_value = value
@@ -470,8 +499,9 @@ class RowTransformer:
             try:
                 num_value = float(numeric_str)
             except ValueError:
-                logger.warning(f"Could not convert '{value}' to number, defaulting to 0")
-                num_value = 0
+                logger.warning(f"Could not convert '{value}' to number, using error marker")
+                self.had_errors = True
+                return self.TYPE_ERROR_MARKER
         
         # Format according to type
         if format_type == 'integer':
