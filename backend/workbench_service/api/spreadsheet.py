@@ -14,6 +14,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
+from datetime import datetime
 
 # Import Pydantic models
 from pydantic import BaseModel, Field
@@ -71,30 +72,46 @@ class OperationResult(BaseModel):
 class OutputColumnDefinition(BaseModel):
     """Definition of an output column for transformation."""
     name: str = Field(..., description="Name of the output column")
-    description: Optional[str] = Field(None, description="Description of the output column")
+    description: str = Field(..., description="Instructions for transforming this column")
+    is_new: bool = Field(True, description="Whether this is a new column or existing one")
+    output_type: str = Field("text", description="Output data type: 'text', 'boolean', 'list', or 'number'")
+    type_options: Dict[str, Any] = Field(default_factory=dict, description="Type-specific options")
 
 class TransformationRequest(BaseModel):
     """Request to perform a column transformation."""
     sheet_name: str = Field(..., description="Name of the sheet to operate on")
     input_columns: List[str] = Field(..., description="List of input column names")
     output_columns: List[OutputColumnDefinition] = Field(..., description="List of output column definitions")
-    instructions: str = Field(..., description="Transformation instructions for LLM")
     include_headers: bool = Field(True, description="Whether to include column headers in context")
-    processing_mode: str = Field("all", description="Processing mode: 'all' or 'sample'")
+    processing_mode: str = Field("preview", description="Processing mode: 'all' or 'preview'")
     error_handling: str = Field("continue", description="Error handling strategy: 'continue', 'stop', or 'retry'")
+    create_duplicate: bool = Field(True, description="Create a duplicate of the spreadsheet before transforming")
     
     model_config = {
         "json_schema_extra": {
             "example": {
                 "sheet_name": "Sheet1",
-                "input_columns": ["SchoolName", "City", "State"],
+                "input_columns": ["Source Data"],
                 "output_columns": [
-                    {"name": "NamedAfterPerson", "description": "Boolean indicating if school is named after a person"}
+                    {
+                        "name": "FormattedOutput", 
+                        "description": "Combine first name and last name from input.", 
+                        "is_new": True, 
+                        "output_type": "text",
+                        "type_options": {}
+                    },
+                    {
+                        "name": "Category", 
+                        "description": "Categorize based on input value A, B, or C.", 
+                        "is_new": True, 
+                        "output_type": "list",
+                        "type_options": {"options": "A,B,C"}
+                    }
                 ],
-                "instructions": "Read the name of the school and give me a true or false value if the school is named after a person.",
                 "include_headers": True,
-                "processing_mode": "all",
-                "error_handling": "continue"
+                "processing_mode": "preview",
+                "error_handling": "continue",
+                "create_duplicate": True
             }
         }
     }
@@ -488,11 +505,11 @@ async def transform_spreadsheet(
     Transform spreadsheet columns using LLM processing.
     
     This endpoint performs row-by-row transformations on the specified spreadsheet
-    using LLM processing based on the provided instructions.
+    using LLM processing based on the provided per-column instructions.
     
     Args:
         spreadsheet_id: ID of the spreadsheet
-        request: Transformation parameters including input columns, output columns, and instructions
+        request: Transformation parameters including input columns, output columns, and per-column instructions
         background_tasks: FastAPI background tasks for async processing
         
     Returns:
@@ -504,117 +521,165 @@ async def transform_spreadsheet(
         # Get the file path
         file_path = spreadsheet_manager.get_spreadsheet_path(spreadsheet_id)
         
-        # Check if sheet exists
+        # Check if sheet exists and get sheet-specific metadata
         info = spreadsheet_manager.get_spreadsheet_info(spreadsheet_id)
         if request.sheet_name not in info.get("sheets", []):
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Sheet '{request.sheet_name}' not found in spreadsheet"
             )
         
-        # Validate input columns
-        sheet_columns = info.get("columns", [])
-        for col in request.input_columns:
-            if col not in sheet_columns:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Input column '{col}' not found in spreadsheet"
-                )
+        # Validate input columns using sheet-specific metadata
+        sheet_metadata = info.get("sheets_metadata", {}).get(request.sheet_name, {})
+        sheet_columns = sheet_metadata.get("columns", [])
+
+        if not sheet_columns:
+             # This might happen if metadata extraction failed during upload/scan
+             logger.warning(f"No column metadata found for sheet '{request.sheet_name}' in spreadsheet '{spreadsheet_id}'. Proceeding without column validation.")
+             # Optionally, you could attempt to read columns here on-the-fly, but it adds overhead.
+             # For now, we'll log a warning and proceed, relying on later pandas errors if columns are truly missing.
+        else:
+             # Perform validation only if we have column metadata
+             for col in request.input_columns:
+                 if col not in sheet_columns:
+                     raise HTTPException(
+                         status_code=400,
+                         detail=f"Input column '{col}' not found in sheet '{request.sheet_name}'"
+                     )
         
-        # For sample processing, process synchronously and return preview
-        if request.processing_mode == "sample":
-            # Process first few rows
-            result = spreadsheet_processor.transform_spreadsheet(
+        # Convert output column models to dictionaries for the processor
+        output_columns = []
+        for col in request.output_columns:
+            col_dict = {
+                "name": col.name,
+                "description": col.description,
+                "output_type": col.output_type,
+                "type_options": col.type_options,
+                "is_new": col.is_new
+            }
+            output_columns.append(col_dict)
+        
+        # For preview processing, process synchronously and return preview
+        if request.processing_mode == "preview":
+            logger.info(f"Processing preview for sheet: {request.sheet_name}")
+
+            # Call the processor with our updated parameters
+            result = await spreadsheet_processor.transform_spreadsheet(
                 file_path=file_path,
                 sheet_name=request.sheet_name,
                 input_columns=request.input_columns,
-                output_columns=[col.dict() for col in request.output_columns],
-                instructions=request.instructions,
+                output_columns=output_columns,
                 include_headers=request.include_headers,
-                processing_mode="sample",
-                error_handling=request.error_handling
+                processing_mode="preview",
+                error_handling=request.error_handling,
+                create_duplicate=False  # Don't create duplicate for preview, only for full processing
             )
             
             if "error" in result:
-                return {
-                    "success": False,
-                    "error": result["error"]
-                }
+                raise HTTPException(status_code=500, detail=result["error"])
             
-            # Handle the async case from the processor
-            if result.get("requires_async"):
-                # Execute the async operation here in the async route handler
-                sample_df = result["sample_df"]
-                processor = result["processor"]
-                input_columns = result["input_columns"]
-                output_columns = result["output_columns"]
-                
-                # Process the dataframe
-                result_df = await processor.process_dataframe(sample_df)
-                
-                # Convert to preview format
-                preview = []
-                
-                # Add header row
-                header_row = []
-                for col in input_columns:
-                    header_row.append(col)
-                for col in [c["name"] for c in output_columns]:
-                    header_row.append(col)
-                preview.append(header_row)
-                
-                # Add data rows
-                for _, row in result_df.iterrows():
-                    data_row = []
-                    for col in input_columns:
-                        data_row.append(str(row[col]))
-                    for col in [c["name"] for c in output_columns]:
-                        data_row.append(str(row[col]))
-                    preview.append(data_row)
-                
-                return {
-                    "success": True,
-                    "preview": preview
-                }
-            
-            return {
-                "success": True,
-                "preview": result.get("preview", [])
-            }
-        
+            return TransformationResult(success=True, preview=result.get("preview", []))
+
         # For full processing, start background task and return job ID
         else:
-            # Create a unique job ID
-            from uuid import uuid4
-            job_id = str(uuid4())
+            # Import job management functions
+            try:
+                from api.jobs import create_job_entry
+            except ImportError:
+                logger.error("Could not import api.jobs module, job tracking will be limited")
+                # Create a simple job ID for fallback
+                from uuid import uuid4
+                job_id = str(uuid4())
+            else:
+                # Create a job entry in the store
+                job_entry = {
+                    "type": "column_transformation",
+                    "status": "submitted",
+                    "progress": 0,
+                    "created_at": datetime.now().isoformat(),
+                    "parameters": {
+                        "spreadsheet_id": spreadsheet_id,
+                        "sheet_name": request.sheet_name,
+                        "input_columns": request.input_columns,
+                        "output_columns": [col.name for col in request.output_columns],
+                    },
+                    "message": "Job submitted, waiting to start processing"
+                }
+                job_id = create_job_entry(job_entry)
+
+            logger.info(f"Created job {job_id} for full transformation")
             
-            # Start background task
+            # Schedule the background task
             background_tasks.add_task(
                 spreadsheet_processor.transform_spreadsheet_background,
                 job_id=job_id,
                 file_path=file_path,
                 sheet_name=request.sheet_name,
                 input_columns=request.input_columns,
-                output_columns=[col.dict() for col in request.output_columns],
-                instructions=request.instructions,
+                output_columns=output_columns,
                 include_headers=request.include_headers,
-                error_handling=request.error_handling
+                error_handling=request.error_handling,
+                create_duplicate=request.create_duplicate,
+                spreadsheet_id=spreadsheet_id  # Add spreadsheet_id parameter
             )
             
-            return {
-                "success": True,
-                "job_id": job_id
-            }
-        
+            return TransformationResult(success=True, job_id=job_id)
+
     except HTTPException as e:
-        logger.error(f"HTTP error during transformation: {e.detail}")
-        return {
-            "success": False,
-            "error": str(e.detail)
-        }
+        # Re-raise validation errors or other HTTPExceptions
+        logger.error(f"HTTP exception during transformation: {e.detail} (Status: {e.status_code})")
+        raise e
     except Exception as e:
-        logger.error(f"Error transforming spreadsheet: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Error transforming spreadsheet: {str(e)}"
-        } 
+        # Handle unexpected internal errors
+        logger.exception(f"Unexpected error transforming spreadsheet: {str(e)}") # Use logger.exception to include traceback
+        raise HTTPException(status_code=500, detail=f"Internal server error during transformation: {str(e)}")
+
+@router.get("/download/{filename}")
+async def download_output_file(filename: str):
+    """
+    Download a file from the outputs directory.
+    
+    This endpoint handles downloading output files created during transformation.
+    
+    Args:
+        filename: Name of the file to download
+        
+    Returns:
+        File response with the output file
+    """
+    from config import WORKBENCH_OUTPUTS_DIR
+    import os
+    
+    logger.info(f"Download output file endpoint called for file: {filename}")
+    
+    # Check if the filename contains path traversal characters
+    if "../" in filename or "..\\" in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: contains path traversal characters"
+        )
+    
+    # Construct the file path
+    file_path = os.path.join(WORKBENCH_OUTPUTS_DIR, filename)
+    
+    # Check if the file exists
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {filename}"
+        )
+    
+    # Check if the file is in the outputs directory
+    if os.path.abspath(file_path).startswith(os.path.abspath(WORKBENCH_OUTPUTS_DIR)):
+        # Return the file
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="application/octet-stream"
+        )
+    else:
+        # If the file is outside the outputs directory, raise an error
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: file is outside the outputs directory"
+        ) 

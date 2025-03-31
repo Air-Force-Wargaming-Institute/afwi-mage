@@ -320,16 +320,16 @@ class SpreadsheetProcessor:
                 detail=f"Error analyzing spreadsheet: {str(e)}"
             )
             
-    def transform_spreadsheet(
+    async def transform_spreadsheet(
         self,
         file_path: Path,
         sheet_name: str,
         input_columns: List[str],
-        output_columns: List[Dict[str, str]],
-        instructions: str,
+        output_columns: List[Dict[str, Any]],
         include_headers: bool = True,
         processing_mode: str = "all",
-        error_handling: str = "continue"
+        error_handling: str = "continue",
+        create_duplicate: bool = True
     ) -> Dict[str, Any]:
         """
         Transform spreadsheet columns using LLM processing.
@@ -338,20 +338,23 @@ class SpreadsheetProcessor:
             file_path: Path to the spreadsheet file
             sheet_name: Name of the sheet to process
             input_columns: List of input column names
-            output_columns: List of output column definitions
-            instructions: Transformation instructions for LLM
+            output_columns: List of output column definitions with per-column instructions
             include_headers: Whether to include column headers in context
-            processing_mode: "all" or "sample"
+            processing_mode: "all" or "preview"
             error_handling: "continue", "stop", or "retry"
+            create_duplicate: Whether to create a duplicate spreadsheet before transformation
             
         Returns:
             Dict with transformation results or error
         """
         try:
-            import asyncio
-            from ..llm import RowTransformer, BatchProcessor
+            from ..llm.transformer import RowTransformer, BatchProcessor
+            from ..spreadsheet.manager import SpreadsheetManager
             
             logger.info(f"Starting spreadsheet transformation with LLM for {file_path}, sheet: {sheet_name}")
+            logger.info(f"Input columns: {input_columns}")
+            logger.info(f"Output columns: {[col['name'] for col in output_columns]}")
+            logger.info(f"Processing mode: {processing_mode}, Create duplicate: {create_duplicate}")
             
             # Read the spreadsheet data
             if file_path.suffix.lower() == '.csv':
@@ -366,9 +369,8 @@ class SpreadsheetProcessor:
                     "error": f"Missing input columns: {', '.join(missing_columns)}"
                 }
             
-            # Prepare the LLM transformer
+            # Prepare the LLM transformer with the updated constructor - no more global instructions
             transformer = RowTransformer(
-                instructions=instructions,
                 input_columns=input_columns,
                 output_columns=output_columns,
                 include_headers=include_headers,
@@ -376,26 +378,37 @@ class SpreadsheetProcessor:
             )
             
             # Process only a sample for preview
-            if processing_mode == "sample":
+            if processing_mode == "preview":
                 # Get sample rows (limited to first 10)
                 sample_size = min(10, len(df))
                 sample_df = df.head(sample_size)
                 
-                # Create processor but don't run it yet - delegate to the caller
+                logger.info(f"Processing preview with {sample_size} rows")
+                
+                # Create processor for preview
                 processor = BatchProcessor(transformer=transformer, max_concurrent=5)
                 
-                # Don't use asyncio.run() since we're already in an event loop
-                # Return a special response that the API route handler will handle
-                return {
-                    "requires_async": True,
-                    "sample_df": sample_df,
-                    "processor": processor,
-                    "input_columns": input_columns,
-                    "output_columns": output_columns,
-                    "sample_size": sample_size
-                }
+                # Process the sample asynchronously - now properly awaited without run_until_complete
+                try:
+                    # Since we're in an async function, we can directly await the processor
+                    result_df = await processor.process_dataframe(sample_df)
+                    
+                    # Convert the result to a list of lists for the API response
+                    header = result_df.columns.tolist()
+                    values = result_df.values.tolist()
+                    preview_data = [header] + values
+                    
+                    return {
+                        "success": True,
+                        "preview": preview_data,
+                        "sample_size": sample_size
+                    }
+                except Exception as async_error:
+                    logger.error(f"Error in async preview processing: {str(async_error)}")
+                    return {"error": f"Error in preview processing: {str(async_error)}"}
                 
             # For full processing in a background task, just return confirmation
+            # The actual processing will happen in transform_spreadsheet_background
             return {
                 "success": True,
                 "message": "Transformation task initialized"
@@ -413,10 +426,11 @@ class SpreadsheetProcessor:
         file_path: Path,
         sheet_name: str,
         input_columns: List[str],
-        output_columns: List[Dict[str, str]],
-        instructions: str,
+        output_columns: List[Dict[str, Any]],
         include_headers: bool = True,
-        error_handling: str = "continue"
+        error_handling: str = "continue",
+        create_duplicate: bool = True,
+        spreadsheet_id: Optional[str] = None
     ) -> None:
         """
         Background task for spreadsheet transformation.
@@ -426,27 +440,115 @@ class SpreadsheetProcessor:
             file_path: Path to the spreadsheet file
             sheet_name: Name of the sheet to process
             input_columns: List of input column names
-            output_columns: List of output column definitions
-            instructions: Transformation instructions for LLM
+            output_columns: List of output column definitions with per-column instructions
             include_headers: Whether to include column headers in context
             error_handling: "continue", "stop", or "retry"
+            create_duplicate: Whether to create a duplicate spreadsheet before transformation
+            spreadsheet_id: ID of the spreadsheet to duplicate (if create_duplicate is True)
         """
-        from ..llm import RowTransformer, BatchProcessor
+        from ..llm.transformer import RowTransformer, BatchProcessor
+        from ..spreadsheet.manager import SpreadsheetManager, get_spreadsheet_manager
+        import os
+        import uuid
+        
+        # Update job status from api.jobs
+        try:
+            from api.jobs import update_job_in_store
+            update_job_status = update_job_in_store
+        except ImportError:
+            # Fallback to local placeholder if API module not accessible
+            update_job_status = self._update_job_status
         
         logger.info(f"Starting background transformation job {job_id}")
         logger.info(f"Processing file: {file_path} (absolute: {os.path.abspath(file_path)})")
         logger.info(f"Input columns: {input_columns}")
         logger.info(f"Output columns: {[col['name'] for col in output_columns]}")
+        logger.info(f"Create duplicate: {create_duplicate}")
         
         try:
             # Update job status
-            self._update_job_status(job_id, status="running", progress=0, message="Starting transformation")
+            update_job_status(job_id, {
+                "status": "running",
+                "progress": 0,
+                "message": "Starting transformation"
+            })
+            
+            # Handle file path - first determine which spreadsheet this belongs to
+            # We need to find the spreadsheet ID to create a duplicate if requested
+            target_file_path = file_path
+            spreadsheet_manager = get_spreadsheet_manager()
+            
+            # If create_duplicate is True, create a duplicate of the spreadsheet
+            if create_duplicate:
+                try:
+                    # Use provided spreadsheet_id if available
+                    if spreadsheet_id:
+                        update_job_status(job_id, {
+                            "status": "running",
+                            "progress": 5,
+                            "message": f"Creating duplicate of spreadsheet {spreadsheet_id}"
+                        })
+                        
+                        # Create duplicate
+                        duplicate_info = spreadsheet_manager.create_duplicate_spreadsheet(spreadsheet_id)
+                        target_file_path = Path(duplicate_info["storage_path"])
+                        
+                        update_job_status(job_id, {
+                            "status": "running",
+                            "progress": 10,
+                            "message": f"Created duplicate spreadsheet {duplicate_info['id']}"
+                        })
+                        
+                        logger.info(f"Created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
+                    else:
+                        # Fallback to searching metadata by file_path (not recommended)
+                        logger.warning(f"No spreadsheet_id provided, attempting to find by file_path (not reliable)")
+                        search_id = None
+                        metadata = spreadsheet_manager.metadata
+                        for id, info in metadata.items():
+                            if str(info.get("storage_path")) == str(file_path):
+                                search_id = id
+                                break
+                        
+                        if search_id:
+                            update_job_status(job_id, {
+                                "status": "running",
+                                "progress": 5,
+                                "message": f"Creating duplicate of spreadsheet {search_id}"
+                            })
+                            
+                            # Create duplicate
+                            duplicate_info = spreadsheet_manager.create_duplicate_spreadsheet(search_id)
+                            target_file_path = Path(duplicate_info["storage_path"])
+                            
+                            update_job_status(job_id, {
+                                "status": "running",
+                                "progress": 10,
+                                "message": f"Created duplicate spreadsheet {duplicate_info['id']}"
+                            })
+                            
+                            logger.info(f"Created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
+                        else:
+                            logger.warning(f"Could not find spreadsheet ID for {file_path}, proceeding with original file")
+                except Exception as dup_error:
+                    logger.error(f"Error creating duplicate spreadsheet: {str(dup_error)}")
+                    update_job_status(job_id, {
+                        "status": "running",
+                        "progress": 5,
+                        "message": f"Failed to create duplicate, proceeding with original: {str(dup_error)}"
+                    })
             
             # Read the spreadsheet data
-            if file_path.suffix.lower() == '.csv':
-                df = pd.read_csv(file_path)
+            update_job_status(job_id, {
+                "status": "running",
+                "progress": 15,
+                "message": "Reading spreadsheet data"
+            })
+            
+            if target_file_path.suffix.lower() == '.csv':
+                df = pd.read_csv(target_file_path)
             else:
-                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                df = pd.read_excel(target_file_path, sheet_name=sheet_name)
             
             # Store a copy of the original DataFrame
             original_df = df.copy()
@@ -458,17 +560,15 @@ class SpreadsheetProcessor:
             if missing_columns:
                 error_msg = f"Missing input columns: {', '.join(missing_columns)}"
                 logger.error(error_msg)
-                self._update_job_status(
-                    job_id, 
-                    status="failed", 
-                    progress=0, 
-                    message=error_msg
-                )
+                update_job_status(job_id, {
+                    "status": "failed", 
+                    "progress": 0, 
+                    "message": error_msg
+                })
                 return
             
-            # Prepare the LLM transformer
+            # Prepare the LLM transformer (using the updated transformer)
             transformer = RowTransformer(
-                instructions=instructions,
                 input_columns=input_columns,
                 output_columns=output_columns,
                 include_headers=include_headers,
@@ -477,10 +577,22 @@ class SpreadsheetProcessor:
             
             # Progress callback
             def on_progress(percent):
-                logger.info(f"Transformation progress: {percent}%")
-                self._update_job_status(job_id, status="running", progress=percent, message="Processing rows")
+                # Scale the progress from 20% to 90%
+                scaled_percent = 20 + (percent * 0.7)
+                logger.info(f"Transformation progress: {percent}% (scaled: {scaled_percent}%)")
+                update_job_status(job_id, {
+                    "status": "running", 
+                    "progress": scaled_percent, 
+                    "message": f"Processing rows: {percent:.1f}% complete"
+                })
             
             # Process the dataframe
+            update_job_status(job_id, {
+                "status": "running",
+                "progress": 20,
+                "message": "Starting row-by-row processing"
+            })
+            
             processor = BatchProcessor(transformer=transformer, max_concurrent=5)
             result_df = await processor.process_dataframe(df, on_progress=on_progress)
             
@@ -489,12 +601,19 @@ class SpreadsheetProcessor:
             logger.info(f"Transformation complete. New columns added: {result_columns}")
             logger.info(f"Result dataframe shape: {result_df.shape}")
             
+            # Save the results
+            update_job_status(job_id, {
+                "status": "running",
+                "progress": 90,
+                "message": "Saving transformed spreadsheet"
+            })
+            
             # Save the results using multiple approaches to ensure it works
             output_paths = []
             
             # 1. Standard save path
             try:
-                output_path = self._save_transformed_spreadsheet(file_path, sheet_name, result_df)
+                output_path = self._save_transformed_spreadsheet(target_file_path, sheet_name, result_df)
                 output_paths.append(output_path)
             except Exception as e:
                 logger.error(f"Error saving using standard method: {str(e)}")
@@ -504,14 +623,15 @@ class SpreadsheetProcessor:
                 from config import BASE_DIR
                 # Generate a more distinctive filename 
                 timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-                alt_filename = f"{file_path.stem}_transformed_{timestamp}_ALT{file_path.suffix}"
+                alt_filename = f"{target_file_path.stem}_transformed_{timestamp}_ALT{target_file_path.suffix}"
                 
                 # Try both relative and absolute paths
                 alt_path1 = Path(BASE_DIR) / "workbench" / "outputs" / alt_filename
                 alt_path2 = Path(os.path.join(os.getcwd(), "data", "workbench", "outputs", alt_filename))
                 
                 logger.info(f"Attempting to save to alternate path 1: {alt_path1}")
-                if file_path.suffix.lower() == '.csv':
+                os.makedirs(os.path.dirname(alt_path1), exist_ok=True)
+                if target_file_path.suffix.lower() == '.csv':
                     result_df.to_csv(alt_path1, index=False)
                 else:
                     result_df.to_excel(alt_path1, sheet_name=sheet_name, index=False)
@@ -521,7 +641,8 @@ class SpreadsheetProcessor:
                     output_paths.append(alt_path1)
                 
                 logger.info(f"Attempting to save to alternate path 2: {alt_path2}")
-                if file_path.suffix.lower() == '.csv':
+                os.makedirs(os.path.dirname(alt_path2), exist_ok=True)
+                if target_file_path.suffix.lower() == '.csv':
                     result_df.to_csv(alt_path2, index=False)
                 else:
                     result_df.to_excel(alt_path2, sheet_name=sheet_name, index=False)
@@ -535,10 +656,11 @@ class SpreadsheetProcessor:
                 
             # 3. Also save to the same directory as the original file
             try:
-                same_dir_path = file_path.parent / f"{file_path.stem}_transformed_{timestamp}{file_path.suffix}"
+                timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+                same_dir_path = target_file_path.parent / f"{target_file_path.stem}_transformed_{timestamp}{target_file_path.suffix}"
                 logger.info(f"Attempting to save to same directory as original: {same_dir_path}")
                 
-                if file_path.suffix.lower() == '.csv':
+                if target_file_path.suffix.lower() == '.csv':
                     result_df.to_csv(same_dir_path, index=False)
                 else:
                     result_df.to_excel(same_dir_path, sheet_name=sheet_name, index=False)
@@ -552,34 +674,60 @@ class SpreadsheetProcessor:
             # Update job status to completed - list all successful paths
             success_msg = "Transformation completed successfully!"
             if output_paths:
-                success_msg += f" Files saved to: {', '.join([str(p) for p in output_paths])}"
+                success_msg += f" Results saved to: {', '.join([str(p) for p in output_paths])}"
                 
-            self._update_job_status(
-                job_id, 
-                status="completed", 
-                progress=100, 
-                message=success_msg,
-                result_url=str(output_paths[0]) if output_paths else None
-            )
+            # Create a relative URL for the first successful path
+            result_url = None
+            if output_paths:
+                try:
+                    from config import WORKBENCH_OUTPUTS_DIR
+                    # Try to make a relative URL for the frontend to access
+                    if str(output_paths[0]).startswith(str(WORKBENCH_OUTPUTS_DIR)):
+                        # Extract just the filename for a download endpoint
+                        output_filename = os.path.basename(output_paths[0])
+                        result_url = f"/api/workbench/spreadsheets/download/{output_filename}"
+                    else:
+                        # If it's not in the expected directory, use the full path
+                        result_url = str(output_paths[0])
+                except Exception as url_error:
+                    logger.error(f"Error creating result URL: {str(url_error)}")
+                    result_url = str(output_paths[0])
+            
+            update_job_status(job_id, {
+                "status": "completed", 
+                "progress": 100, 
+                "message": success_msg,
+                "result_url": result_url
+            })
             
         except Exception as e:
             logger.error(f"Error in background transformation job {job_id}: {str(e)}", exc_info=True)
-            self._update_job_status(job_id, status="failed", progress=0, message=f"Error: {str(e)}")
+            update_job_status(job_id, {
+                "status": "failed", 
+                "progress": 0, 
+                "message": f"Error during transformation: {str(e)}"
+            })
     
-    def _update_job_status(self, job_id: str, status: str, progress: float, message: str, result_url: Optional[str] = None) -> None:
+    def _update_job_status(self, job_id: str, updates: Dict[str, Any]) -> None:
         """
         Update the status of a background job. This is a placeholder that should be replaced
-        with a proper job tracking system in a production environment.
+        with integration to the job tracking system (api.jobs module).
         
         Args:
             job_id: Unique job identifier
-            status: Job status ("running", "completed", "failed")
-            progress: Progress percentage (0-100)
-            message: Status message
-            result_url: Optional URL to results
+            updates: Dictionary with updates like status, progress, message, result_url, etc.
         """
         # This would typically update a database or cache with job status
-        logger.info(f"Job {job_id} status update: {status}, {progress}%, {message}")
+        logger.info(f"Job {job_id} status update: {updates}")
+        
+        # Try to import and use the actual job update function
+        try:
+            from api.jobs import update_job_in_store
+            update_job_in_store(job_id, updates)
+        except ImportError:
+            logger.warning("Could not import api.jobs.update_job_in_store, job status updates won't be persisted.")
+        except Exception as e:
+            logger.error(f"Error updating job status via api.jobs: {str(e)}")
     
     def _save_transformed_spreadsheet(self, original_path: Path, sheet_name: str, df: pd.DataFrame) -> Path:
         """

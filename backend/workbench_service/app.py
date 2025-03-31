@@ -92,9 +92,32 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# Determine the list of allowed origins based on config and debug mode
+allowed_origins = []
+if CORS_ORIGINS:
+    allowed_origins.extend(CORS_ORIGINS)
+
+# Add the default frontend development origin if in debug mode and not already present
+if DEBUG and "http://localhost:3000" not in allowed_origins:
+    # If '*' is present, it might cause issues with credentials, 
+    # so we might prefer to replace it or just add the specific origin.
+    # For simplicity here, we just add it.
+    allowed_origins.append("http://localhost:3000")
+
+# Remove wildcard if specific origins are present, as it can conflict with credentials=True
+if len(allowed_origins) > 1 and "*" in allowed_origins:
+    allowed_origins.remove("*")
+
+# If after all checks, the list is empty or only contains '*', default to '*' 
+# but this might still cause issues if credentials are required by the frontend.
+if not allowed_origins:
+    allowed_origins = ["*"] # Be cautious with this if credentials are used
+
+logger.info(f"Configuring CORS with allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*", "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
