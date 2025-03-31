@@ -197,5 +197,46 @@
     "upload_date": "2025-03-29T01:55:15.426982",
     "modified_date": "2025-03-29T02:07:15.170357",
     "storage_path": "/app/data/workbench/uploads/24abf25b-dfb4-4ec3-bd67-d12717ff3831.xlsx"
+  },
+  "8d76a827-fa18-4148-adfb-b44c28ab76f9": {
+    "filename": "Fruit-Prices-2022.csv",
+    "size_bytes": 4203,
+    "sheet_count": 1,
+    "sheets": [
+      "Sheet1"
+    ],
+    "columns": [
+      "Fruit",
+      "Form",
+      "RetailPrice",
+      "RetailPriceUnit",
+      "Yield",
+      "CupEquivalentSize",
+      "CupEquivalentUnit",
+      "CupEquivalentPrice"
+    ],
+    "row_count": 62,
+    "sheets_metadata": {
+      "Sheet1": {
+        "columns": [
+          "Fruit",
+          "Form",
+          "RetailPrice",
+          "RetailPriceUnit",
+          "Yield",
+          "CupEquivalentSize",
+          "CupEquivalentUnit",
+          "CupEquivalentPrice"
+        ],
+        "row_count": 62
+      }
+    },
+    "id": "8d76a827-fa18-4148-adfb-b44c28ab76f9",
+    "description": null,
+    "original_filename": "Fruit-Prices-2022.csv",
+    "modified_filename": "Fruit-Prices-2022.csv",
+    "upload_date": "2025-03-31T17:27:41.484220",
+    "modified_date": "2025-03-31T17:27:41.484220",
+    "storage_path": "/app/data/workbench/uploads/8d76a827-fa18-4148-adfb-b44c28ab76f9.csv"
   }
 }
