@@ -127,18 +127,6 @@ services:
     networks:
       - app-network
 
-  api_gateway:
-    image: traefik:v2.5
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-    ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
   embedding:
     build: ./embedding_service
     ports:
@@ -183,7 +171,6 @@ services:
     ports:
       - "8007:8000"
     environment:
-      - CUDA_VISIBLE_DEVICES=0,1
       - MAX_NUM_BATCHED_TOKENS=4096
       - MAX_NUM_SEQS=256
       - MAX_PADDING_LENGTH=256
@@ -193,9 +180,7 @@ services:
       - HF_DATASETS_OFFLINE=1
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
-      - TENSOR_PARALLEL_SIZE=2
       - GPU_MEMORY_UTILIZATION=0.85
-      - OMP_NUM_THREADS=12
     volumes:
       - ../models:/models
       - ../data:/data
@@ -208,14 +193,13 @@ services:
               count: all
               capabilities: [gpu]
     ipc: host
-    command: --model /models/DeepHermes-3-Llama-3-8B-Preview --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.85 --max-model-len=65536
+    command: --model /models/DeepHermes-3-Llama-3-8B-Preview --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview --dtype=half --tensor-parallel-size=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l) --gpu-memory-utilization=0.85 --max-model-len=65536
 
   vllm_embeddings:
     image: vllm/vllm-openai:latest
     ports:
       - "8012:8000"
     environment:
-      - CUDA_VISIBLE_DEVICES=0,1
       - MAX_NUM_BATCHED_TOKENS=4096
       - MAX_NUM_SEQS=256
       - MAX_PADDING_LENGTH=256
@@ -225,9 +209,7 @@ services:
       - HF_DATASETS_OFFLINE=1
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
-      - TENSOR_PARALLEL_SIZE=2
       - GPU_MEMORY_UTILIZATION=0.10
-      - OMP_NUM_THREADS=12
     volumes:
       - ../models:/models
       - ../data:/data
@@ -240,8 +222,22 @@ services:
               count: all
               capabilities: [gpu]
     ipc: host
-    command: --model /models/bge-base-en-v1.5 --tokenizer /models/bge-base-en-v1.5 --dtype=half --tensor-parallel-size=2 --gpu-memory-utilization=0.10
+    command: --model /models/bge-base-en-v1.5 --tokenizer /models/bge-base-en-v1.5 --dtype=half --tensor-parallel-size=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l) --gpu-memory-utilization=0.10
 
+  frontend:
+    build: ../frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+    volumes:
+      - ../data:/data
+      - ../frontend:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
