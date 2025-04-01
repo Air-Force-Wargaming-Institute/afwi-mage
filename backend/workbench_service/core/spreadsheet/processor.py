@@ -498,35 +498,55 @@ class SpreadsheetProcessor:
                         })
                         
                         # Create duplicate
+                        # Log before calling
+                        logger.info(f"Attempting to create duplicate for spreadsheet ID {spreadsheet_id}")
                         duplicate_info = spreadsheet_manager.create_duplicate_spreadsheet(spreadsheet_id)
-                        target_file_path = Path(duplicate_info["storage_path"])
-                        duplicate_id = duplicate_info["id"]
                         
-                        update_job_status(job_id, {
-                            "status": "running",
-                            "progress": 10,
-                            "message": f"Created duplicate spreadsheet {duplicate_info['id']}"
-                        })
-                        
-                        logger.info(f"Created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
+                        # Check if duplication was successful
+                        if duplicate_info and duplicate_info.get("storage_path"):
+                            target_file_path = Path(duplicate_info["storage_path"])
+                            duplicate_id = duplicate_info["id"]
+                            
+                            update_job_status(job_id, {
+                                "status": "running",
+                                "progress": 10,
+                                "message": f"Created duplicate spreadsheet {duplicate_info['id']}"
+                            })
+                            
+                            logger.info(f"Successfully created duplicate spreadsheet: {duplicate_info['id']} at {target_file_path}")
+                        else:
+                            # Handle case where create_duplicate_spreadsheet returns None or invalid info
+                            error_msg = "Failed to create duplicate: Function returned invalid data."
+                            logger.error(error_msg)
+                            update_job_status(job_id, {
+                                "status": "failed",
+                                "progress": 5,
+                                "message": error_msg
+                            })
+                            return # Stop execution if duplication failed
+
                     else:
                         # No spreadsheet_id provided, cannot perform duplication
-                        error_msg = "Cannot create duplicate: No spreadsheet_id provided"
+                        error_msg = "Cannot create duplicate: No spreadsheet_id provided for duplication."
                         logger.error(error_msg)
                         update_job_status(job_id, {
-                            "status": "running",
+                            "status": "failed", # Mark as failed
                             "progress": 5,
-                            "message": f"Warning: {error_msg}. Proceeding with original file."
+                            "message": error_msg
                         })
+                        return # Stop execution
+
                 except Exception as dup_error:
-                    logger.error(f"Error creating duplicate spreadsheet: {str(dup_error)}")
+                    error_msg = f"Failed to create duplicate spreadsheet: {str(dup_error)}"
+                    logger.error(error_msg, exc_info=True) # Log with traceback
                     update_job_status(job_id, {
-                        "status": "running",
+                        "status": "failed", # Mark as failed
                         "progress": 5,
-                        "message": f"Failed to create duplicate, proceeding with original: {str(dup_error)}"
+                        "message": error_msg
                     })
+                    return # Stop execution if duplication fails
             
-            # Read the spreadsheet data
+            # Read the spreadsheet data (only runs if duplication succeeded or wasn't requested)
             update_job_status(job_id, {
                 "status": "running",
                 "progress": 15,

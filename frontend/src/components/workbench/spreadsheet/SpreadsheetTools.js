@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
 import { WorkbenchContext } from '../../../contexts/WorkbenchContext';
 import {
   Box,
@@ -27,21 +27,13 @@ import {
   ListItemText,
   Switch,
   FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Tooltip,
-  FormHelperText
+  FormHelperText,
+  LinearProgress
 } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
-import SettingsIcon from '@mui/icons-material/Settings';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import CodeIcon from '@mui/icons-material/Code';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TableContainer from '@mui/material/TableContainer';
 import Table from '@mui/material/Table';
@@ -63,23 +55,18 @@ import JobMonitor from '../common/JobMonitor'; // Import JobMonitor component
 const SpreadsheetTools = () => {
   const {
     spreadsheets,
-    selectedSpreadsheet,
     getSpreadsheetSheets,
     getSpreadsheetSummary,
     performCellOperation,
-    isLoading,
-    connectionError,
     apiBaseUrl,
     uploadSpreadsheet,
     fetchSpreadsheets,
     transformSpreadsheet,
     trackTransformationJob,
-    getJobStatus,
-    cancelJob,
-    setActiveJobId,
     transformationState,
     updateTransformationState,
-    resetTransformationState
+    resetTransformationState,
+    setActiveView
   } = useContext(WorkbenchContext);
 
   // State for selected spreadsheet and column information
@@ -95,6 +82,7 @@ const SpreadsheetTools = () => {
   // File upload ref and state
   const fileInputRef = useRef(null);
   const [uploadError, setUploadError] = useState(null);
+  const [sheetsLoaded, setSheetsLoaded] = useState(false);
 
   // State for transformation configuration
   const [selectedInputColumns, setSelectedInputColumns] = useState(() => 
@@ -107,9 +95,6 @@ const SpreadsheetTools = () => {
       outputType: 'text',
       typeOptions: {}
     }]);
-  const [transformationInstructions, setTransformationInstructions] = useState(() =>
-    transformationState?.transformationInstructions || '');
-  const [previewData, setPreviewData] = useState([]);
   const [outputPreview, setOutputPreview] = useState([]);
   const [processingMode, setProcessingMode] = useState(() =>
     transformationState?.processingMode || 'preview');
@@ -135,7 +120,7 @@ const SpreadsheetTools = () => {
   const isMountedRef = useRef(true);
 
   // Function to persist state changes to context
-  const persistState = (updates = {}) => {
+  const persistState = useCallback((updates = {}) => {
     // Create current state snapshot
     const currentState = {
       activeSpreadsheetId,
@@ -143,51 +128,175 @@ const SpreadsheetTools = () => {
       activeStep,
       selectedInputColumns,
       outputColumns,
-      transformationInstructions,
       processingMode,
       createDuplicate,
       advancedOptions,
+      columns, // Persist columns too
       ...updates // Apply any updates passed in
     };
-    
+
     // Update the context
     updateTransformationState(currentState);
-  };
-
-  // Update persistence when key states change
-  useEffect(() => {
-    persistState();
   }, [
     activeSpreadsheetId,
     selectedSheet,
     activeStep,
     selectedInputColumns,
     outputColumns,
-    transformationInstructions,
     processingMode,
     createDuplicate,
-    advancedOptions
+    advancedOptions,
+    columns,
+    updateTransformationState // Added dependency
   ]);
 
-  // Fetch spreadsheets when component mounts and handle cleanup
+  // Update persistence when key states change
   useEffect(() => {
-    // Set mounted flag
+    persistState();
+  }, [persistState]); // Use the stable persistState callback
+
+  // Moved sheet fetching logic into separate useCallback
+  const handleSheetChange = useCallback(async (sheetName) => {
+    setSelectedSheet(sheetName);
+
+    // If the newly selected sheet is different from the persisted one,
+    // reset columns and selections.
+    if (sheetName !== transformationState?.selectedSheet) {
+      setColumns([]);
+      setSelectedInputColumns([]);
+    }
+
+    try {
+      const summaryData = await getSpreadsheetSummary(activeSpreadsheetId, sheetName);
+      const fetchedColumns = summaryData.column_summaries || [];
+      setColumns(fetchedColumns);
+      // Persist columns immediately after fetching
+      persistState({ selectedSheet: sheetName, columns: fetchedColumns }); // Persist selectedSheet here too
+
+      const previewResult = await performCellOperation(activeSpreadsheetId, {
+        operation: 'read',
+        sheet_name: sheetName,
+        cell_range: 'A1:Z10'
+      });
+
+      if (previewResult.success) {
+        // setPreviewData(previewResult.data.values); // Removed unused state update
+      }
+    } catch (err) {
+      console.error('Error fetching column information:', err);
+    }
+  // Add dependencies for useCallback
+  }, [activeSpreadsheetId, getSpreadsheetSummary, performCellOperation, persistState, transformationState?.selectedSheet]);
+
+  // Fetch sheet names for a given spreadsheet ID - wrapped in useCallback
+  const fetchSheetsForActiveId = useCallback(async (spreadsheetId) => {
+    if (!isMountedRef.current || !spreadsheetId) return;
+
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      console.log(`Fetching sheets for restored/selected spreadsheet ID: ${spreadsheetId}`);
+      const sheetsData = await getSpreadsheetSheets(spreadsheetId, { signal: abortControllerRef.current.signal });
+
+      if (isMountedRef.current) {
+        const fetchedSheetNames = sheetsData.sheets || [];
+        setSheetNames(fetchedSheetNames);
+        setSheetsLoaded(true); // Mark sheets as loaded for this ID
+        console.log('Sheet names loaded:', fetchedSheetNames);
+
+        // Determine the sheet to select after loading
+        let sheetToSelect = null;
+        if (selectedSheet && fetchedSheetNames.includes(selectedSheet)) {
+          // If a valid sheet was restored, use it
+          sheetToSelect = selectedSheet;
+          console.log(`Restored selectedSheet '${selectedSheet}' is valid.`);
+        } else if (fetchedSheetNames.length > 0) {
+          // Otherwise, if sheets exist, select the first one
+          sheetToSelect = fetchedSheetNames[0];
+          if (selectedSheet) {
+             console.warn(`Restored selectedSheet '${selectedSheet}' not found in loaded sheets: ${fetchedSheetNames}. Selecting first available sheet: '${sheetToSelect}'.`);
+          } else {
+             console.log(`No initial sheet selected, selecting first available sheet: '${sheetToSelect}'.`);
+          }
+        } else {
+          // No sheets found
+           console.warn(`No sheets loaded for spreadsheet ${spreadsheetId}.`);
+           if (selectedSheet) {
+              console.warn(`Restored selectedSheet '${selectedSheet}' cannot be selected.`);
+           }
+        }
+
+        // Call handleSheetChange ONLY if we determined a valid sheet to select
+        if (sheetToSelect) {
+          handleSheetChange(sheetToSelect);
+        } else {
+          // If no sheet could be selected (e.g., empty spreadsheet), reset related state
+          setSelectedSheet('');
+          setColumns([]);
+          persistState({ selectedSheet: '', columns: [] }); // Persist the reset
+        }
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Sheet fetch request was aborted');
+        return;
+      }
+      console.error(`Error fetching sheet names for ID ${spreadsheetId}:`, err);
+      if (isMountedRef.current) {
+        setSheetNames([]); // Clear sheet names on error
+        setSheetsLoaded(false); // Mark as not loaded
+        setSelectedSheet(''); // Reset selected sheet on error
+        setColumns([]);      // Reset columns on error
+        persistState({ selectedSheet: '', columns: [] }); // Persist the reset
+
+        if (err.response && (err.response.status === 404 || err.response.status === 400)) {
+          setUploadError(`Spreadsheet with ID ${spreadsheetId} not found.`);
+          setActiveSpreadsheetId(''); // Clear invalid ID
+        } else {
+           setUploadError('Error fetching sheet names.');
+        }
+      }
+    }
+  // Add dependencies
+  }, [getSpreadsheetSheets, selectedSheet, handleSheetChange, persistState, setUploadError, setActiveSpreadsheetId]);
+
+  // Fetch spreadsheets list on initial mount
+  useEffect(() => {
     isMountedRef.current = true;
-    
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    fetchSpreadsheets();
-    
-    // Cleanup function
+    fetchSpreadsheets(); // Fetch the list of available spreadsheets
+
     return () => {
-      // Set unmounted flag
       isMountedRef.current = false;
-      
-      // Cancel any pending requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [fetchSpreadsheets]); // Depend only on fetchSpreadsheets for initial list load
+
+  // Fetch sheets for the activeSpreadsheetId when it changes or is restored
+  useEffect(() => {
+    if (activeSpreadsheetId && isMountedRef.current) {
+      // Reset loaded status before fetching
+      setSheetsLoaded(false);
+      // Fetch sheets for the current ID
+      fetchSheetsForActiveId(activeSpreadsheetId);
+    } else if (!activeSpreadsheetId && isMountedRef.current) {
+       // Clear sheets and related state if ID becomes empty
+       setSheetNames([]);
+       setSheetsLoaded(false);
+       setSelectedSheet('');
+       setColumns([]);
+       persistState({ selectedSheet: '', columns: [] }); // Persist reset
+    }
+  // Fetch sheets only when activeSpreadsheetId changes.
+  // fetchSheetsForActiveId includes selectedSheet in its dependency array
+  // to handle the restoration logic correctly after sheets are loaded.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSpreadsheetId]);
 
   // Check if current spreadsheet ID is still valid when spreadsheets list changes
   useEffect(() => {
@@ -198,20 +307,15 @@ const SpreadsheetTools = () => {
       if (!spreadsheetExists) {
         console.log('Selected spreadsheet no longer exists in list, clearing selection');
         setActiveSpreadsheetId('');
-        setSelectedSheet('');
-        setSheetNames([]);
-        setUploadError('The previously selected spreadsheet is no longer available. Please select another one.');
+        
+        // Show an error message
+        setUploadError(`The selected spreadsheet was not found. It may have been deleted or the backend service was restarted.`);
+        
+        // Refresh the spreadsheet list
+        fetchSpreadsheets();
       }
     }
   }, [spreadsheets, activeSpreadsheetId]);
-
-  // Restore state when selected sheet changes and we have stored column data
-  useEffect(() => {
-    if (selectedSheet && transformationState?.selectedSheet === selectedSheet && transformationState?.columns?.length > 0) {
-      // Restore columns data if available
-      setColumns(transformationState.columns);
-    }
-  }, [selectedSheet, transformationState]);
 
   // Safe setState functions that check if component is still mounted
   const safeSetState = (stateSetter) => (value) => {
@@ -222,67 +326,46 @@ const SpreadsheetTools = () => {
 
   // Handle spreadsheet selection
   const handleSpreadsheetChange = async (spreadsheetId) => {
-    // Special case for upload option
     if (spreadsheetId === 'upload_new') {
       if (fileInputRef.current) {
         fileInputRef.current.click();
       }
       return;
     }
-    
+
+    // Check if the ID actually changed
+    const idChanged = spreadsheetId !== activeSpreadsheetId;
+
+    // Update active ID - this will trigger the useEffect to fetch sheets
     setActiveSpreadsheetId(spreadsheetId);
+
+    // Reset sheet-specific states immediately
     setSelectedSheet('');
     setColumns([]);
-    
-    // Only reset input/output config if switching to a different spreadsheet
-    if (spreadsheetId !== transformationState?.activeSpreadsheetId) {
+    setSheetNames([]); // Clear sheet names immediately
+    setSheetsLoaded(false); // Reset loaded flag
+    setUploadError(null); // Clear any previous upload errors
+
+    // If the spreadsheet ID *actually* changed, reset the configuration and step
+    if (idChanged) {
+      console.log('Spreadsheet ID changed, resetting configuration and step.');
       setSelectedInputColumns([]);
-      setOutputColumns([{ 
-        name: '', 
-        description: '', 
-        isNew: true,
-        outputType: 'text',
-        typeOptions: {}
-      }]);
-      setTransformationInstructions('');
-      setPreviewData([]);
+      setOutputColumns([{ name: '', description: '', isNew: true, outputType: 'text', typeOptions: {} }]);
       setOutputPreview([]);
-    }
-    
-    // Cancel any pending requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-    
-    // Fetch sheet names for the selected spreadsheet
-    try {
-      const sheetsData = await getSpreadsheetSheets(spreadsheetId, { signal: abortControllerRef.current.signal });
-      
-      // Only update state if component is still mounted
-      if (isMountedRef.current) {
-        setSheetNames(sheetsData.sheets || []);
-        setActiveStep(0);
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('Request was aborted');
-        return;
-      }
-      
-      console.error('Error fetching sheet names:', err);
-      
-      // If we get a 404 error, it means the spreadsheet doesn't exist
-      if (err.response && (err.response.status === 404 || err.response.status === 400)) {
-        console.log('Spreadsheet not found, clearing selection');
-        setActiveSpreadsheetId('');
-        
-        // Show an error message
-        setUploadError(`The selected spreadsheet was not found. It may have been deleted or the backend service was restarted.`);
-        
-        // Refresh the spreadsheet list
-        fetchSpreadsheets();
-      }
+      setActiveStep(0);
+      // Persist the reset configuration due to ID change
+      persistState({
+        activeSpreadsheetId: spreadsheetId,
+        selectedSheet: '', // Reset sheet
+        columns: [], // Reset columns
+        selectedInputColumns: [],
+        outputColumns: [{ name: '', description: '', isNew: true, outputType: 'text', typeOptions: {} }],
+        activeStep: 0
+      });
+    } else {
+      // If the ID didn't change (e.g., re-selecting the same one),
+      // just persist the current ID and reset sheet/columns
+      persistState({ activeSpreadsheetId: spreadsheetId, selectedSheet: '', columns: [] });
     }
   };
 
@@ -320,39 +403,6 @@ const SpreadsheetTools = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    }
-  };
-
-  // Handle sheet selection
-  const handleSheetChange = async (sheetName) => {
-    setSelectedSheet(sheetName);
-    
-    // Don't clear columns if we're returning to the same sheet with saved data
-    if (sheetName !== transformationState?.selectedSheet) {
-      setColumns([]);
-      setSelectedInputColumns([]);
-    }
-    
-    // Fetch column information and preview data
-    try {
-      const summaryData = await getSpreadsheetSummary(activeSpreadsheetId, sheetName);
-      setColumns(summaryData.column_summaries || []);
-      
-      // Persist column data for faster future loading
-      persistState({ columns: summaryData.column_summaries || [] });
-
-      // Fetch preview data
-      const previewResult = await performCellOperation(activeSpreadsheetId, {
-        operation: 'read',
-        sheet_name: sheetName,
-        cell_range: 'A1:Z10' // Get first 10 rows for preview
-      });
-
-      if (previewResult.success) {
-        setPreviewData(previewResult.data.values);
-      }
-    } catch (err) {
-      console.error('Error fetching column information:', err);
     }
   };
 
@@ -406,6 +456,22 @@ const SpreadsheetTools = () => {
         [field]: value
       };
     }
+    
+    setOutputColumns(updatedOutputColumns);
+  };
+
+  // Handle column definition change (Create New or Use Existing)
+  const handleColumnDefinitionChange = (index, value) => {
+    const isNewSelected = value === "create_new";
+    const updatedOutputColumns = [...outputColumns];
+    
+    // Update both isNew and name in a single state update
+    updatedOutputColumns[index] = {
+      ...updatedOutputColumns[index],
+      isNew: isNewSelected,
+      // Clear name if switching to Create New
+      name: isNewSelected ? '' : updatedOutputColumns[index].name
+    };
     
     setOutputColumns(updatedOutputColumns);
   };
@@ -550,7 +616,7 @@ const SpreadsheetTools = () => {
     }
   };
 
-  // Continue processing after preview success
+  // Handle continuing with full processing
   const handleContinueProcessing = async () => {
     // Run the transformation again with the full dataset, explicitly passing 'all'
     await generateOutputPreview('all');
@@ -565,6 +631,68 @@ const SpreadsheetTools = () => {
     setTransformationResults(null);
   };
 
+  // Start a completely new transformation workflow
+  const handleStartNewWorkflow = () => {
+    // Reset all state and go back to step 0
+    handleReset();
+  };
+
+  // Execute another transformation on the current spreadsheet
+  const handleAnotherTransformation = () => {
+    // Keep the current spreadsheet and sheet, but reset other data
+    // and go back to step 0 (select input columns)
+    const currentSpreadsheetId = activeSpreadsheetId;
+    const currentSheet = selectedSheet;
+    const currentColumns = columns;
+    
+    // Partial reset that preserves the spreadsheet selection
+    setSelectedInputColumns([]);
+    setOutputColumns([{ 
+      name: '', 
+      description: '', 
+      isNew: true,
+      outputType: 'text',
+      typeOptions: {}
+    }]);
+    setOutputPreview([]);
+    setTransformationResults(null);
+    setTransformationProgress(0);
+    setTransformationError(null);
+    setActiveStep(0);
+    
+    // Preserve the current spreadsheet and sheet in state
+    setActiveSpreadsheetId(currentSpreadsheetId);
+    setSelectedSheet(currentSheet);
+    setColumns(currentColumns);
+    
+    // Update the persistence
+    updateTransformationState({
+      activeSpreadsheetId: currentSpreadsheetId,
+      selectedSheet: currentSheet,
+      columns: currentColumns,
+      activeStep: 0,
+      selectedInputColumns: [],
+      outputColumns: [{ 
+        name: '', 
+        description: '', 
+        isNew: true,
+        outputType: 'text',
+        typeOptions: {}
+      }]
+    });
+  };
+
+  // Navigate to the Upload/Manage Spreadsheets page
+  const handleGoToSpreadsheetLibrary = () => {
+    // This assumes the WorkbenchContext has a method to change the active view
+    if (typeof setActiveView === 'function') {
+      setActiveView('library');
+    } else {
+      // Fallback - open in a new tab if direct navigation isn't available
+      window.open('/workbench/spreadsheets', '_blank');
+    }
+  };
+
   // Reset transformation
   const handleReset = () => {
     setSelectedInputColumns([]);
@@ -575,7 +703,6 @@ const SpreadsheetTools = () => {
       outputType: 'text',
       typeOptions: {}
     }]);
-    setTransformationInstructions('');
     setOutputPreview([]);
     setTransformationProgress(0);
     setTransformationError(null);
@@ -801,14 +928,7 @@ const SpreadsheetTools = () => {
                         <InputLabel>Column Definition</InputLabel>
                         <Select
                           value={column.isNew ? "create_new" : "use_existing"}
-                          onChange={(e) => {
-                            const isNew = e.target.value === "create_new";
-                            handleOutputColumnChange(index, 'isNew', isNew);
-                            // Reset column name if we switch to creating a new column
-                            if (isNew && !column.isNew) {
-                              handleOutputColumnChange(index, 'name', '');
-                            }
-                          }}
+                          onChange={(e) => handleColumnDefinitionChange(index, e.target.value)}
                           label="Column Definition"
                         >
                           <MenuItem value="create_new">Create New Column</MenuItem>
@@ -1261,7 +1381,6 @@ const SpreadsheetTools = () => {
                                 maxHeight: '3em',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical'
                               }}>
@@ -1555,6 +1674,64 @@ const SpreadsheetTools = () => {
             {/* Add JobMonitor for tracking transformation jobs */}
             {transformationResults?.job_id && processingMode === 'all' && (
               <Box mt={4}>
+                <Box sx={{
+                  backgroundColor: 'info.lighter',
+                  p: 3,
+                  borderRadius: 2,
+                  mb: 2,
+                  border: '1px solid',
+                  borderColor: 'info.light'
+                }}>
+                  <Typography variant="h6" align="center" gutterBottom color="info.dark">
+                    MAGE is working to transform your spreadsheet
+                  </Typography>
+                  <Typography variant="body1" align="center">
+                    When MAGE has finished, you can view/download your spreadsheet on the{' '}
+                    <Button 
+                      color="primary" 
+                      onClick={handleGoToSpreadsheetLibrary}
+                      sx={{ textTransform: 'none', fontWeight: 'bold', padding: '0 4px' }}
+                    >
+                      Upload/Manage Spreadsheets
+                    </Button>{' '}
+                    page.
+                  </Typography>
+                  
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    gap: 2, 
+                    mt: 3 
+                  }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleStartNewWorkflow}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        boxShadow: 2,
+                        '&:hover': {
+                          boxShadow: 3
+                        }
+                      }}
+                    >
+                      Begin a New Transformation Workflow
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      onClick={handleAnotherTransformation}
+                      sx={{
+                        px: 2,
+                        py: 1
+                      }}
+                    >
+                      Execute Another Transformation on the Current Spreadsheet
+                    </Button>
+                  </Box>
+                </Box>
+                
                 <Typography variant="subtitle1" gutterBottom>Job Status</Typography>
                 <JobMonitor 
                   onViewResults={(job) => {
@@ -1590,24 +1767,7 @@ const SpreadsheetTools = () => {
     return (
       <Box display="flex" alignItems="center" width="100%">
         <Box width="100%" mr={1}>
-          <div 
-            style={{
-              height: 10,
-              borderRadius: 5,
-              backgroundColor: '#e0e0e0',
-              position: 'relative'
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                borderRadius: 5,
-                backgroundColor: '#1976d2',
-                width: `${value}%`,
-                transition: 'width 0.3s ease'
-              }}
-            />
-          </div>
+          <LinearProgress variant="determinate" value={value} />
         </Box>
         <Box minWidth={35}>
           <Typography variant="body2" color="textSecondary">{`${Math.round(value)}%`}</Typography>

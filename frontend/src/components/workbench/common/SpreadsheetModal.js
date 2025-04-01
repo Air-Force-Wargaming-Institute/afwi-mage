@@ -444,6 +444,12 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
   
   // Load sheet data
   const loadSheetData = async (sheetName, page = 1, pageSize = 100) => {
+    // Add validation: Only proceed if sheetName is a valid string
+    if (typeof sheetName !== 'string' || !sheetName.trim()) {
+      console.log('Skipping loadSheetData: Invalid sheetName', sheetName);
+      return;
+    }
+
     setLocalLoading(true);
     
     try {

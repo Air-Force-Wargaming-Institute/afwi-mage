@@ -744,8 +744,10 @@ class SpreadsheetManager:
             except Exception as cleanup_error:
                 logger.error(f"Error during cleanup after failure: {cleanup_error}")
             
-            logger.error(f"Error creating duplicate spreadsheet: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to create duplicate spreadsheet: {str(e)}")
+            error_msg = f"Failed to create duplicate spreadsheet: {str(e)}"
+            logger.error(error_msg, exc_info=True) # Log with traceback
+            # Return None instead of raising HTTPException for background task compatibility
+            return None
 
     def update_metadata_after_transform(
         self,

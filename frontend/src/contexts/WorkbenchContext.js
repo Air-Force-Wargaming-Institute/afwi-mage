@@ -45,18 +45,22 @@ export const WorkbenchProvider = ({ children }) => {
   }, [transformationState]);
 
   // Update transformation state
-  const updateTransformationState = (updates) => {
+  const updateTransformationState = useCallback((updates) => {
     setTransformationState(prevState => {
       const newState = { ...(prevState || {}), ...updates };
+      // Avoid unnecessary state update if object is shallowly the same
+      if (JSON.stringify(prevState) === JSON.stringify(newState)) {
+        return prevState;
+      }
       return newState;
     });
-  };
+  }, []); // No dependencies needed as it only uses setTransformationState
 
   // Reset transformation state
-  const resetTransformationState = () => {
+  const resetTransformationState = useCallback(() => {
     localStorage.removeItem('workbench_transformation_state');
     setTransformationState(null);
-  };
+  }, []); // No dependencies needed
 
   // Setup axios headers with authentication token
   useEffect(() => {
@@ -179,7 +183,7 @@ export const WorkbenchProvider = ({ children }) => {
   };
 
   // Transform spreadsheet columns with AI assistance
-  const transformSpreadsheet = async (spreadsheetId, transformationParams, options = {}) => {
+  const transformSpreadsheet = useCallback(async (spreadsheetId, transformationParams, options = {}) => {
     setIsLoading(true);
     setError(null);
     
@@ -230,12 +234,12 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]); // Depends on apiBaseUrl
 
   // Job management functions
   
   // Fetch job status from API
-  const getJobStatus = async (jobId, options = {}) => {
+  const getJobStatus = useCallback(async (jobId, options = {}) => {
     setError(null);
     
     try {
@@ -287,10 +291,10 @@ export const WorkbenchProvider = ({ children }) => {
         throw error;
       }
     }
-  };
+  }, [apiBaseUrl, connectionError, jobs]); // Added jobs dependency
 
   // List all jobs
-  const listJobs = async (filter = {}, options = {}) => {
+  const listJobs = useCallback(async (filter = {}, options = {}) => {
     setIsLoading(true);
     setError(null);
     
@@ -349,10 +353,10 @@ export const WorkbenchProvider = ({ children }) => {
         throw error;
       }
     }
-  };
+  }, [apiBaseUrl, connectionError, activeJobId]); // Added activeJobId
 
   // Cancel a job
-  const cancelJob = async (jobId, options = {}) => {
+  const cancelJob = useCallback(async (jobId, options = {}) => {
     setError(null);
     
     try {
@@ -388,10 +392,10 @@ export const WorkbenchProvider = ({ children }) => {
         throw error;
       }
     }
-  };
+  }, [apiBaseUrl, connectionError]);
 
   // Track a transformation job
-  const trackTransformationJob = (jobId, parameters) => {
+  const trackTransformationJob = useCallback((jobId, parameters) => {
     // Create a new job object for tracking
     const newJob = {
       id: jobId,
@@ -411,10 +415,10 @@ export const WorkbenchProvider = ({ children }) => {
     
     console.log(`Tracking new transformation job: ${jobId}`);
     return newJob;
-  };
+  }, []); // Only depends on setters
 
   // Upload a new spreadsheet
-  const uploadSpreadsheet = async (file, description = '') => {
+  const uploadSpreadsheet = useCallback(async (file, description = '') => {
     setIsLoading(true);
     setError(null);
     
@@ -445,10 +449,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl, fetchSpreadsheets]); // Added fetchSpreadsheets dependency
 
   // Get details for a specific spreadsheet
-  const getSpreadsheetDetails = async (spreadsheetId) => {
+  const getSpreadsheetDetails = useCallback(async (spreadsheetId) => {
     setIsLoading(true);
     setError(null);
     
@@ -470,10 +474,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
 
   // Get spreadsheet sheets
-  const getSpreadsheetSheets = async (spreadsheetId) => {
+  const getSpreadsheetSheets = useCallback(async (spreadsheetId) => {
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/sheets`);
       const response = await axios.get(url);
@@ -486,10 +490,10 @@ export const WorkbenchProvider = ({ children }) => {
       }
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
 
   // Get column summaries for a spreadsheet
-  const getSpreadsheetSummary = async (spreadsheetId, sheetName) => {
+  const getSpreadsheetSummary = useCallback(async (spreadsheetId, sheetName) => {
     try {
       let endpoint = `api/workbench/spreadsheets/${spreadsheetId}/summary`;
       if (sheetName) {
@@ -506,10 +510,10 @@ export const WorkbenchProvider = ({ children }) => {
       }
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
 
   // Perform cell operations
-  const performCellOperation = async (spreadsheetId, operation) => {
+  const performCellOperation = useCallback(async (spreadsheetId, operation) => {
     setIsLoading(true);
     setError(null);
     
@@ -531,10 +535,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
   
   // Generate visualization from data
-  const generateVisualization = async (request) => {
+  const generateVisualization = useCallback(async (request) => {
     setIsLoading(true);
     setError(null);
     
@@ -564,10 +568,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
   
   // Execute visualization code
-  const executeVisualizationCode = async (visualizationId, code) => {
+  const executeVisualizationCode = useCallback(async (visualizationId, code) => {
     setIsLoading(true);
     setError(null);
     
@@ -595,10 +599,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
   
   // Extract data context for visualization
-  const extractDataContext = async (spreadsheetId) => {
+  const extractDataContext = useCallback(async (spreadsheetId) => {
     setIsLoading(true);
     setError(null);
     
@@ -618,10 +622,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl]);
 
   // Delete a spreadsheet
-  const deleteSpreadsheet = async (spreadsheetId) => {
+  const deleteSpreadsheet = useCallback(async (spreadsheetId) => {
     setIsLoading(true);
     setError(null);
     
@@ -650,10 +654,10 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl, selectedSpreadsheet]); // Added selectedSpreadsheet dependency
 
   // Update spreadsheet metadata (like filename)
-  const updateSpreadsheet = async (spreadsheetId, updates) => {
+  const updateSpreadsheet = useCallback(async (spreadsheetId, updates) => {
     setIsLoading(true);
     setError(null);
     
@@ -688,12 +692,12 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  };
+  }, [apiBaseUrl, selectedSpreadsheet]); // Added selectedSpreadsheet dependency
 
   // Clear error state
-  const clearError = () => {
+  const clearError = useCallback(() => {
     setError(null);
-  };
+  }, []); // No dependencies needed as it only uses setError
 
   return (
     <WorkbenchContext.Provider value={{
