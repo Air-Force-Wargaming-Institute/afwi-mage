@@ -1,131 +1,109 @@
 """
-Visualization code execution module.
+Functions for executing visualization code.
 
-This module handles the safe execution of Python visualization code and
-converts the generated figures to web-friendly formats.
+This module handles:
+- Setting up matplotlib rendering
+- Executing user Python/Matplotlib code
+- Saving visualization outputs
 """
 
 import os
-import io
-import sys
-import base64
 import logging
-import subprocess
-import tempfile
-from typing import Tuple, Optional, Dict, Any
+import traceback
+import uuid
 from pathlib import Path
-
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+matplotlib.use('Agg')  # Set headless backend
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import io
+import base64
+from typing import Dict, Any, Optional, List, Tuple
 
-from config import WORKBENCH_OUTPUTS_DIR
+from config import WORKBENCH_SPREADSHEETS_DIR
 
 logger = logging.getLogger("workbench_service")
 
-async def execute_visualization_code(code: str, visualization_id: str) -> Tuple[str, str]:
+async def execute_visualization_code(visualization_id: str, code: str, data_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Execute Python visualization code and save the output.
+    Execute the provided Python/Matplotlib visualization code.
     
     Args:
+        visualization_id: ID of the visualization
         code: Python code to execute
-        visualization_id: Unique ID for the visualization
+        data_context: Data context to provide to the execution environment
         
     Returns:
-        Tuple of (file_path, base64_image_data)
+        Dictionary containing execution results (success, image URL, etc.)
     """
-    logger.info(f"Executing visualization code for ID: {visualization_id}")
+    # Set up output directory for visualizations 
+    output_dir = Path(WORKBENCH_SPREADSHEETS_DIR) / "visualizations"
+    os.makedirs(output_dir, exist_ok=True)
     
-    # Create output directory if it doesn't exist
-    output_dir = Path(WORKBENCH_OUTPUTS_DIR) / "visualizations"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Generate a filename for this visualization output
+    output_filename = f"{visualization_id}_{uuid.uuid4().hex[:8]}.png"
+    output_path = output_dir / output_filename
     
-    # Full path to save the figure
-    output_path = str(output_dir / f"{visualization_id}.png")
+    # Clear any existing plots
+    plt.close('all')
+    
+    # Prepare execution context with available data and libraries
+    execution_locals = {
+        'plt': plt,
+        'pd': pd,
+        'np': np,
+        'logging': logging,
+        'io': io,
+        'Path': Path,
+        'output_path': output_path,
+        'visualization_id': visualization_id
+    }
+    
+    # Add data context if provided
+    if data_context:
+        execution_locals.update(data_context)
     
     try:
-        # In a production environment, this would use a secure sandbox
-        # For demonstration purposes, we'll use a more direct approach
-        return await _execute_code_direct(code, output_path)
+        # Execute the code within our namespace
+        exec(code, execution_locals)
+        
+        # Check if there's an active figure
+        if plt.get_fignums():
+            # Save the figure to the output file
+            logger.info(f"Saving visualization to: {output_path}")
+            plt.savefig(output_path, bbox_inches='tight', dpi=300)
+            plt.close('all')
+            
+            # Generate a data URL for returning in the API response
+            with open(output_path, 'rb') as img_file:
+                img_data = base64.b64encode(img_file.read()).decode('utf-8')
+                data_url = f"data:image/png;base64,{img_data}"
+            
+            # Generate URL for accessing the file
+            # Note: In a real application, you'd need to configure the web server
+            # to serve files from the output directory
+            public_url = f"/api/workbench/visualizations/{visualization_id}/image/{output_filename}"
+            
+            return {
+                "success": True,
+                "image_url": public_url,
+                "data_url": data_url,
+                "file_path": str(output_path)
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No visualization was created. Make sure your code calls plt.figure() or similar."
+            }
     except Exception as e:
-        logger.error(f"Error executing visualization code: {str(e)}", exc_info=True)
-        # Generate a simple error image
-        error_image_path, error_image_data = _generate_error_image(str(e))
-        return error_image_path, error_image_data
-
-async def _execute_code_direct(code: str, output_path: str) -> Tuple[str, str]:
-    """
-    Execute visualization code directly using matplotlib.
-    
-    For demonstration only - in production, use a secure sandbox.
-    """
-    # Modify the code to save the figure to our output path
-    modified_code = code.replace(
-        "plt.show()",
-        f"plt.savefig('{output_path}', dpi=300, bbox_inches='tight')"
-    )
-    
-    # In a real implementation, this would use a secure sandbox like RestrictedPython
-    # For demonstration, we're using exec() with a global namespace
-    # THIS IS NOT SECURE FOR PRODUCTION USE
-    
-    # Create a temporary file for the code
-    with tempfile.NamedTemporaryFile(suffix='.py', mode='w', delete=False) as f:
-        temp_file = f.name
-        # Save the modified code to a temporary file
-        f.write(modified_code)
-    
-    try:
-        # Execute the code in a separate process with a timeout
-        process = subprocess.run(
-            [sys.executable, temp_file],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        # Capture the full traceback
+        error_tb = traceback.format_exc()
+        logger.error(f"Error executing visualization code: {str(e)}\n{error_tb}")
         
-        if process.returncode != 0:
-            error_msg = process.stderr or "Unknown execution error"
-            logger.error(f"Code execution failed: {error_msg}")
-            raise Exception(f"Code execution failed: {error_msg}")
-        
-        # Check if the image was created
-        if not os.path.exists(output_path):
-            raise Exception("Visualization code executed but no image was created")
-        
-        # Read the image and convert to base64
-        with open(output_path, 'rb') as f:
-            image_data = base64.b64encode(f.read()).decode('utf-8')
-        
-        return output_path, image_data
-    finally:
-        # Clean up the temporary file
-        try:
-            os.unlink(temp_file)
-        except Exception:
-            pass
-
-def _generate_error_image(error_message: str) -> Tuple[str, str]:
-    """Generate a simple error image with the error message."""
-    try:
-        import matplotlib.pyplot as plt
-        
-        # Create a figure with the error message
-        plt.figure(figsize=(10, 6))
-        plt.text(0.5, 0.5, f"Error: {error_message}", 
-                 ha='center', va='center', fontsize=12, color='red',
-                 wrap=True)
-        plt.axis('off')
-        
-        # Save to memory buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        
-        # Convert to base64
-        image_data = base64.b64encode(buf.read()).decode('utf-8')
-        
-        return "error.png", image_data
-    except Exception as e:
-        logger.error(f"Failed to generate error image: {str(e)}", exc_info=True)
-        # Return a minimal base64 encoded 1x1 red pixel image
-        return "error.png", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" 
+        # Return detailed error information
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": error_tb
+        } 

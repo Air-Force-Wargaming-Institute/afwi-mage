@@ -1561,11 +1561,15 @@ const SpreadsheetTools = () => {
                     // Refresh the spreadsheet list when job completes
                     if (job.status === 'completed') {
                       fetchSpreadsheets();
-                      // If there's a result URL, offer to open it
-                      if (job.result_url) {
+                      // If there's a result with spreadsheet_id, offer to open it
+                      if (job.result && job.result.spreadsheet_id) {
                         const shouldOpen = window.confirm('Transformation complete! Would you like to view the results?');
                         if (shouldOpen) {
-                          window.open(job.result_url, '_blank');
+                          // Build download URL from spreadsheet_id
+                          const baseUrl = apiBaseUrl.endsWith('/') 
+                            ? `${apiBaseUrl}api/workbench/spreadsheets` 
+                            : `${apiBaseUrl}/api/workbench/spreadsheets`;
+                          window.open(`${baseUrl}/${job.result.spreadsheet_id}/download`, '_blank');
                         }
                       }
                     }

@@ -447,15 +447,28 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     setLocalLoading(true);
     
     try {
-      // Calculate range based on pagination - use current rowsPerPage state, not the default parameter
-      const cellRange = getPageCellRange(page, pageSize);
-      console.log(`Loading sheet data for ${sheetName}, page ${page}, with ${pageSize} rows per page. Range: ${cellRange}`);
+      // Check if the file is likely a CSV based on filename extension
+      const isCsv = filename && filename.toLowerCase().endsWith('.csv');
       
-      const result = await performCellOperation(spreadsheetId, {
+      // Prepare operation parameters
+      const operationParams = {
         operation: 'read',
         sheet_name: sheetName,
-        cell_range: cellRange
-      });
+      };
+      
+      if (isCsv) {
+        // For CSV, send start_row and end_row instead of cell_range
+        // Add 1 because backend skiprows is 0-based, but our page logic is 1-based for rows
+        operationParams.start_row = (page - 1) * pageSize;
+        operationParams.end_row = operationParams.start_row + pageSize - 1;
+        console.log(`Loading CSV data for ${sheetName}, page ${page}, rows ${operationParams.start_row + 1}-${operationParams.end_row + 1}`);
+      } else {
+        // For Excel, use cell_range
+        operationParams.cell_range = getPageCellRange(page, pageSize);
+        console.log(`Loading Excel data for ${sheetName}, page ${page}, with ${pageSize} rows per page. Range: ${operationParams.cell_range}`);
+      }
+      
+      const result = await performCellOperation(spreadsheetId, operationParams);
       
       if (result && result.success) {
         // Update sheet data

@@ -20,6 +20,7 @@ export const WorkbenchProvider = ({ children }) => {
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [jobs, setJobs] = useState([]);
   const [activeJobId, setActiveJobId] = useState(null);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   // Column transformation persistent state
   const [transformationState, setTransformationState] = useState(() => {
@@ -76,62 +77,99 @@ export const WorkbenchProvider = ({ children }) => {
     console.log('WORKBENCH_SERVICE_PORT:', process.env.REACT_APP_WORKBENCH_SERVICE_PORT);
     setApiBaseUrl(baseUrl);
     
-    // Function to check backend connection
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+
     const checkBackendConnection = async () => {
       try {
-        // Construct health endpoint URL properly - avoid double slashes
         const healthUrl = baseUrl.endsWith('/') ? `${baseUrl}health` : `${baseUrl}/health`;
         console.log('Checking backend connection at:', healthUrl);
-        
-        // Change from HEAD to GET request since the endpoint doesn't support HEAD
-        await axios.get(healthUrl, { timeout: 2000 });
-        // If successful, backend is available
-        console.log('Backend connection successful');
-        setConnectionError(false);
+        await axios.get(healthUrl, { timeout: 5000 }); // Slightly increased timeout
+
+        if (isMounted) {
+          console.log('Backend connection successful');
+          setConnectionError(false); // Explicitly set to false only on success
+          setError(null); // Clear any previous connection-related errors
+        }
       } catch (error) {
-        // If error, backend is not available
-        console.error('Backend connection check failed:', error);
-        setConnectionError(true);
+        if (isMounted) {
+          console.error('Backend connection check failed:', error);
+          setConnectionError(true); // Set connection error on failure
+          // Optionally set a general error message
+          // setError('Initial connection to backend failed. Please ensure it is running.');
+        }
+      } finally {
+        if (isMounted) {
+          setInitialCheckDone(true); // Mark initial check as complete
+        }
       }
     };
     
-    // Perform the check
     checkBackendConnection();
-  }, []);
+
+    return () => {
+      isMounted = false; // Cleanup function
+    };
+  }, []); // Keep dependency array empty to run only once on mount
 
   // Fetch spreadsheets from API
   const fetchSpreadsheets = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    // Guard: If we know the connection failed previously, don't try again immediately.
+    if (connectionError) {
+      console.warn("Skipping fetchSpreadsheets due to existing connection error.");
+      // Ensure loading is false if we skip
+      setIsLoading(false);
+      // Optionally set an error message, though the initial check might have already done so
+      // setError('Cannot connect to backend services. Please ensure the backend is running.');
+      return []; // Return empty array as the fetch didn't proceed
+    }
+
+    setIsLoading(true); // Indicate loading for this specific fetch
+    setError(null); // Clear previous fetch errors
+
     try {
       // Ensure no double slashes in URL by using path.join logic
-      const url = apiBaseUrl.endsWith('/') 
+      const url = apiBaseUrl.endsWith('/')
         ? `${apiBaseUrl}api/workbench/spreadsheets/list`
         : `${apiBaseUrl}/api/workbench/spreadsheets/list`;
       
       console.log('Fetching spreadsheets from URL:', url);
       const response = await axios.get(url);
       console.log('Spreadsheets response:', response.data);
-      setSpreadsheets(response.data);
+
+      // Ensure all spreadsheets have is_transformed flag set properly
+      const processedSpreadsheets = response.data.map(sheet => ({
+        ...sheet,
+        is_transformed: !!sheet.is_transformed || !!sheet.original_id
+      }));
+
+      // Check if component is still mounted before setting state
+      // Note: This specific useCallback doesn't have a direct isMounted flag,
+      // rely on component-level checks where this is called if needed.
+      setSpreadsheets(processedSpreadsheets);
       setIsLoading(false);
-      return response.data;
+      // Clear connection error if fetch succeeds after potentially failing before
+      setConnectionError(false);
+      return processedSpreadsheets;
     } catch (error) {
       console.error('Error fetching spreadsheets:', error);
       // Log the URL that failed
-      console.error('Failed URL:', apiBaseUrl.endsWith('/') 
+      console.error('Failed URL:', apiBaseUrl.endsWith('/')
         ? `${apiBaseUrl}api/workbench/spreadsheets/list`
         : `${apiBaseUrl}/api/workbench/spreadsheets/list`);
       
-      if (error.message === 'Network Error') {
-        setConnectionError(true);
-        setError('Cannot connect to backend services. Please ensure the backend is running.');
+      // Check if component is still mounted before setting state
+      if (error.message === 'Network Error' || error.code === 'ECONNREFUSED') {
+         setConnectionError(true); // Set connection error on network failure
+         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
-        setError('Failed to load spreadsheets. Please try again later.');
+         setError('Failed to load spreadsheets. Please try again later.');
+         // Clear connection error if it's a different type of error
+         setConnectionError(false);
       }
       setIsLoading(false);
       return [];
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, connectionError]); // Add connectionError dependency
 
   // Helper function to join URL paths correctly
   const joinPaths = (base, path) => {
@@ -232,6 +270,13 @@ export const WorkbenchProvider = ({ children }) => {
             message: job.progress + 10 >= 100 ? 'Successfully completed job' : 'Processing data...'
           };
           
+          // Add result object when job completes
+          if (updatedJob.status === 'completed' && !updatedJob.result) {
+            updatedJob.result = {
+              spreadsheet_id: 'mock-spreadsheet-' + jobId.substring(0, 4)
+            };
+          }
+          
           // Update local state
           setJobs(prevJobs => prevJobs.map(j => j.id === jobId ? updatedJob : j));
           
@@ -283,7 +328,9 @@ export const WorkbenchProvider = ({ children }) => {
             completed_at: new Date(Date.now() - 3540000).toISOString(), // 59 minutes ago
             parameters: { sheet_name: 'Sheet2' },
             message: 'Successfully completed job',
-            result_url: '#/sample-result.xlsx'
+            result: {
+              spreadsheet_id: 'mock-spreadsheet-123'
+            }
           }
         ];
         
@@ -685,7 +732,8 @@ export const WorkbenchProvider = ({ children }) => {
       trackTransformationJob,
       setActiveJobId,
       updateTransformationState,
-      resetTransformationState
+      resetTransformationState,
+      initialCheckDone
     }}>
       {children}
     </WorkbenchContext.Provider>

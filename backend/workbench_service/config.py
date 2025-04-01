@@ -31,13 +31,12 @@ else:
 if IN_DOCKER:
     BASE_DIR = Path('/app/data')
 else:
-    BASE_DIR = Path(os.environ.get("BASE_DIR", os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))))
+    BASE_DIR = Path(os.environ.get("BASE_DIR", os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")))) # Adjusted relative path calculation
 
 # Ensure paths are absolute
 BASE_DIR = BASE_DIR.absolute()
 WORKBENCH_DIR = BASE_DIR / "workbench"
-WORKBENCH_UPLOADS_DIR = WORKBENCH_DIR / "uploads"
-WORKBENCH_OUTPUTS_DIR = WORKBENCH_DIR / "outputs"
+WORKBENCH_SPREADSHEETS_DIR = WORKBENCH_DIR / "spreadsheets" # Consolidated directory
 
 # External service URLs
 CORE_SERVICE_URL = os.environ.get("CORE_SERVICE_URL", "http://core:8000")
@@ -45,7 +44,7 @@ EMBEDDING_SERVICE_URL = os.environ.get("EMBEDDING_SERVICE_URL", "http://embeddin
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "llama3.2:latest")
+DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "llama3.2:3b")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
 
 # Job configuration
@@ -62,8 +61,7 @@ def get_config() -> Dict[str, Any]:
         "CORS_ORIGINS": CORS_ORIGINS,
         "BASE_DIR": str(BASE_DIR),
         "WORKBENCH_DIR": str(WORKBENCH_DIR),
-        "WORKBENCH_UPLOADS_DIR": str(WORKBENCH_UPLOADS_DIR),
-        "WORKBENCH_OUTPUTS_DIR": str(WORKBENCH_OUTPUTS_DIR),
+        "WORKBENCH_SPREADSHEETS_DIR": str(WORKBENCH_SPREADSHEETS_DIR), # Updated directory
         "CORE_SERVICE_URL": CORE_SERVICE_URL,
         "EMBEDDING_SERVICE_URL": EMBEDDING_SERVICE_URL,
         "OLLAMA_BASE_URL": OLLAMA_BASE_URL,
@@ -77,32 +75,30 @@ def get_config() -> Dict[str, Any]:
 def validate_config() -> None:
     """Validate the configuration and check required directories."""
     logger = logging.getLogger("workbench_service")
-    
+
     # Log configuration
     logger.info(f"Service configuration: HOST={HOST}, PORT={PORT}, DEBUG={DEBUG}")
     logger.info(f"Running in Docker: {IN_DOCKER}")
     logger.info(f"Data directories (absolute paths):")
     logger.info(f"  BASE_DIR: {BASE_DIR.absolute()}")
     logger.info(f"  WORKBENCH_DIR: {WORKBENCH_DIR.absolute()}")
-    logger.info(f"  WORKBENCH_UPLOADS_DIR: {WORKBENCH_UPLOADS_DIR.absolute()}")
-    logger.info(f"  WORKBENCH_OUTPUTS_DIR: {WORKBENCH_OUTPUTS_DIR.absolute()}")
-    
+    logger.info(f"  WORKBENCH_SPREADSHEETS_DIR: {WORKBENCH_SPREADSHEETS_DIR.absolute()}") # Updated directory
+
     # Check critical directories
-    os.makedirs(WORKBENCH_UPLOADS_DIR, exist_ok=True)
-    os.makedirs(WORKBENCH_OUTPUTS_DIR, exist_ok=True)
-    
+    os.makedirs(WORKBENCH_SPREADSHEETS_DIR, exist_ok=True) # Updated directory
+
     # Check if directories are writeable
     try:
-        test_file = WORKBENCH_UPLOADS_DIR / ".write_test"
+        test_file = WORKBENCH_SPREADSHEETS_DIR / ".write_test" # Updated directory
         with open(test_file, 'w') as f:
             f.write('test')
         os.remove(test_file)
-        logger.info(f"WORKBENCH_UPLOADS_DIR is writable")
+        logger.info(f"WORKBENCH_SPREADSHEETS_DIR is writable") # Updated directory
     except Exception as e:
-        logger.error(f"WORKBENCH_UPLOADS_DIR is not writable: {str(e)}")
-    
+        logger.error(f"WORKBENCH_SPREADSHEETS_DIR is not writable: {str(e)}") # Updated directory
+
     # Validate external service URLs
     logger.info(f"External services: CORE_SERVICE_URL={CORE_SERVICE_URL}")
     logger.info(f"LLM configuration: DEFAULT_LLM_MODEL={DEFAULT_LLM_MODEL}")
-    
+
     logger.info("Configuration validation complete") 

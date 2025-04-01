@@ -16,7 +16,7 @@ import pandas as pd
 from fastapi import UploadFile, HTTPException
 
 # Import configuration
-from config import WORKBENCH_UPLOADS_DIR
+from config import WORKBENCH_SPREADSHEETS_DIR
 
 logger = logging.getLogger("workbench_service")
 
@@ -31,21 +31,21 @@ class SpreadsheetManager:
     - List available spreadsheets
     """
     
-    def __init__(self, upload_dir: Optional[Path] = None):
+    def __init__(self, spreadsheet_dir: Optional[Path] = None):
         """
         Initialize the spreadsheet manager.
         
         Args:
-            upload_dir: Directory to store uploaded files
+            spreadsheet_dir: Directory to store spreadsheet files
         """
-        self.upload_dir = upload_dir or WORKBENCH_UPLOADS_DIR
-        self.metadata_file = self.upload_dir / "metadata.json"
+        self.spreadsheet_dir = spreadsheet_dir or WORKBENCH_SPREADSHEETS_DIR
+        self.metadata_file = self.spreadsheet_dir / "metadata.json"
         
         # Create directory if it doesn't exist
-        os.makedirs(self.upload_dir, exist_ok=True)
+        os.makedirs(self.spreadsheet_dir, exist_ok=True)
         
         # Log detailed path information
-        logger.info(f"SpreadsheetManager initialized with uploads directory: {self.upload_dir} (absolute: {os.path.abspath(self.upload_dir)})")
+        logger.info(f"SpreadsheetManager initialized with spreadsheets directory: {self.spreadsheet_dir} (absolute: {os.path.abspath(self.spreadsheet_dir)})")
         logger.info(f"Looking for metadata file at: {self.metadata_file} (absolute: {os.path.abspath(self.metadata_file)})")
         
         # Load metadata if exists, otherwise initialize empty
@@ -57,19 +57,19 @@ class SpreadsheetManager:
     
     def _validate_metadata_against_files(self):
         """Validate metadata against actual files in the directory."""
-        logger.info("Validating metadata against actual files in the upload directory")
+        logger.info("Validating metadata against actual files in the spreadsheet directory")
         
-        # Get all valid spreadsheet files in the upload directory
+        # Get all valid spreadsheet files in the spreadsheet directory
         actual_files = []
-        for filename in os.listdir(self.upload_dir):
-            file_path = os.path.join(self.upload_dir, filename)
+        for filename in os.listdir(self.spreadsheet_dir):
+            file_path = os.path.join(self.spreadsheet_dir, filename)
             if os.path.isfile(file_path):
                 # Check if it's a valid spreadsheet file
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in ['.xlsx', '.xls', '.csv']:
                     actual_files.append(filename)
         
-        logger.info(f"Found {len(actual_files)} valid spreadsheet files in upload directory")
+        logger.info(f"Found {len(actual_files)} valid spreadsheet files in spreadsheet directory")
         
         # Check for files in directory but not in metadata
         files_not_in_metadata = []
@@ -108,12 +108,12 @@ class SpreadsheetManager:
             # Try looking for metadata.json in common alternative locations
             alt_locations = [
                 # Docker default path
-                Path("/app/data/workbench/uploads/metadata.json"),
+                Path("/app/data/workbench/spreadsheets/metadata.json"),
                 # Local development paths
-                Path("./data/workbench/uploads/metadata.json"),
-                Path("../data/workbench/uploads/metadata.json"),
+                Path("./data/workbench/spreadsheets/metadata.json"),
+                Path("../data/workbench/spreadsheets/metadata.json"),
                 # Absolute paths from environment
-                Path(os.environ.get("WORKBENCH_UPLOADS_DIR", "")).joinpath("metadata.json") if os.environ.get("WORKBENCH_UPLOADS_DIR") else None
+                Path(os.environ.get("WORKBENCH_SPREADSHEETS_DIR", "")).joinpath("metadata.json") if os.environ.get("WORKBENCH_SPREADSHEETS_DIR") else None
             ]
             
             # Filter out None values
@@ -136,10 +136,10 @@ class SpreadsheetManager:
                     except Exception as e:
                         logger.warning(f"Error reading alternative metadata file: {str(e)}")
             
-            # Last attempt: check if uploads directory has any spreadsheet files we can scan
+            # Last attempt: check if spreadsheets directory has any spreadsheet files we can scan
             if not metadata_found:
                 try:
-                    logger.info(f"No metadata file found, scanning uploads directory for spreadsheet files")
+                    logger.info(f"No metadata file found, scanning spreadsheets directory for spreadsheet files")
                     metadata = self._scan_directory_for_metadata()
                     if metadata:
                         logger.info(f"Created metadata from directory scan with {len(metadata)} entries")
@@ -173,16 +173,16 @@ class SpreadsheetManager:
             return empty_metadata
     
     def _scan_directory_for_metadata(self) -> Dict[str, Dict[str, Any]]:
-        """Scan the uploads directory for spreadsheet files and create metadata."""
+        """Scan the spreadsheets directory for spreadsheet files and create metadata."""
         metadata = {}
         
         try:
             # Get all files in the directory
-            files = os.listdir(self.upload_dir)
+            files = os.listdir(self.spreadsheet_dir)
             
             # Filter for valid spreadsheet files
             for filename in files:
-                file_path = os.path.join(self.upload_dir, filename)
+                file_path = os.path.join(self.spreadsheet_dir, filename)
                 if os.path.isfile(file_path) and self._is_valid_spreadsheet(filename):
                     # Generate a unique ID
                     file_id = str(uuid.uuid4())
@@ -280,7 +280,7 @@ class SpreadsheetManager:
         new_filename = f"{file_id}{extension}"
         
         # Create full path to save the file
-        file_path = self.upload_dir / new_filename
+        file_path = self.spreadsheet_dir / new_filename
         
         # Save the file
         try:
@@ -300,6 +300,7 @@ class SpreadsheetManager:
         
         # Add additional metadata
         file_info["id"] = file_id
+        file_info["filename"] = filename
         file_info["description"] = description
         file_info["original_filename"] = filename
         file_info["modified_filename"] = filename  # Initially same as original filename
@@ -430,16 +431,20 @@ class SpreadsheetManager:
         Returns:
             List of spreadsheet metadata
         """
-        # If metadata is empty, try importing from provided metadata file
+        # Reload metadata from file each time to ensure freshness
+        self.metadata = self._load_metadata()
+        logger.info(f"Refreshed metadata, found {len(self.metadata)} entries.")
+
+        # If metadata is empty after reload, try importing from provided metadata file
         if not self.metadata:
-            logger.warning("Metadata is empty, attempting to re-initialize from default locations")
+            logger.warning("Metadata is empty after reload, attempting to re-initialize from default locations")
             
             # Try each of these potential locations
             potential_paths = [
-                "data/workbench/uploads/metadata.json",
-                "/app/data/workbench/uploads/metadata.json",
-                "./data/workbench/uploads/metadata.json",
-                "../data/workbench/uploads/metadata.json"
+                "data/workbench/spreadsheets/metadata.json",
+                "/app/data/workbench/spreadsheets/metadata.json",
+                "./data/workbench/spreadsheets/metadata.json",
+                "../data/workbench/spreadsheets/metadata.json"
             ]
             
             for path in potential_paths:
@@ -454,22 +459,9 @@ class SpreadsheetManager:
         # Prepare the list to return
         spreadsheet_list = []
         for file_id, info in self.metadata.items():
-            display_filename = ""
+            display_filename = info.get("modified_filename", info.get("filename", "unknown"))
             original_file_reference = info.get("original_filename", info.get("filename", "unknown_original"))
             
-            # Check if this is a transformed file by looking for original_id
-            if info.get("original_id") and info["original_id"] in self.metadata:
-                # It's a transformed file, construct the desired display name
-                original_entry = self.metadata[info["original_id"]]
-                original_display_name = original_entry.get("modified_filename", original_entry.get("original_filename", "original"))
-                
-                # Split original name and extension
-                name_part, ext_part = os.path.splitext(original_display_name)
-                display_filename = f"{name_part}_MAGE Modified{ext_part}"
-            else:
-                # It's an original file, use its modified or original name
-                display_filename = info.get("modified_filename", original_file_reference)
-
             # Ensure basic info is present
             upload_date = info.get("upload_date", "")
             modified_date = info.get("modified_date", upload_date) # Default modified to upload if missing
@@ -484,7 +476,8 @@ class SpreadsheetManager:
                 "modified_date": modified_date, 
                 "sheet_count": sheet_count,
                 "size_bytes": size_bytes,
-                "is_transformed": info.get("original_id") is not None # Add flag to indicate transformed status
+                "is_transformed": info.get("original_id") is not None, # Add flag to indicate transformed status
+                "original_id": info.get("original_id")  # Include the original_id explicitly
             })
 
         # Sort the list, perhaps by modified date descending?
@@ -640,7 +633,7 @@ class SpreadsheetManager:
         # Update metadata fields
         for key, value in updates.items():
             # Don't allow changing certain fields
-            if key in ["id", "storage_path", "original_filename", "upload_date"]:
+            if key in ["id", "storage_path", "original_filename", "upload_date", "original_id"]:
                 continue
                 
             spreadsheet_info[key] = value
@@ -685,25 +678,26 @@ class SpreadsheetManager:
         
         # Construct the new filename and storage path
         original_suffix = original_path.suffix
-        duplicate_filename = f"{duplicate_id}{original_suffix}"
-        duplicate_path = self.upload_dir / duplicate_filename
+        duplicate_storage_filename = f"{duplicate_id}{original_suffix}"
+        duplicate_path = self.spreadsheet_dir / duplicate_storage_filename
         
         # Create duplicate metadata
         current_time = datetime.now().isoformat()
         original_filename = original_info.get("original_filename", original_info.get("filename", "unknown"))
         
-        # Construct a new filename with "Copy of" prefix
-        modified_filename = f"Copy of {original_filename}"
+        # Construct a new display filename with "Copy of" prefix
+        original_display_name = original_info.get("modified_filename", original_filename)
+        modified_filename = f"Copy of {original_display_name}"
         
         duplicate_info = {
             "id": duplicate_id,
-            "filename": duplicate_filename,
+            "filename": original_filename,
             "original_filename": original_filename,
             "modified_filename": modified_filename,
             "upload_date": current_time,
             "modified_date": current_time,
             "storage_path": str(duplicate_path),
-            "original_id": original_spreadsheet_id,  # Link back to original
+            "original_id": original_spreadsheet_id,
             "description": f"Duplicate of {original_filename} created for column transformation"
         }
         
@@ -758,23 +752,19 @@ class SpreadsheetManager:
         spreadsheet_id: str,
         new_columns: List[str],
         new_row_count: int,
-        new_storage_path: Path,
         sheet_name: str
     ) -> None:
         """
-        Update metadata for a spreadsheet after a transformation modifies it.
+        Update metadata for a spreadsheet after a transformation modifies it in place.
 
         Args:
-            spreadsheet_id: ID of the spreadsheet metadata to update.
+            spreadsheet_id: ID of the spreadsheet metadata to update (should be the duplicate's ID).
             new_columns: The complete list of columns after transformation.
             new_row_count: The total number of rows after transformation.
-            new_storage_path: The path to the file containing the transformed data.
             sheet_name: The name of the sheet that was transformed.
         """
         if spreadsheet_id not in self.metadata:
             logger.warning(f"Cannot update metadata for non-existent spreadsheet ID: {spreadsheet_id}")
-            # Optionally raise an error or just log and return
-            # raise HTTPException(status_code=404, detail=f"Spreadsheet with ID {spreadsheet_id} not found for metadata update")
             return
 
         logger.info(f"Updating metadata for transformed spreadsheet ID: {spreadsheet_id}")
@@ -795,100 +785,42 @@ class SpreadsheetManager:
             logger.info(f"Updated sheets_metadata for sheet '{sheet_name}': {spreadsheet_info['sheets_metadata'][sheet_name]}")
         else:
             logger.warning(f"Sheet '{sheet_name}' not found in sheets_metadata for ID {spreadsheet_id}. Cannot update sheet-specific columns/rows.")
-            # Optionally create the entry if it's missing
-            # if "sheets_metadata" not in spreadsheet_info:
-            #     spreadsheet_info["sheets_metadata"] = {}
-            # spreadsheet_info["sheets_metadata"][sheet_name] = {
-            #     "columns": new_columns,
-            #     "row_count": new_row_count
-            # }
 
-        # Update storage path and modification date
-        spreadsheet_info["storage_path"] = str(new_storage_path)
+        # Update modification date and potentially file size if it changed
         spreadsheet_info["modified_date"] = datetime.now().isoformat()
+        try:
+            # Make sure we're using absolute paths
+            storage_path = Path(spreadsheet_info["storage_path"])
+            if not storage_path.is_absolute():
+                storage_path = storage_path.absolute()
+                spreadsheet_info["storage_path"] = str(storage_path)
 
-        # Potentially update filename fields if the transformation overwrites the file
-        # Currently, transformations save to a new file in 'outputs', so we might not need this.
-        # If the intention was to overwrite the duplicate, we'd update 'filename' or 'modified_filename'.
-        # spreadsheet_info["modified_filename"] = new_storage_path.name # Example if overwriting
+            if storage_path.exists():
+                spreadsheet_info["size_bytes"] = storage_path.stat().st_size
+            else:
+                logger.warning(f"Storage path {storage_path} does not exist when updating metadata, checking with .xlsx extension")
+                # Try adding .xlsx extension if the file doesn't exist
+                if not storage_path.suffix.lower() in ['.xlsx', '.xls']:
+                    xlsx_path = Path(str(storage_path) + '.xlsx')
+                    if xlsx_path.exists():
+                        logger.info(f"Found file with .xlsx extension: {xlsx_path}")
+                        spreadsheet_info["storage_path"] = str(xlsx_path)
+                        spreadsheet_info["size_bytes"] = xlsx_path.stat().st_size
+        except Exception as e:
+             logger.warning(f"Could not update file size for {spreadsheet_id}: {e}")
+
+        # Update the modified filename to indicate transformation
+        original_display_name = spreadsheet_info.get("original_filename", "original")
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Keep the original extension
+        _ , ext = os.path.splitext(spreadsheet_info.get("filename", ".xlsx"))
+        if not ext:
+            ext = ".xlsx"  # Default to xlsx if no extension found
+        spreadsheet_info["modified_filename"] = f"{os.path.splitext(original_display_name)[0]}_Transformed_{timestamp_str}{ext}"
 
         self.metadata[spreadsheet_id] = spreadsheet_info
         self._save_metadata()
         logger.info(f"Successfully updated metadata for spreadsheet ID: {spreadsheet_id}")
-
-    def create_metadata_for_transformed_file(
-        self,
-        original_spreadsheet_id: str,
-        new_columns: List[str],
-        new_row_count: int,
-        new_storage_path: Path,
-        sheet_name: str
-    ) -> str:
-        """
-        Create a new metadata entry for a transformed file, linking it to the original.
-
-        Args:
-            original_spreadsheet_id: ID of the original spreadsheet.
-            new_columns: The complete list of columns in the transformed file.
-            new_row_count: The total number of rows in the transformed file.
-            new_storage_path: The path to the transformed file.
-            sheet_name: The name of the sheet that was transformed.
-
-        Returns:
-            The ID of the newly created metadata entry.
-
-        Raises:
-            HTTPException: If the original spreadsheet ID is not found.
-        """
-        if original_spreadsheet_id not in self.metadata:
-            logger.error(f"Original spreadsheet ID {original_spreadsheet_id} not found. Cannot create metadata for transformed file.")
-            raise HTTPException(status_code=404, detail=f"Original spreadsheet with ID {original_spreadsheet_id} not found")
-
-        logger.info(f"Creating new metadata entry for transformed file derived from: {original_spreadsheet_id}")
-        original_info = self.metadata[original_spreadsheet_id]
-
-        # Generate a new unique ID for the transformed file's metadata
-        new_id = str(uuid.uuid4())
-        current_time = datetime.now().isoformat()
-
-        # Determine a suitable filename (use the actual output filename)
-        new_filename = new_storage_path.name
-        original_display_name = original_info.get("modified_filename", original_info.get("original_filename", "source"))
-        modified_display_name = f"Transformed_{original_display_name}_{current_time[:10]}" # Example display name
-
-        new_metadata_entry = {
-            "id": new_id,
-            "filename": new_filename, # Actual stored filename
-            "original_filename": original_info.get("original_filename"), # Keep track of the ultimate source file name
-            "modified_filename": modified_display_name, # A more user-friendly display name
-            "description": f"Transformed data from sheet '{sheet_name}' of {original_display_name}",
-            "upload_date": current_time, # Represents creation time of this entry
-            "modified_date": current_time,
-            "storage_path": str(new_storage_path),
-            "original_id": original_spreadsheet_id, # Link back to the source spreadsheet
-            "size_bytes": new_storage_path.stat().st_size if new_storage_path.exists() else 0,
-            # Assume transformation outputs a single sheet structure for simplicity here
-            # A more complex approach might be needed if transformations could merge/split sheets
-            "sheet_count": 1,
-            "sheets": [sheet_name],
-             # Add sheet-specific metadata
-            "sheets_metadata": {
-                sheet_name: {
-                    "columns": new_columns,
-                    "row_count": new_row_count
-                }
-            },
-            # Add top-level convenience fields for the primary (only) sheet
-            "columns": new_columns,
-            "row_count": new_row_count
-        }
-
-        # Save the new metadata entry
-        self.metadata[new_id] = new_metadata_entry
-        self._save_metadata()
-        logger.info(f"Successfully created new metadata entry with ID: {new_id} for transformed file: {new_storage_path}")
-
-        return new_id
 
 # Singleton instance of SpreadsheetManager
 _spreadsheet_manager_instance = None

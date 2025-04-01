@@ -448,7 +448,6 @@ class SpreadsheetProcessor:
         """
         from ..llm.transformer import RowTransformer, BatchProcessor
         from ..spreadsheet.manager import get_spreadsheet_manager
-        import os
         import uuid
         from pathlib import Path
         
@@ -485,6 +484,7 @@ class SpreadsheetProcessor:
             # We need to find the spreadsheet ID to create a duplicate if requested
             target_file_path = file_path
             spreadsheet_manager = get_spreadsheet_manager()
+            duplicate_id = None  # Initialize for later use
             
             # If create_duplicate is True, create a duplicate of the spreadsheet
             if create_duplicate:
@@ -590,11 +590,6 @@ class SpreadsheetProcessor:
             logger.info(f"Transformation complete. Final structure: {final_row_count} rows, {len(final_columns)} columns.")
             logger.info(f"Final columns: {final_columns}")
 
-            # Log the transformation results
-            # result_columns = [col for col in result_df.columns if col not in original_df.columns]
-            # logger.info(f"Transformation complete. New columns added: {result_columns}")
-            # logger.info(f"Result dataframe shape: {result_df.shape}")
-
             # Save the results
             update_job_status(job_id, {
                 "status": "running",
@@ -603,51 +598,80 @@ class SpreadsheetProcessor:
             })
             
             # Track if any errors occurred during transformation
-            had_transformation_errors = False
-            if 'had_errors' in transformer.__dict__ and transformer.had_errors:
-                had_transformation_errors = True
+            had_transformation_errors = transformer.had_errors if hasattr(transformer, 'had_errors') else False
             
-            # Save the results using our reliable save method
+            # Save the transformed data back to the target file
             try:
-                output_path = self._save_transformed_spreadsheet(target_file_path, sheet_name, result_df)
-                logger.info(f"Successfully saved transformed spreadsheet to {output_path}")
-
-                # --- Create new metadata entry for the transformed file ---
-                new_metadata_id = None
-                try:
-                    new_metadata_id = spreadsheet_manager.create_metadata_for_transformed_file(
-                        original_spreadsheet_id=spreadsheet_id, # Link to the original
-                        new_columns=final_columns,
-                        new_row_count=final_row_count,
-                        new_storage_path=output_path,
-                        sheet_name=sheet_name
-                    )
-                    logger.info(f"Created new metadata entry {new_metadata_id} for transformed file.")
-                except Exception as meta_error:
-                    logger.error(f"Failed to create metadata for transformed file: {meta_error}", exc_info=True)
-                    # Decide if this should fail the job or just log a warning
-                    # For now, log warning and continue with job completion, but without updated metadata link
-                    update_job_status(job_id, {
-                        "status": "running",
-                        "progress": 98,
-                        "message": f"Warning: Saved transformed file but failed to create metadata entry: {meta_error}"
-                    })
-                # --- End metadata creation ---
-
-                # Create a relative URL for the result
-                try:
-                    from config import WORKBENCH_OUTPUTS_DIR
-                    # Ensure both paths are Path objects
-                    outputs_dir = Path(WORKBENCH_OUTPUTS_DIR)
-                    output_path_obj = Path(output_path)
-                    
-                    # Extract just the filename for a download endpoint
-                    output_filename = output_path_obj.name
-                    result_url = f"/api/workbench/spreadsheets/download/{output_filename}"
-                    logger.info(f"Generated result URL: {result_url}")
-                except Exception as url_error:
-                    logger.error(f"Error creating result URL: {str(url_error)}")
-                    result_url = str(output_path)
+                logger.info(f"Saving transformed data back to {target_file_path}")
+                
+                # Save based on file type
+                if target_file_path.suffix.lower() == '.csv':
+                    result_df.to_csv(target_file_path, index=False)
+                else:
+                    # For Excel, we need to handle possible multiple sheets
+                    try:
+                        # First read all existing sheets
+                        other_sheets = {}
+                        if target_file_path.exists():
+                            try:
+                                excel_file = pd.ExcelFile(target_file_path, engine='openpyxl')
+                                for other_sheet in excel_file.sheet_names:
+                                    if other_sheet != sheet_name:
+                                        other_sheets[other_sheet] = pd.read_excel(target_file_path, sheet_name=other_sheet, engine='openpyxl')
+                            except Exception as e:
+                                logger.warning(f"Error reading existing sheets: {e}. Only the transformed sheet will be saved.")
+                        
+                        # Ensure the target file has a proper Excel extension
+                        if not target_file_path.suffix.lower() in ['.xlsx', '.xls']:
+                            logger.warning(f"Target file {target_file_path} doesn't have Excel extension, appending .xlsx")
+                            target_file_path = Path(str(target_file_path) + '.xlsx')
+                        
+                        # Then write all sheets at once with specified engine
+                        with pd.ExcelWriter(target_file_path, engine='openpyxl', mode='w') as writer:
+                            # Write the transformed sheet
+                            result_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                            
+                            # Write all other sheets
+                            for other_sheet_name, other_df in other_sheets.items():
+                                try:
+                                    other_df.to_excel(writer, sheet_name=other_sheet_name, index=False)
+                                except Exception as e:
+                                    logger.warning(f"Error writing sheet {other_sheet_name}: {e}")
+                    except Exception as excel_error:
+                        logger.error(f"Error handling Excel file: {excel_error}", exc_info=True)
+                        # Fallback: at least save the transformed sheet
+                        try:
+                            fallback_path = target_file_path
+                            if not fallback_path.suffix.lower() == '.xlsx':
+                                fallback_path = Path(str(fallback_path).rsplit('.', 1)[0] + '.xlsx')
+                            
+                            result_df.to_excel(fallback_path, sheet_name=sheet_name, index=False, engine='openpyxl')
+                            logger.warning(f"Used fallback method to save only the transformed sheet to {fallback_path}")
+                            target_file_path = fallback_path
+                        except Exception as fallback_error:
+                            logger.error(f"Even fallback save failed: {fallback_error}", exc_info=True)
+                            raise fallback_error
+                
+                logger.info(f"Successfully saved transformed data to {target_file_path}")
+                
+                # Update metadata for the transformed file (use duplicate ID if we created one)
+                spreadsheet_to_update = duplicate_id or spreadsheet_id
+                if spreadsheet_to_update:
+                    try:
+                        spreadsheet_manager.update_metadata_after_transform(
+                            spreadsheet_id=spreadsheet_to_update,
+                            new_columns=final_columns,
+                            new_row_count=final_row_count,
+                            sheet_name=sheet_name
+                        )
+                        logger.info(f"Updated metadata for spreadsheet ID: {spreadsheet_to_update}")
+                    except Exception as meta_error:
+                        logger.error(f"Failed to update metadata: {meta_error}", exc_info=True)
+                        update_job_status(job_id, {
+                            "status": "running",
+                            "progress": 95,
+                            "message": f"Warning: Saved transformed data but failed to update metadata: {meta_error}"
+                        })
                 
                 # Set job status based on whether there were errors during transformation
                 if had_transformation_errors:
@@ -656,24 +680,26 @@ class SpreadsheetProcessor:
                 else:
                     status_message = "Transformation completed successfully!"
                     job_status = "completed"
-
-                # Include the new metadata ID in the success message if created
-                if new_metadata_id:
-                    status_message += f" New data saved with spreadsheet ID: {new_metadata_id}."
-
+                
+                # Add the spreadsheet ID to the success message
+                if duplicate_id:
+                    status_message += f" Data saved to duplicate spreadsheet ID: {duplicate_id}."
+                elif spreadsheet_id:
+                    status_message += f" Data saved to original spreadsheet ID: {spreadsheet_id}."
+                
                 update_job_status(job_id, {
                     "status": job_status,
                     "progress": 100,
                     "message": status_message,
-                    "result": { # Add result section to job info
-                        "output_file_path": str(output_path),
-                        "new_spreadsheet_id": new_metadata_id # Include the new ID if created
+                    "result": {
+                        "output_file_path": str(target_file_path) if target_file_path else None,
+                        "spreadsheet_id": duplicate_id or spreadsheet_id,
+                        "message": None
                     }
-                    # "result_url": result_url # Keep or remove based on whether download endpoint is preferred
                 })
                 
             except Exception as save_error:
-                logger.error(f"Error saving transformed spreadsheet: {str(save_error)}", exc_info=True)
+                logger.error(f"Error saving transformed data: {str(save_error)}", exc_info=True)
                 update_job_status(job_id, {
                     "status": "failed", 
                     "progress": 90, 
@@ -707,65 +733,4 @@ class SpreadsheetProcessor:
         except ImportError:
             logger.warning("Could not import api.jobs.update_job_in_store, job status updates won't be persisted.")
         except Exception as e:
-            logger.error(f"Error updating job status via api.jobs: {str(e)}")
-    
-    def _save_transformed_spreadsheet(self, original_path: Path, sheet_name: str, df: pd.DataFrame) -> Path:
-        """
-        Save the transformed spreadsheet data.
-        
-        Args:
-            original_path: Path to the original spreadsheet
-            sheet_name: Name of the sheet that was processed
-            df: Transformed DataFrame
-            
-        Returns:
-            Path to the saved output file
-        """
-        from pathlib import Path
-        import os
-        from config import WORKBENCH_OUTPUTS_DIR
-        
-        # Ensure original_path is a Path object
-        if not isinstance(original_path, Path):
-            original_path = Path(original_path)
-            
-        # Ensure WORKBENCH_OUTPUTS_DIR is a Path object
-        outputs_dir = Path(WORKBENCH_OUTPUTS_DIR)
-        
-        # Create output directory if it doesn't exist
-        logger.info(f"Saving transformed spreadsheet. Output directory: {outputs_dir}")
-        outputs_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generate output filename
-        timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-        original_name = original_path.stem
-        output_filename = f"{original_name}_transformed_{timestamp}"
-        logger.info(f"Generated output filename: {output_filename}")
-        
-        # Determine output format based on original file
-        if original_path.suffix.lower() == '.csv':
-            output_path = outputs_dir / f"{output_filename}.csv"
-            logger.info(f"Saving CSV to: {output_path}")
-            df.to_csv(output_path, index=False)
-        else:
-            output_path = outputs_dir / f"{output_filename}.xlsx"
-            logger.info(f"Saving Excel to: {output_path}")
-            # Log DataFrame info for debugging
-            logger.info(f"DataFrame info: {len(df)} rows, {len(df.columns)} columns")
-            logger.info(f"Column names: {list(df.columns)}")
-            df.to_excel(output_path, sheet_name=sheet_name, index=False)
-        
-        # Verify file was created
-        if not output_path.exists():
-            error_msg = f"Failed to save file! Path does not exist: {output_path}"
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
-        else:
-            logger.info(f"Successfully saved transformed spreadsheet to {output_path}")
-            try:
-                file_size = output_path.stat().st_size
-                logger.info(f"File size: {file_size} bytes")
-            except Exception as e:
-                logger.error(f"Could not get file size: {str(e)}")
-            
-        return output_path 
+            logger.error(f"Error updating job status via api.jobs: {str(e)}") 

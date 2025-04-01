@@ -1,0 +1,441 @@
+{
+  "8b38c4e6-4c1b-45eb-89fb-8ee7d12fdb7c": {
+    "filename": "sampledatainsurance.xlsx",
+    "size_bytes": 61520,
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 23,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood",
+          "history",
+          "justification"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "8b38c4e6-4c1b-45eb-89fb-8ee7d12fdb7c",
+    "description": null,
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance.xlsx",
+    "upload_date": "2025-04-01T00:47:03.778909",
+    "modified_date": "2025-04-01T00:47:03.778909",
+    "storage_path": "/app/data/workbench/spreadsheets/8b38c4e6-4c1b-45eb-89fb-8ee7d12fdb7c.xlsx"
+  },
+  "90bcb599-77ad-4045-a243-f82443dd0b15": {
+    "id": "90bcb599-77ad-4045-a243-f82443dd0b15",
+    "filename": "sampledatainsurance.xlsx",
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance_Transformed_20250401_011150.xlsx",
+    "upload_date": "2025-04-01T01:10:59.519937",
+    "modified_date": "2025-04-01T01:11:50.247041",
+    "storage_path": "/app/data/workbench/spreadsheets/90bcb599-77ad-4045-a243-f82443dd0b15.xlsx",
+    "original_id": "8b38c4e6-4c1b-45eb-89fb-8ee7d12fdb7c",
+    "description": "Duplicate of sampledatainsurance.xlsx created for column transformation",
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
+    ],
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood",
+          "story"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "size_bytes": 53180
+  },
+  "991e9e48-df8c-4314-9f58-161b11a36798": {
+    "id": "991e9e48-df8c-4314-9f58-161b11a36798",
+    "filename": "sampledatainsurance.xlsx",
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance_Transformed_20250401_025036.xlsx",
+    "upload_date": "2025-04-01T02:49:11.679729",
+    "modified_date": "2025-04-01T02:50:36.705851",
+    "storage_path": "/app/data/workbench/spreadsheets/991e9e48-df8c-4314-9f58-161b11a36798.xlsx",
+    "original_id": "8b38c4e6-4c1b-45eb-89fb-8ee7d12fdb7c",
+    "description": "Duplicate of sampledatainsurance.xlsx created for column transformation",
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
+    ],
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood",
+          "history",
+          "justification"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "size_bytes": 64995
+  },
+  "d23ebc66-3fda-470d-8c5e-c7ed7d261213": {
+    "filename": "DTRA_24_3_SBIR_STTR_Cost_Template_2024.xls",
+    "size_bytes": 112401,
+    "sheet_count": 12,
+    "sheets": [
+      "General",
+      "Total Cost Summary ",
+      "Option ",
+      "Escalation & Indirect Rates",
+      "Consultants",
+      "Materials-Equipment",
+      "Equipment",
+      "Travel",
+      "ODC Details",
+      "Task 1",
+      "Task 2",
+      "Task 3"
+    ],
+    "columns": [
+      "Cost Proposal",
+      "Unnamed: 1"
+    ],
+    "row_count": 35,
+    "sheets_metadata": {
+      "General": {
+        "columns": [
+          "Cost Proposal",
+          "Unnamed: 1"
+        ],
+        "row_count": 35
+      },
+      "Total Cost Summary ": {
+        "columns": [
+          "Cost Proposal ",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14",
+          "Unnamed: 15",
+          "Unnamed: 16",
+          "Unnamed: 17",
+          "Unnamed: 18",
+          "Unnamed: 19",
+          "Unnamed: 20"
+        ],
+        "row_count": 65
+      },
+      "Option ": {
+        "columns": [
+          "Cost Proposal - Option ",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14",
+          "Unnamed: 15",
+          "Unnamed: 16",
+          "Unnamed: 17",
+          "Unnamed: 18",
+          "Unnamed: 19",
+          "Unnamed: 20",
+          "Unnamed: 21",
+          "Unnamed: 22"
+        ],
+        "row_count": 75
+      },
+      "Escalation & Indirect Rates": {
+        "columns": [
+          "LABOR ESCALATION",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6"
+        ],
+        "row_count": 32
+      },
+      "Consultants": {
+        "columns": [
+          "CONSULTANTS (Note 2)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9"
+        ],
+        "row_count": 18
+      },
+      "Materials-Equipment": {
+        "columns": [
+          " MATERIALS - SUPPLIES - EQUIPMENT (Note 1)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4"
+        ],
+        "row_count": 16
+      },
+      "Equipment": {
+        "columns": [
+          "Equipment (Note 1 and 2) ",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12"
+        ],
+        "row_count": 27
+      },
+      "Travel": {
+        "columns": [
+          " TRAVEL",
+          "(Note 1 and 2)",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14"
+        ],
+        "row_count": 32
+      },
+      "ODC Details": {
+        "columns": [
+          "OTHER DIRECT COSTS (Notes 1 and 2)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7"
+        ],
+        "row_count": 17
+      },
+      "Task 1": {
+        "columns": [
+          "Cost Proposal (NOTE 4)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14",
+          "Unnamed: 15",
+          "Unnamed: 16",
+          "Unnamed: 17",
+          "Unnamed: 18",
+          "Unnamed: 19",
+          "Unnamed: 20",
+          "Unnamed: 21",
+          "Unnamed: 22"
+        ],
+        "row_count": 73
+      },
+      "Task 2": {
+        "columns": [
+          "Cost Proposal (NOTE 4)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14",
+          "Unnamed: 15",
+          "Unnamed: 16",
+          "Unnamed: 17",
+          "Unnamed: 18",
+          "Unnamed: 19",
+          "Unnamed: 20",
+          "Unnamed: 21",
+          "Unnamed: 22"
+        ],
+        "row_count": 73
+      },
+      "Task 3": {
+        "columns": [
+          "Cost Proposal (NOTE 4)",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7",
+          "Unnamed: 8",
+          "Unnamed: 9",
+          "Unnamed: 10",
+          "Unnamed: 11",
+          "Unnamed: 12",
+          "Unnamed: 13",
+          "Unnamed: 14",
+          "Unnamed: 15",
+          "Unnamed: 16",
+          "Unnamed: 17",
+          "Unnamed: 18",
+          "Unnamed: 19",
+          "Unnamed: 20",
+          "Unnamed: 21",
+          "Unnamed: 22"
+        ],
+        "row_count": 73
+      }
+    },
+    "id": "d23ebc66-3fda-470d-8c5e-c7ed7d261213",
+    "description": null,
+    "original_filename": "DTRA_24_3_SBIR_STTR_Cost_Template_2024.xls",
+    "modified_filename": "DTRA_24_3_SBIR_STTR_Cost_Template_2024.xls",
+    "upload_date": "2025-04-01T03:03:34.914232",
+    "modified_date": "2025-04-01T03:03:34.914232",
+    "storage_path": "/app/data/workbench/spreadsheets/d23ebc66-3fda-470d-8c5e-c7ed7d261213.xls"
+  }
+}

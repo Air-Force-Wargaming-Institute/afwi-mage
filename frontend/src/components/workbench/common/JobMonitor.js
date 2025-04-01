@@ -44,7 +44,10 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
     listJobs, 
     cancelJob, 
     setActiveJobId,
-    isLoading 
+    isLoading,
+    apiBaseUrl,
+    setActiveView,
+    fetchSpreadsheets
   } = useContext(WorkbenchContext);
   
   const [expandedJobId, setExpandedJobId] = useState(null);
@@ -83,6 +86,12 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
         clearInterval(pollingInterval);
         setPollingInterval(null);
       }
+      
+      // Refresh spreadsheet list when a job completes
+      if (activeJob.status === 'completed' && activeJob.result && activeJob.result.spreadsheet_id) {
+        console.log('Job completed with spreadsheet ID, refreshing list:', activeJob.result.spreadsheet_id);
+        fetchSpreadsheets();
+      }
       return;
     }
     
@@ -91,7 +100,7 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
     } catch (error) {
       console.error('Error polling job status:', error);
     }
-  }, [activeJobId, jobs, getJobStatus, pollingInterval]);
+  }, [activeJobId, jobs, getJobStatus, pollingInterval, fetchSpreadsheets]);
   
   // Set up polling when activeJobId changes
   useEffect(() => {
@@ -273,11 +282,17 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
                 
                 {/* Actions based on job status */}
                 <Box display="flex" justifyContent="flex-end" mt={2}>
-                  {job.status === 'completed' && job.result_url && (
+                  {job.status === 'completed' && job.result && job.result.spreadsheet_id && (
                     <Tooltip title="Download results">
                       <Button
                         startIcon={<DownloadIcon />}
-                        onClick={() => window.open(job.result_url, '_blank')}
+                        onClick={() => {
+                          // Build download URL from spreadsheet_id
+                          const baseUrl = apiBaseUrl.endsWith('/') 
+                            ? `${apiBaseUrl}api/workbench/spreadsheets` 
+                            : `${apiBaseUrl}/api/workbench/spreadsheets`;
+                          window.open(`${baseUrl}/${job.result.spreadsheet_id}/download`, '_blank');
+                        }}
                       >
                         Download
                       </Button>
@@ -292,6 +307,22 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
                       sx={{ ml: 1 }}
                     >
                       View Results
+                    </Button>
+                  )}
+
+                  {/* Add a button to show the transformed spreadsheet in the library */}
+                  {job.status === 'completed' && job.result && job.result.spreadsheet_id && (
+                    <Button
+                      onClick={() => {
+                        // Navigate to library view and refresh
+                        setActiveView('library');
+                        fetchSpreadsheets();
+                      }}
+                      color="secondary"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    >
+                      Show in Library
                     </Button>
                   )}
                 </Box>

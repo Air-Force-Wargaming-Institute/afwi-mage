@@ -21,7 +21,7 @@ matplotlib.use('Agg')  # Use non-interactive backend
 # Core visualization functionality
 from core.visualization.generation import generate_visualization_code
 from core.visualization.execution import execute_visualization_code
-from config import WORKBENCH_OUTPUTS_DIR
+from config import WORKBENCH_SPREADSHEETS_DIR
 
 logger = logging.getLogger("workbench_service")
 

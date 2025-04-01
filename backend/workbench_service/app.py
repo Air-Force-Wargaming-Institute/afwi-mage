@@ -16,7 +16,7 @@ from pathlib import Path
 # Import configuration
 from config import (
     HOST, PORT, CORS_ORIGINS, LOG_LEVEL, DEBUG, IN_DOCKER,
-    WORKBENCH_UPLOADS_DIR, WORKBENCH_OUTPUTS_DIR, BASE_DIR, WORKBENCH_DIR
+    WORKBENCH_SPREADSHEETS_DIR, BASE_DIR, WORKBENCH_DIR
 )
 
 # Configure logging
@@ -30,25 +30,24 @@ logger = logging.getLogger("workbench_service")
 # Log directory information with absolute paths
 logger.info(f"BASE_DIR: {str(BASE_DIR)} (absolute: {os.path.abspath(BASE_DIR)})")
 logger.info(f"WORKBENCH_DIR: {str(WORKBENCH_DIR)} (absolute: {os.path.abspath(WORKBENCH_DIR)})")
-logger.info(f"WORKBENCH_UPLOADS_DIR: {str(WORKBENCH_UPLOADS_DIR)} (absolute: {os.path.abspath(WORKBENCH_UPLOADS_DIR)})")
-logger.info(f"WORKBENCH_OUTPUTS_DIR: {str(WORKBENCH_OUTPUTS_DIR)} (absolute: {os.path.abspath(WORKBENCH_OUTPUTS_DIR)})")
+logger.info(f"WORKBENCH_SPREADSHEETS_DIR: {str(WORKBENCH_SPREADSHEETS_DIR)} (absolute: {os.path.abspath(WORKBENCH_SPREADSHEETS_DIR)})")
 
 # Create required directories with verbose logging
-for directory in [WORKBENCH_DIR, WORKBENCH_UPLOADS_DIR, WORKBENCH_OUTPUTS_DIR]:
+for directory in [WORKBENCH_DIR, WORKBENCH_SPREADSHEETS_DIR]:
     try:
         os.makedirs(directory, exist_ok=True)
         logger.info(f"Ensured directory exists: {directory}")
     except Exception as e:
         logger.error(f"Failed to create directory {directory}: {str(e)}")
 
-# Initialize metadata file if it doesn't exist
-metadata_file = WORKBENCH_UPLOADS_DIR / "metadata.json"
+# Initialize metadata file if it doesn't exist inside the spreadsheets directory
+metadata_file = WORKBENCH_SPREADSHEETS_DIR / "metadata.json"
 logger.info(f"Metadata file path: {metadata_file} (absolute: {os.path.abspath(metadata_file)})")
 
 if not os.path.exists(metadata_file):
     logger.info(f"Metadata file does not exist, creating empty metadata file")
     try:
-        # Ensure parent directory exists
+        # Ensure parent directory exists (should already exist from above)
         os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
         
         # Create an empty metadata dict
@@ -64,9 +63,9 @@ if not os.path.exists(metadata_file):
     except Exception as e:
         logger.error(f"Failed to create metadata file: {str(e)}")
         
-        # Try alternative location as fallback
+        # Try alternative location as fallback (less likely needed now)
         try:
-            alt_path = os.path.join(os.getcwd(), "metadata.json")
+            alt_path = WORKBENCH_DIR / "metadata.json"
             logger.info(f"Attempting to create metadata at alternative location: {alt_path}")
             with open(alt_path, 'w') as f:
                 json.dump({}, f, indent=2)
@@ -123,9 +122,9 @@ async def health_check():
     """Simple health check endpoint."""
     # Include file system status in health check
     fs_status = {
-        "metadata_file_exists": os.path.exists(WORKBENCH_UPLOADS_DIR / "metadata.json"),
-        "uploads_dir_exists": os.path.exists(WORKBENCH_UPLOADS_DIR),
-        "uploads_dir_writable": os.access(WORKBENCH_UPLOADS_DIR, os.W_OK),
+        "metadata_file_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR / "metadata.json"),
+        "spreadsheets_dir_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR),
+        "spreadsheets_dir_writable": os.access(WORKBENCH_SPREADSHEETS_DIR, os.W_OK),
         "running_in_docker": IN_DOCKER
     }
     

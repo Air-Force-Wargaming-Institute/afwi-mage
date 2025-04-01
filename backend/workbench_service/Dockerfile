@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/data/workbench/uploads /app/data/workbench/outputs
+RUN mkdir -p /app/data/workbench/spreadsheets
 
 # Create a Docker environment marker file
 RUN touch /.dockerenv
@@ -32,8 +32,7 @@ ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=8020
 ENV DEBUG=1
-ENV WORKBENCH_UPLOADS_DIR=/app/data/workbench/uploads
-ENV WORKBENCH_OUTPUTS_DIR=/app/data/workbench/outputs
+ENV WORKBENCH_SPREADSHEETS_DIR=/app/data/workbench/spreadsheets
 
 # Expose port
 EXPOSE 8020

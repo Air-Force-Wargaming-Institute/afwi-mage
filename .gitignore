@@ -41,7 +41,6 @@ Thumbs.db
 /data/vectorstores/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
-!/WorkbenchPlan.md
 
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*

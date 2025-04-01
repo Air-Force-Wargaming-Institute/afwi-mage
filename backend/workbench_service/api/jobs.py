@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 from enum import Enum
 
-from config import WORKBENCH_DIR, get_config
+from config import WORKBENCH_DIR, WORKBENCH_SPREADSHEETS_DIR, get_config
 
 logger = logging.getLogger("workbench_service")
 
@@ -65,10 +65,30 @@ class JobParameters(BaseModel):
     # e.g., transformation_details: Optional[Dict[str, Any]] = None
 
 class JobResult(BaseModel):
-    """Result of a completed job."""
+    """Model for job result data"""
     output_file_path: Optional[str] = None
+    spreadsheet_id: Optional[str] = None
     message: Optional[str] = None
-    # Add other result fields as necessary
+
+class JobUpdate(BaseModel):
+    """Model for job update data"""
+    status: Optional[str] = None
+    progress: Optional[float] = None
+    message: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+
+class JobDetails(BaseModel):
+    """Model for job details"""
+    id: str
+    type: str
+    status: str
+    progress: float = 0.0
+    message: Optional[str] = None
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    parameters: Dict[str, Any] = {}
+    result: Optional[Dict[str, Any]] = None
 
 class Job(BaseModel):
     """Represents a background job."""
@@ -101,7 +121,7 @@ def get_job_store_path() -> Path:
     """Gets the path to the job store JSON file."""
     config = get_config()
     # Ensure WORKBENCH_DIR is a Path object if it comes from config dict
-    workbench_dir = Path(config.get('WORKBENCH_DIR', WORKBENCH_DIR)) 
+    workbench_dir = Path(config.get('WORKBENCH_DIR', WORKBENCH_DIR))
     return workbench_dir / "jobs_store.json"
 
 def load_jobs_from_store() -> Dict[str, Dict]:
@@ -182,15 +202,56 @@ def create_job_entry(job_id: str, job_type: str, parameters: Optional[Dict] = No
     logger.info(f"Created new job entry: ID={job_id}, Type={job_type}")
     return new_job # Return the Pydantic model instance
 
-def update_job_in_store(job_id: str, updates: Dict[str, Any]) -> Optional[Job]:
-    """Updates an existing job in the store."""
+def update_job_in_store(job_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update a job in the jobs store
+    
+    Args:
+        job_id: ID of the job to update
+        updates: Dictionary of fields to update
+        
+    Returns:
+        Updated job details
+    """
+    # Validate updates before applying
+    if "result" in updates and updates["result"] is not None:
+        # Ensure result is a dictionary
+        if not isinstance(updates["result"], dict):
+            logger.warning(f"Invalid result format for job {job_id}: {updates['result']}")
+            updates["result"] = {"message": str(updates["result"])}
+            
+        # Ensure spreadsheet_id is a string if provided
+        if "spreadsheet_id" in updates["result"] and updates["result"]["spreadsheet_id"] is not None:
+            updates["result"]["spreadsheet_id"] = str(updates["result"]["spreadsheet_id"])
+
+    # Sanitize progress value if present
+    if "progress" in updates:
+        try:
+            updates["progress"] = float(updates["progress"])
+            # Ensure progress is between 0 and 100
+            updates["progress"] = max(0.0, min(100.0, updates["progress"]))
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid progress value for job {job_id}: {updates['progress']}")
+            updates["progress"] = 0.0
+
+    # Ensure status is a valid string if present
+    valid_statuses = ["submitted", "running", "completed", "failed", "cancelled", "completed_with_errors"]
+    if "status" in updates and updates["status"] not in valid_statuses:
+        logger.warning(f"Invalid status for job {job_id}: {updates['status']}")
+        updates["status"] = "failed"  # Default to failed if status is invalid
+            
+    # Get current jobs
     jobs = load_jobs_from_store()
+    
     if job_id not in jobs:
         logger.warning(f"Attempted to update non-existent job: ID={job_id}")
         return None
 
     # Load the existing job data into a Pydantic model to easily update
     try:
+        # Ensure 'id' is present before creating the model
+        if 'id' not in jobs[job_id]:
+            jobs[job_id]['id'] = job_id
         existing_job = Job(**jobs[job_id])
     except Exception as e:
          logger.error(f"Error parsing job data for ID {job_id} from store: {e}", exc_info=True)
@@ -203,11 +264,38 @@ def update_job_in_store(job_id: str, updates: Dict[str, Any]) -> Optional[Job]:
     if "status" in updated_fields:
          if updated_fields["status"] == "running" and not existing_job.started_at:
              updated_fields["started_at"] = current_time
-         elif updated_fields["status"] in ["completed", "failed", "cancelled"] and not existing_job.completed_at:
+         elif updated_fields["status"] in ["completed", "failed", "cancelled", "completed_with_errors"] and not existing_job.completed_at: # Added completed_with_errors
              updated_fields["completed_at"] = current_time
-    
+
+    # Ensure 'result' is treated as a dict if updating it
+    if 'result' in updated_fields and isinstance(updated_fields['result'], dict):
+        # Merge with existing result if present
+        existing_result_dict = existing_job.result.model_dump() if existing_job.result else {}
+        updated_fields['result'] = {**existing_result_dict, **updated_fields['result']}
+    elif 'result' in updated_fields:
+         logger.warning(f"Ignoring non-dict update for 'result' field in job {job_id}")
+         del updated_fields['result']
+
     # Use model_copy for safe updates
-    updated_job = existing_job.model_copy(update=updated_fields)
+    try:
+        updated_job = existing_job.model_copy(update=updated_fields)
+    except Exception as update_error:
+        logger.error(f"Error updating job model for ID {job_id}: {update_error}", exc_info=True)
+        logger.error(f"Existing Job Data: {jobs[job_id]}")
+        logger.error(f"Updates attempted: {updates}")
+        logger.error(f"Updated Fields processed: {updated_fields}")
+        # Attempt to save with minimal valid fields if update fails
+        minimal_updates = {k: v for k, v in updated_fields.items() if k in Job.model_fields}
+        if 'status' not in minimal_updates: minimal_updates['status'] = 'failed' # Mark as failed if update logic broke
+        if 'message' not in minimal_updates: minimal_updates['message'] = f"Internal error during update: {update_error}"
+        if 'completed_at' not in minimal_updates: minimal_updates['completed_at'] = datetime.utcnow()
+        try:
+            updated_job = existing_job.model_copy(update=minimal_updates)
+            logger.warning(f"Job {job_id} update failed, saving with minimal fields.")
+        except Exception as final_error:
+             logger.critical(f"CRITICAL: Could not even apply minimal updates to job {job_id}: {final_error}")
+             # Cannot update, just return None
+             return None
 
     # Store the updated dictionary representation
     jobs[job_id] = updated_job.model_dump()
@@ -243,8 +331,8 @@ async def list_jobs(
              logger.warning(f"Skipping job ID {job_id} due to parsing error: {e}")
              continue # Skip jobs that fail validation
              
-    # Sort by creation date descending
-    all_jobs.sort(key=lambda j: j.created_at, reverse=True)
+    # Sort by creation date descending (handle potential None values)
+    all_jobs.sort(key=lambda j: j.created_at or datetime.min, reverse=True)
 
     # Apply filters
     filtered_jobs = all_jobs
@@ -299,6 +387,9 @@ async def cancel_job(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     try:
+        # Ensure 'id' is present
+        if 'id' not in job_data:
+            job_data['id'] = job_id
         job = Job(**job_data)
     except Exception as e:
         logger.error(f"Error parsing job data for ID {job_id} before cancellation: {e}", exc_info=True)
@@ -326,28 +417,14 @@ async def cancel_job(job_id: str):
     
     return updated_job
 
-@router.get("/{job_id}/result")
-async def get_job_result(job_id: str):
-    """
-    Get result of a completed job.
-    
-    Args:
-        job_id: ID of the job
-        
-    Returns:
-        Job result
-    """
-    logger.info(f"Get job result endpoint called for ID: {job_id}")
-    
-    # Placeholder implementation - simulate a successfully completed job
-    return {
-        "job_id": job_id,
-        "status": JobStatus.COMPLETED,
-        "result": {
-            "data": "Sample result data for the completed job",
-            "metadata": {
-                "processing_time": 5.3,
-                "output_type": "text"
-            }
-        }
-    } 
+# This endpoint is likely deprecated if results are part of the main job status
+# @router.get("/{job_id}/result")
+# async def get_job_result(job_id: str):
+#     """
+#     Get result of a completed job. (Likely Deprecated)
+#     """
+#     logger.warning(f"Deprecated endpoint /result called for job ID: {job_id}. Use GET /{job_id} instead.")
+#     job_details = await get_job(job_id) # Reuse the main get_job endpoint
+#     if job_details.status not in ["completed", "completed_with_errors"]:
+#         raise HTTPException(status_code=400, detail=f"Job {job_id} is not yet completed (status: {job_details.status})")
+#     return job_details.result or {"message": "No result data available."} 

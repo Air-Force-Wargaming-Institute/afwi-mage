@@ -21,7 +21,8 @@ import {
   DialogActions,
   Grid,
   Divider,
-  TextField
+  TextField,
+  Chip
 } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -334,7 +335,17 @@ const SpreadsheetViewer = () => {
           <TableBody>
             {spreadsheets.map((sheet) => (
               <TableRow key={sheet.id}>
-                <TableCell>{sheet.filename}</TableCell>
+                <TableCell>
+                  {sheet.filename}
+                  {sheet.is_transformed && (
+                    <Chip 
+                      size="small" 
+                      label="Transformed" 
+                      color="secondary" 
+                      sx={{ ml: 1 }} 
+                    />
+                  )}
+                </TableCell>
                 <TableCell>{new Date(sheet.upload_date).toLocaleString()}</TableCell>
                 <TableCell>{sheet.sheet_count}</TableCell>
                 <TableCell>{formatFileSize(sheet.size_bytes)}</TableCell>

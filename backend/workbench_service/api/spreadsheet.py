@@ -59,7 +59,9 @@ class CellOperation(BaseModel):
     """Operation to perform on a cell or range."""
     operation: str = Field(..., description="Type of operation to perform (read, write, analyze)")
     sheet_name: str = Field(..., description="Name of the sheet to operate on")
-    cell_range: str = Field(..., description="Cell range in Excel notation (e.g., 'A1:B10')")
+    cell_range: Optional[str] = Field(None, description="Cell range in Excel notation (e.g., 'A1:B10'), used for Excel files")
+    start_row: Optional[int] = Field(None, description="Start row index (0-based), used for CSV files")
+    end_row: Optional[int] = Field(None, description="End row index (0-based), used for CSV files")
     value: Optional[str] = Field(None, description="Value to write (for write operations)")
     instruction: Optional[str] = Field(None, description="LLM instruction (for analyze operations)")
 
@@ -216,7 +218,9 @@ async def operate_on_cells(
         result = spreadsheet_processor.read_spreadsheet(
             file_path=file_path,
             sheet_name=operation.sheet_name,
-            cell_range=operation.cell_range
+            cell_range=operation.cell_range,
+            start_row=operation.start_row,
+            end_row=operation.end_row
         )
         return result
     elif operation.operation == "write":
@@ -639,54 +643,4 @@ async def transform_spreadsheet(
     except Exception as e:
         # Handle unexpected internal errors
         logger.exception(f"Unexpected error transforming spreadsheet: {str(e)}") # Use logger.exception to include traceback
-        raise HTTPException(status_code=500, detail=f"Internal server error during transformation: {str(e)}")
-
-@router.get("/download/{filename}")
-async def download_output_file(filename: str):
-    """
-    Download a file from the outputs directory.
-    
-    This endpoint handles downloading output files created during transformation.
-    
-    Args:
-        filename: Name of the file to download
-        
-    Returns:
-        File response with the output file
-    """
-    from config import WORKBENCH_OUTPUTS_DIR
-    import os
-    
-    logger.info(f"Download output file endpoint called for file: {filename}")
-    
-    # Check if the filename contains path traversal characters
-    if "../" in filename or "..\\" in filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid filename: contains path traversal characters"
-        )
-    
-    # Construct the file path
-    file_path = os.path.join(WORKBENCH_OUTPUTS_DIR, filename)
-    
-    # Check if the file exists
-    if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=404,
-            detail=f"File not found: {filename}"
-        )
-    
-    # Check if the file is in the outputs directory
-    if os.path.abspath(file_path).startswith(os.path.abspath(WORKBENCH_OUTPUTS_DIR)):
-        # Return the file
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="application/octet-stream"
-        )
-    else:
-        # If the file is outside the outputs directory, raise an error
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied: file is outside the outputs directory"
-        ) 
+        raise HTTPException(status_code=500, detail=f"Internal server error during transformation: {str(e)}") 
