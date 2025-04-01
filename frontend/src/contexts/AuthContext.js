@@ -12,6 +12,33 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
+  // Function to check for and use a refreshed token
+  const handleRefreshedToken = (headers) => {
+    const refreshedToken = headers.get('X-Refreshed-Token');
+    if (refreshedToken) {
+      localStorage.setItem('token', refreshedToken);
+      setToken(refreshedToken);
+    }
+  };
+
+  // Create a fetch wrapper that handles token refreshing
+  const authenticatedFetch = async (url, options = {}) => {
+    if (!token) return fetch(url, options);
+    
+    // Add authorization header if not present
+    const headers = options.headers || {};
+    if (!headers.Authorization && !headers.authorization) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, { ...options, headers });
+    
+    // Check for refreshed token in response headers
+    handleRefreshedToken(response.headers);
+    
+    return response;
+  };
+
   useEffect(() => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('token');
@@ -27,6 +54,9 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             setIsAuthenticated(true);
             setToken(storedToken);
+            
+            // Check for refreshed token
+            handleRefreshedToken(response.headers);
           } else {
             // Token is invalid
             localStorage.removeItem('token');
@@ -42,6 +72,7 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  //TODO: encrypt password before sending to backend; DB will need to be updated to store encrypted passwords
   const login = async (username, password) => {
     try {
       const response = await fetch(getApiUrl('AUTH', '/api/auth/users/token'), {
@@ -68,11 +99,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       
       // Fetch user details
-      const userResponse = await fetch(getApiUrl('AUTH', '/api/auth/users/me'), {
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-        },
-      });
+      const userResponse = await authenticatedFetch(getApiUrl('AUTH', '/api/auth/users/me'));
       
       if (!userResponse.ok) throw new Error('Failed to fetch user details');
       
@@ -97,7 +124,8 @@ export const AuthProvider = ({ children }) => {
     token,
     login,
     logout,
-    loading
+    loading,
+    authenticatedFetch // Expose the fetch wrapper to components
   };
 
   if (loading) {

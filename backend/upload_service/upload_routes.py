@@ -323,7 +323,7 @@ def get_file_type(file_name: str) -> str:
     else:
         return 'Unknown'
 
-@router.post("/api/upload/")
+@router.post("/api/upload/upload")
 async def upload_files(files: List[UploadFile] = File(...), folder: Optional[str] = ""):
     uploaded_files = []
     errors = []

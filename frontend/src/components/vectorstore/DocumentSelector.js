@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   Typography,
   Paper,
@@ -44,6 +44,8 @@ import {
 } from '@material-ui/icons';
 import { makeStyles } from '@material-ui/core/styles';
 import { getDocuments, checkDocumentCompatibility } from '../../services/documentService';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -304,6 +306,7 @@ const getFolderPathFromPath = (path) => {
 
 const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected }) => {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [currentPath, setCurrentPath] = useState('');
   const [documents, setDocuments] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);

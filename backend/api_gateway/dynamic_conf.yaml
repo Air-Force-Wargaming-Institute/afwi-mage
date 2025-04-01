@@ -10,8 +10,34 @@ http:
         trustForwardHeader: true
         authResponseHeaders:
           - "X-User-ID"
-          - "X-User-Role"
-          - "X-User-Email"
+          - "X-Username"
+          - "X-User-Permission"
+          - "Authorization"
+          - "X-Refreshed-Token"
+        authRequestHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "Accept"
+    
+    # New CORS middleware
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://127.0.0.1:3000"
+        accessControlAllowCredentials: true
+        accessControlAllowHeaders:
+          - "Authorization"
+          - "content-type"
+          - "x-requested-with"
+        accessControlMaxAge: 100
+        addVaryHeader: true
     
     # Rate limiting middleware
     rate-limit-default:
@@ -84,17 +110,19 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "security-headers"
         - "rate-limit-auth"
         - "compress"
     
     # Chat Service Router
     chat-router:
-      rule: "PathPrefix(`/chat`) || PathPrefix(`/sessions`) || PathPrefix(`/conversations`) || PathPrefix(`/api/prompts`) || Path(`/api/chat/health`)"
+      rule: "PathPrefix(`/api/chat`) || Path(`/api/chat/health`)"
       service: "chat-service"
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         - "rate-limit-chat"
@@ -109,17 +137,19 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         - "rate-limit-upload"
       
     # Core Service Router
     core-router:
-      rule: "PathPrefix(`/api/core/documents`) || Path(`/`) || Path(`/api/core/health`)"
+      rule: "PathPrefix(`/api/core`) || Path(`/api/core/health`)"
       service: "core-service"
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -130,6 +160,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -140,6 +171,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -150,6 +182,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -160,6 +193,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -170,6 +204,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
         
@@ -180,6 +215,7 @@ http:
       entryPoints:
         - "web"
       middlewares:
+        - "cors-headers"
         - "auth-middleware"
         - "security-headers"
       

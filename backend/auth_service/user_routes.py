@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -143,15 +144,28 @@ def delete_user(
     return None
 
 @router.get("/api/auth/users/validate-token")
-async def validate_token(current_user: User = Depends(get_current_user)):
+async def validate_token(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Endpoint for API Gateway ForwardAuth middleware to validate tokens.
     Returns 200 if token is valid, 401 if invalid.
+    Also refreshes the token's expiration time.
     """
-    return {
+    # Create a new token with refreshed expiration time
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    refreshed_token = create_access_token(
+        data={"sub": current_user.username}, expires_delta=access_token_expires
+    )
+    
+    response = JSONResponse(content={
         "status": "valid",
         "user_id": current_user.id,
         "username": current_user.username,
-        "permission": current_user.permission
-    }
+        "permission": current_user.permission,
+        "refreshed_token": refreshed_token
+    })
+    response.headers["X-User-ID"] = str(current_user.id)
+    response.headers["X-Username"] = current_user.username
+    response.headers["X-User-Permission"] = current_user.permission
+    response.headers["X-Refreshed-Token"] = refreshed_token
+    return response
 

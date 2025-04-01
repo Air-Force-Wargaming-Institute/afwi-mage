@@ -93,8 +93,8 @@
 
 ### Tasks
 - [ ] **3.1 Re-enable Authentication Service**
-  - [ ] Uncomment auth service in docker-compose.yml
-  - [ ] Reactivate PostgreSQL database service
+  - [x] Uncomment auth service in docker-compose.yml
+  - [x] Reactivate PostgreSQL database service
   - [ ] Implement token validation endpoint in auth service
   - [ ] Add `/api/auth/validate` endpoint for Traefik ForwardAuth
   - [ ] Add user info propagation via HTTP headers

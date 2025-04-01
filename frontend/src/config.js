@@ -25,6 +25,15 @@ export const getApiUrl = (service, endpoint) => {
   return url;
 };
 
+// Function to get API Gateway URL without service-specific port
+export const getGatewayUrl = (endpoint) => {
+  // Ensure endpoint starts with / if it doesn't already
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // Use the base URL without service-specific port
+  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost';
+  return `${apiBaseUrl}${formattedEndpoint}`;
+};
+
 // Add direct API endpoints export
 export const API_ENDPOINTS = {
   CORE: API_URLS.CORE,
