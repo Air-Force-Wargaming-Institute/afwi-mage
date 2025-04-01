@@ -5,8 +5,8 @@ $headers = @{
     "Content-Type" = "application/json"
 }
 $body = @{
-    model = "/models/Llama-3.2-1B-Instruct-abliterated"
-    prompt = "Write a short paragraph about artificial intelligence:"
+    model = "/models/DeepHermes-3-Llama-3-8B-Preview"
+    prompt = "Write a long story about artificial intelligence:"
     max_tokens = 150
     temperature = 0.7
     top_p = 0.95

@@ -1,5 +1,8 @@
 name: afwi-multi-agent-generative-engine
 
+include:
+  - vLLM/docker-compose.vllm.yml
+
 networks:
   app-network:
     driver: bridge
@@ -41,6 +44,7 @@ services:
       - "8009:8009"
     environment:
       - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
     volumes:
       - ../data:/app/data
       - ./chat_service:/app
@@ -63,6 +67,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=postgresql://postgres:password@agent_db:5433/agent_db
     depends_on:
       - init-data
     networks:
@@ -157,6 +162,7 @@ services:
       - MODEL_SERVICE_URL=http://model_service:8008
       - PYTHONPATH=/app
       - SERVICE_PORT=8011
+      - DATABASE_URL=postgresql://postgres:password@direct_chat_db:5433/direct_chat_db
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -165,73 +171,6 @@ services:
     networks:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
-
-  vllm:
-    build: ./vLLM
-    ports:
-      - "8007:8000"
-    environment:
-      - MAX_NUM_BATCHED_TOKENS=4096
-      - MAX_NUM_SEQS=256
-      - MAX_PADDING_LENGTH=256
-      - MAX_MODEL_LEN=4096
-      - QUANTIZATION=awq
-      - TRUST_REMOTE_CODE=true
-      - HF_DATASETS_OFFLINE=1
-      - TRANSFORMERS_OFFLINE=1
-      - HF_HUB_OFFLINE=1
-      - GPU_MEMORY_UTILIZATION=0.85
-    volumes:
-      - ../models:/models
-      - ../data:/data
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    ipc: host
-    command: >
-      --model /models/DeepHermes-3-Llama-3-8B-Preview
-      --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview
-      --dtype=half
-      --gpu-memory-utilization=0.85
-      --max-model-len=65536
-
-  vllm_embeddings:
-    build: ./vLLM
-    ports:
-      - "8012:8000"
-    environment:
-      - MAX_NUM_BATCHED_TOKENS=4096
-      - MAX_NUM_SEQS=256
-      - MAX_PADDING_LENGTH=256
-      - MAX_MODEL_LEN=4096
-      - QUANTIZATION=awq
-      - TRUST_REMOTE_CODE=true
-      - HF_DATASETS_OFFLINE=1
-      - TRANSFORMERS_OFFLINE=1
-      - HF_HUB_OFFLINE=1
-      - GPU_MEMORY_UTILIZATION=0.10
-    volumes:
-      - ../models:/models
-      - ../data:/data
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    ipc: host
-    command: >
-      --model /models/bge-base-en-v1.5
-      --tokenizer /models/bge-base-en-v1.5
-      --dtype=half
-      --gpu-memory-utilization=0.10
 
   frontend:
     build: ../frontend
@@ -245,6 +184,47 @@ services:
       - ../frontend:/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - app-network
+
+  redis:
+    image: redis/redis-stack:7.4.0-v3-x86_64
+    ports:
+      - "6379:6379"
+      - "6380:8001"
+    networks:
+      - app-network
+
+  chat_db:
+    image: postgres:17.4
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=chat_db
+    networks:
+      - app-network
+      
+  direct_chat_db:
+    image: postgres:17.4
+    ports:
+      - "5433:5433"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=direct_chat_db
+    networks:
+      - app-network
+
+  agent_db:
+    image: postgres:17.4
+    ports:
+      - "5433:5433"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=direct_chat_db
     networks:
       - app-network
 

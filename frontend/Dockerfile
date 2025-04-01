@@ -2,7 +2,8 @@ FROM node:18.20.8-slim
 WORKDIR /app
 
 # Copy package files first for better caching
-COPY package.json package-lock.json ./
+COPY package.json package.json
+COPY package-lock.json package-lock.json
 RUN npm install
 
 # Then copy the rest of the application
