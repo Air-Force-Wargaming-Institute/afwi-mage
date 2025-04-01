@@ -226,5 +226,119 @@
       "spreadsheet_id": "9c9d4c5c-5671-45e1-bf66-6b5ec53f6413",
       "message": null
     }
+  },
+  "f26afa39-e093-4984-b808-a2a84205b454": {
+    "id": "f26afa39-e093-4984-b808-a2a84205b454",
+    "type": "column_transformation",
+    "status": "completed",
+    "progress": 100.0,
+    "message": "Transformation completed successfully! Data saved to duplicate spreadsheet ID: a6543d08-6be7-4c7a-b964-c3b522f7e033.",
+    "created_at": "2025-04-01T12:25:09.302757",
+    "started_at": "2025-04-01T12:25:09.323109",
+    "completed_at": "2025-04-01T12:25:37.463577",
+    "parameters": {
+      "spreadsheet_id": "d195d09e-c2e5-4062-be6c-f8b6f19052c1",
+      "sheet_name": "Sheet1"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/a6543d08-6be7-4c7a-b964-c3b522f7e033.csv",
+      "spreadsheet_id": "a6543d08-6be7-4c7a-b964-c3b522f7e033",
+      "message": null
+    }
+  },
+  "d2cef707-44fc-403a-a645-7f502e2dcb7c": {
+    "id": "d2cef707-44fc-403a-a645-7f502e2dcb7c",
+    "type": "column_transformation",
+    "status": "completed_with_errors",
+    "progress": 100.0,
+    "message": "Transformation completed with some errors. Some cells may contain default values. Data saved to duplicate spreadsheet ID: 13a2d3b4-d1fe-4677-b52f-a4f2faca8da6.",
+    "created_at": "2025-04-01T12:29:40.591704",
+    "started_at": "2025-04-01T12:29:40.622463",
+    "completed_at": "2025-04-01T12:30:24.862480",
+    "parameters": {
+      "spreadsheet_id": "d195d09e-c2e5-4062-be6c-f8b6f19052c1",
+      "sheet_name": "Sheet1"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/13a2d3b4-d1fe-4677-b52f-a4f2faca8da6.csv",
+      "spreadsheet_id": "13a2d3b4-d1fe-4677-b52f-a4f2faca8da6",
+      "message": null
+    }
+  },
+  "7dbb6ffc-4e2f-436f-a9da-a3cf17cd78d8": {
+    "id": "7dbb6ffc-4e2f-436f-a9da-a3cf17cd78d8",
+    "type": "column_transformation",
+    "status": "completed_with_errors",
+    "progress": 100.0,
+    "message": "Transformation completed with some errors. Some cells may contain default values. Data saved to duplicate spreadsheet ID: f496460b-bf3c-4819-a3b1-b6910c6b33c8.",
+    "created_at": "2025-04-01T12:31:56.452935",
+    "started_at": "2025-04-01T12:31:56.467955",
+    "completed_at": "2025-04-01T12:32:08.529933",
+    "parameters": {
+      "spreadsheet_id": "7c954e4a-a9a8-49bb-a468-cca0891d4f9b",
+      "sheet_name": "SafetyData"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/f496460b-bf3c-4819-a3b1-b6910c6b33c8.xlsx",
+      "spreadsheet_id": "f496460b-bf3c-4819-a3b1-b6910c6b33c8",
+      "message": null
+    }
+  },
+  "63cc8b42-ebe6-4463-9df4-8ec65f25b910": {
+    "id": "63cc8b42-ebe6-4463-9df4-8ec65f25b910",
+    "type": "column_transformation",
+    "status": "completed",
+    "progress": 100.0,
+    "message": "Transformation completed successfully! Data saved to duplicate spreadsheet ID: 7c76ccb5-a4c6-4493-b2d6-48d4723d7962.",
+    "created_at": "2025-04-01T12:36:26.164696",
+    "started_at": "2025-04-01T12:36:26.181623",
+    "completed_at": "2025-04-01T12:36:50.316459",
+    "parameters": {
+      "spreadsheet_id": "7c954e4a-a9a8-49bb-a468-cca0891d4f9b",
+      "sheet_name": "SafetyData"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/7c76ccb5-a4c6-4493-b2d6-48d4723d7962.xlsx",
+      "spreadsheet_id": "7c76ccb5-a4c6-4493-b2d6-48d4723d7962",
+      "message": null
+    }
+  },
+  "c3b0be78-cab3-47fa-998b-f66cfb1f9bb5": {
+    "id": "c3b0be78-cab3-47fa-998b-f66cfb1f9bb5",
+    "type": "column_transformation",
+    "status": "completed",
+    "progress": 100.0,
+    "message": "Transformation completed successfully! Data saved to duplicate spreadsheet ID: c689ccbe-992f-4881-bbec-1316968362f1.",
+    "created_at": "2025-04-01T14:14:44.672593",
+    "started_at": "2025-04-01T14:14:44.698317",
+    "completed_at": "2025-04-01T14:15:18.431431",
+    "parameters": {
+      "spreadsheet_id": "7c954e4a-a9a8-49bb-a468-cca0891d4f9b",
+      "sheet_name": "SafetyData"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/c689ccbe-992f-4881-bbec-1316968362f1.xlsx",
+      "spreadsheet_id": "c689ccbe-992f-4881-bbec-1316968362f1",
+      "message": null
+    }
+  },
+  "d0b4c867-54a3-4917-ab23-d76d62cc4998": {
+    "id": "d0b4c867-54a3-4917-ab23-d76d62cc4998",
+    "type": "column_transformation",
+    "status": "completed",
+    "progress": 100.0,
+    "message": "Transformation completed successfully! Data saved to duplicate spreadsheet ID: 0c845962-d028-400c-b6a1-6a3d42703148.",
+    "created_at": "2025-04-01T14:18:29.717723",
+    "started_at": "2025-04-01T14:18:29.757128",
+    "completed_at": "2025-04-01T14:19:03.686675",
+    "parameters": {
+      "spreadsheet_id": "7c954e4a-a9a8-49bb-a468-cca0891d4f9b",
+      "sheet_name": "SafetyData"
+    },
+    "result": {
+      "output_file_path": "/app/data/workbench/spreadsheets/0c845962-d028-400c-b6a1-6a3d42703148.xlsx",
+      "spreadsheet_id": "0c845962-d028-400c-b6a1-6a3d42703148",
+      "message": null
+    }
   }
 }

@@ -568,26 +568,33 @@ const SpreadsheetTools = () => {
         setIsTransforming(false);
         
         if (result.success) {
-          if (result.preview) {
+          // Handle preview results if present (typically for 'preview' mode)
+          if (result.preview && currentMode === 'preview') {
             setOutputPreview(result.preview);
-            // If we're in preview mode, set a success message
-            if (currentMode === 'preview') {
-              setTransformationResults({
-                status: 'preview_success',
-                previewRows: result.preview.length - 1 // Subtract 1 for header row
-              });
-            } else if (result.job_id) {
-              // For full processing, track the job using the context function
-              const job = trackTransformationJob(result.job_id, transformationParams);
-              setTransformationResults({
-                job_id: result.job_id,
-                status: 'submitted'
-              });
-              
-              console.log('Full dataset transformation started with job ID:', result.job_id);
-              console.log('Job parameters:', JSON.stringify(transformationParams));
-            }
+            setTransformationResults({
+              status: 'preview_success',
+              previewRows: result.preview.length - 1 // Subtract 1 for header row
+            });
           } 
+          // Handle job submission results if present (typically for 'all' mode)
+          else if (result.job_id) {
+            // For full processing, track the job using the context function
+            const job = trackTransformationJob(result.job_id, transformationParams);
+            setTransformationResults({
+              job_id: result.job_id,
+              status: 'submitted'
+            });
+            
+            console.log('Full dataset transformation started with job ID:', result.job_id);
+            console.log('Job parameters:', JSON.stringify(transformationParams));
+          }
+          // Handle cases where success is true but neither preview nor job_id is returned (should not happen ideally)
+          else {
+              console.warn("Transformation successful but no preview or job ID returned.");
+              // Potentially set a generic success message or leave state as is?
+              // For now, let's clear the transformation results to avoid confusion
+              setTransformationResults({ status: 'unknown_success' }); 
+          }
         } else {
           setTransformationError(result.error || 'Unknown error occurred during transformation');
         }
@@ -618,7 +625,9 @@ const SpreadsheetTools = () => {
 
   // Handle continuing with full processing
   const handleContinueProcessing = async () => {
-    // Run the transformation again with the full dataset, explicitly passing 'all'
+    // Set processing mode to 'all' first
+    setProcessingMode('all');
+    // Then run the transformation again with the full dataset
     await generateOutputPreview('all');
   };
   
@@ -1672,7 +1681,7 @@ const SpreadsheetTools = () => {
             )}
             
             {/* Add JobMonitor for tracking transformation jobs */}
-            {transformationResults?.job_id && processingMode === 'all' && (
+            {transformationResults?.job_id && transformationResults?.status !== 'preview_success' && (
               <Box mt={4}>
                 <Box sx={{
                   backgroundColor: 'info.lighter',
