@@ -82,6 +82,28 @@ else:
     except Exception as e:
         logger.error(f"Error reading existing metadata file: {str(e)}")
 
+# Check jobs store file existence and writability
+jobs_store_path = WORKBENCH_DIR / "jobs_store.json"
+logger.info(f"Jobs store file path: {jobs_store_path} (absolute: {os.path.abspath(jobs_store_path)})")
+
+if not os.path.exists(jobs_store_path):
+    logger.info(f"Jobs store file does not exist, creating empty jobs store file")
+    try:
+        os.makedirs(os.path.dirname(jobs_store_path), exist_ok=True)
+        with open(jobs_store_path, 'w') as f:
+            json.dump({}, f, indent=2)
+        logger.info(f"Successfully created empty jobs store file at {jobs_store_path}")
+    except Exception as e:
+        logger.error(f"Failed to create jobs store file: {str(e)}")
+else:
+    # Verify it's writable
+    try:
+        with open(jobs_store_path, 'a'):
+            pass
+        logger.info(f"Verified jobs store file is writable at {jobs_store_path}")
+    except Exception as e:
+        logger.error(f"Jobs store file is not writable: {str(e)}")
+
 # Create FastAPI app
 app = FastAPI(
     title="Analysis Workbench Service",

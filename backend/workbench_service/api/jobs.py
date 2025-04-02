@@ -28,10 +28,12 @@ router = APIRouter()
 class JobStatus(str, Enum):
     """Status of a background job."""
     PENDING = "pending"
+    SUBMITTED = "submitted"
     RUNNING = "running"
     COMPLETED = "completed"
+    COMPLETED_WITH_ERRORS = "completed_with_errors"
     FAILED = "failed"
-    CANCELED = "canceled"
+    CANCELLED = "cancelled"
 
 class JobInfo(BaseModel):
     """Information about a background job."""
@@ -162,21 +164,30 @@ def load_jobs_from_store() -> Dict[str, Dict]:
 def save_jobs_to_store(jobs_data: Dict[str, Dict]):
     """Saves the job data to the JSON file store."""
     job_store_path = get_job_store_path()
+    
+    # Custom JSON encoder to handle datetime objects
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            return super().default(obj)
+    
     with _job_store_lock:
         try:
-             # Ensure parent directory exists
+            # Ensure parent directory exists
             job_store_path.parent.mkdir(parents=True, exist_ok=True)
             with open(job_store_path, 'w') as f:
-                # Use Pydantic's json method for proper serialization, including datetimes
+                # Use Pydantic's dict method for proper serialization, including datetimes
                 # We need to convert our dictionary of Job models back to serializable dicts
                 serializable_data = {
-                    job_id: Job(**job_dict).model_dump(mode='json') 
+                    job_id: Job(**job_dict).dict(exclude_none=True) 
                     for job_id, job_dict in jobs_data.items()
                 }
-                json.dump(serializable_data, f, indent=2)
+                json.dump(serializable_data, f, indent=2, cls=DateTimeEncoder)
         except Exception as e:
             logger.error(f"Error saving jobs to store {job_store_path}: {e}", exc_info=True)
-            # Potentially raise an exception here or handle the error appropriately
+            # Re-raise the exception to propagate the error
+            raise
 
 # --- Helper Functions for Job Management ---
 
@@ -197,7 +208,7 @@ def create_job_entry(job_id: str, job_type: str, parameters: Optional[Dict] = No
     )
     
     # Store the dictionary representation
-    jobs[job_id] = new_job.model_dump() 
+    jobs[job_id] = new_job.dict()
     save_jobs_to_store(jobs)
     logger.info(f"Created new job entry: ID={job_id}, Type={job_type}")
     return new_job # Return the Pydantic model instance

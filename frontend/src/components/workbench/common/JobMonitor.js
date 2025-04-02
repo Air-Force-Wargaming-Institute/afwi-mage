@@ -80,7 +80,7 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
     if (!activeJob) return;
     
     // Only poll for jobs that are not in a terminal state
-    if (['completed', 'failed', 'cancelled'].includes(activeJob.status)) {
+    if (['completed', 'failed', 'cancelled', 'completed_with_errors'].includes(activeJob.status)) {
       // Clear polling interval for completed jobs
       if (pollingInterval) {
         clearInterval(pollingInterval);
@@ -88,7 +88,8 @@ const JobMonitor = ({ onViewResults, showAll = false }) => {
       }
       
       // Refresh spreadsheet list when a job completes
-      if (activeJob.status === 'completed' && activeJob.result && activeJob.result.spreadsheet_id) {
+      if ((activeJob.status === 'completed' || activeJob.status === 'completed_with_errors') && 
+          activeJob.result && activeJob.result.spreadsheet_id) {
         console.log('Job completed with spreadsheet ID, refreshing list:', activeJob.result.spreadsheet_id);
         fetchSpreadsheets();
       }
