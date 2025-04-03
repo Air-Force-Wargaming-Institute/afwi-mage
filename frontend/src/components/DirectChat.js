@@ -73,6 +73,7 @@ import { useMarkdownComponents } from '../styles/markdownStyles';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import Slider from '@material-ui/core/Slider';
 import rehypeRaw from 'rehype-raw';
+import { GradientText } from '../styles/StyledComponents';
 
 // Suppress ResizeObserver errors
 // This is a workaround for the "ResizeObserver loop completed with undelivered notifications" error
@@ -103,11 +104,11 @@ const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    padding: theme.spacing(2),
-    height: 'calc(100vh - 215px)',
-    maxHeight: 'calc(100vh - 128px)',
+    padding: theme.spacing(0, 2, 2, 2), // Removed top padding
+    height: 'calc(100vh)',
+    maxHeight: 'calc(100vh)',
     overflow: 'hidden',
-    marginTop: '10px',
+    marginTop: '0px', // Removed top margin
   },
   chatContainer: {
     display: 'flex',
@@ -120,13 +121,55 @@ const useStyles = makeStyles((theme) => ({
   chatLog: {
     width: '20%',
     height: '100%',
+    paddingTop: '10px',
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+    paddingBottom: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    overflow: 'hidden', // Ensure no overflow outside container
     '& > *:not(:first-child)': {
-      overflow: 'auto',
+      overflow: 'hidden',
     },
+    transition: 'opacity 0.3s ease',
+    position: 'relative',
+    border: `${theme.custom.borderWidth.regular}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxSizing: 'border-box',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+    '&.disabled': {
+      opacity: 0.5,
+      pointerEvents: 'none',
+      filter: 'grayscale(50%)',
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient2,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.regular,
+      left: theme.custom.borderWidth.regular,
+      right: theme.custom.borderWidth.regular,
+      bottom: theme.custom.borderWidth.regular,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.regular/2,
+      background: theme.palette.background.paper,
+      zIndex: -1,
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1
+    }
   },
   chatArea: {
     width: '60%',
@@ -135,15 +178,44 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     flexShrink: 0,
     overflow: 'hidden',
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: 'transparent',
     position: 'relative',
     transition: 'opacity 0.3s ease',
+    borderTop: `${theme.custom.borderWidth.extraThick}px solid transparent`,
+    borderLeft: `3px solid ${theme.palette.primary.main}`,
+    borderRight: `3px solid ${theme.palette.primary.main}`,
+    borderBottom: `${theme.custom.borderWidth.extraThick}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: '0 6px 25px rgba(0, 0, 0, 0.7)',
+    animation: '$pulseBorder 2s infinite',
     '&.disabled': {
       opacity: 0.5,
       pointerEvents: 'none',
       '& .MuiInputBase-root': {
         backgroundColor: theme.palette.action.disabledBackground,
       }
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.vibrant,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.extraThick,
+      left: theme.custom.borderWidth.extraThick,
+      right: theme.custom.borderWidth.extraThick,
+      bottom: theme.custom.borderWidth.extraThick,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.extraThick/2,
+      background: theme.palette.background.paper,
+      zIndex: -1,
     },
     '&::-webkit-scrollbar': {
       width: '8px',
@@ -166,15 +238,49 @@ const useStyles = makeStyles((theme) => ({
     width: '20%',
     height: '100%',
     paddingTop: '10px',
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+    paddingBottom: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: theme.palette.background.paper,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    overflow: 'hidden', // Ensure no overflow outside container
     transition: 'opacity 0.3s ease',
+    position: 'relative',
+    border: `${theme.custom.borderWidth.regular}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxSizing: 'border-box',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
     '&.disabled': {
       opacity: 0.5,
       pointerEvents: 'none',
       filter: 'grayscale(50%)',
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient2,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.regular,
+      left: theme.custom.borderWidth.regular,
+      right: theme.custom.borderWidth.regular,
+      bottom: theme.custom.borderWidth.regular,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.regular/2,
+      background: theme.palette.background.paper,
+      zIndex: -1,
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1
     }
   },
   dropzone: {
@@ -185,7 +291,9 @@ const useStyles = makeStyles((theme) => ({
     cursor: 'pointer',
     marginBottom: theme.spacing(2),
     backgroundColor: theme.palette.action.hover,
-    transition: 'background-color 0.3s',
+    transition: theme.custom.transition,
+    width: '100%',
+    boxSizing: 'border-box',
     '&:hover': {
       backgroundColor: theme.palette.action.selected,
     },
@@ -200,6 +308,22 @@ const useStyles = makeStyles((theme) => ({
   },
   fileList: {
     marginTop: theme.spacing(2),
+    width: '100%',
+    overflowY: 'auto',
+    paddingRight: theme.spacing(1),
+    height: '100%', // Use full height of parent container
+    paddingBottom: theme.spacing(3), // Add padding at bottom to ensure space before border
+    position: 'relative',
+    '&::-webkit-scrollbar': {
+      width: '4px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[500],
+      borderRadius: '4px',
+    },
   },
   fileItem: {
     marginBottom: theme.spacing(1),
@@ -207,15 +331,37 @@ const useStyles = makeStyles((theme) => ({
     border: `1px solid ${theme.palette.divider}`,
     borderRadius: theme.shape.borderRadius,
     backgroundColor: theme.palette.background.default,
+    transition: theme.custom.transition,
+    width: '100%',
+    boxSizing: 'border-box',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      transform: 'translateY(-1px)',
+      boxShadow: theme.custom.boxShadow,
+    },
+    '&:last-child': {
+      marginBottom: theme.spacing(4), // Add extra margin to the last file item
+    },
   },
   fileItemRow: {
     display: 'flex',
     alignItems: 'center',
     marginBottom: theme.spacing(0.5),
+    width: '100%',
+    overflow: 'hidden',
   },
   classificationSelect: {
     marginTop: theme.spacing(0.5),
     width: '100%',
+    '& .MuiOutlinedInput-input': {
+      padding: theme.spacing(1),
+    },
+    '& .MuiSelect-select': {
+      padding: theme.spacing(0.75, 1),
+    },
+    '& .MuiOutlinedInput-root': {
+      borderRadius: theme.shape.borderRadius,
+    },
   },
   messageArea: {
     flex: 1,
@@ -248,8 +394,16 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
-    borderTop: `1px solid ${theme.palette.divider}`,
+    borderTop: `1px solid ${theme.palette.primary.main}`,
+    borderLeft: `3px solid ${theme.palette.primary.main}`, // Added left border
+    borderRight: `3px solid ${theme.palette.primary.main}`, // Added right border
+    borderBottom: `3px solid ${theme.palette.primary.main}`, // Added bottom border
+    // Consider adding border-radius if the main chatArea has rounded corners at the bottom
+    // borderBottomLeftRadius: theme.shape.borderRadius, 
+    // borderBottomRightRadius: theme.shape.borderRadius,
     minHeight: '76px',
+    position: 'relative',
+    zIndex: 2,
   },
   classificationSection: {
     marginTop: theme.spacing(0.25),
@@ -309,19 +463,28 @@ const useStyles = makeStyles((theme) => ({
     },
     '& .MuiOutlinedInput-multiline': {
       padding: theme.spacing(0.5),
-      overflow: 'hidden', // Hide overflow on the outer container
+      overflow: 'hidden',
     },
     '& textarea': {
-      overflow: 'auto !important',  // Keep scrolling only on the textarea itself
-      paddingTop: '8px !important',    // Add padding to prevent text clipping at top
-      paddingBottom: '8px !important', // Add padding to prevent text clipping at bottom
+      overflow: 'auto !important',
+      paddingTop: '8px !important',
+      paddingBottom: '8px !important',
     },
   },
   newChatButton: {
-    marginTop: theme.spacing(3),
+    marginTop: theme.spacing(1),
     marginBottom: theme.spacing(2),
-    width: '60%',
+    width: '90%',
     alignSelf: 'center',
+    background: theme.custom.gradients.gradient1,
+    transition: theme.custom.transition,
+    position: 'relative',
+    zIndex: 2,
+    '&:hover': {
+      background: theme.custom.gradients.vibrant,
+      transform: 'translateY(-2px)',
+      boxShadow: theme.custom.boxShadowLarge,
+    },
   },
   message: {
     padding: theme.spacing(2),
@@ -329,13 +492,12 @@ const useStyles = makeStyles((theme) => ({
     border: '1px solid #e0e0e0',
     wordBreak: 'break-word',
     position: 'relative',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.3s ease',
-    backgroundColor: theme.palette.background.paper,
-    animation: '$messageAppear 0.3s ease-out',
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    backgroundColor: theme.custom.gradients.vibrant,
     maxWidth: '85%',
     '&:hover': {
-      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+      boxShadow: theme.custom.boxShadowLarge,
       transform: 'translateY(-1px)',
     },
   },
@@ -350,8 +512,8 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   userMessage: {
-    backgroundColor: theme.palette.primary.main,
-    color: '#ffffff !important', // Add !important to force white color
+    backgroundColor: 'rgb(46, 46, 46)',
+    color: '#ffffff !important',
     borderRadius: '18px 18px 4px 18px',
     padding: theme.spacing(1.5, 2),
     position: 'relative',
@@ -362,21 +524,21 @@ const useStyles = makeStyles((theme) => ({
       opacity: 1,
     },
     '& $copyButton, & $bookmarkButton': {
-      backgroundColor: 'rgba(255, 255, 255, 0.95)', // Higher contrast against dark backgrounds
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)', // Stronger shadow against dark backgrounds
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
       '& .MuiSvgIcon-root': {
-        color: theme.palette.primary.dark, // Dark icon for better contrast on white button
+        color: theme.palette.primary.dark,
       },
     },
   },
   aiMessage: {
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: 'rgba(5, 0, 44, 0.23)',
     color: theme.palette.text.primary,
     borderRadius: '18px 18px 18px 4px',
     padding: theme.spacing(1.5, 2),
     position: 'relative',
     marginBottom: theme.spacing(1),
-    maxWidth: '75%',
+    maxWidth: '80%',
     boxShadow: theme.shadows[1],
     '&:hover $messageActions, &:hover $topActions': {
       opacity: 1,
@@ -387,6 +549,53 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: theme.spacing(1, 2),
+    transition: theme.custom.transition,
+    position: 'relative',
+    zIndex: 2,
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(1),
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      transform: 'translateY(-1px)',
+      boxShadow: theme.custom.boxShadow,
+    },
+    '&.Mui-selected': {
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.common.white,
+      '& .MuiTypography-root': {
+        color: theme.palette.common.white,
+      },
+      '& .MuiSvgIcon-root': {
+        color: theme.palette.common.white,
+      },
+      '&:hover': {
+        backgroundColor: theme.palette.primary.dark,
+      },
+    },
+    '&:last-child': {
+      marginBottom: theme.spacing(4), // Add extra margin to the last chat session item
+    },
+  },
+  sessionsList: {
+    padding: theme.spacing(1),
+    paddingBottom: theme.spacing(3),
+    position: 'relative',
+    zIndex: 2,
+    overflowY: 'auto',
+    height: '100%',
+    '&::-webkit-scrollbar': {
+      width: '6px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[500],
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.grey[600],
+      },
+    },
   },
   sessionActions: {
     display: 'flex',
@@ -426,6 +635,7 @@ const useStyles = makeStyles((theme) => ({
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     position: 'relative',
+    zIndex: 2,
   },
   sessionName: {
     position: 'absolute',
@@ -475,8 +685,8 @@ const useStyles = makeStyles((theme) => ({
     '& p': {
       margin: theme.spacing(1, 0),
     },
-    position: 'relative', // Ensure proper positioning
-    zIndex: 1, // Lower than the buttons
+    position: 'relative',
+    zIndex: 1,
   },
   messageFooter: {
     display: 'flex',
@@ -505,20 +715,20 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.85, // Increased from 0.7 for better visibility
-    transition: 'all 0.2s ease',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Increased from 0.8 for better contrast
-    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)', // Added shadow for better visibility
+    opacity: 0.85,
+    transition: theme.custom.transition,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
       opacity: 1,
-      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)', // Enhanced shadow on hover
+      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
     },
     zIndex: 1,
     '& .MuiSvgIcon-root': {
-      fontSize: '20px', // Increased from 18px for better visibility
+      fontSize: '20px',
       margin: 'auto',
-      color: theme.palette.primary.main, // Setting icon color to primary for better visibility
+      color: theme.palette.primary.main,
     },
   },
   agentsHeader: {
@@ -553,9 +763,9 @@ const useStyles = makeStyles((theme) => ({
     '& .MuiDialog-paper': {
       maxWidth: 600,
       padding: theme.spacing(2),
-      backgroundColor: '#ffffff',
+      backgroundColor: theme.palette.background.paper,
       borderRadius: '10px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+      boxShadow: theme.custom.boxShadowLarge,
     },
   },
   dialogTitle: {
@@ -626,11 +836,11 @@ const useStyles = makeStyles((theme) => ({
   },
   promptHelpDialog: {
     '& .MuiDialog-paper': {
-      maxWidth: 700,  // Slightly wider for prompt guidance
+      maxWidth: 700,
       padding: theme.spacing(2),
-      backgroundColor: '#ffffff',
+      backgroundColor: theme.palette.background.paper,
       borderRadius: '10px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+      boxShadow: theme.custom.boxShadowLarge,
     },
   },
   promptTip: {
@@ -783,6 +993,43 @@ const useStyles = makeStyles((theme) => ({
       backgroundPosition: '-200% 0',
     },
   },
+  '@keyframes borderGlow': {
+    '0%': {
+      opacity: 1,
+      background: 'linear-gradient(135deg, #4285f4, #34a853, #ea4335)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '0% 0%',
+      filter: 'brightness(1.2) contrast(1.3)',
+    },
+    '25%': {
+      opacity: 1,
+      background: 'linear-gradient(to right, #4285f4, #34a853, #fbbc05)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '50% 0%',
+      filter: 'brightness(1.3) contrast(1.4)',
+    },
+    '50%': {
+      opacity: 1,
+      background: 'linear-gradient(45deg, #ea4335, #4285f4, #34a853)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '100% 50%',
+      filter: 'brightness(1.4) contrast(1.5)',
+    },
+    '75%': {
+      opacity: 1,
+      background: 'linear-gradient(to bottom, #fbbc05, #ea4335, #4285f4)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '50% 100%',
+      filter: 'brightness(1.3) contrast(1.4)',
+    },
+    '100%': {
+      opacity: 1,
+      background: 'linear-gradient(to left, #34a853, #fbbc05, #ea4335)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '0% 100%',
+      filter: 'brightness(1.2) contrast(1.3)',
+    },
+  },
   retryButton: {
     marginRight: theme.spacing(1),
     '&:hover': {
@@ -814,7 +1061,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.primary.main,
     left: '0px',
     transform: 'translateY(-50%)',
-    transition: 'all 0.2s ease',
+    transition: theme.custom.transition,
     cursor: 'pointer',
     zIndex: 1000,
   },
@@ -827,20 +1074,20 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.85, // Increased from 0.7 for better visibility
-    transition: 'all 0.2s ease',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Added background color for contrast
-    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)', // Added shadow
+    opacity: 0.85,
+    transition: theme.custom.transition,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 1)',
       opacity: 1,
-      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)', // Enhanced shadow on hover
+      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
     },
     zIndex: 1,
     '& .MuiSvgIcon-root': {
-      fontSize: '20px', // Increased from 18px for better visibility
+      fontSize: '20px',
       margin: 'auto',
-      color: theme.palette.primary.main, // Setting icon color to primary for better visibility
+      color: theme.palette.primary.main,
     },
   },
   bookmarkTooltip: {
@@ -853,42 +1100,42 @@ const useStyles = makeStyles((theme) => ({
     bottom: theme.spacing(1),
     display: 'flex',
     gap: theme.spacing(1),
-    opacity: 0.2, // Changed from 0 to have a slight visibility even when not hovering
-    transition: 'opacity 0.2s ease',
-    zIndex: 10, // Increase z-index to ensure buttons are clickable
+    opacity: 0.2,
+    transition: theme.custom.transition,
+    zIndex: 10,
   },
   topActions: {
     position: 'absolute',
     top: theme.spacing(1),
     right: theme.spacing(1),
-    bottom: 'auto', // Ensure it doesn't overlap with bottom positioning
+    bottom: 'auto',
     display: 'flex',
     gap: theme.spacing(1),
-    opacity: 0.2, // Changed from 0 to have a slight visibility even when not hovering
-    transition: 'opacity 0.2s ease',
-    zIndex: 10, // Increase z-index to ensure buttons are clickable
-    pointerEvents: 'auto', // Ensure clicks reach the buttons
+    opacity: 0.2,
+    transition: theme.custom.transition,
+    zIndex: 10,
+    pointerEvents: 'auto',
   },
   userMessageActions: {
     position: 'absolute',
     right: theme.spacing(1),
     bottom: theme.spacing(1),
-    top: 'auto', // Override any top positioning
+    top: 'auto',
     display: 'flex',
     gap: theme.spacing(1),
     opacity: 0.2,
-    transition: 'opacity 0.2s ease',
-    zIndex: 3, // Ensure buttons are above text
+    transition: theme.custom.transition,
+    zIndex: 3,
   },
   userMessageText: {
     fontSize: '0.95rem',
-    color: '#FFFFFF !important', // White text with !important to override any conflicting styles
+    color: '#FFFFFF !important',
     whiteSpace: 'pre-wrap',
-    textAlign: 'left', // Explicitly set left alignment
+    textAlign: 'left',
     wordBreak: 'break-word',
-    paddingRight: '40px', // Prevent overlap with action buttons
-    '& *': { // Apply to all child elements
-      color: '#FFFFFF !important' // Ensure all child elements inherit white color
+    paddingRight: '40px',
+    '& *': {
+      color: '#FFFFFF !important'
     }
   },
   bookmarkRibbon: {
@@ -937,7 +1184,7 @@ const useStyles = makeStyles((theme) => ({
     width: '300px',
     pointerEvents: 'auto',
     opacity: 0,
-    transition: 'opacity 0.2s ease',
+    transition: theme.custom.transition,
   },
   bookmarkPreview: {
     position: 'absolute',
@@ -1010,9 +1257,9 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '1.1rem',
   },
   markdown: {
-    textAlign: 'left', // Set markdown content to left-align by default
+    textAlign: 'left',
     '& p, & ul, & ol, & li, & blockquote': {
-      textAlign: 'left', // Ensure all text elements are left-aligned
+      textAlign: 'left',
     },
     '& details': {
       margin: '1em 0',
@@ -1041,7 +1288,7 @@ const useStyles = makeStyles((theme) => ({
   },
   markdownDetails: {
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
+    transition: theme.custom.transition,
     '& summary': {
       fontWeight: 600,
       cursor: 'pointer',
@@ -1109,10 +1356,11 @@ const useStyles = makeStyles((theme) => ({
   },
   docUploadContainer: {
     padding: theme.spacing(2),
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: 'transparent',
     borderRadius: theme.shape.borderRadius,
-    boxShadow: theme.shadows[1],
     marginTop: theme.spacing(2),
+    position: 'relative',
+    zIndex: 2,
   },
   panelHeader: {
     fontSize: '1.2rem',
@@ -1121,6 +1369,7 @@ const useStyles = makeStyles((theme) => ({
   },
   vectorstoreSection: {
     marginBottom: theme.spacing(2),
+    width: '100%',
   },
   sectionLabel: {
     fontSize: '0.8rem',
@@ -1142,6 +1391,8 @@ const useStyles = makeStyles((theme) => ({
     textDecoration: 'none',
     display: 'block',
     marginTop: theme.spacing(0.5),
+    width: '100%',
+    textAlign: 'left',
     '&:hover': {
       textDecoration: 'underline',
     },
@@ -1151,7 +1402,6 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 500,
     marginBottom: theme.spacing(1),
   },
-  // Add styles for native select
   nativeSelect: {
     width: '100%', 
     padding: '8px',
@@ -1163,6 +1413,7 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.primary,
     marginTop: theme.spacing(1),
     marginBottom: theme.spacing(1),
+    boxSizing: 'border-box',
     '&:focus': {
       outline: 'none',
       border: `1px solid ${theme.palette.primary.main}`,
@@ -1171,6 +1422,39 @@ const useStyles = makeStyles((theme) => ({
       opacity: 0.7,
       backgroundColor: theme.palette.action.disabledBackground,
     }
+  },
+  // Add a style for an uploadPaneContent container
+  uploadPaneContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden', // Prevent overall overflow
+  },
+
+  // Add a style for the fileListContainer to control flex behavior
+  fileListContainer: {
+    flexGrow: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: '100px',
+  },
+
+  // Add styles for chat log content container
+  chatLogContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  
+  chatSessionsContainer: {
+    flexGrow: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: '100px',
+    paddingBottom: theme.spacing(2), // Ensure content doesn't touch bottom border
   },
 }));
 
@@ -1324,7 +1608,7 @@ const MessageContent = ({
             }}
             size="small"
             title="Copy message"
-            style={{ pointerEvents: 'auto' }} // Ensure button is clickable
+            color="primary"
           >
             {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
           </IconButton>
@@ -1485,6 +1769,7 @@ const MessageContent = ({
               onClick={() => handleCopy(content)}
               size="small"
               title="Copy message"
+              color="primary"
             >
               {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>
@@ -1494,6 +1779,7 @@ const MessageContent = ({
                 onClick={onBookmark}
                 size="small"
                 title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                color="primary"
               >
                 {isBookmarked ? <BookmarkIcon fontSize="small" /> : <BookmarkBorderIcon fontSize="small" />}
               </IconButton>
@@ -1507,6 +1793,7 @@ const MessageContent = ({
             onClick={onRetry}
             size="small"
             title="Retry"
+            color="primary"
           >
             <ReplayIcon fontSize="small" />
           </IconButton>
@@ -1949,121 +2236,150 @@ const DocumentUploadPane = ({
   }, [currentSessionId, vectorstores, selectedVectorstore, isLoadingVectorstores]);
 
   return (
-    <Paper className={classes.docUploadContainer} elevation={3}>
-      <Typography variant="h6" className={classes.panelHeader}>
-        Knowledge Sources
-      </Typography>
-      
-      {/* Vectorstore Selection */}
-      <div className={classes.vectorstoreSection}>
-        <Typography variant="subtitle2" className={classes.sectionLabel}>
-          MAGE Retrieval Databases
-        </Typography>
+    <div className={classes.uploadPane}>
+      <div className={classes.uploadPaneContent}>
+        <Box mb={3}>
+          <GradientText variant="h1" fontWeight="600" fontSize={'2rem'} gutterBottom>
+            Knowledge Sources
+          </GradientText>
+        </Box>
+
+        {/* Vectorstore Selection */}
+        <div className={classes.vectorstoreSection}>
+          <Typography 
+            variant="subtitle2" 
+            className={classes.sectionLabel}
+            style={{
+              fontWeight: 500,
+              marginBottom: '8px',
+              color: 'rgba(255, 255, 255, 0.7)'
+            }}
+          >
+            MAGE Retrieval Databases
+          </Typography>
+          
+          {/* Replace Material-UI Select with native select */}
+          <select
+            value={selectedVectorstore || ""}
+            onChange={(e) => {
+              console.log("Vectorstore selected:", e.target.value);
+              if (onVectorstoreChange) {
+                onVectorstoreChange(e);
+              }
+            }}
+            disabled={!currentSessionId || isLoadingVectorstores}
+            className={classes.nativeSelect}
+          >
+            <option value="">Select Vectorstore</option>
+            {vectorstores && vectorstores.length > 0 ? (
+              vectorstores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name || store.id}
+                </option>
+              ))
+            ) : (
+              <option value="" disabled>Loading vectorstores...</option>
+            )}
+          </select>
+          
+          <Link 
+            href="/retrieval/build-databases" 
+            className={classes.buildDatabasesLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Build Retrieval Databases
+          </Link>
+        </div>
         
-        {/* Replace Material-UI Select with native select */}
-        <select
-          value={selectedVectorstore || ""}
-          onChange={(e) => {
-            console.log("Vectorstore selected:", e.target.value);
-            if (onVectorstoreChange) {
-              onVectorstoreChange(e);
-            }
-          }}
-          disabled={!currentSessionId || isLoadingVectorstores}
-          className={classes.nativeSelect}
-        >
-          <option value="">Select Vectorstore</option>
-          {vectorstores && vectorstores.length > 0 ? (
-            vectorstores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name || store.id}
-              </option>
-            ))
-          ) : (
-            <option value="" disabled>Loading vectorstores...</option>
-          )}
-        </select>
+        <Divider className={classes.divider} />
         
-        <Link 
-          href="/retrieval/build-databases" 
-          className={classes.buildDatabasesLink}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Build Retrieval Databases
-        </Link>
-      </div>
-      
-      <Divider className={classes.divider} />
-      
-      {/* Document Upload */}
-      <Typography variant="h6" className={classes.docUploadHeader}>
-        Document Upload
-      </Typography>
-      
-      <div {...getRootProps()} className={classes.dropzone}>
-        <input {...getInputProps()} />
-        <CloudUploadIcon className={classes.uploadIcon} />
-        <Typography className={classes.uploadText}>
-          {!currentSessionId
-            ? 'Please select a chat session first'
-            : isDragActive
-              ? 'Drop the files here...'
-              : isUploading
-                ? 'Uploading...'
-                : 'Drag & drop files here, or click to select files'}
-        </Typography>
-        <Typography variant="caption" color="textSecondary">
-          Supported formats: PDF, TXT, DOC, DOCX, XLSX, CSV
-        </Typography>
-      </div>
-      <div className={classes.fileList}>
-        {uploadedFiles.map(file => (
-          <div key={file.id} className={classes.fileItem}>
-            <div className={classes.fileItemRow}>
-              <Checkbox
-                checked={file.isChecked}
-                onChange={() => handleCheckboxChange(file.id)}
-                color="primary"
-                size="small"
-                style={{ padding: '4px', marginRight: '8px' }}
-              />
-              <Typography variant="body2" style={{ flex: 1 }}>
-                {file.name}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => handleRemoveFile(file.id)}
-                disabled={isUploading}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </div>
-            <FormControl className={classes.classificationSelect} size="small">
-              <Select
-                value={file.classification || CLASSIFICATION_LEVELS.SELECT}
-                onChange={(e) => handleClassificationChange(file.id, e.target.value)}
-                variant="outlined"
-                disabled={file.status === 'pending'}
-              >
-                <MenuItem value={CLASSIFICATION_LEVELS.SELECT} disabled>
-                  {CLASSIFICATION_LEVELS.SELECT}
-                </MenuItem>
-                <MenuItem value={CLASSIFICATION_LEVELS.UNCLASSIFIED}>
-                  {CLASSIFICATION_LEVELS.UNCLASSIFIED}
-                </MenuItem>
-                <MenuItem value={CLASSIFICATION_LEVELS.SECRET}>
-                  {CLASSIFICATION_LEVELS.SECRET}
-                </MenuItem>
-                <MenuItem value={CLASSIFICATION_LEVELS.TOP_SECRET}>
-                  {CLASSIFICATION_LEVELS.TOP_SECRET}
-                </MenuItem>
-              </Select>
-            </FormControl>
+        {/* Document Upload */}
+        <Box mb={2} mt={2}>
+          <GradientText variant="h2" fontWeight="600" fontSize={'1.5rem'} gutterBottom>
+            Document Upload
+          </GradientText>
+        </Box>
+        
+        <div {...getRootProps()} className={classes.dropzone}>
+          <input {...getInputProps()} />
+          <CloudUploadIcon className={classes.uploadIcon} />
+          <Typography className={classes.uploadText}>
+            {!currentSessionId
+              ? 'Please select a chat session first'
+              : isDragActive
+                ? 'Drop the files here...'
+                : isUploading
+                  ? 'Uploading...'
+                  : 'Drag & drop files here, or click to select files'}
+          </Typography>
+          <Typography variant="caption" color="textSecondary">
+            Supported formats: PDF, TXT, DOC, DOCX, XLSX, CSV
+          </Typography>
+        </div>
+        
+        {/* File List Container */}
+        <div className={classes.fileListContainer}>
+          <div className={classes.fileList}>
+            {uploadedFiles.map(file => (
+              <div key={file.id} className={classes.fileItem}>
+                {/* File item content */}
+                <div className={classes.fileItemRow}>
+                  <Checkbox
+                    checked={file.isChecked}
+                    onChange={() => handleCheckboxChange(file.id)}
+                    color="primary"
+                    size="small"
+                    style={{ padding: '4px', marginRight: '8px' }}
+                  />
+                  <Typography 
+                    variant="body2" 
+                    style={{ 
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={file.name}
+                  >
+                    {file.name}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveFile(file.id)}
+                    disabled={isUploading}
+                    style={{ padding: '4px', color: isUploading ? 'inherit' : '#ea4335' }}
+                  >
+                    <DeleteIcon fontSize="small" style={{ color: isUploading ? 'inherit' : '#ea4335' }} />
+                  </IconButton>
+                </div>
+                <FormControl className={classes.classificationSelect} size="small">
+                  <Select
+                    value={file.classification || CLASSIFICATION_LEVELS.SELECT}
+                    onChange={(e) => handleClassificationChange(file.id, e.target.value)}
+                    variant="outlined"
+                    disabled={file.status === 'pending'}
+                  >
+                    <MenuItem value={CLASSIFICATION_LEVELS.SELECT} disabled>
+                      {CLASSIFICATION_LEVELS.SELECT}
+                    </MenuItem>
+                    <MenuItem value={CLASSIFICATION_LEVELS.UNCLASSIFIED}>
+                      {CLASSIFICATION_LEVELS.UNCLASSIFIED}
+                    </MenuItem>
+                    <MenuItem value={CLASSIFICATION_LEVELS.SECRET}>
+                      {CLASSIFICATION_LEVELS.SECRET}
+                    </MenuItem>
+                    <MenuItem value={CLASSIFICATION_LEVELS.TOP_SECRET}>
+                      {CLASSIFICATION_LEVELS.TOP_SECRET}
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
-    </Paper>
+    </div>
   );
 };
 
@@ -2481,69 +2797,83 @@ const DirectChat = () => {
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
-        <Paper className={classes.chatLog} elevation={3}>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            className={classes.newChatButton}
-            onClick={handleNewChat}
-          >
-            Start New Chat Session
-          </Button>
-          <List>
-            {chatSessions.map((session) => (
-              <React.Fragment key={session.id}>
-                <ListItem 
-                  button 
-                  className={classes.chatSessionItem}
-                  selected={session.id === currentSessionId}
-                  onClick={() => handleSelectSession(session.id)}
-                >
-                  <div style={{ flex: 1 }}>
-                    <ListItemText 
-                      primary={session.name} 
-                      secondary={
-                        <Typography 
-                          variant="caption" 
-                          color="textSecondary" transparent
-                          style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
-                        >
-                          {new Date(session.created_at).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })} {new Date(session.created_at).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                          })}    •••    ID: {session.id.split('-')[0]}
-                        </Typography>
-                      }
-                    />
-                  </div>
-                  <div className={classes.sessionActions}>
-                    <Tooltip title="Edit">
-                      <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton edge="end" aria-label="delete" onClick={(e) => handleDeleteConfirmation(e, session.id)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Download">
-                      <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
-                        <GetAppIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
-                </ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-          </List>
-        </Paper>
+        <div className={classes.chatLog}>
+          <div className={classes.uploadPaneContent}>
+            <Box mb={3}>
+              <GradientText variant="h1" fontWeight="600" fontSize={'2rem'} gutterBottom>
+                Chat History
+              </GradientText>
+            </Box>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              className={classes.newChatButton}
+              onClick={handleNewChat}
+            >
+              Start New Chat Session
+            </Button>
+            <div className={classes.chatSessionsContainer}>
+              <List className={classes.sessionsList}>
+                {chatSessions.map((session) => (
+                  <React.Fragment key={session.id}>
+                    <ListItem 
+                      button 
+                      className={classes.chatSessionItem}
+                      selected={session.id === currentSessionId}
+                      onClick={() => handleSelectSession(session.id)}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <ListItemText 
+                          primary={session.name} 
+                          secondary={
+                            <Typography 
+                              variant="caption" 
+                              color="textSecondary" transparent
+                              style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
+                            >
+                              {new Date(session.created_at).toLocaleDateString('en-US', {
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })} {new Date(session.created_at).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false
+                              })}    •••    ID: {session.id.split('-')[0]}
+                            </Typography>
+                          }
+                        />
+                      </div>
+                      <div className={classes.sessionActions}>
+                        <Tooltip title="Edit">
+                          <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)} color="primary">
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            edge="end" 
+                            aria-label="delete" 
+                            onClick={(e) => handleDeleteConfirmation(e, session.id)}
+                            style={{ color: '#ea4335' }}
+                          >
+                            <DeleteIcon style={{ color: '#ea4335' }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Download">
+                          <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)} color="primary">
+                            <GetAppIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
+                    </ListItem>
+                    <Divider />
+                  </React.Fragment>
+                ))}
+              </List>
+            </div>
+          </div>
+        </div>
         <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           {!currentSessionId && (
             <div className={classes.noSessionsOverlay}>
@@ -2609,6 +2939,7 @@ const DirectChat = () => {
                 InputProps={{
                   style: { 
                     maxHeight: '300px',
+                    border: `1px solid ${theme.palette.primary.main}`,
                     overflow: 'hidden' // Hide overflow on the Input component wrapper
                   }
                 }}
@@ -2969,9 +3300,9 @@ const DirectChat = () => {
           </Button>
           <Button 
             onClick={handleDeleteChat}
-            color="secondary"
             variant="contained"
             startIcon={<DeleteIcon />}
+            style={{ backgroundColor: 'transparent', color: 'white' , border: '1px solid red' }}
           >
             Delete
           </Button>

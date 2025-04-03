@@ -46,7 +46,7 @@ const HeaderRoot = styled('header')(({ theme }) => ({
   minHeight: 80,
   backgroundColor: theme.palette.background.header,
   boxShadow: theme.custom.boxShadow,
-  padding: '10px 20px',
+  padding: '10px 20px 5px 20px',
 }));
 
 const HeaderContent = styled(Box)(({ theme }) => ({
@@ -109,13 +109,21 @@ const useStyles = makeStyles((theme) => ({
     position: 'relative',
     transition: theme.custom.transition,
     borderRadius: theme.shape.borderRadius,
+    overflow: 'hidden',
+    '& .link-content': {
+      position: 'relative',
+      zIndex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+    },
     '&:hover': {
       color: 'white',
-      backgroundColor: theme.palette.primary.main,
+      background: theme.custom.gradients.gradient2,
     },
     '&.active': {
       color: 'white',
-      backgroundColor: theme.palette.primary.main,
+      background: theme.custom.gradients.gradient2,
       position: 'relative',
       '&::after': {
         content: '""',
@@ -127,22 +135,18 @@ const useStyles = makeStyles((theme) => ({
         background: `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, transparent 100%)`,
         borderRadius: '0px 0px 4px 4px',
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
+        zIndex: 0,
       }
     },
-    '& svg': {
-      fontSize: 24,
-      marginRight: 5,
-      position: 'relative',
-      top: -1,
-    }
   },
   workflowNav: {
     width: '100%',
     display: 'flex',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 5,
     borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-    paddingTop: 10,
+    paddingTop: 5,
+    backgroundColor: 'rgba(15, 15, 15, 0.13)',
     '& ul': {
       listStyleType: 'none',
       padding: 0,
@@ -167,13 +171,21 @@ const useStyles = makeStyles((theme) => ({
     position: 'relative',
     transition: theme.custom.transition,
     borderRadius: theme.shape.borderRadius,
+    overflow: 'hidden',
+    '& .link-content': {
+      position: 'relative',
+      zIndex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+    },
     '&:hover': {
       color: 'white',
-      backgroundColor: theme.palette.primary.main,
+      background: theme.custom.gradients.gradient2,
     },
     '&.active': {
       color: 'white',
-      backgroundColor: theme.palette.primary.main,
+      background: theme.custom.gradients.gradient2,
       '&::after': {
         content: '""',
         position: 'absolute',
@@ -183,6 +195,7 @@ const useStyles = makeStyles((theme) => ({
         height: 18,
         background: `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, transparent 100%)`,
         borderRadius: '0px 0px 4px 4px',
+        zIndex: 0,
       }
     }
   },
@@ -316,7 +329,9 @@ function HeaderStyled() {
                   className={`${classes.navLink} ${activeTab === 'home' ? 'active' : ''}`}
                   onClick={() => setActiveTab('home')}
                 >
-                  <HomeIcon /> Home
+                  <Box component="span" className="link-content">
+                    <HomeIcon /> Home
+                  </Box>
                 </Link>
               </li>
               <li>
@@ -325,17 +340,19 @@ function HeaderStyled() {
                   className={`${classes.navLink} ${activeTab === 'multi-agent' ? 'active' : ''}`}
                   onClick={() => setActiveTab('multi-agent')}
                 >
-                  <Box component="img"
-                    src={robotIcon} 
-                    alt="Agent Portal" 
-                    style={{ 
-                      width: '20px', 
-                      height: '24px', 
-                      marginRight: '5px',
-                      verticalAlign: 'middle'
-                    }} 
-                  /> 
-                  Agent Portal
+                  <Box component="span" className="link-content">
+                    <Box component="img"
+                      src={robotIcon} 
+                      alt="Agent Portal" 
+                      style={{ 
+                        width: '20px', 
+                        height: '24px', 
+                        marginRight: '5px',
+                        verticalAlign: 'middle'
+                      }} 
+                    /> 
+                    Agent Portal
+                  </Box>
                 </Link>
               </li>
               <li>
@@ -344,7 +361,9 @@ function HeaderStyled() {
                   className={`${classes.navLink} ${activeTab === 'fine-tuning' ? 'active' : ''}`}
                   onClick={() => setActiveTab('fine-tuning')}
                 >
-                  <TuneIcon /> Fine-Tuning
+                  <Box component="span" className="link-content">
+                    <TuneIcon /> Fine-Tuning
+                  </Box>
                 </Link>
               </li>
               <li>
@@ -353,7 +372,9 @@ function HeaderStyled() {
                   className={`${classes.navLink} ${activeTab === 'retrieval' ? 'active' : ''}`}
                   onClick={() => setActiveTab('retrieval')}
                 >
-                  <LibraryBooksIcon /> Retriever Systems
+                  <Box component="span" className="link-content">
+                    <LibraryBooksIcon /> Retriever Systems
+                  </Box>
                 </Link>
               </li>
               <li>
@@ -362,7 +383,9 @@ function HeaderStyled() {
                   className={`${classes.navLink} ${activeTab === 'document-library' ? 'active' : ''}`}
                   onClick={() => setActiveTab('document-library')}
                 >
-                  <FolderIcon /> Document Library
+                  <Box component="span" className="link-content">
+                    <FolderIcon /> Document Library
+                  </Box>
                 </Link>
               </li>
             </ul>
@@ -441,7 +464,9 @@ function HeaderStyled() {
                 to="/multi-agent/guide" 
                 className={`${classes.workflowLink} ${location.pathname === '/multi-agent/guide' ? 'active' : ''}`}
               >
-                <HelpOutlineIcon style={{marginRight: 5}} /> Guide
+                <Box component="span" className="link-content">
+                  <HelpOutlineIcon /*style={{marginRight: 5}}*/ /> Guide
+                </Box>
               </Link>
             </li>
             <li>
@@ -449,19 +474,21 @@ function HeaderStyled() {
                 to="/multi-agent/team-chat" 
                 className={`${classes.workflowLink} ${location.pathname.includes('/multi-agent/team-chat') ? 'active' : ''}`}
               >
-                <Box 
-                  component="img"
-                  src={agentTeamIcon} 
-                  alt="Team Chat" 
-                  sx={{ 
-                    width: 24, 
-                    height: 24, 
-                    filter: 'invert(1)',
-                    marginRight: 1,
-                    verticalAlign: 'middle'
-                  }}
-                /> 
-                Multi-Agent Chat
+                <Box component="span" className="link-content">
+                  <Box 
+                    component="img"
+                    src={agentTeamIcon} 
+                    alt="Team Chat" 
+                    sx={{ 
+                      width: 24, 
+                      height: 24, 
+                      filter: 'invert(1)',
+                      marginRight: 1,
+                      verticalAlign: 'middle'
+                    }}
+                  /> 
+                  Multi-Agent Chat
+                </Box>
               </Link>
             </li>
             <li>
@@ -469,7 +496,9 @@ function HeaderStyled() {
                 to="/multi-agent/direct-chat" 
                 className={`${classes.workflowLink} ${isActive('/multi-agent/direct-chat')}`}
               >
-                <ChatIcon style={{marginRight: 5}} /> Direct Chat
+                <Box component="span" className="link-content">
+                  <ChatIcon /*style={{marginRight: 5}}*/ /> Direct Chat
+                </Box>
               </Link>
             </li>
             <li>
@@ -477,7 +506,9 @@ function HeaderStyled() {
                 to="/multi-agent/workbench" 
                 className={`${classes.workflowLink} ${isActive('/multi-agent/workbench')}`}
               >
-                <BarChartIcon style={{marginRight: 5}} /> Analysis Workbench
+                <Box component="span" className="link-content">
+                  <BarChartIcon /*style={{marginRight: 5}}*/ /> Analysis Workbench
+                </Box>
               </Link>
             </li>
           </ul>
@@ -492,30 +523,40 @@ function HeaderStyled() {
                 to="/fine-tuning" 
                 className={`${classes.workflowLink} ${location.pathname === '/fine-tuning' ? 'active' : ''}`}
               >
-                <HelpOutlineIcon style={{marginRight: 5}} /> Guide
+                <Box component="span" className="link-content">
+                  <HelpOutlineIcon /*style={{marginRight: 5}}*/ /> Guide
+                </Box>
               </Link>
             </li>
             <li className={classes.workflowStep}>
               <Link to="/fine-tuning/extract" className={`${classes.workflowLink} ${isActive('/fine-tuning/extract')}`}>
-                <span className={classes.extractIcon}><CallSplitIcon style={{marginRight: 5}} /></span> Extract
+                <Box component="span" className="link-content">
+                  <span className={classes.extractIcon}><CallSplitIcon /*style={{marginRight: 5}}*/ /></span> Extract
+                </Box>
               </Link>
               <ArrowForwardIcon className={classes.arrow} />
             </li>
             <li className={classes.workflowStep}>
               <Link to="/fine-tuning/generate" className={`${classes.workflowLink} ${isActive('/fine-tuning/generate')}`}>
-                <SettingsIcon style={{marginRight: 5}} /> Generate
+                <Box component="span" className="link-content">
+                  <SettingsIcon /*style={{marginRight: 5}}*/ /> Generate
+                </Box>
               </Link>
               <ArrowForwardIcon className={classes.arrow} />
             </li>
             <li className={classes.workflowStep}>
               <Link to="/fine-tuning/fine-tune" className={`${classes.workflowLink} ${isActive('/fine-tuning/fine-tune')}`}>
-                <TuneIcon style={{marginRight: 5}} /> Fine-Tune
+                <Box component="span" className="link-content">
+                  <TuneIcon /*style={{marginRight: 5}}*/ /> Fine-Tune
+                </Box>
               </Link>
               <ArrowForwardIcon className={classes.arrow} />
             </li>
             <li className={classes.workflowStep}>
               <Link to="/fine-tuning/test" className={`${classes.workflowLink} ${isActive('/fine-tuning/test')}`}>
-                <PlayCircleFilledIcon style={{marginRight: 5}} /> Test
+                <Box component="span" className="link-content">
+                  <PlayCircleFilledIcon /*style={{marginRight: 5}}*/ /> Test
+                </Box>
               </Link>
             </li>
           </ul>
@@ -530,32 +571,40 @@ function HeaderStyled() {
                 to="/retrieval" 
                 className={`${classes.workflowLink} ${location.pathname === '/retrieval' ? 'active' : ''}`}
               >
-                <HelpOutlineIcon style={{marginRight: 5}} /> Guide
+                <Box component="span" className="link-content">
+                  <HelpOutlineIcon /*style={{marginRight: 5}}*/ /> Guide
+                </Box>
               </Link>
             </li>
             <li>
               <Link to="/retrieval/build-databases" className={`${classes.workflowLink} ${isActive('/retrieval/build-databases')}`}>
-                <StorageIcon style={{marginRight: 5}} /> Build Retrieval Databases
+                <Box component="span" className="link-content">
+                  <StorageIcon /*style={{marginRight: 5}}*/ /> Build Retrieval Databases
+                </Box>
               </Link>
             </li>
             <li>
               <Link to="/retrieval/manage-databases" className={`${classes.workflowLink} ${isActive('/retrieval/manage-databases')}`}>
-                <StorageIcon style={{marginRight: 5}} /> Manage Retrieval Databases
+                <Box component="span" className="link-content">
+                  <StorageIcon /*style={{marginRight: 5}}*/ /> Manage Retrieval Databases
+                </Box>
               </Link>
             </li>
             <li>
               <Link to="/retrieval/librarian-agents" className={`${classes.workflowLink} ${isActive('/retrieval/librarian-agents')}`}>
-                <Box 
-                  component="img" 
-                  src={robotIcon} 
-                  alt="Robot Icon" 
-                  sx={{
-                    width: 24, 
-                    height: 24, 
-                    marginRight: 1
-                  }}
-                />
-                Librarian Agents
+                <Box component="span" className="link-content">
+                  <Box 
+                    component="img" 
+                    src={robotIcon} 
+                    alt="Robot Icon" 
+                    sx={{
+                      width: 24, 
+                      height: 24, 
+                      marginRight: 1
+                    }}
+                  />
+                  Librarian Agents
+                </Box>
               </Link>
             </li>
           </ul>

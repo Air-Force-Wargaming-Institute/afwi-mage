@@ -167,6 +167,38 @@ let theme = createTheme({
           minHeight: '100vh',
           textAlign: 'center',
         },
+        // Add global styling for all delete icons - more specific targeting
+        'svg[data-testid="DeleteIcon"]': {
+          color: '#ea4335 !important', // Use important to override inline styles
+        },
+        // Target using Material-UI class name pattern
+        '.MuiSvgIcon-root[viewBox="0 0 24 24"]:has(path[d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"])': {
+          color: '#ea4335 !important',
+        },
+        // Style delete text in buttons more directly
+        '.MuiButton-containedSecondary svg[data-testid="DeleteIcon"]': {
+          color: 'white !important', // For secondary buttons, keep icon white for contrast
+        },
+        '.MuiButton-colorError': {
+          color: '#ea4335 !important',
+          '& svg': {
+            color: '#ea4335 !important',
+          },
+          '& span': {
+            color: '#ea4335 !important',
+          },
+        },
+        // Target buttons with delete icon directly
+        '.MuiButton-root:has(svg[data-testid="DeleteIcon"])': {
+          color: '#ea4335 !important',
+          '& .MuiButton-label': {
+            color: '#ea4335 !important',
+          },
+        },
+        // Target IconButton directly when it contains a delete icon
+        '.MuiIconButton-root svg[data-testid="DeleteIcon"]': {
+          color: '#ea4335',
+        },
       },
     },
     MuiPaper: {
@@ -184,6 +216,9 @@ let theme = createTheme({
         borderRadius: 10,
         textTransform: 'none',
         transition: 'all 0.3s ease',
+        '& svg[data-testid="DeleteIcon"]': {
+          color: '#ea4335',
+        },
       },
       contained: {
         boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
@@ -207,12 +242,63 @@ let theme = createTheme({
       sizeSmall: {
         padding: '6px 12px',
       },
+      containedError: {
+        color: '#ea4335',
+        backgroundColor: 'rgba(234, 67, 53, 0.1)',
+        '&:hover': {
+          backgroundColor: 'rgba(234, 67, 53, 0.2)',
+        },
+      },
+      outlinedError: {
+        color: '#ea4335',
+        borderColor: '#ea4335',
+        '&:hover': {
+          backgroundColor: 'rgba(234, 67, 53, 0.08)',
+        },
+      },
+      textError: {
+        color: '#ea4335',
+        '&:hover': {
+          backgroundColor: 'rgba(234, 67, 53, 0.08)',
+        },
+      },
+      colorError: {
+        color: '#ea4335',
+        '& .MuiButton-label': {
+          color: '#ea4335',
+        },
+        '& .MuiSvgIcon-root': {
+          color: '#ea4335',
+        },
+      },
     },
     MuiIconButton: {
       root: {
         color: '#f0f0f0',
         '&:hover': {
           backgroundColor: 'rgba(66, 134, 244, 0.39)',
+        },
+        // Add specific rule for IconButton containing DeleteIcon
+        '& svg[data-testid="DeleteIcon"]': {
+          color: '#ea4335',
+        },
+      },
+      colorPrimary: {
+        color: '#4285f4',
+        '&:hover': {
+          backgroundColor: 'rgba(66, 134, 244, 0.1)',
+        },
+      },
+      colorSecondary: {
+        color: '#34a853',
+        '&:hover': {
+          backgroundColor: 'rgba(52, 168, 83, 0.1)',
+        },
+      },
+      colorError: {
+        color: '#ea4335',
+        '&:hover': {
+          backgroundColor: 'rgba(234, 67, 53, 0.1)',
         },
       },
     },
@@ -378,6 +464,20 @@ let theme = createTheme({
       colorPrimary: {
         '&.Mui-checked': {
           color: '#4285f4',
+        },
+      },
+    },
+    MuiSvgIcon: {
+      root: {
+        '&[viewBox="0 0 24 24"]:has(path[d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"])': {
+          color: '#ea4335',
+        },
+      },
+    },
+    MuiTypography: {
+      root: {
+        '&.MuiTypography-caption:has(+ .MuiIconButton-root svg[data-testid="DeleteIcon"])': {
+          color: '#ea4335',
         },
       },
     },

@@ -26,7 +26,8 @@ import {
   TableHead,
   TableRow,
   Box,
-  useTheme
+  useTheme,
+  IconButton
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import HomeIcon from '@material-ui/icons/Home';
@@ -40,6 +41,8 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
 import CodeIcon from '@material-ui/icons/Code';
 import VisibilityIcon from '@material-ui/icons/Visibility';
+import GetAppIcon from '@material-ui/icons/GetApp';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 // Import our styled components
 import { 
@@ -55,6 +58,20 @@ import {
   StyledContainer,
   useContainerStyles
 } from '../../styles/StyledComponents';
+
+// Import action buttons from the dedicated file
+import {
+  DeleteButton,
+  EditButton,
+  DownloadButton,
+  ViewButton,
+  AddButton,
+  CopyButton,
+  DeleteActionButton,
+  DeleteText,
+  withDeleteStyling,
+  DELETE_COLOR
+} from '../../styles/ActionButtons';
 
 // Create component-specific styles using makeStyles
 const useStyles = makeStyles((theme) => ({
@@ -456,39 +473,225 @@ const StyleTest = () => {
                   >
                     Edit
                   </Button>
+                  <Button 
+                    variant="outlined" 
+                    color="error" 
+                    startIcon={<DeleteIcon style={{ color: '#ea4335' }} />}
+                    style={{ 
+                      marginRight: theme.spacing(1), 
+                      marginBottom: theme.spacing(1), 
+                      color: '#ea4335',
+                      borderColor: '#ea4335'
+                    }}
+                  >
+                    Delete
+                  </Button>
                 </Box>
               </Box>
               <Box mt={2}>
                 <Typography variant="body2" gutterBottom>Action Buttons</Typography>
-                <Box display="flex" flexWrap="wrap">
-                  <Button 
-                    size="small" 
-                    color="primary" 
-                    startIcon={<EditIcon />}
-                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    size="small" 
-                    color="primary" 
-                    startIcon={<DeleteIcon />}
-                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
-                  >
-                    Delete
-                  </Button>
-                  <Button 
-                    size="small" 
-                    color="primary" 
-                    startIcon={<AddIcon />}
-                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
-                  >
-                    Add
-                  </Button>
+                <Box display="flex" flexWrap="wrap" alignItems="center">
+                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', mr: 2 }}>
+                    <IconButton color="primary" size="small">
+                      <EditIcon />
+                    </IconButton>
+                    <Typography variant="caption" color="primary">Edit</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', mr: 2 }}>
+                    <IconButton color="error" size="small">
+                      <DeleteIcon style={{ color: '#ea4335' }}/>
+                    </IconButton>
+                    <Typography variant="caption" style={{ color: '#ea4335' }}>Delete</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <IconButton color="primary" size="small">
+                      <AddIcon style={{ color: '#4285f4' }}/>
+                    </IconButton>
+                    <Typography variant="caption" color="primary">Add</Typography>
+                  </Box>
                 </Box>
               </Box>
             </Grid>
           </Grid>
+        </Box>
+
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
+
+        {/* ACTION BUTTONS */}
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Action Buttons</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Action button styles defined in: src/styles/ActionButtons.js and src/styles/theme.js<br/>
+            Note: All delete-related elements (icons, text, buttons) use red color
+          </Box>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <GradientBorderPaper>
+                <Typography variant="h6" gutterBottom>Standard Action Buttons</Typography>
+                <Box display="flex" flexWrap="wrap" alignItems="center">
+                  <DeleteButton onClick={() => alert('Delete clicked')} />
+                  <EditButton onClick={() => alert('Edit clicked')} />
+                  <DownloadButton onClick={() => alert('Download clicked')} />
+                  <ViewButton onClick={() => alert('View clicked')} />
+                  <AddButton onClick={() => alert('Add clicked')} />
+                  <CopyButton onClick={() => alert('Copy clicked')} />
+                </Box>
+                <Box mt={2}>
+                  <Typography variant="body2">
+                    These buttons use the styled components from ActionButtons.js with proper tooltips
+                  </Typography>
+                </Box>
+              </GradientBorderPaper>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <GradientBorderPaper>
+                <Typography variant="h6" gutterBottom>Direct Material-UI IconButton Usage</Typography>
+                <Box display="flex" flexWrap="wrap" alignItems="center">
+                  <IconButton color="error" size="small" style={{ color: '#ea4335' }}>
+                    <DeleteIcon style={{ color: '#ea4335' }} />
+                  </IconButton>
+                  <IconButton color="primary" size="small">
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton color="primary" size="small">
+                    <GetAppIcon />
+                  </IconButton>
+                  <IconButton color="primary" size="small">
+                    <VisibilityIcon />
+                  </IconButton>
+                  <IconButton color="secondary" size="small">
+                    <AddIcon />
+                  </IconButton>
+                </Box>
+                <Box mt={2}>
+                  <Typography variant="body2">
+                    These buttons use direct Material-UI IconButton with color props from theme.js overrides
+                  </Typography>
+                </Box>
+              </GradientBorderPaper>
+            </Grid>
+          </Grid>
+
+          <Box mt={3}>
+            <GradientBorderPaper>
+              <Typography variant="h6" gutterBottom>Text Buttons with Icons</Typography>
+              <Box display="flex" flexWrap="wrap" alignItems="center" gap={2}>
+                <DeleteActionButton onClick={() => alert('Delete text button clicked')}>
+                  Delete Item
+                </DeleteActionButton>
+                <Button color="primary" startIcon={<EditIcon />}>
+                  Edit Item
+                </Button>
+                <Button color="primary" startIcon={<GetAppIcon />}>
+                  Download Item
+                </Button>
+                <Button color="secondary" startIcon={<AddIcon />}>
+                  Add Item
+                </Button>
+              </Box>
+              <Box mt={2}>
+                <Typography variant="body2">
+                  Delete text button uses red color while others use their respective theme colors
+                </Typography>
+              </Box>
+            </GradientBorderPaper>
+          </Box>
+
+          <Box mt={3}>
+            <GradientBorderPaper>
+              <Typography variant="h6" gutterBottom>Delete-Specific Styling Options</Typography>
+              <Box display="flex" flexDirection="column" alignItems="flex-start" gap={2}>
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>1. Delete Text (uses DeleteText component)</Typography>
+                  <DeleteText>This text uses the DeleteText component for consistent red styling</DeleteText>
+                </Box>
+                
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>2. Consistent DELETE_COLOR export</Typography>
+                  <Typography style={{ color: DELETE_COLOR }}>
+                    Any component can use the DELETE_COLOR export for consistency: {DELETE_COLOR}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>3. Delete Button with Icon</Typography>
+                  <Button 
+                    variant="contained" 
+                    style={{ backgroundColor: DELETE_COLOR, color: 'white' }}
+                    startIcon={<DeleteIcon />}
+                  >
+                    Delete with Consistent Color
+                  </Button>
+                </Box>
+                
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>4. Standard Material-UI Button with error color</Typography>
+                  <Button 
+                    variant="contained" 
+                    color="error"
+                    startIcon={<DeleteIcon style={{ color: 'white' }} />}
+                  >
+                    Delete
+                  </Button>
+                </Box>
+              </Box>
+              <Box mt={2}>
+                <Typography variant="body2">
+                  These examples demonstrate different ways to ensure delete elements consistently use red styling
+                </Typography>
+              </Box>
+            </GradientBorderPaper>
+          </Box>
+
+          <Box mt={3}>
+            <GradientBorderPaper>
+              <Typography variant="h6" gutterBottom>Action Buttons in Context</Typography>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Annual Report</TableCell>
+                      <TableCell>PDF</TableCell>
+                      <TableCell>2023-05-10</TableCell>
+                      <TableCell>
+                        <Box display="flex">
+                          <ViewButton tooltip="View document" />
+                          <DownloadButton tooltip="Download document" />
+                          <EditButton tooltip="Edit document" />
+                          <DeleteButton tooltip="Delete document" />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Project Plan</TableCell>
+                      <TableCell>DOCX</TableCell>
+                      <TableCell>2023-06-15</TableCell>
+                      <TableCell>
+                        <Box display="flex" flexWrap="wrap" alignItems="center">
+                          <Box mr={1}>
+                            <Button size="small" color="primary" startIcon={<VisibilityIcon />}>View</Button>
+                          </Box>
+                          <DeleteActionButton size="small">Delete</DeleteActionButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </GradientBorderPaper>
+          </Box>
         </Box>
 
         <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
@@ -603,7 +806,14 @@ const StyleTest = () => {
                   <TableCell>PDF</TableCell>
                   <TableCell>
                     <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
-                    <Button size="small" color="primary" startIcon={<DeleteIcon />}>Delete</Button>
+                    <Button 
+                      size="small" 
+                      color="error" 
+                      startIcon={<DeleteIcon style={{ color: '#ea4335' }} />}
+                      style={{ color: '#ea4335' }}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -612,7 +822,14 @@ const StyleTest = () => {
                   <TableCell>DOCX</TableCell>
                   <TableCell>
                     <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
-                    <Button size="small" color="primary" startIcon={<VisibilityIcon />}>View</Button>
+                    <Button 
+                      size="small" 
+                      color="error" 
+                      startIcon={<DeleteIcon style={{ color: '#ea4335' }} />}
+                      style={{ color: '#ea4335' }}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -621,7 +838,14 @@ const StyleTest = () => {
                   <TableCell>TXT</TableCell>
                   <TableCell>
                     <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
-                    <Button size="small" color="primary" startIcon={<CodeIcon />}>Code</Button>
+                    <Button 
+                      size="small" 
+                      color="error" 
+                      startIcon={<DeleteIcon style={{ color: '#ea4335' }} />}
+                      style={{ color: '#ea4335' }}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               </TableBody>
