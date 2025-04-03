@@ -55,7 +55,7 @@ let theme = createTheme({
       card: 'rgba(40, 40, 40, 0.8)',
     },
     text: {
-      primary: '#f0f0f0',
+      primary: '#ffffff',
       secondary: '#bbbbbb',
     },
     divider: '#333333',
