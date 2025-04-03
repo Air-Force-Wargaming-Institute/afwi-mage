@@ -4,10 +4,10 @@ import { createTheme, responsiveFontSizes } from '@material-ui/core/styles';
 const gradients = {
   gradient1: 'linear-gradient(to right,rgb(129, 177, 255),rgb(95, 127, 255),rgb(165, 165, 165))',
   gradient2: 'linear-gradient(135deg,rgb(129, 177, 255),rgb(95, 127, 255),rgb(165, 165, 165))',
-  horizontal: 'linear-gradient(to right, #4285f4, #34a853, #fbbc05)',
-  vertical: 'linear-gradient(to bottom, #4285f4, #34a853, #ea4335)',
-  vibrant: 'linear-gradient(45deg, #4285f4 0%, #34a853 50%, #ea4335 100%)',
-  strong: 'linear-gradient(to right, #4285f4 0%, #34a853 40%, #fbbc05 100%)',
+  horizontal: 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+  vertical: 'linear-gradient(to bottom, #4285f4,rgb(203, 208, 255),rgb(5, 140, 251))',
+  vibrant: 'linear-gradient(45deg, #4285f4,rgb(203, 208, 255),rgb(5, 140, 251))',
+  strong: 'linear-gradient(to right, #4285f4,rgb(203, 208, 255),rgb(5, 140, 251))',
   border: 'linear-gradient(to right, rgba(71, 106, 162, 0.8), rgba(121, 181, 255, 0.8), rgba(17, 96, 255, 0.8))',
 };
 

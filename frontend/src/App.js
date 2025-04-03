@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Route, Switch, Redirect, useLocation } from 'react-router-dom';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
-import Header from './components/Header';
+import HeaderStyled from './components/HeaderStyled';
 import Home from './components/Home';
 import AdminDashboard from './components/AdminDashboard';
 import FineTuneGuide from './components/FineTuneGuide';
@@ -9,8 +9,6 @@ import ExtractComponent from './components/ExtractComponent';
 import GenerateDataset from './components/GenerateDataset';
 import FineTune from './components/FineTune';
 import Test from './components/Test';
-import MultiAgentBuilder from './components/MultiAgentBuilder';
-import MultiAgentHILChat from './components/MultiAgentHILChat';
 import RetrievalGuide from './components/RetrievalGuide';
 import BuildRetrievalDatabases from './components/BuildRetrievalDatabases';
 import ManageVectorStores from './components/vectorstore/ManageVectorStores';
@@ -30,18 +28,33 @@ import TeamChatContainer from './components/TeamChatContainer';
 import AFWIMageCoin from './assets/AFWI_MAGE_COIN.png';
 import StyleTest from './components/common/StyleTest';
 import ThemeProvider from './styles/ThemeProvider';
+import { useTheme } from '@material-ui/core/styles';
+import { Box, CssBaseline } from '@material-ui/core';
+import { StyledContainer } from './styles/StyledComponents';
+import backgroundImage from './assets/background.jpg';
+import Login from './components/Login';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
   const { user } = useContext(AuthContext) || { user: null };
-  const isAdmin = user?.permission === 'admin';
-
+  
   return (
-    <div className="App animated-gradient">
-      {!isLoginPage && <Header />}
-      <main>
+    <>
+      {!isLoginPage && <HeaderStyled />}
+      <Box 
+        component="main" 
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'auto',
+          position: 'relative',
+          zIndex: 2,
+          pt: 10,
+        }}
+      >
         <Switch>
           <Route exact path="/login">
             <Redirect to="/home" />
@@ -58,7 +71,7 @@ const AuthenticatedRoutes = () => {
           </Route>
           <Route path="/multi-agent/guide" component={UserGuide} />
           
-          {/* New Team Chat Container with nested routes */}
+          {/* Team Chat Container */}
           <Route path="/multi-agent/team-chat" component={TeamChatContainer} />
           
           {/* Redirect old routes to new structure */}
@@ -85,19 +98,30 @@ const AuthenticatedRoutes = () => {
           </Route>
           <Redirect to="/home" />
         </Switch>
-      </main>
-      {!isLoginPage && (
-        <footer className="app-footer">
-          The application was developed by the LeMay Center's Air Force Wargaming Institute, Maxwell AFB, Alabama.
-        </footer>
-      )}
+      </Box>
       {/* AFWI MAGE Coin Logo */}
-      <img src={AFWIMageCoin} alt="AFWI MAGE Coin" className="afwi-mage-coin" />
-    </div>
+      <Box
+        component="img"
+        src={AFWIMageCoin}
+        alt="AFWI MAGE Coin"
+        sx={{
+          position: 'fixed',
+          bottom: 40,
+          left: 40,
+          width: 300,
+          height: 'auto',
+          zIndex: 1,
+          opacity: 0.9,
+          pointerEvents: 'none'
+        }}
+      />
+    </>
   );
 };
 
 function App() {
+  const theme = useTheme();
+
   return (
     <ThemeProvider>
       <ExtractionProvider>
@@ -109,7 +133,20 @@ function App() {
                   <AuthProvider>
                     <WorkbenchProvider>
                       <Router>
-                        <AuthenticatedRoutes />
+                        <CssBaseline />
+                        <Box sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          minHeight: '100vh',
+                          backgroundColor: theme.palette.background.default,
+                          backgroundImage: `url(${backgroundImage})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundAttachment: 'fixed',
+                          overflow: 'hidden'
+                        }}>
+                          <AuthenticatedRoutes />
+                        </Box>
                       </Router>
                     </WorkbenchProvider>
                   </AuthProvider>

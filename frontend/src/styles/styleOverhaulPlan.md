@@ -62,9 +62,21 @@ This document outlines the step-by-step process for migrating our application st
   - [ ] Component-specific styles
   - [ ] Utility classes
   - [ ] Material-UI overrides
+- [ ] Create a spreadsheet or document to track:
+  - [ ] CSS class name
+  - [ ] Current usage location
+  - [ ] Migration status
+  - [ ] MUI equivalent or custom styled component
 - [ ] Remove MaterialUI overrides from CSS - they'll be handled by theming
 - [ ] Identify and prioritize components for migration
 - [ ] Create CSS usage report to track which components use which styles
+
+### Next Steps for CSS Cleanup
+
+1. Create a CSS analysis script that identifies all CSS classes used in the codebase
+2. Document CSS specificity issues and conflicts
+3. Identify the most problematic CSS overrides to prioritize for migration
+4. Start with global styles that affect Material-UI components
 
 ## 4. Component Migration (Priority Order)
 
@@ -143,16 +155,16 @@ For each component:
 | Section | Progress | Notes |
 |---------|----------|-------|
 | Theme Setup | 100% | Created theme.js, ThemeProvider.js, and migrated App.js to use it |
-| Style Hooks | 70% | Created StyledComponents.js with common patterns |
-| CSS Cleanup | 0% | Not started yet |
+| Style Hooks | 100% | Created StyledComponents.js with common patterns, gradient effects, and containers |
+| CSS Cleanup | 5% | Started initial analysis, need to complete the audit |
 | Core Components | 20% | App.js complete, StyleTest.js refactored as test component |
-| UI Components | 0% | Not started yet |
+| UI Components | 10% | Some basic UI components styled, many remain to be migrated |
 | Feature Components | 0% | Not started yet |
-| Gradient Effects | 100% | Successfully created styled components with gradient effects |
+| Gradient Effects | 100% | Successfully created styled components with gradient effects and enhanced visibility |
 | Utility Classes | 50% | Approach decided, using Box props and custom hooks |
-| Testing | 20% | StyleTest component created for visual validation |
+| Testing | 30% | StyleTest component provides comprehensive validation of styled components |
 | Performance | 0% | Not started yet |
-| Documentation | 30% | StyleTest component provides examples of usage |
+| Documentation | 40% | StyleTest component provides examples of usage, additional docs needed |
 
 ## Resources
 
@@ -170,7 +182,7 @@ We're using the following approach for utility classes conversion:
 
 ## Next Steps
 
-1. Work on refactoring Header component to use Material-UI styling
-2. Identify and prioritize high-visibility components for early migration
-3. Create a cleanup script to identify unused CSS after portions are migrated
-4. Establish naming conventions for styled components
+1. Complete the CSS audit to identify all styles that need migration
+2. Update Header component to use Material-UI styling (priority component)
+3. Create a script to track CSS class usage across the application
+4. Begin migrating the most frequently used components first

@@ -425,7 +425,7 @@ export const AnimatedContentArea = styled(Box)(({ theme }) => ({
     right: 0,
     bottom: 0,
     zIndex: -1,
-    background: theme.custom.gradients.gradient1,
+    background: theme.custom.gradients.gradient,
     animation: '$borderGlow 8s infinite alternate',
     borderRadius: theme.shape.borderRadius,
   },
