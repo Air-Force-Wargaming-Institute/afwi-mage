@@ -17,7 +17,6 @@ import ManageVectorStores from './components/vectorstore/ManageVectorStores';
 import LibrarianAgents from './components/LibrarianAgents';
 import DocumentLibrary from './components/DocumentLibrary';
 import UserGuide from './components/UserGuide';
-import './App.css';
 import { ExtractionProvider } from './contexts/ExtractionContext';
 import { GenerationProvider } from './contexts/GenerationContext';
 import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
@@ -30,6 +29,7 @@ import { WorkbenchProvider } from './contexts/WorkbenchContext';
 import TeamChatContainer from './components/TeamChatContainer';
 import AFWIMageCoin from './assets/AFWI_MAGE_COIN.png';
 import StyleTest from './components/common/StyleTest';
+import ThemeProvider from './styles/ThemeProvider';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -99,25 +99,27 @@ const AuthenticatedRoutes = () => {
 
 function App() {
   return (
-    <ExtractionProvider>
-      <GenerationProvider>
-        <DocumentLibraryProvider>
-          <DirectChatProvider>
-            <ChatProvider>
-              <HILChatProvider>
-                <AuthProvider>
-                  <WorkbenchProvider>
-                    <Router>
-                      <AuthenticatedRoutes />
-                    </Router>
-                  </WorkbenchProvider>
-                </AuthProvider>
-              </HILChatProvider>
-            </ChatProvider>
-          </DirectChatProvider>
-        </DocumentLibraryProvider>
-      </GenerationProvider>
-    </ExtractionProvider>
+    <ThemeProvider>
+      <ExtractionProvider>
+        <GenerationProvider>
+          <DocumentLibraryProvider>
+            <DirectChatProvider>
+              <ChatProvider>
+                <HILChatProvider>
+                  <AuthProvider>
+                    <WorkbenchProvider>
+                      <Router>
+                        <AuthenticatedRoutes />
+                      </Router>
+                    </WorkbenchProvider>
+                  </AuthProvider>
+                </HILChatProvider>
+              </ChatProvider>
+            </DirectChatProvider>
+          </DocumentLibraryProvider>
+        </GenerationProvider>
+      </ExtractionProvider>
+    </ThemeProvider>
   );
 }
 

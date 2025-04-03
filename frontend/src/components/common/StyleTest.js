@@ -24,8 +24,11 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  Box,
+  useTheme
 } from '@material-ui/core';
+import { makeStyles } from '@material-ui/core/styles';
 import HomeIcon from '@material-ui/icons/Home';
 import FolderIcon from '@material-ui/icons/Folder';
 import StorageIcon from '@material-ui/icons/Storage';
@@ -35,387 +38,522 @@ import InfoIcon from '@material-ui/icons/Info';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
+import CodeIcon from '@material-ui/icons/Code';
+import VisibilityIcon from '@material-ui/icons/Visibility';
+
+// Import our styled components
+import { 
+  GradientBorderPaper, 
+  AnimatedGradientPaper, 
+  GradientBorderCard,
+  GradientCornersPaper,
+  GradientText,
+  SubtleGlowPaper,
+  HighContrastGradientPaper,
+  AnimatedSideNav,
+  AnimatedContentArea,
+  StyledContainer,
+  useContainerStyles
+} from '../../styles/StyledComponents';
+
+// Create component-specific styles using makeStyles
+const useStyles = makeStyles((theme) => ({
+  root: {
+    marginTop: theme.spacing(3),
+    marginBottom: theme.spacing(3),
+  },
+  colorBox: {
+    height: 80,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1)
+  },
+  textSample: {
+    marginBottom: theme.spacing(1)
+  },
+  flexCenter: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  navItem: {
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(1),
+    transition: theme.custom.transition,
+    padding: theme.spacing(1, 1.5),
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover
+    },
+    '&.active': {
+      backgroundColor: theme.palette.primary.main,
+      '& $navIcon, & $navText': {
+        color: 'white'
+      }
+    }
+  },
+  navIcon: {
+    minWidth: 40,
+    color: theme.palette.primary.main
+  },
+  navText: {
+    color: theme.palette.text.primary
+  },
+  gradientText: {
+    background: theme.custom.gradients.horizontal,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    color: 'transparent',
+    fontWeight: 600
+  }
+}));
 
 const StyleTest = () => {
+  const classes = useStyles();
+  const containerClasses = useContainerStyles();
+  const theme = useTheme();
+
   return (
-    <Container className="container" style={{ marginTop: '20px' }}>
-      <Paper className="main-content" style={{ marginBottom: '30px' }}>
-        <Typography variant="h4" className="section-title" gutterBottom>
-          MAGE Style Guide & Component Library
+    <StyledContainer maxWidth="lg">
+      <AnimatedGradientPaper elevation={3} style={{ marginBottom: theme.spacing(4) }}>
+        <Typography variant="h4" gutterBottom>
+          MAGE Material-UI Theme Guide
         </Typography>
         <Typography variant="body1" paragraph>
-          This page displays all styled components and elements used throughout the application.
-          Use this as a reference when implementing new features to maintain design consistency.
+          This page displays the Material-UI theme implementation with styled components.
+          Use this as a reference for implementing the new theming system across the application.
         </Typography>
 
         {/* COLOR PALETTE */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Color Palette (CSS Variables)</Typography>
-          <Grid container spacing={2}>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Theme Color Palette</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Colors defined in: src/styles/theme.js (palette section)
+          </Box>
+          <Grid container spacing={2} style={{ marginTop: theme.spacing(2) }}>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--primary-color)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--primary-color</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="primary.main">
+                <Typography variant="body2" style={{ color: 'white' }}>primary.main</Typography>
+              </Box>
             </Grid>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--secondary-color)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--secondary-color</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="secondary.main">
+                <Typography variant="body2" style={{ color: 'white' }}>secondary.main</Typography>
+              </Box>
             </Grid>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--background-color)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--background-color</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="primary.light">
+                <Typography variant="body2" style={{ color: 'white' }}>primary.light</Typography>
+              </Box>
             </Grid>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--text-color-light)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'black',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--text-color-light</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="background.default">
+                <Typography variant="body2" style={{ color: 'white' }}>background.default</Typography>
+              </Box>
             </Grid>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--text-color-dark)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--text-color-dark</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="text.primary" style={{ color: 'black' }}>
+                <Typography variant="body2">text.primary</Typography>
+              </Box>
             </Grid>
             <Grid item xs={4} sm={2}>
-              <div style={{ 
-                background: 'var(--container-bg-color)', 
-                height: '80px', 
-                borderRadius: 'var(--border-radius)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'black',
-                flexDirection: 'column'
-              }}>
-                <Typography variant="body2">--container-bg-color</Typography>
-              </div>
+              <Box className={classes.colorBox} bgcolor="text.secondary">
+                <Typography variant="body2" style={{ color: 'white' }}>text.secondary</Typography>
+              </Box>
             </Grid>
           </Grid>
-        </div>
+          
+          <Grid container spacing={2} style={{ marginTop: theme.spacing(2) }}>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} bgcolor="background.paper">
+                <Typography variant="body2" style={{ color: 'white' }}>background.paper</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} bgcolor="background.lighter">
+                <Typography variant="body2" style={{ color: 'white' }}>background.lighter</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} style={{ 
+                background: theme.custom.gradients.gradient1,
+              }}>
+                <Typography variant="body2" style={{ color: 'white' }}>gradients.gradient1</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} bgcolor="background.card">
+                <Typography variant="body2" style={{ color: 'white' }}>background.card</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} bgcolor="action.hover">
+                <Typography variant="body2" style={{ color: 'white' }}>action.hover</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4} sm={2}>
+              <Box className={classes.colorBox} bgcolor="primary.main">
+                <Typography variant="body2" style={{ color: 'white' }}>table-header-bg</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
 
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* TYPOGRAPHY */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Typography</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Typography</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Typography styles defined in: src/styles/theme.js (typography section)
+          </Box>
           
-          <Paper className="info-box">
-            <h1>h1 Heading</h1>
-            <h2>h2 Heading</h2>
-            <h3>h3 Heading</h3>
-            <h4>h4 Heading</h4>
-            <h5>h5 Heading</h5>
-            <h6>h6 Heading</h6>
-            <p>Regular paragraph text. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-            <p className="text-secondary">Secondary text with reduced opacity</p>
-            <span className="bold">Bold text element</span>
-          </Paper>
+          <GradientBorderPaper elevation={2} style={{ marginBottom: theme.spacing(3) }}>
+            <Typography variant="h1" className={classes.textSample}>h1 Heading</Typography>
+            <Typography variant="h2" className={classes.textSample}>h2 Heading</Typography>
+            <Typography variant="h3" className={classes.textSample}>h3 Heading</Typography>
+            <Typography variant="h4" className={classes.textSample}>h4 Heading</Typography>
+            <Typography variant="h5" className={classes.textSample}>h5 Heading</Typography>
+            <Typography variant="h6" className={classes.textSample}>h6 Heading</Typography>
+            <Typography variant="body1" className={classes.textSample}>
+              Body 1 text for primary content. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+            </Typography>
+            <Typography variant="body2" color="textSecondary" className={classes.textSample}>
+              Body 2 text for secondary content with reduced emphasis.
+            </Typography>
+            <Typography variant="body1" className={classes.textSample}>
+              Text with <Box component="span" fontWeight="fontWeightBold" display="inline">bold</Box>, 
+              <Box component="span" fontStyle="italic" display="inline"> italic</Box>, and 
+              <Box component="span" color="primary.main" display="inline"> primary color</Box> styling.
+            </Typography>
+            <Typography variant="body1" className={classes.gradientText} style={{ marginBottom: theme.spacing(2) }}>
+              Gradient text effect
+            </Typography>
+            <Box display="flex" alignItems="center">
+              <Typography variant="caption" style={{ marginRight: theme.spacing(1) }}>caption</Typography>
+              <Typography variant="body2" style={{ marginRight: theme.spacing(1) }}>body2</Typography>
+              <Typography variant="body1" style={{ marginRight: theme.spacing(1) }}>body1</Typography>
+              <Typography variant="subtitle2" style={{ marginRight: theme.spacing(1) }}>subtitle2</Typography>
+              <Typography variant="subtitle1" style={{ marginRight: theme.spacing(1) }}>subtitle1</Typography>
+              <Typography variant="h6">h6</Typography>
+            </Box>
+          </GradientBorderPaper>
+        </Box>
 
-          <Paper className="info-box" style={{ marginTop: '16px' }}>
-            <Typography variant="h4" className="section-title">MUI Typography: h4 with section-title class</Typography>
-            <Typography variant="h5" className="section-subtitle">MUI Typography: h5 with section-subtitle class</Typography>
-            <Typography variant="body1">MUI Typography: Body 1 text for primary content</Typography>
-            <Typography variant="body2">MUI Typography: Body 2 text for secondary content</Typography>
-          </Paper>
-        </div>
-
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* CONTAINERS */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Container Elements</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Styled Container Components</Typography>
           
-          <div style={{ marginBottom: '20px' }}>
-            <Typography variant="body2" gutterBottom><code>.container</code> - Main container with padding and border radius</Typography>
-            <div className="container" style={{ height: 'auto', padding: '20px', marginBottom: '16px', position: 'relative' }}>
-              <div style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '8px', 
-                background: 'var(--primary-color)', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '4px', 
-                fontSize: '11px',
-                fontFamily: 'monospace'
-              }}>
-                .container
-              </div>
-              Container with className="container"
-            </div>
-          </div>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>GradientBorderPaper - Standard content container</Typography>
+                <GradientBorderPaper elevation={2} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    GradientBorderPaper
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js
+                  </Box>
+                  Container with gradient border (hairline width)
+                </GradientBorderPaper>
+              </Box>
 
-          <div style={{ marginBottom: '20px' }}>
-            <Typography variant="body2" gutterBottom><code>.main-content</code> - Main content area with background and shadow</Typography>
-            <div className="main-content" style={{ padding: '20px', marginBottom: '16px', position: 'relative' }}>
-              <div style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '8px', 
-                background: 'var(--primary-color)', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '4px', 
-                fontSize: '11px',
-                fontFamily: 'monospace'
-              }}>
-                .main-content
-              </div>
-              Container with className="main-content"
-            </div>
-          </div>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>SubtleGlowPaper - Ultra thin gradient effect</Typography>
+                <SubtleGlowPaper elevation={2} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    SubtleGlowPaper
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js
+                  </Box>
+                  Container with subtle gradient glow (box-shadow based)
+                </SubtleGlowPaper>
+              </Box>
 
-          <div style={{ marginBottom: '20px' }}>
-            <Typography variant="body2" gutterBottom><code>.info-box</code> - Information box with lighter background</Typography>
-            <div className="info-box" style={{ marginBottom: '16px', position: 'relative' }}>
-              <div style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '8px', 
-                background: 'var(--primary-color)', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '4px', 
-                fontSize: '11px',
-                fontFamily: 'monospace'
-              }}>
-                .info-box
-              </div>
-              Container with className="info-box"
-            </div>
-          </div>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>AnimatedGradientPaper - Enhanced animated gradient border</Typography>
+                <AnimatedGradientPaper elevation={2} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    AnimatedGradientPaper
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js <br/>
+                    Animation keyframes in: src/styles/ThemeProvider.js
+                  </Box>
+                  Container with animated gradient border
+                </AnimatedGradientPaper>
+              </Box>
 
-          <div style={{ marginBottom: '20px' }}>
-            <Typography variant="body2" gutterBottom><code>.paper</code> - Paper element for content sections</Typography>
-            <div className="paper" style={{ marginBottom: '16px', position: 'relative' }}>
-              <div style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '8px', 
-                background: 'var(--primary-color)', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '4px', 
-                fontSize: '11px',
-                fontFamily: 'monospace'
-              }}>
-                .paper
-              </div>
-              Container with className="paper"
-            </div>
-          </div>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>HighContrastGradientPaper - Maximum visibility border</Typography>
+                <HighContrastGradientPaper elevation={2} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    HighContrastGradientPaper
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js <br/>
+                    Animation keyframes in: src/styles/ThemeProvider.js
+                  </Box>
+                  High-intensity border with pulsing animation effect
+                </HighContrastGradientPaper>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>GradientCornersPaper - Accent corners</Typography>
+                <GradientCornersPaper elevation={2} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    GradientCornersPaper
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js
+                  </Box>
+                  Container with gradient accent corners
+                </GradientCornersPaper>
+              </Box>
 
-          <div style={{ marginBottom: '20px' }}>
-            <Typography variant="body2" gutterBottom><code>.root-container</code> - Root layout container (with side nav)</Typography>
-            <div className="root-container" style={{ height: 'auto', marginBottom: '16px', position: 'relative' }}>
-              <div style={{ 
-                position: 'absolute', 
-                top: '4px', 
-                right: '8px', 
-                background: 'var(--primary-color)', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '4px', 
-                fontSize: '11px',
-                fontFamily: 'monospace',
-                zIndex: 1
-              }}>
-                .root-container
-              </div>
-              <div className="side-nav" style={{ position: 'relative' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  top: '4px', 
-                  right: '8px', 
-                  background: '#5c5c5c', 
-                  color: 'white', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px', 
-                  fontSize: '11px',
-                  fontFamily: 'monospace'
-                }}>
-                  .side-nav
-                </div>
-                <Typography variant="body1">Side Navigation</Typography>
-                <div className="nav-item" style={{ position: 'relative' }}>
-                  <div style={{ 
-                    position: 'absolute', 
-                    top: '4px', 
-                    right: '8px', 
-                    background: '#5c5c5c', 
-                    color: 'white', 
-                    padding: '2px 6px', 
-                    borderRadius: '4px', 
-                    fontSize: '11px',
-                    fontFamily: 'monospace'
-                  }}>
-                    .nav-item
-                  </div>
-                  <span className="nav-icon">📁</span>
-                  <span className="nav-text">Nav Item</span>
-                </div>
-                <div className="nav-item active" style={{ position: 'relative' }}>
-                  <div style={{ 
-                    position: 'absolute', 
-                    top: '4px', 
-                    right: '8px', 
-                    background: '#ffffff', 
-                    color: 'var(--primary-color)', 
-                    padding: '2px 6px', 
-                    borderRadius: '4px', 
-                    fontSize: '11px',
-                    fontFamily: 'monospace'
-                  }}>
-                    .nav-item.active
-                  </div>
-                  <span className="nav-icon">📊</span>
-                  <span className="nav-text">Active Nav Item</span>
-                </div>
-              </div>
-              <div className="main-content" style={{ flex: 1, padding: '20px', position: 'relative' }}>
-                <div style={{ 
-                  position: 'absolute', 
-                  top: '4px', 
-                  right: '8px', 
-                  background: 'var(--primary-color)', 
-                  color: 'white', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px', 
-                  fontSize: '11px',
-                  fontFamily: 'monospace'
-                }}>
-                  .main-content
-                </div>
-                Root container with side navigation and main content area
-              </div>
-            </div>
-          </div>
-        </div>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>containerClasses.infoBox - Information box with gradient border</Typography>
+                <Box className={containerClasses.infoBox} style={{ position: 'relative' }}>
+                  <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    containerClasses.infoBox
+                  </Box>
+                  <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                    Modify in: src/styles/StyledComponents.js (useContainerStyles)
+                  </Box>
+                  Info box with horizontal gradient border
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
 
-        <Divider className="divider" />
+          <Box mb={3} mt={3}>
+            <Typography variant="body2" gutterBottom>GradientBorderCard - Card with gradient border on hover</Typography>
+            <GradientBorderCard elevation={2} style={{ maxWidth: '400px', position: 'relative' }}>
+              <Box position="absolute" top={8} right={8} bgcolor="primary.main" borderRadius={4} p={0.5} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                GradientBorderCard
+              </Box>
+              <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                Modify in: src/styles/StyledComponents.js
+              </Box>
+              <Typography variant="h5" gutterBottom>Card Title</Typography>
+              <Typography variant="body2" paragraph>
+                Card content with gradient border that becomes more visible on hover.
+              </Typography>
+              <Button variant="contained" color="primary">Card Action</Button>
+            </GradientBorderCard>
+          </Box>
+
+          <Box mb={3} mt={4}>
+            <Typography variant="body2" gutterBottom>Layout with side navigation</Typography>
+            <Box display="flex" style={{ height: 'auto', marginBottom: theme.spacing(2), position: 'relative' }}>
+              <AnimatedSideNav>
+                <Typography variant="body1" gutterBottom>Side Navigation</Typography>
+                <Box className={classes.navItem} display="flex" alignItems="center">
+                  <Box className={classes.navIcon} mr={1}><HomeIcon /></Box>
+                  <span className={classes.navText}>Dashboard</span>
+                </Box>
+                <Box className={classes.navItem} display="flex" alignItems="center">
+                  <Box className={classes.navIcon} mr={1}><FolderIcon /></Box>
+                  <span className={classes.navText}>Documents</span>
+                </Box>
+                <Box className={`${classes.navItem} active`} display="flex" alignItems="center">
+                  <Box className={classes.navIcon} mr={1}><StorageIcon /></Box>
+                  <span className={classes.navText}>Databases</span>
+                </Box>
+                <Box className={classes.navItem} display="flex" alignItems="center">
+                  <Box className={classes.navIcon} mr={1}><ChatIcon /></Box>
+                  <span className={classes.navText}>Conversations</span>
+                </Box>
+              </AnimatedSideNav>
+              <AnimatedContentArea>
+                <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+                  Both side navigation and content area use the AnimatedGradientPaper styling<br/>
+                  Modify in: src/styles/StyledComponents.js
+                </Box>
+                Content area with animated border styling
+              </AnimatedContentArea>
+            </Box>
+          </Box>
+        </Box>
+
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* BUTTONS */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Buttons</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Buttons</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Button styles defined in: src/styles/theme.js (overrides.MuiButton section)
+          </Box>
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="body2" gutterBottom><code>.app-button</code> - Primary button</Typography>
-              <button className="app-button">App Button</button>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6} md={4}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Contained Button (Primary)</Typography>
+                <Button variant="contained" color="primary">Primary Button</Button>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Contained Button (Secondary)</Typography>
+                <Button variant="contained" color="secondary">Secondary Button</Button>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Outlined Button</Typography>
+                <Button variant="outlined" color="primary">Outlined Button</Button>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="body2" gutterBottom><code>.upload-button</code> - Upload button</Typography>
-              <button className="upload-button app-button">Upload Button</button>
+            
+            <Grid item xs={12} sm={6} md={4}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Text Button</Typography>
+                <Button color="primary">Text Button</Button>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Disabled Button</Typography>
+                <Button variant="contained" color="primary" disabled>Disabled Button</Button>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>With Elevation and Hover Lift</Typography>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  style={{ 
+                    boxShadow: theme.custom.boxShadow,
+                    transition: theme.custom.transition
+                  }}
+                  className="hover-lift" // We'll still need this class for now
+                >
+                  Hover Lift Effect
+                </Button>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="body2" gutterBottom><code>[disabled]</code> - Disabled button</Typography>
-              <button className="app-button" disabled>Disabled Button</button>
+
+            <Grid item xs={12} sm={6} md={4}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Buttons with Icons</Typography>
+                <Box display="flex" flexWrap="wrap">
+                  <Button 
+                    variant="contained" 
+                    color="primary" 
+                    startIcon={<AddIcon />}
+                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
+                  >
+                    Add
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    color="primary" 
+                    startIcon={<EditIcon />}
+                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
+                  >
+                    Edit
+                  </Button>
+                </Box>
+              </Box>
+              <Box mt={2}>
+                <Typography variant="body2" gutterBottom>Action Buttons</Typography>
+                <Box display="flex" flexWrap="wrap">
+                  <Button 
+                    size="small" 
+                    color="primary" 
+                    startIcon={<EditIcon />}
+                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    size="small" 
+                    color="primary" 
+                    startIcon={<DeleteIcon />}
+                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
+                  >
+                    Delete
+                  </Button>
+                  <Button 
+                    size="small" 
+                    color="primary" 
+                    startIcon={<AddIcon />}
+                    style={{ marginRight: theme.spacing(1), marginBottom: theme.spacing(1) }}
+                  >
+                    Add
+                  </Button>
+                </Box>
+              </Box>
             </Grid>
           </Grid>
+        </Box>
 
-          <Grid container spacing={2} style={{ marginTop: '16px' }}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" gutterBottom>Material-UI Buttons</Typography>
-              <Button variant="contained" color="primary" style={{ marginRight: '8px' }}>Primary</Button>
-              <Button variant="contained" color="secondary" style={{ marginRight: '8px' }}>Secondary</Button>
-              <Button variant="outlined" color="primary">Outlined</Button>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" gutterBottom>Action Buttons</Typography>
-              <Button size="small" className="action-button" startIcon={<EditIcon />}>Edit</Button>
-              <Button size="small" className="action-button" startIcon={<DeleteIcon />}>Delete</Button>
-              <Button size="small" className="action-button" startIcon={<AddIcon />}>Add</Button>
-            </Grid>
-          </Grid>
-        </div>
-
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* FORM ELEMENTS */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Form Elements</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Form Elements</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Form element styles defined in: src/styles/theme.js (overrides.MuiInputBase, MuiOutlinedInput, etc.)
+          </Box>
           
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
-              <div style={{ marginBottom: '16px' }}>
-                <Typography variant="body2" gutterBottom>Text Input</Typography>
-                <input type="text" placeholder="Standard text input" style={{ width: '100%' }} />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Text Field</Typography>
+                <TextField label="Standard" variant="outlined" fullWidth />
+              </Box>
+              <Box mb={3}>
                 <Typography variant="body2" gutterBottom>Select Dropdown</Typography>
-                <select style={{ width: '100%' }}>
+                <TextField
+                  select
+                  label="Select Option"
+                  variant="outlined"
+                  fullWidth
+                  SelectProps={{
+                    native: true,
+                  }}
+                >
                   <option>Option 1</option>
                   <option>Option 2</option>
                   <option>Option 3</option>
-                </select>
-              </div>
-              <div>
+                </TextField>
+              </Box>
+              <Box>
                 <Typography variant="body2" gutterBottom>Textarea</Typography>
-                <textarea placeholder="Standard textarea" rows={4} style={{ width: '100%' }}></textarea>
-              </div>
+                <TextField
+                  label="Multiline"
+                  multiline
+                  rows={4}
+                  variant="outlined"
+                  fullWidth
+                />
+              </Box>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <div style={{ marginBottom: '16px' }}>
-                <Typography variant="body2" gutterBottom>Material-UI Text Field</Typography>
-                <TextField label="Standard" variant="outlined" fullWidth />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <Typography variant="body2" gutterBottom>Material-UI with Helper Text</Typography>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Text Field with Helper Text</Typography>
                 <TextField 
                   label="With Helper" 
                   variant="outlined" 
                   helperText="Helper text goes here" 
                   fullWidth 
                 />
-              </div>
-              <div>
-                <Typography variant="body2" gutterBottom>Material-UI with Error</Typography>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" gutterBottom>Required Field</Typography>
+                <TextField 
+                  label="Required Field" 
+                  variant="outlined" 
+                  required
+                  fullWidth 
+                />
+              </Box>
+              <Box>
+                <Typography variant="body2" gutterBottom>Error State</Typography>
                 <TextField 
                   label="Error State" 
                   variant="outlined" 
@@ -423,30 +561,33 @@ const StyleTest = () => {
                   helperText="Error message goes here" 
                   fullWidth 
                 />
-              </div>
+              </Box>
             </Grid>
           </Grid>
 
-          <div style={{ marginTop: '24px' }}>
+          <Box mt={4}>
             <Typography variant="body2" gutterBottom>File Upload Dropzone</Typography>
-            <div className="dropzone">
+            <Box className={containerClasses.dropzone}>
               <Typography variant="body1">Drop files here or click to browse</Typography>
-              <Button variant="contained" color="primary" className="upload-button" style={{ marginTop: '8px' }}>
+              <Button variant="contained" color="primary" style={{ marginTop: theme.spacing(2) }}>
                 Browse Files
               </Button>
-            </div>
-          </div>
-        </div>
+            </Box>
+          </Box>
+        </Box>
 
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* TABLES */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Tables</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Tables</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Table styles defined in: src/styles/theme.js (overrides.MuiTable, MuiTableRow, etc.)
+          </Box>
 
-          <Typography variant="body2" gutterBottom>Standard Table with Hover Effects</Typography>
-          <div className="table-container">
-            <Table className="table">
+          <Typography variant="body2" gutterBottom>Dark Mode Table with Hover Effects</Typography>
+          <TableContainer component={GradientBorderPaper}>
+            <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -461,8 +602,8 @@ const StyleTest = () => {
                   <TableCell>Document 1</TableCell>
                   <TableCell>PDF</TableCell>
                   <TableCell>
-                    <Button size="small" className="action-button" startIcon={<EditIcon />}>Edit</Button>
-                    <Button size="small" className="action-button" startIcon={<DeleteIcon />}>Delete</Button>
+                    <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
+                    <Button size="small" color="primary" startIcon={<DeleteIcon />}>Delete</Button>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -470,128 +611,197 @@ const StyleTest = () => {
                   <TableCell>Document 2</TableCell>
                   <TableCell>DOCX</TableCell>
                   <TableCell>
-                    <Button size="small" className="action-button" startIcon={<EditIcon />}>Edit</Button>
-                    <Button size="small" className="action-button" startIcon={<DeleteIcon />}>Delete</Button>
+                    <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
+                    <Button size="small" color="primary" startIcon={<VisibilityIcon />}>View</Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>3</TableCell>
+                  <TableCell>Document 3</TableCell>
+                  <TableCell>TXT</TableCell>
+                  <TableCell>
+                    <Button size="small" color="primary" startIcon={<EditIcon />}>Edit</Button>
+                    <Button size="small" color="primary" startIcon={<CodeIcon />}>Code</Button>
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
-          </div>
-        </div>
+          </TableContainer>
+        </Box>
 
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
         {/* CARDS AND LISTS */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Cards and Lists</Typography>
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>Cards and Lists</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Card styles defined in: src/styles/theme.js (overrides.MuiCard)<br/>
+            List styles defined in: src/styles/theme.js (overrides.MuiListItem, MuiListItemIcon, etc.)
+          </Box>
           
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" gutterBottom>Material-UI Card</Typography>
+              <Typography variant="body2" gutterBottom>Material-UI Card with Dark Theme</Typography>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>Card Title</Typography>
                   <Typography variant="body2">
                     Card content with text. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
                   </Typography>
-                  <Button variant="contained" color="primary" style={{ marginTop: '16px' }}>
+                  <Button 
+                    variant="contained" 
+                    color="primary" 
+                    style={{ marginTop: theme.spacing(2) }}
+                  >
                     Action
                   </Button>
                 </CardContent>
               </Card>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" gutterBottom>Feature Card</Typography>
-              <div className="feature-card">
-                <div className="feature-icon">🚀</div>
-                <div className="feature-title">Feature Title</div>
-                <div className="feature-description">Feature description text goes here.</div>
-              </div>
+              <Typography variant="body2" gutterBottom>Feature Card with Gradient</Typography>
+              <GradientBorderCard>
+                <Box display="flex" flexDirection="column" alignItems="center">
+                  <Box fontSize="2rem" mb={2}>🚀</Box>
+                  <Typography variant="h6" gutterBottom>Feature Title</Typography>
+                  <Typography variant="body2" align="center">Feature description text goes here.</Typography>
+                </Box>
+              </GradientBorderCard>
             </Grid>
           </Grid>
 
-          <div style={{ marginTop: '24px' }}>
-            <Typography variant="body2" gutterBottom>Material-UI List</Typography>
-            <Paper>
+          <Box mt={4}>
+            <Typography variant="body2" gutterBottom>Material-UI List with Dark Theme</Typography>
+            <GradientBorderPaper>
               <List>
-                <ListItem button className="list-item">
-                  <ListItemIcon className="list-item-icon">
+                <ListItem button>
+                  <ListItemIcon>
                     <FolderIcon />
                   </ListItemIcon>
-                  <ListItemText className="list-item-text" primary="Documents" secondary="12 items" />
+                  <ListItemText primary="Documents" secondary="12 items" />
                 </ListItem>
-                <ListItem button className="list-item">
-                  <ListItemIcon className="list-item-icon">
+                <ListItem button>
+                  <ListItemIcon>
                     <StorageIcon />
                   </ListItemIcon>
-                  <ListItemText className="list-item-text" primary="Databases" secondary="3 items" />
+                  <ListItemText primary="Databases" secondary="3 items" />
                 </ListItem>
-                <ListItem button className="list-item">
-                  <ListItemIcon className="list-item-icon">
+                <ListItem button>
+                  <ListItemIcon>
                     <ChatIcon />
                   </ListItemIcon>
-                  <ListItemText className="list-item-text" primary="Conversations" secondary="24 items" />
+                  <ListItemText primary="Conversations" secondary="24 items" />
                 </ListItem>
               </List>
-            </Paper>
-          </div>
+            </GradientBorderPaper>
+          </Box>
 
-          <div style={{ marginTop: '24px' }}>
-            <Typography variant="body2" gutterBottom>Feature Grid</Typography>
-            <div className="feature-grid">
-              <div className="feature-card">
-                <div className="feature-icon">📊</div>
-                <div className="feature-title">Analytics</div>
-                <div className="feature-description">Powerful analytics tools</div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🤖</div>
-                <div className="feature-title">Automation</div>
-                <div className="feature-description">Automate your workflow</div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📱</div>
-                <div className="feature-title">Responsive</div>
-                <div className="feature-description">Works on all devices</div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <Box mt={4}>
+            <Typography variant="body2" gutterBottom>Feature Grid with Hover Effects</Typography>
+            <Box display="flex" flexWrap="wrap" justifyContent="center">
+              <GradientBorderCard style={{ width: 200, margin: theme.spacing(1) }}>
+                <Box display="flex" flexDirection="column" alignItems="center">
+                  <Box fontSize="2rem" mb={2}>📊</Box>
+                  <Typography variant="h6" gutterBottom>Analytics</Typography>
+                  <Typography variant="body2" align="center">Powerful analytics tools</Typography>
+                </Box>
+              </GradientBorderCard>
+              <GradientBorderCard style={{ width: 200, margin: theme.spacing(1) }}>
+                <Box display="flex" flexDirection="column" alignItems="center">
+                  <Box fontSize="2rem" mb={2}>🤖</Box>
+                  <Typography variant="h6" gutterBottom>Automation</Typography>
+                  <Typography variant="body2" align="center">Automate your workflow</Typography>
+                </Box>
+              </GradientBorderCard>
+              <GradientBorderCard style={{ width: 200, margin: theme.spacing(1) }}>
+                <Box display="flex" flexDirection="column" alignItems="center">
+                  <Box fontSize="2rem" mb={2}>📱</Box>
+                  <Typography variant="h6" gutterBottom>Responsive</Typography>
+                  <Typography variant="body2" align="center">Works on all devices</Typography>
+                </Box>
+              </GradientBorderCard>
+            </Box>
+          </Box>
+        </Box>
 
-        <Divider className="divider" />
+        <Divider style={{ margin: `${theme.spacing(4)}px 0` }} />
 
-        {/* UTILITY CLASSES */}
-        <div className="section">
-          <Typography variant="h5" className="section-subtitle">Utility Classes</Typography>
+        {/* MUI SYSTEM PROPS */}
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>MUI Box System Props (Replacing Utility Classes)</Typography>
+          <Box fontSize="12px" mb={2} fontFamily="monospace" color="text.secondary">
+            Box system props are part of Material-UI core - styling values from theme.js
+          </Box>
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Paper className="info-box">
-                <Typography variant="body2" gutterBottom><code>.mt-2</code> - Margin Top (16px)</Typography>
-                <div className="mt-2" style={{ background: '#f0f0f0', padding: '8px' }}>
-                  Element with margin-top
-                </div>
-              </Paper>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <GradientBorderPaper>
+                <Typography variant="body2" gutterBottom>Spacing & Margin Props</Typography>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} mb={2}>No margin (m={0})</Box>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} m={2} mb={2}>Margin 16px (m={2})</Box>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} m={3} mb={2}>Margin 24px (m={3})</Box>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} mt={3} mb={2}>Top margin (mt={3})</Box>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} mb={3}>Bottom margin (mb={3})</Box>
+                <Box bgcolor="background.lighter" p={2} borderRadius={1} mx="auto" width="50%">Horizontal auto (mx="auto")</Box>
+              </GradientBorderPaper>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Paper className="info-box">
-                <Typography variant="body2" gutterBottom><code>.mb-3</code> - Margin Bottom (24px)</Typography>
-                <div className="mb-3" style={{ background: '#f0f0f0', padding: '8px' }}>
-                  Element with margin-bottom
-                </div>
-                <div style={{ background: '#e0e0e0', padding: '8px' }}>Next element</div>
-              </Paper>
+            
+            <Grid item xs={12} md={4}>
+              <GradientBorderPaper>
+                <Typography variant="body2" gutterBottom>Display & Flex Props</Typography>
+                <Box display="flex" bgcolor="background.lighter" p={2} borderRadius={1} mb={2}>
+                  <Box bgcolor="primary.main" p={2} borderRadius={1} mr={2}>item 1</Box>
+                  <Box bgcolor="primary.main" p={2} borderRadius={1}>item 2</Box>
+                </Box>
+                <Box display="flex" justifyContent="space-between" bgcolor="background.lighter" p={2} borderRadius={1} mb={2}>
+                  <Box bgcolor="primary.main" p={2} borderRadius={1}>start</Box>
+                  <Box bgcolor="primary.main" p={2} borderRadius={1}>end</Box>
+                </Box>
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  bgcolor="background.lighter"
+                  p={3}
+                  borderRadius={1}
+                  height={80}
+                >
+                  <Box bgcolor="primary.main" p={2} borderRadius={1}>centered</Box>
+                </Box>
+              </GradientBorderPaper>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Paper className="info-box">
-                <Typography variant="body2" gutterBottom><code>.bold</code> - Bold Text</Typography>
-                <p>Regular text with <span className="bold">bold text</span> inside.</p>
-              </Paper>
+            
+            <Grid item xs={12} md={4}>
+              <GradientBorderPaper>
+                <Typography variant="body2" gutterBottom>Color & Typography Props</Typography>
+                <Box color="text.primary" mb={1}>color="text.primary"</Box>
+                <Box color="text.secondary" mb={1}>color="text.secondary"</Box>
+                <Box color="primary.main" mb={1}>color="primary.main"</Box>
+                <GradientText mb={1}>GradientText component</GradientText>
+                <Box
+                  textOverflow="ellipsis"
+                  overflow="hidden"
+                  whiteSpace="nowrap"
+                  mb={1}
+                  width={150}
+                >
+                  This text is truncated with ellipsis because it's too long
+                </Box>
+                <Box bgcolor="primary.main" p={2} borderRadius={1} mb={1} color="white">bgcolor="primary.main"</Box>
+                <Box
+                  p={2}
+                  borderRadius={1}
+                  color="white"
+                  style={{ background: theme.custom.gradients.gradient1 }}
+                >
+                  Using gradient background
+                </Box>
+              </GradientBorderPaper>
             </Grid>
           </Grid>
-        </div>
-      </Paper>
-    </Container>
+        </Box>
+      </AnimatedGradientPaper>
+    </StyledContainer>
   );
 };
 

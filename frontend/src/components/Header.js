@@ -25,6 +25,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import agentTeamIcon from '../assets/agent-team.png';
 import BarChartIcon from '@material-ui/icons/BarChart';
 import PaletteIcon from '@material-ui/icons/Palette';
+import '../styles/header.css';
 
 function Header() {
   const location = useLocation();
@@ -86,8 +87,8 @@ function Header() {
           <div className="logo-title-container">
             <img src={logo} alt="AFWI Logo" className="logo" />
             <div className="title-container" style={{textAlign:'left'}}>
-              <h2 style={{color:'white'}}></h2>
-              <h1 style={{color:'white'}}></h1>
+              <h2 style={{color:'white'}}>Air Force Wargaming Institute</h2>
+              <h1 style={{color:'white'}}>Multi-Agent Generative Engine</h1>
             </div>
           </div>
           
