@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Route, Switch, Redirect, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import Home from './components/Home';
 import AdminDashboard from './components/AdminDashboard';
@@ -29,11 +29,14 @@ import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
 import { WorkbenchProvider } from './contexts/WorkbenchContext';
 import TeamChatContainer from './components/TeamChatContainer';
 import AFWIMageCoin from './assets/AFWI_MAGE_COIN.png';
+import StyleTest from './components/common/StyleTest';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  const { user } = useContext(AuthContext) || { user: null };
+  const isAdmin = user?.permission === 'admin';
 
   return (
     <div className="App animated-gradient">
@@ -46,6 +49,10 @@ const AuthenticatedRoutes = () => {
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
+          
+          {/* StyleTest route - accessible to all users */}
+          <Route path="/style-test" component={StyleTest} />
+          
           <Route exact path="/multi-agent">
             <Redirect to="/multi-agent/team-chat" />
           </Route>

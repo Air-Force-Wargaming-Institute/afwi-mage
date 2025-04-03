@@ -24,6 +24,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import agentTeamIcon from '../assets/agent-team.png';
 import BarChartIcon from '@material-ui/icons/BarChart';
+import PaletteIcon from '@material-ui/icons/Palette';
 
 function Header() {
   const location = useLocation();
@@ -58,6 +59,11 @@ function Header() {
 
   const handleAdminClick = React.useCallback(() => {
     history.push('/admin');
+    setMenuOpen(false);
+  }, [history]);
+
+  const handleStyleTestClick = React.useCallback(() => {
+    history.push('/style-test');
     setMenuOpen(false);
   }, [history]);
 
@@ -183,11 +189,17 @@ function Header() {
             </IconButton>
             <div className={`user-menu ${menuOpen ? 'open' : ''}`}>
               {user?.permission === 'admin' && (
-                <div className="menu-item" onClick={handleAdminClick}>
-                  <SupervisorAccountIcon />
-                  Admin Dashboard
-                </div>
+                <>
+                  <div className="menu-item" onClick={handleAdminClick}>
+                    <SupervisorAccountIcon />
+                    Admin Dashboard
+                  </div>
+                </>
               )}
+              <div className="menu-item" onClick={handleStyleTestClick}>
+                <PaletteIcon />
+                Style Test
+              </div>
               <div className="menu-item" onClick={handleLogout}>
                 <ExitToAppIcon />
                 Logout
