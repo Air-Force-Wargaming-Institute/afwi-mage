@@ -1,14 +1,21 @@
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
 
 /**
  * Get all vector stores with optional filtering and pagination
  * @param {Object} params - Query parameters for filtering and pagination
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with vector stores data
  */
-export const getVectorStores = async (params = {}) => {
+export const getVectorStores = async (params = {}, token) => {
   try {
-    const response = await axios.get(getApiUrl('EMBEDDING', '/api/embedding/vectorstores'), { params });
+    const response = await axios.get(getGatewayUrl('/api/embedding/vectorstores'), 
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }, { params }
+    );
     return response.data;
   } catch (error) {
     console.error('Error fetching vector stores:', error);
@@ -19,9 +26,10 @@ export const getVectorStores = async (params = {}) => {
 /**
  * Get details of a specific vector store
  * @param {string} id - Vector store ID
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with vector store details
  */
-export const getVectorStoreById = async (id) => {
+export const getVectorStoreById = async (id, token) => {
   try {
     const response = await axios.get(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`));
     return response.data;
@@ -35,9 +43,10 @@ export const getVectorStoreById = async (id) => {
  * Update an existing vector store
  * @param {string} id - Vector store ID
  * @param {Object} data - Vector store update data
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with updated vector store
  */
-export const updateVectorStore = async (id, data) => {
+export const updateVectorStore = async (id, data, token) => {
   try {
     const response = await axios.put(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`), data);
     return response.data;
@@ -50,9 +59,10 @@ export const updateVectorStore = async (id, data) => {
 /**
  * Delete a vector store
  * @param {string} id - Vector store ID
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with deletion status
  */
-export const deleteVectorStore = async (id) => {
+export const deleteVectorStore = async (id, token) => {
   try {
     const response = await axios.delete(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`));
     return response.data;
@@ -67,9 +77,10 @@ export const deleteVectorStore = async (id) => {
  * @param {string} id - Vector store ID
  * @param {string} query - Query text
  * @param {Object} options - Additional query options like top_k
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with query results
  */
-export const testVectorStoreQuery = async (id, query, options = {}) => {
+export const testVectorStoreQuery = async (id, query, options = {}, token) => {
   try {
     const response = await axios.post(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/query`), 
@@ -95,9 +106,10 @@ export const testVectorStoreQuery = async (id, query, options = {}) => {
  * Analyze a vector store's content using an LLM
  * @param {string} id - Vector store ID
  * @param {Object} options - Analysis options like sample_size and summary_length
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with analysis results
  */
-export const analyzeVectorStore = async (id, options = {}) => {
+export const analyzeVectorStore = async (id, options = {}, token) => {
   try {
     const response = await axios.post(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/analyze`),
@@ -115,9 +127,10 @@ export const analyzeVectorStore = async (id, options = {}) => {
  * @param {string} id - Vector store ID
  * @param {string} query - Query text
  * @param {Object} options - Additional options like top_k, include_sources
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with LLM answer and optionally sources
  */
-export const llmQueryVectorStore = async (id, query, options = {}) => {
+export const llmQueryVectorStore = async (id, query, options = {}, token) => {
   try {
     const response = await axios.post(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/llm-query`),
@@ -144,9 +157,10 @@ export const llmQueryVectorStore = async (id, query, options = {}) => {
 /**
  * Get the status of a long-running job
  * @param {string} jobId - Job ID
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with job status
  */
-export const getJobStatus = async (jobId) => {
+export const getJobStatus = async (jobId, token) => {
   try {
     const response = await axios.get(getApiUrl('EMBEDDING', `/api/embedding/status/${jobId}`));
     return response.data;
@@ -160,7 +174,7 @@ export const getJobStatus = async (jobId) => {
  * Get available embedding models
  * @returns {Promise} - Response with list of available models
  */
-export const getEmbeddingModels = async () => {
+export const getEmbeddingModels = async (token) => {
   try {
     const response = await axios.get(getApiUrl('EMBEDDING', '/api/embedding/models'));
     return response.data;
@@ -174,9 +188,10 @@ export const getEmbeddingModels = async () => {
  * Add documents to an existing vector store
  * @param {string} id - Vector store ID
  * @param {Array} files - Array of file paths to add
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with job details
  */
-export const addDocumentsToVectorStore = async (id, files) => {
+export const addDocumentsToVectorStore = async (id, files, token) => {
   try {
     const response = await axios.post(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/update`),
@@ -195,7 +210,7 @@ export const addDocumentsToVectorStore = async (id, files) => {
  * @param {Object} operations - Object containing add (file paths) and remove (document IDs) arrays
  * @returns {Promise} - Response with job details
  */
-export const batchUpdateVectorStore = async (id, operations) => {
+export const batchUpdateVectorStore = async (id, operations, token) => {
   try {
     const response = await axios.post(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/batch_update`),
@@ -212,9 +227,10 @@ export const batchUpdateVectorStore = async (id, operations) => {
  * Remove documents from a vector store
  * @param {string} id - Vector store ID
  * @param {Array} documentIds - Array of document IDs to remove
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with operation status
  */
-export const removeDocumentsFromVectorStore = async (id, documentIds) => {
+export const removeDocumentsFromVectorStore = async (id, documentIds, token) => {
   try {
     const response = await axios.delete(
       getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/documents`),
@@ -230,9 +246,10 @@ export const removeDocumentsFromVectorStore = async (id, documentIds) => {
 /**
  * Clean up old vector store backups, keeping only the most recent ones.
  * @param {number} maxPerStore - Maximum number of backups to keep per vector store (optional)
+ * @param {string} token - The authentication token
  * @returns {Promise<Object>} - Response indicating success and number of backups removed
  */
-export const cleanupVectorStoreBackups = async (maxPerStore = 3) => {
+export const cleanupVectorStoreBackups = async (maxPerStore = 3, token) => {
   try {
     const response = await axios.post(getApiUrl('EMBEDDING', '/api/embedding/cleanup-backups'), { max_per_store: maxPerStore });
     return response.data;
