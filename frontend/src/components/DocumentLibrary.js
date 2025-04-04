@@ -25,22 +25,22 @@ import {
   Link,
   List,
   ListItem,
-  ListItemIcon,
   ListItemText,
   Select,
   MenuItem,
   CircularProgress,
+  Box,
+  Snackbar,
+  useTheme
 } from '@material-ui/core';
+import { makeStyles } from '@material-ui/core/styles';
 import {
   CloudUpload as UploadIcon,
-  Delete as DeleteIcon,
   Visibility as ViewIcon,
-  GetApp as DownloadIcon,
   Description as FileIcon,
   Folder as FolderIcon,
   CreateNewFolder as CreateFolderIcon,
   ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
   DragIndicator as DragIcon,
   Reply as MoveUpIcon,
 } from '@material-ui/icons';
@@ -48,6 +48,8 @@ import FilePreview from './FilePreview';
 import axios from 'axios';
 import { getApiUrl } from '../config';
 import { useDocumentLibrary, ACTIONS } from '../contexts/DocumentLibraryContext';
+import { StyledContainer, GradientBorderPaper, useContainerStyles, GradientText } from '../styles/StyledComponents';
+import { DeleteButton, DownloadButton, EditButton, ViewButton } from '../styles/ActionButtons';
 
 const SECURITY_CLASSIFICATIONS = [
   "SELECT A CLASSIFICATION",
@@ -96,7 +98,163 @@ const getFileNameWithoutExtension = (fileName) => {
   return lastDotIndex === -1 ? fileName : fileName.substring(0, lastDotIndex);
 };
 
-// Add ErrorBoundary component
+const useStyles = makeStyles((theme) => ({
+  root: {
+    padding: theme.spacing(3),
+    overflow: 'visible',
+  },
+  gridContainer: {
+    flexWrap: 'nowrap',
+  },
+  leftColumn: {
+    width: '25%',
+    minWidth: '300px',
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(2),
+    overflowY: 'auto',
+  },
+  rightColumn: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'visible',
+    gap: theme.spacing(2),
+  },
+  paperSection: {
+    padding: theme.spacing(2.5),
+  },
+  sectionTitle: {
+    marginBottom: theme.spacing(2),
+  },
+  tipsList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(1.5),
+  },
+  tipItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(1),
+  },
+  tipBullet: {
+    color: theme.palette.primary.main,
+    fontWeight: 'bold',
+    marginTop: theme.spacing(0.5),
+  },
+  fileListPaper: {
+    flex: '1 1 35%',
+    minHeight: 800,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  fileListHeader: {
+    padding: theme.spacing(2, 2.5),
+  },
+  breadcrumbsContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(1.5),
+    justifyContent: 'space-between',
+  },
+  breadcrumbLink: {
+    cursor: 'pointer',
+    padding: theme.spacing(0.5, 1),
+    borderRadius: theme.shape.borderRadius,
+    transition: theme.transitions.create('background-color'),
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  dragTipToolbar: {
+    backgroundColor: theme.palette.info.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1, 2),
+    marginBottom: theme.spacing(2),
+    minHeight: '48px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dragTipTextContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  bulkActionsContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  tableContainer: {
+    flexGrow: 1,
+    overflowY: 'auto',
+    position: 'relative',
+  },
+  table: {
+    minWidth: 650,
+    tableLayout: 'fixed',
+  },
+  tableHeadCell: {
+     backgroundColor: theme.palette.primary.main,
+     color: theme.palette.primary.contrastText,
+     fontWeight: 'bold',
+  },
+  tableRowHighlight: {
+    backgroundColor: `${theme.palette.error.main}33 !important`,
+    border: `2px solid ${theme.palette.error.main} !important`,
+  },
+  tableRowDropTarget: {
+     backgroundColor: theme.palette.action.selected,
+  },
+  classificationSelect: {
+    width: '100%',
+    borderRadius: theme.shape.borderRadius,
+  },
+  actionCell: {
+     display: 'flex',
+     gap: theme.spacing(0.5),
+  },
+  filePreviewPaper: {
+    flex: '1 1 65%',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  emptyPreview: {
+    padding: theme.spacing(4),
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing(1.5),
+    color: theme.palette.text.secondary,
+    flexGrow: 1,
+  },
+  emptyPreviewIcon: {
+     fontSize: 48,
+     opacity: 0.5,
+  },
+  errorBoundary: {
+    padding: theme.spacing(3),
+    textAlign: 'center',
+    backgroundColor: theme.palette.error.light + '33',
+    borderRadius: theme.shape.borderRadius,
+    margin: theme.spacing(3),
+    border: `1px solid ${theme.palette.error.main}`,
+  },
+  errorBoundaryButton: {
+    marginTop: theme.spacing(2),
+  },
+}));
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -114,32 +272,29 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ 
-          padding: '20px', 
-          textAlign: 'center', 
-          backgroundColor: '#ffebee',
-          borderRadius: '8px',
-          margin: '20px'
+        <Box sx={{
+          p: 3,
+          textAlign: 'center',
+          bgcolor: 'rgba(234, 67, 53, 0.1)',
+          borderRadius: 1,
+          m: 3,
+          border: '1px solid',
+          borderColor: 'error.main'
         }}>
-          <h2>Something went wrong.</h2>
-          <p>{this.state.error?.message}</p>
-          <button 
+          <Typography variant="h5" color="error" gutterBottom>Something went wrong.</Typography>
+          <Typography variant="body1" color="textSecondary" paragraph>{this.state.error?.message}</Typography>
+          <Button
+            variant="contained"
+            color="primary"
             onClick={() => {
               this.setState({ hasError: false, error: null });
               window.location.reload();
             }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#1976d2',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            sx={{ mt: 2 }}
           >
             Try Again
-          </button>
-        </div>
+          </Button>
+        </Box>
       );
     }
 
@@ -149,25 +304,15 @@ class ErrorBoundary extends React.Component {
 
 function DocumentLibrary() {
   const { state, dispatch } = useDocumentLibrary();
+  const classes = useStyles();
+  const theme = useTheme();
+  const containerClasses = useContainerStyles();
 
-  // Extract draggedItem and dropTarget early since we need them in auto-scroll functions
   const draggedItem = state?.draggedItem;
   const dropTarget = state?.dropTarget;
 
-  // Add ref for table container to enable auto-scrolling
   const tableContainerRef = useRef(null);
   
-  // Add state for auto-scrolling
-  const [autoScrollActive, setAutoScrollActive] = useState(false);
-  const [autoScrollDirection, setAutoScrollDirection] = useState(null);
-  const [scrollSpeed, setScrollSpeed] = useState(5);
-  const [mousePosition, setMousePosition] = useState({ y: 0 });
-  const autoScrollTimerRef = useRef(null);
-  
-  // Create a ref for the cleanup function to avoid circular dependencies
-  const cleanupDragOperationRef = useRef(null);
-
-  // Extract other needed state variables
   const documents = state?.documents || [];
   const selectedDocs = state?.selectedDocs || [];
   const previewFile = state?.previewFile;
@@ -185,284 +330,13 @@ function DocumentLibrary() {
   const itemToRename = state?.itemToRename;
   const newName = state?.newName;
 
-  // Add a ref to track the last time we processed a drag event
   const lastDragProcessTimeRef = useRef(0);
-  // Add a ref to store the current debounced drag handler
   const currentDragHandlerRef = useRef(null);
-  // Add a ref to directly store the dragged item outside of React state
   const draggedItemRef = useRef(null);
 
-  // Function to stop auto-scrolling
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollActive) {
-      setAutoScrollActive(false);
-      setAutoScrollDirection(null);
-      setScrollSpeed(5);
-      
-      if (autoScrollTimerRef.current) {
-        cancelAnimationFrame(autoScrollTimerRef.current);
-        autoScrollTimerRef.current = null;
-      }
-    }
-  }, [autoScrollActive]);
-  
-  // Function to start auto-scrolling when needed
-  const startAutoScroll = useCallback((passedDirection, passedSpeed) => {
-    // Check if we have a dragged item (from state or ref)
-    const effectiveDraggedItem = state?.draggedItem || draggedItemRef.current;
-    
-    // Only start if not already active, have a dragged item, and a valid container
-    if (!autoScrollActive && effectiveDraggedItem && tableContainerRef.current) {
-      // Set state to active right away
-      setAutoScrollActive(true);
-      
-      // Clear any existing timers
-      if (autoScrollTimerRef.current) {
-        cancelAnimationFrame(autoScrollTimerRef.current);
-        autoScrollTimerRef.current = null;
-      }
-      
-      // Use passed direction/speed if available, fall back to state, then defaults
-      const direction = passedDirection || autoScrollDirection || 'down';
-      const speed = passedSpeed || scrollSpeed || 10;
-      
-      // Force first scroll action for immediate feedback
-      if (tableContainerRef.current) {
-        // Get the current scroll metrics
-        const container = tableContainerRef.current;
-        const scrollTop = container.scrollTop;
-        const maxScroll = container.scrollHeight - container.clientHeight;
-        
-        // Immediate first scroll to improve responsiveness
-        if (direction === 'up') {
-          if (scrollTop > 0) {
-            container.scrollTop = Math.max(0, scrollTop - speed);
-          }
-        } else if (direction === 'down') {
-          if (scrollTop < maxScroll) {
-            container.scrollTop = Math.min(maxScroll, scrollTop + speed);
-          }
-        }
-      }
-      
-      // Use requestAnimationFrame for smoother performance
-      const scrollStep = () => {
-        if (!tableContainerRef.current || !autoScrollActive) {
-          stopAutoScroll();
-          return;
-        }
-        
-        // Continue to use the explicitly passed direction/speed throughout the animation
-        const currentDirection = direction;
-        const currentSpeed = speed;
-        
-        const container = tableContainerRef.current;
-        const scrollTop = container.scrollTop;
-        const maxScroll = container.scrollHeight - container.clientHeight;
-        
-        if (currentDirection === 'up') {
-          // Add a check to make sure we're not already at the top
-          if (scrollTop > 0) {
-            const oldScrollTop = scrollTop;
-            // Use Math.max to ensure we don't go below 0
-            container.scrollTop = Math.max(0, scrollTop - currentSpeed);
-            
-            // Calculate the actual change for debugging
-            const actualChange = oldScrollTop - container.scrollTop;
-            
-            // If we couldn't move at all, stop scrolling
-            if (actualChange === 0 && currentSpeed > 0) {
-              stopAutoScroll();
-              return;
-            }
-          } else {
-            // Stop if we've reached the top
-            stopAutoScroll();
-            return;
-          }
-        } else if (currentDirection === 'down') {
-          if (scrollTop < maxScroll) {
-            const oldScrollTop = scrollTop;
-            // Use Math.min to ensure we don't go above maxScroll
-            container.scrollTop = Math.min(maxScroll, scrollTop + currentSpeed);
-            
-            // Calculate the actual change for debugging
-            const actualChange = container.scrollTop - oldScrollTop;
-            
-            // If we couldn't move at all, stop scrolling
-            if (actualChange === 0 && currentSpeed > 0) {
-              stopAutoScroll();
-              return;
-            }
-          } else {
-            // Stop if we've reached the bottom
-            stopAutoScroll();
-            return;
-          }
-        } else {
-          // If no direction is set, stop scrolling
-          stopAutoScroll();
-          return;
-        }
-        
-        // Continue the animation loop only if still active
-        if (autoScrollActive) {
-          autoScrollTimerRef.current = requestAnimationFrame(scrollStep);
-        }
-      };
-      
-      // Start the animation loop
-      autoScrollTimerRef.current = requestAnimationFrame(scrollStep);
-    }
-  }, [autoScrollActive, autoScrollDirection, scrollSpeed, state?.draggedItem, stopAutoScroll]);
+  const cleanupDragOperationRef = useRef(null);
 
-  // Handle mouse movement during drag to determine scroll direction and speed
-  const handleDragMove = useCallback((e) => {
-    // Always prevent default for drag events
-    e.preventDefault();
-    
-    // Check both state and ref for dragged item
-    const effectiveDraggedItem = state?.draggedItem || draggedItemRef.current;
-    
-    // Only process if we have a container and are in a drag operation
-    if (!tableContainerRef.current) {
-      return;
-    }
-    
-    if (!effectiveDraggedItem) {
-      return;
-    }
-    
-    const container = tableContainerRef.current;
-    const rect = container.getBoundingClientRect();
-    
-    // Check if mouse is within the container bounds horizontally
-    const isInContainerX = e.clientX >= rect.left && e.clientX <= rect.right;
-    
-    const scrollTop = container.scrollTop;
-    const maxScroll = container.scrollHeight - container.clientHeight;
-    
-    // Define scroll zones (percentage of container height) - INCREASED SIZES
-    const topZoneSize = 0.4; // 40% of container height (was 30%)
-    const bottomZoneSize = 0.3; // 30% of container height (was 20%)
-    
-    const topZoneThreshold = rect.top + (rect.height * topZoneSize);
-    const bottomZoneThreshold = rect.bottom - (rect.height * bottomZoneSize);
-    
-    // Check which zone the mouse is in
-    let newDirection = null;
-    let newSpeed = 0;
-    let shouldStartScroll = false;
-    
-    if (e.clientY < topZoneThreshold && e.clientY >= rect.top) {
-      // In top scroll zone
-      if (scrollTop > 0) {
-        newDirection = 'up';
-        // Calculate intensity (0-1) - MADE MORE AGGRESSIVE
-        const intensity = 1.2 - ((e.clientY - rect.top) / (rect.height * topZoneSize));
-        // Clamp intensity between 0.1 and 1.0
-        const clampedIntensity = Math.min(Math.max(intensity, 0.1), 1.0);
-        // INCREASED SPEED RANGE (Min 10px, max 50px)
-        newSpeed = Math.ceil(clampedIntensity * 40) + 10;
-        shouldStartScroll = true;
-      }
-    } else if (e.clientY > bottomZoneThreshold && e.clientY <= rect.bottom) {
-      // In bottom scroll zone
-      if (scrollTop < maxScroll) {
-        newDirection = 'down';
-        // Calculate intensity (0-1) - MADE MORE AGGRESSIVE
-        const intensity = 1.2 * ((e.clientY - bottomZoneThreshold) / (rect.height * bottomZoneSize));
-        // Clamp intensity between 0.1 and 1.0
-        const clampedIntensity = Math.min(Math.max(intensity, 0.1), 1.0);
-        // INCREASED SPEED RANGE (Min 10px, max 50px)
-        newSpeed = Math.ceil(clampedIntensity * 40) + 10;
-        shouldStartScroll = true;
-      }
-    } else {
-      if (autoScrollActive) {
-        // Not in a scroll zone but auto-scroll is active
-        stopAutoScroll();
-      }
-    }
-    
-    // Start auto-scrolling if needed
-    if (shouldStartScroll) {
-      // Update state values (these may not be immediately available but we'll pass them directly)
-      if (autoScrollDirection !== newDirection) {
-        setAutoScrollDirection(newDirection);
-      }
-      if (scrollSpeed !== newSpeed) {
-        setScrollSpeed(newSpeed);
-      }
-      
-      // Pass the direction and speed directly to avoid relying on state updates
-      if (!autoScrollActive) {
-        // We need to start scrolling
-        startAutoScroll(newDirection, newSpeed);
-      } else {
-        // If scrolling is already active, just update the direction and speed
-        // This update may still need to scroll in a new direction
-        if (autoScrollDirection !== newDirection || scrollSpeed !== newSpeed) {
-          stopAutoScroll();
-          // No delay to make it more responsive
-          startAutoScroll(newDirection, newSpeed);
-        }
-      }
-    }
-    
-    // Update mouse position state for rendering scroll indicators
-    setMousePosition({ y: e.clientY });
-  }, [startAutoScroll, stopAutoScroll, autoScrollActive, autoScrollDirection, scrollSpeed, state?.draggedItem]);
-  
-  // Add cleanup function to handle any drag end
-  const cleanupDragOperation = useCallback(() => {
-    // Remove all drag-related event listeners
-    if (currentDragHandlerRef.current) {
-      document.removeEventListener('dragover', currentDragHandlerRef.current);
-      currentDragHandlerRef.current = null;
-    }
-    
-    document.removeEventListener('dragover', handleDragMove);
-    document.removeEventListener('dragend', cleanupDragOperationRef.current);
-    document.body.removeEventListener('dragend', cleanupDragOperationRef.current);
-    document.body.removeEventListener('drop', cleanupDragOperationRef.current);
-    
-    // Stop auto-scrolling if active
-    if (autoScrollActive) {
-      stopAutoScroll();
-    }
-    
-    // Clear dragged item state
-    setDraggedItem(null);
-    draggedItemRef.current = null;
-    setDropTarget(null);
-  }, [handleDragMove, stopAutoScroll, autoScrollActive]);
-
-  // Store the cleanup function in ref to avoid circular dependencies
-  cleanupDragOperationRef.current = cleanupDragOperation;
-  
-  // Add effect to clean up auto-scrolling when component unmounts
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('dragover', handleDragMove);
-      document.removeEventListener('dragend', cleanupDragOperationRef.current);
-      if (autoScrollTimerRef.current) {
-        cancelAnimationFrame(autoScrollTimerRef.current);
-        autoScrollTimerRef.current = null;
-      }
-    };
-  }, [handleDragMove]);
-
-  // Modify the useEffect for container event listener to prevent duplicate events
-  useEffect(() => {
-    // We'll handle drag events at the document level instead of having both
-    // document and container listeners to avoid duplicate processing
-    return () => {};
-  }, []);
-
-  // Memoize the fetchDocuments function
   const fetchDocuments = useCallback(async (path) => {
-    // Skip if already refreshing
     if (state?.isRefreshing) {
       return;
     }
@@ -482,21 +356,17 @@ function DocumentLibrary() {
         throw new Error('Invalid response format: expected an array');
       }
       
-      // Transform the data and explicitly sort to ensure folders appear at the top
       const processedDocuments = data.map(doc => ({
         ...doc,
         isFolder: doc.type === 'folder',
-        id: doc.path, // Ensure unique ID for each item
+        id: doc.path,
         securityClassification: doc.security_classification || doc.securityClassification || 'SELECT A CLASSIFICATION'
       }));
       
-      // Sort to ensure folders are always at the top
       const sortedDocuments = processedDocuments.sort((a, b) => {
-        // First sort by type (folders first)
         if (a.isFolder && !b.isFolder) return -1;
         if (!a.isFolder && b.isFolder) return 1;
         
-        // Then sort alphabetically by name within each type
         return a.name.localeCompare(b.name);
       });
       
@@ -513,14 +383,12 @@ function DocumentLibrary() {
     }
   }, [state?.isRefreshing, dispatch]);
 
-  // Only fetch documents when the path changes
   useEffect(() => {
     if (state?.currentPath !== undefined) {
       fetchDocuments(state.currentPath);
     }
-  }, [state?.currentPath]); // Only depend on the path changes
+  }, [state?.currentPath]);
 
-  // State setters
   const setSelectedDocs = (docs) => dispatch({ type: ACTIONS.SET_SELECTED_DOCS, payload: docs });
   const setPreviewFile = (file) => dispatch({ type: ACTIONS.SET_PREVIEW_FILE, payload: file });
   const setDragOver = (isDragOver) => dispatch({ type: ACTIONS.SET_DRAG_OVER, payload: isDragOver });
@@ -537,7 +405,6 @@ function DocumentLibrary() {
   const setDraggedItem = (item) => dispatch({ type: ACTIONS.SET_DRAGGED_ITEM, payload: item });
   const setDropTarget = (target) => dispatch({ type: ACTIONS.SET_DROP_TARGET, payload: target });
   const setOperationProgress = (progress) => {
-    // Ensure progress has the correct structure
     const formattedProgress = typeof progress === 'string' 
       ? { status: progress, processed_items: undefined, total_items: undefined }
       : progress;
@@ -545,7 +412,6 @@ function DocumentLibrary() {
     dispatch({ type: ACTIONS.SET_OPERATION_PROGRESS, payload: formattedProgress });
   };
 
-  // File Upload Drag and Drop Handlers
   const handleFileUploadDragOver = (e) => {
     e.preventDefault();
     setDragOver(true);
@@ -572,7 +438,7 @@ function DocumentLibrary() {
   const uploadFiles = async (files) => {
     const formData = new FormData();
     files.forEach(file => {
-      formData.append('files', file);  // Changed from 'file' to 'files' to match backend parameter name
+      formData.append('files', file);
     });
     formData.append('folder', currentPath);
 
@@ -595,14 +461,12 @@ function DocumentLibrary() {
       const results = await response.json();
       console.log('Upload response:', results);
       
-      // Check for any upload errors
       if (results.status === 'error') {
         console.error('Failed to upload:', results.message);
         setError('Failed to upload: ' + results.message);
         return;
       }
 
-      // Create a status message based on results
       let statusMessage;
       if (results.status === 'success') {
         statusMessage = `Successfully uploaded ${results.total_uploaded} file(s)`;
@@ -617,7 +481,6 @@ function DocumentLibrary() {
         total_items: results.total_uploaded + (results.total_failed || 0)
       });
 
-      // Refresh the document list from the server to get the latest security classifications
       await fetchDocuments(currentPath);
       
     } catch (error) {
@@ -630,7 +493,6 @@ function DocumentLibrary() {
     try {
       const isFolder = item.type === 'folder';
       
-      // Show browser's built-in confirmation dialog
       const confirmMessage = isFolder 
         ? `Are you sure you want to delete the folder "${item.name}" and all its contents? This action cannot be undone.`
         : `Are you sure you want to delete the file "${item.name}"? This action cannot be undone.`;
@@ -645,22 +507,12 @@ function DocumentLibrary() {
 
       await axios.delete(endpoint);
       
-      // Refresh file list
       fetchDocuments(currentPath);
       
-      // Show success notification
-      setOperationProgress({
-        status: `Successfully deleted ${isFolder ? 'folder' : 'file'}: ${item.name}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setOperationProgress(`Successfully deleted ${isFolder ? 'folder' : 'file'}: ${item.name}`);
     } catch (error) {
       console.error('Error deleting:', error);
-      setOperationProgress({
-        status: `Error deleting ${item.type}: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setError(`Error deleting ${item.type}: ${error.message}`);
     }
   };
 
@@ -670,7 +522,6 @@ function DocumentLibrary() {
 
   const handleDownload = async (fileItem) => {
     try {
-      // Properly encode the full path
       const encodedPath = fileItem.path.split('/')
         .map(segment => encodeURIComponent(segment))
         .join('/');
@@ -695,11 +546,9 @@ function DocumentLibrary() {
   };
 
   const handleFileUpdate = (filePath) => {
-    // Refresh the document list after a file update
     fetchDocuments(filePath);
   };
 
-  // Bulk Selection Handlers
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
       setSelectedDocs(documents.map(doc => doc.id));
@@ -717,47 +566,32 @@ function DocumentLibrary() {
     }
   };
 
-  // Update the checkbox checked state with safety check
   const isSelected = (docId) => {
     const currentSelected = Array.isArray(selectedDocs) ? selectedDocs : [];
     return currentSelected.includes(docId);
   };
 
-  // Bulk Action Handlers
   const handleBulkDelete = async () => {
     try {
       const selectedItems = documents.filter(doc => selectedDocs.includes(doc.id));
       
-      // Show confirmation with count
       if (!window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items? This action cannot be undone.`)) {
         return;
       }
       
-      // Get paths and remove duplicates
       const filePaths = [...new Set(selectedItems.map(item => item.path))];
       
-      // Perform the bulk delete
       await axios.post(getApiUrl('UPLOAD', '/api/upload/bulk-delete/'), {
         filenames: filePaths
       });
       
-      // Clear selection and refresh
       setSelectedDocs([]);
       fetchDocuments(currentPath);
       
-      // Show success message
-      setOperationProgress({
-        status: `Successfully deleted ${filePaths.length} items`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setOperationProgress(`Successfully deleted ${filePaths.length} items`);
     } catch (error) {
       console.error('Error performing bulk delete:', error);
-      setOperationProgress({
-        status: `Error performing bulk delete: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setError(`Error performing bulk delete: ${error.message}`);
     }
   };
 
@@ -781,7 +615,6 @@ function DocumentLibrary() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Handle the ZIP file download
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -830,10 +663,9 @@ function DocumentLibrary() {
     if (!item.isFolder) return;
     
     const folderPath = item.path;
-    console.log('Navigating to folder:', folderPath); // Add debug logging
+    console.log('Navigating to folder:', folderPath);
     setCurrentPath(folderPath);
     updateBreadcrumbs(folderPath);
-    // Clear selected files when navigating to a new folder
     setSelectedDocs([]);
   };
 
@@ -860,7 +692,6 @@ function DocumentLibrary() {
     const newPath = parts.join('/');
     setCurrentPath(newPath);
     updateBreadcrumbs(newPath);
-    // Clear selected files when navigating back
     setSelectedDocs([]);
   };
 
@@ -879,7 +710,7 @@ function DocumentLibrary() {
           old_name: itemToRename.name,
           new_name: fullNewName,
           folder: currentPath,
-          update_metadata: true  // Add flag to update metadata content
+          update_metadata: true
         })
       });
 
@@ -892,48 +723,46 @@ function DocumentLibrary() {
       setItemToRename(null);
       setNewName("");
 
-      // Show success message
-      setOperationProgress({
-        status: `Successfully renamed ${itemToRename.isFolder ? 'folder' : 'file'} to ${fullNewName}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setOperationProgress(`Successfully renamed ${itemToRename.isFolder ? 'folder' : 'file'} to ${fullNewName}`);
     } catch (error) {
       console.error('Error renaming item:', error);
       setError('Failed to rename item: ' + error.message);
     }
   };
 
-  // Enhance drag start handler
+  const cleanupDragOperation = useCallback(() => {
+      document.removeEventListener('dragend', cleanupDragHandler, { once: true });
+      document.body.removeEventListener('dragend', cleanupDragHandler, { once: true });
+      document.body.removeEventListener('drop', cleanupDragHandler, { once: true });
+
+      setDraggedItem(null);
+      draggedItemRef.current = null;
+      setDropTarget(null);
+  }, [setDraggedItem, setDropTarget]);
+
+  cleanupDragOperationRef.current = cleanupDragOperation;
+
+  const cleanupDragHandler = () => {
+      if (cleanupDragOperationRef.current) {
+          cleanupDragOperationRef.current();
+      }
+  };
+
   const handleDragStart = (e, item) => {
     e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
-    
-    // Remove any existing listeners first to prevent duplicates
-    document.removeEventListener('dragover', handleDragMove);
-    document.removeEventListener('dragend', cleanupDragOperationRef.current);
-    
-    // Create a direct handler function that logs and prevents default
-    const dragMoveHandler = (moveEvent) => {
-      // Always prevent default in dragover handlers - this is needed to allow dropping
-      moveEvent.preventDefault();
-      
-      // Call our regular handler
-      handleDragMove(moveEvent);
-    };
-    
-    // The rest of the existing drag start code
-    const itemsToDrag = selectedDocs.includes(item.id) ? 
-      documents.filter(doc => selectedDocs.includes(doc.id)) : 
+
+    document.removeEventListener('dragend', cleanupDragHandler);
+    document.body.removeEventListener('dragend', cleanupDragHandler);
+    document.body.removeEventListener('drop', cleanupDragHandler);
+
+    const itemsToDrag = selectedDocs.includes(item.id) ?
+      documents.filter(doc => selectedDocs.includes(doc.id)) :
       [item];
-    
-    // Store the dragged item in the ref for direct access
+
     draggedItemRef.current = itemsToDrag;
-    
-    // Set the state (this may not be available immediately in event handlers)
     setDraggedItem(itemsToDrag);
 
-    // Create drag image before setting draggedItem
     const dragImage = document.createElement('div');
     dragImage.className = 'drag-image';
     const dragText = itemsToDrag.length > 1 ? 
@@ -962,47 +791,40 @@ function DocumentLibrary() {
 
     document.body.appendChild(dragImage);
     e.dataTransfer.setDragImage(dragImage, 10, 10);
-    setTimeout(() => document.body.removeChild(dragImage), 0);
-    
-    // Add a small delay before attaching handler
     setTimeout(() => {
-      // Store handler reference and attach it
-      currentDragHandlerRef.current = dragMoveHandler;
-      document.addEventListener('dragover', dragMoveHandler, { passive: false });
-      
-      // Add dragend to body and document for backup
-      document.addEventListener('dragend', cleanupDragOperationRef.current);
-      document.body.addEventListener('dragend', cleanupDragOperationRef.current);
-      document.body.addEventListener('drop', cleanupDragOperationRef.current);
-    }, 10);
-    
-    // Safety timeout to cleanup if events somehow get lost
+        if (document.body.contains(dragImage)) {
+             document.body.removeChild(dragImage);
+        }
+    }, 0);
+
+    document.addEventListener('dragend', cleanupDragHandler, { once: true });
+    document.body.addEventListener('dragend', cleanupDragHandler, { once: true });
+    document.body.addEventListener('drop', cleanupDragHandler, { once: true });
+
     setTimeout(() => {
       if (state?.draggedItem || draggedItemRef.current) {
-        cleanupDragOperationRef.current();
+        if (cleanupDragOperationRef.current) {
+            cleanupDragOperationRef.current();
+        }
       }
     }, 30000);
   };
 
-  // Enhance handleDrop to clean up event listeners
   const handleDrop = async (e, targetFolder) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.style.backgroundColor = '';
-    
-    // Clean up event listeners and stop auto-scrolling
+    const currentDraggedItem = draggedItemRef.current;
     cleanupDragOperationRef.current();
-    
-    if (!state?.draggedItem || !targetFolder?.isFolder || 
-        (Array.isArray(state.draggedItem) ? state.draggedItem.some(item => item.id === targetFolder.id) : state.draggedItem.id === targetFolder.id)) {
+
+    if (!currentDraggedItem || !targetFolder?.isFolder ||
+        (Array.isArray(currentDraggedItem) ? currentDraggedItem.some(item => item.id === targetFolder.id) : currentDraggedItem.id === targetFolder.id)) {
       return;
     }
 
-    // Rest of the existing drop handler...
     try {
-      const sourcePaths = Array.isArray(state.draggedItem) ? 
-        state.draggedItem.map(item => item.path) : 
-        [state.draggedItem.path];
+      const sourcePaths = Array.isArray(currentDraggedItem) ?
+        currentDraggedItem.map(item => item.path) :
+        [currentDraggedItem.path];
 
       const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
@@ -1016,7 +838,6 @@ function DocumentLibrary() {
       });
 
       if (!response.ok) {
-        // Try to extract detailed error information if available
         try {
           const errorData = await response.json();
           throw new Error(
@@ -1025,7 +846,6 @@ function DocumentLibrary() {
             `HTTP error! status: ${response.status}`
           );
         } catch (jsonError) {
-          // If we can't parse the JSON, just throw the original error
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       }
@@ -1033,7 +853,6 @@ function DocumentLibrary() {
       const result = await response.json();
       await fetchDocuments(currentPath);
       
-      // Check if there were any partial failures
       if (result.results && result.results.failed && result.results.failed.length > 0) {
         const failedCount = result.results.failed.length;
         const successCount = result.results.successful.length;
@@ -1042,45 +861,28 @@ function DocumentLibrary() {
           processed_items: undefined,
           total_items: undefined
         });
-        // Log details of failures for debugging
         console.log('Failed moves:', result.results.failed);
       } else {
-        setOperationProgress({
-          status: `Successfully moved ${sourcePaths.length} item(s) to ${targetFolder.name}`,
-          processed_items: undefined,
-          total_items: undefined
-        });
+        setOperationProgress(`Successfully moved ${sourcePaths.length} item(s) to ${targetFolder.name}`);
       }
     } catch (error) {
       console.error('Error moving items:', error);
-      setOperationProgress({
-        status: `Error moving items: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
-    } finally {
-      setDraggedItem(null);
-      draggedItemRef.current = null;
-      setDropTarget(null);
+      setError(`Error moving items: ${error.message}`);
     }
   };
 
-  // Also enhance breadcrumb drop handler to clean up
   const handleBreadcrumbDrop = async (e, crumb) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.style.backgroundColor = '';
-    
-    // Clean up event listeners and stop auto-scrolling
+    const currentDraggedItem = draggedItemRef.current;
     cleanupDragOperationRef.current();
-    
-    if (!state?.draggedItem) return;
-    
-    // Rest of the existing handler code...
+
+    if (!currentDraggedItem) return;
+
     try {
-      const sourcePaths = Array.isArray(state.draggedItem) ? 
-        state.draggedItem.map(item => item.path) : 
-        [state.draggedItem.path];
+      const sourcePaths = Array.isArray(currentDraggedItem) ?
+        currentDraggedItem.map(item => item.path) :
+        [currentDraggedItem.path];
 
       const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
         method: 'POST',
@@ -1093,56 +895,37 @@ function DocumentLibrary() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       await fetchDocuments(currentPath);
-      setOperationProgress({
-        status: `Successfully moved ${sourcePaths.length} item(s) to ${crumb.name}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setOperationProgress(`Successfully moved ${sourcePaths.length} item(s) to ${crumb.name}`);
     } catch (error) {
       console.error('Error moving items:', error);
-      setOperationProgress({
-        status: `Error moving items: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
-    } finally {
-      setDraggedItem(null);
-      draggedItemRef.current = null;
+      setError(`Error moving items: ${error.message}`);
     }
   };
 
   const handleDragOver = (e, item) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Check if we have a dragged item (from state or ref)
-    const draggedItem = state?.draggedItem || draggedItemRef.current;
-    
-    if (item?.isFolder && draggedItem) {
-      // Only set if they're different items
-      const isDifferentItem = Array.isArray(draggedItem) ? 
-        !draggedItem.some(drag => drag.id === item.id) : 
-        draggedItem.id !== item.id;
+    const currentDraggedItem = draggedItemRef.current;
+
+    if (item?.isFolder && currentDraggedItem) {
+      const isDifferentItem = Array.isArray(currentDraggedItem) ?
+        !currentDraggedItem.some(drag => drag.id === item.id) :
+        currentDraggedItem.id !== item.id;
 
       if (isDifferentItem) {
         setDropTarget(item);
-        e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
       }
     }
   };
 
   const handleDragLeave = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (item?.isFolder) {
-      setDropTarget(null);
-      e.currentTarget.style.backgroundColor = '';
+    const relatedTarget = e.relatedTarget;
+    if (!e.currentTarget.contains(relatedTarget)) {
+        if (dropTarget?.id === item?.id) {
+            setDropTarget(null);
+        }
     }
   };
 
@@ -1180,9 +963,7 @@ function DocumentLibrary() {
     }
   };
 
-  // Update the breadcrumb click handler
   const handleBreadcrumbClick = (path) => {
-    // If clicking "Root", reset everything to initial state
     if (path === "") {
       setCurrentPath("");
       setBreadcrumbs([{ name: "Root", path: "" }]);
@@ -1190,23 +971,17 @@ function DocumentLibrary() {
       setCurrentPath(path);
       updateBreadcrumbs(path);
     }
-    // Clear selected files when navigating via breadcrumbs
     setSelectedDocs([]);
   };
 
-  // Add these handlers for breadcrumb drag and drop
   const handleBreadcrumbDragOver = (e, crumb) => {
     e.preventDefault();
     e.stopPropagation();
-    // Show visual feedback
-    e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
   };
 
   const handleBreadcrumbDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Remove visual feedback
-    e.currentTarget.style.backgroundColor = '';
   };
 
   const handleClassificationChange = async (item, newClassification) => {
@@ -1217,10 +992,8 @@ function DocumentLibrary() {
       });
 
       if (response.status === 200) {
-        // Refresh documents from server to ensure consistency
         await fetchDocuments(currentPath);
         
-        // Show success message
         setOperationProgress({
           status: `Successfully updated classification for ${item.name}`,
           processed_items: undefined,
@@ -1229,798 +1002,473 @@ function DocumentLibrary() {
       }
     } catch (error) {
       console.error('Error updating classification:', error);
-      setOperationProgress({
-        status: `Error updating classification: ${error.message}`,
-        processed_items: undefined,
-        total_items: undefined
-      });
+      setError(`Error updating classification: ${error.message}`);
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (cleanupDragOperationRef.current) {
+         cleanupDragOperationRef.current();
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <ErrorBoundary>
-      <main style={{ 
-        padding: '20px', 
-        height: 'calc(100vh + 1000px)',
-        overflow: 'hidden' 
-      }}>
-        <Container maxWidth={false} style={{ 
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <Grid 
-            container 
-            spacing={3} 
-            style={{ 
-              height: '100%',
-              flexWrap: 'nowrap'
-            }}
-          >
-            {/* Left Column - Upload and Tips Sections */}
-            <Grid 
-              item 
-              style={{ 
-                width: '20%',
-                minWidth: '250px',
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                maxHeight: '100%',
-                overflow: 'auto'
-              }}
-            >
-              {/* Upload Section */}
-              <Paper className="paper" style={{ height: 'auto', padding: '20px' }}>
-                <div className="section">
-                  <Typography variant="h6" className="section-title">
-                    Upload Documents
-                  </Typography>
-                  <Typography variant="subtitle2" className="text-secondary">
-                    Add new PDF, DOCX, or TXT documents to the library
-                  </Typography>
-                </div>
+      <StyledContainer maxWidth={false} className={classes.root}>
+        <Grid container spacing={2} className={classes.gridContainer}>
+          <Grid item className={classes.leftColumn}>
+            <GradientText sx={{ mt: 3, mb: 2, display: 'block', textAlign: 'center' }}>
+              <Typography variant="h1" fontWeight="600" fontSize={'5rem'} gutterBottom sx={{ mb: 0 }}>
+                Document Library
+              </Typography>
+            </GradientText>
 
-                <div
-                  className={`dropzone ${dragOver ? 'active' : ''}`}
-                  onDragOver={handleFileUploadDragOver}
-                  onDragLeave={handleFileUploadDragLeave}
-                  onDrop={handleFileUploadDrop}
-                  style={{ 
-                    margin: '20px 0',
-                    padding: '20px',
-                    border: '2px dashed #ccc',
-                    borderRadius: '4px',
-                    textAlign: 'center'
-                  }}
-                >
-                  <input
-                    type="file"
-                    id="file-upload"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
-                  />
-                  <label htmlFor="file-upload">
-                    <Button
-                      component="span"
-                      variant="contained"
-                      className="upload-button"
-                      startIcon={<UploadIcon />}
-                    >
-                      Upload Files
-                    </Button>
-                  </label>
-                  <Typography variant="body2" style={{ marginTop: '1rem' }}>
-                    or drag and drop files here
-                  </Typography>
-                </div>
-              </Paper>
+            <GradientBorderPaper elevation={2} className={classes.paperSection}>
+              <Typography variant="h6" className={classes.sectionTitle}>
+                Upload Documents
+              </Typography>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                Add new PDF, DOCX, or TXT documents to the library
+              </Typography>
 
-              {/* Document Preparation Tips */}
-              <Paper className="paper" style={{ height: 'auto', padding: '20px' }}>
-                <Typography variant="h6" className="section-title" style={{ marginBottom: '16px' }}>
-                  Document Preparation Tips
+              <Box className={`${containerClasses.dropzone} ${dragOver ? 'active' : ''}`} onDragOver={handleFileUploadDragOver} onDragLeave={handleFileUploadDragLeave} onDrop={handleFileUploadDrop} sx={{ my: 2.5, p: 2.5 }}>
+                <input
+                  type="file"
+                  id="file-upload"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
+                <label htmlFor="file-upload">
+                  <Button
+                    component="span"
+                    variant="contained"
+                    color="primary"
+                    startIcon={<UploadIcon />}
+                  >
+                    Upload Files
+                  </Button>
+                </label>
+                <Typography variant="body2" sx={{ mt: 1.5 }}>
+                  or drag and drop files here
                 </Typography>
-                <Typography variant="body2" style={{ marginBottom: '12px' }}>
-                  For optimal data extraction and fine-tuning results:
-                </Typography>
-                <ul style={{ 
-                  listStyle: 'none', 
-                  padding: 0,
-                  margin: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Remove headers, footers, and page numbers that don't contribute to the content
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Clean up any OCR artifacts or scanning errors in the text
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Ensure proper paragraph breaks and formatting consistency
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Remove any irrelevant tables, figures, or references that might confuse the model
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Break long documents into logical, topic-based sections
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Standardize formatting of dates, numbers, and special characters
-                    </Typography>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>•</span>
-                    <Typography variant="body2">
-                      Remove any sensitive or classified information not intended for training
-                    </Typography>
-                  </li>
-                </ul>
-              </Paper>
-            </Grid>
+              </Box>
+            </GradientBorderPaper>
 
-            {/* Right Column - File List and Preview */}
-            <Grid 
-              item 
-              style={{ 
-                flex: 1,
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                overflow: 'hidden'
-              }}
-            >
-              <Paper className="paper" style={{ 
-                flex: '2 1 35%',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                marginBottom: '16px'
-              }}>
-                <div className="section" style={{ marginBottom: '12px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    marginBottom: '12px',
-                    justifyContent: 'space-between'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      {currentPath && (
-                        <IconButton onClick={handleNavigateBack} style={{ marginRight: '8px' }}>
+            <GradientBorderPaper elevation={2} className={classes.paperSection}>
+              <Typography variant="h6" className={classes.sectionTitle}>
+                Document Preparation Tips
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1.5 }}>
+                For optimal data extraction and fine-tuning results:
+              </Typography>
+              <ul className={classes.tipsList}>
+                {[
+                  "Remove headers, footers, and page numbers that don't contribute to the content",
+                  "Clean up any OCR artifacts or scanning errors in the text",
+                  "Ensure proper paragraph breaks and formatting consistency",
+                  "Remove any irrelevant tables, figures, or references that might confuse the model",
+                  "Break long documents into logical, topic-based sections",
+                  "Standardize formatting of dates, numbers, and special characters",
+                  "Remove any sensitive or classified information not intended for training",
+                ].map((tip, index) => (
+                  <li key={index} className={classes.tipItem}>
+                    <span className={classes.tipBullet}>•</span>
+                    <Typography variant="body2">{tip}</Typography>
+                  </li>
+                ))}
+              </ul>
+            </GradientBorderPaper>
+          </Grid>
+
+          <Grid item className={classes.rightColumn}>
+            <GradientBorderPaper elevation={3} className={classes.fileListPaper}>
+              <Box className={classes.fileListHeader}>
+                <Box className={classes.breadcrumbsContainer}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {currentPath && (
+                      <Tooltip title="Go to Parent Folder">
+                        <IconButton onClick={handleNavigateBack} size="small" sx={{ mr: 1 }}>
                           <ArrowBackIcon />
                         </IconButton>
-                      )}
-                      <Breadcrumbs aria-label="breadcrumb">
-                        {breadcrumbs.map((crumb, index) => (
-                          <Link
-                            key={index}
-                            component="button"
-                            onClick={() => handleBreadcrumbClick(crumb.path)}
-                            style={{ 
-                              cursor: 'pointer',
-                              color: index === breadcrumbs.length - 1 ? 'text.primary' : 'inherit',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              transition: 'background-color 0.2s'
-                            }}
-                            onDragOver={(e) => handleBreadcrumbDragOver(e, crumb)}
-                            onDragLeave={handleBreadcrumbDragLeave}
-                            onDrop={(e) => handleBreadcrumbDrop(e, crumb)}
-                          >
-                            {crumb.name}
-                          </Link>
-                        ))}
-                      </Breadcrumbs>
-                    </div>
-                    <Button
-                      variant="outlined"
-                      startIcon={<CreateFolderIcon />}
-                      onClick={() => setNewFolderDialogOpen(true)}
-                      style={{ marginLeft: '16px' }}
-                    >
-                      Create New Folder
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Combined Tip and Bulk Actions Bar */}
-                <Toolbar 
-                  style={{ 
-                    backgroundColor: 'rgba(79, 195, 247, 0.08)',
-                    borderRadius: '4px',
-                    padding: '8px 16px',
-                    marginBottom: '16px',
-                    minHeight: '48px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  {/* Tip Section - Left Side */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <DragIcon style={{ color: 'var(--primary-color)' }} />
-                    <Typography variant="body2" style={{ color: 'var(--text-color-dark)' }}>
-                      Tip: Drag and drop files or folders to move them. Drop files onto folders in the list or on the breadcrumb menu above to move them.
-                    </Typography>
-                  </div>
-
-                  {/* Bulk Actions Section - Right Side */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Typography style={{ marginRight: '16px' }} color="inherit" variant="subtitle1">
-                      {selectedDocs.length} {selectedDocs.length === 1 ? 'item' : 'items'} selected
-                    </Typography>
-                    {currentPath && (
-                      <Tooltip title="Move to Parent Folder">
-                        <span>
-                          <IconButton 
-                            onClick={handleMoveToParent}
-                            disabled={selectedDocs.length === 0}
-                            style={{ 
-                              opacity: selectedDocs.length === 0 ? 0.5 : 1 
-                            }}
-                          >
-                            <MoveUpIcon />
-                          </IconButton>
-                        </span>
                       </Tooltip>
                     )}
-                    <Tooltip title="Download Selected">
-                      <span>
-                        <IconButton 
-                          onClick={handleBulkDownload}
-                          disabled={selectedDocs.length === 0}
-                          style={{ 
-                            opacity: selectedDocs.length === 0 ? 0.5 : 1 
-                          }}
+                    <Breadcrumbs aria-label="breadcrumb">
+                      {breadcrumbs.map((crumb, index) => (
+                        <Link
+                          key={index}
+                          component="button"
+                          onClick={() => handleBreadcrumbClick(crumb.path)}
+                          underline="hover"
+                          color={index === breadcrumbs.length - 1 ? 'textPrimary' : 'inherit'}
+                          onDragOver={(e) => handleBreadcrumbDragOver(e, crumb)}
+                          onDragLeave={handleBreadcrumbDragLeave}
+                          onDrop={(e) => handleBreadcrumbDrop(e, crumb)}
+                          className={classes.breadcrumbLink}
                         >
-                          <DownloadIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Delete Selected">
-                      <span>
-                        <IconButton 
-                          onClick={handleBulkDelete}
-                          disabled={selectedDocs.length === 0}
-                          style={{ 
-                            opacity: selectedDocs.length === 0 ? 0.5 : 1 
-                          }}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </div>
-                </Toolbar>
-
-                <TableContainer 
-                  ref={tableContainerRef}
-                  className="table-container" 
-                  style={{ 
-                    margin: '0', 
-                    position: 'relative',
-                    maxHeight: 'calc(100% - 120px)',  // Subtract space for header and tip
-                    overflow: 'auto'  // Enable scrolling
-                  }}
-                  onDragOver={(e) => {
-                    // Add a container-level dragover handler to ensure we always get events
-                    // even when the mouse is not over a specific table row
-                    e.preventDefault();
-                    
-                    // Reduced debounce time to make it more responsive (50ms instead of 100ms)
-                    const now = Date.now();
-                    if (now - lastDragProcessTimeRef.current > 50) {
-                      lastDragProcessTimeRef.current = now;
-                      
-                      // Call the regular handler
-                      if (currentDragHandlerRef.current) {
-                        currentDragHandlerRef.current(e);
-                      } else {
-                        // Fallback to direct handler
-                        handleDragMove(e);
-                      }
-                    }
-                  }}
-                  onDragLeave={(e) => {
-                    // Only trigger if we're leaving the entire container
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const isActuallyLeaving = 
-                      e.clientX < rect.left || 
-                      e.clientX > rect.right ||
-                      e.clientY < rect.top || 
-                      e.clientY > rect.bottom;
-                      
-                    if (isActuallyLeaving) {
-                      stopAutoScroll();
-                    }
-                  }}
-                >
-                  {/* Add scroll indicators with increased height to match larger zones */}
-                  {autoScrollActive && autoScrollDirection === 'up' && (
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '60px', // Increased from 40px
-                        background: 'linear-gradient(to bottom, rgba(25, 118, 210, 0.3), transparent)',
-                        pointerEvents: 'none',
-                        zIndex: 2,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'flex-start',
-                        paddingTop: '5px'
-                      }}
-                    >
-                      <div style={{ 
-                        color: '#1976d2', 
-                        fontWeight: 'bold',
-                        backgroundColor: 'rgba(255,255,255,0.7)',
-                        padding: '2px 8px',
-                        borderRadius: '10px'
-                      }}>
-                        Auto-Scrolling ↑
-                      </div>
-                    </div>
-                  )}
-                  
-                  {autoScrollActive && autoScrollDirection === 'down' && (
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: '60px', // Increased from 40px
-                        background: 'linear-gradient(to top, rgba(25, 118, 210, 0.3), transparent)',
-                        pointerEvents: 'none',
-                        zIndex: 2,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'flex-end',
-                        paddingBottom: '5px'
-                      }}
-                    >
-                      <div style={{ 
-                        color: '#1976d2', 
-                        fontWeight: 'bold',
-                        backgroundColor: 'rgba(255,255,255,0.7)',
-                        padding: '2px 8px',
-                        borderRadius: '10px'
-                      }}>
-                        Auto-Scrolling ↓
-                      </div>
-                    </div>
-                  )}
-
-                  {(isLoading || isRefreshing) && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1
-                    }}>
-                      <Typography>Zipping your files for download...</Typography>
-                    </div>
-                  )}
-                  
-                  <Table 
-                    className="table" 
-                    style={{ 
-                      minWidth: 650,
-                      tableLayout: 'fixed'
-                    }} 
-                    size="small"
-                    stickyHeader
+                          {crumb.name || "Root"}
+                        </Link>
+                      ))}
+                    </Breadcrumbs>
+                  </Box>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<CreateFolderIcon />}
+                    onClick={() => setNewFolderDialogOpen(true)}
                   >
-                    <TableHead>
-                      <TableRow>
-                        <TableCell padding="checkbox" style={{ width: '40px' }}>
-                          <Checkbox
-                            indeterminate={selectedDocs.length > 0 && selectedDocs.length < documents.length}
-                            checked={documents.length > 0 && selectedDocs.length === documents.length}
-                            onChange={handleSelectAllClick}
-                          />
-                        </TableCell>
-                        <TableCell style={{ width: '50%' }}>Name</TableCell>
-                        <TableCell style={{ width: '20%' }}>Classification</TableCell>
-                        <TableCell style={{ width: '5%' }}>Type</TableCell>
-                        <TableCell style={{ width: '10%' }}>Upload Date</TableCell>
-                        <TableCell style={{ width: '15%' }}>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Array.isArray(documents) && documents.map((item) => (
-                        <TableRow 
-                          key={item.id}
-                          hover
-                          onClick={(e) => {
-                            // Ignore clicks on checkbox cell, classification dropdown, and action buttons
-                            if (e.target.closest('.checkbox-cell') || 
-                                e.target.closest('.MuiSelect-root') || 
-                                e.target.closest('.actions-cell')) {
-                              return;
-                            }
-                            
-                            // For folders, handle single click to select
-                            if (item.isFolder) {
-                              handleSelectDoc(item.id);
-                            } else {
-                              // For files, toggle the checkbox
-                              handleSelectDoc(item.id);
-                            }
-                          }}
-                          onDoubleClick={(e) => {
-                            // Ignore double clicks on controls
-                            if (e.target.closest('.checkbox-cell') || 
-                                e.target.closest('.MuiSelect-root') || 
-                                e.target.closest('.actions-cell')) {
-                              return;
-                            }
-                            
-                            // Navigate into folder on double click
-                            if (item.isFolder) {
-                              handleFolderClick(item);
-                            }
-                          }}
-                          style={{ 
-                            cursor: item.isFolder ? 'pointer' : 'default',
-                            backgroundColor: dropTarget?.id === item.id 
-                              ? 'rgba(25, 118, 210, 0.08)' 
-                              : (!item.isFolder && item.securityClassification === 'SELECT A CLASSIFICATION')
-                                ? 'rgba(244, 67, 54, 0.08)'
-                                : undefined,
-                            border: (!item.isFolder && item.securityClassification === 'SELECT A CLASSIFICATION')
-                              ? '2px solid #f44336'
-                              : undefined
-                          }}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, item)}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            if (item?.isFolder && 
-                                (!state?.draggedItem || 
-                                 (Array.isArray(state?.draggedItem) 
-                                  ? !state?.draggedItem.some(i => i.id === item.id)
-                                  : state?.draggedItem.id !== item.id))) {
-                              
-                              setDropTarget(item);
-                              e.currentTarget.style.backgroundColor = 'rgba(25, 118, 210, 0.08)';
-                            }
-                          }}
-                          onDragLeave={(e) => handleDragLeave(e, item)}
-                          onDrop={(e) => handleDrop(e, item)}
+                    Create Folder
+                  </Button>
+                </Box>
+              </Box>
+
+              <Toolbar className={classes.dragTipToolbar}>
+                <Box className={classes.dragTipTextContainer}>
+                  <DragIcon color="primary" />
+                  <Typography variant="body2" color="textPrimary">
+                    Tip: Drag and drop items to move them into folders or use breadcrumbs.
+                  </Typography>
+                </Box>
+
+                <Box className={classes.bulkActionsContainer}>
+                  <Typography color="textSecondary" variant="subtitle2" sx={{ mr: 1 }}>
+                    {selectedDocs.length || 0} selected
+                  </Typography>
+                  {currentPath && (
+                    <Tooltip title="Move Selected to Parent Folder">
+                      <span>
+                        <IconButton
+                          onClick={handleMoveToParent}
+                          disabled={!selectedDocs.length}
+                          size="small"
                         >
-                          <TableCell padding="checkbox" style={{ width: '60px' }} className="checkbox-cell">
-                            <Checkbox
-                              checked={isSelected(item.id)}
-                              onChange={(e) => {
-                                e.stopPropagation();
+                          <MoveUpIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+                  <DownloadButton
+                     onClick={handleBulkDownload}
+                     tooltip="Download Selected"
+                     disabled={!selectedDocs.length}
+                     size="small"
+                   />
+                   <DeleteButton
+                     onClick={handleBulkDelete}
+                     tooltip="Delete Selected"
+                     disabled={!selectedDocs.length}
+                     size="small"
+                   />
+                </Box>
+              </Toolbar>
+
+              <TableContainer ref={tableContainerRef} className={classes.tableContainer}>
+                {(isLoading) && (
+                  <Box sx={{ }}>
+                    <CircularProgress />
+                     <Typography sx={{ mt: 1 }}>Zipping files...</Typography>
+                  </Box>
+                )}
+                 {isRefreshing && !isLoading && (
+                    <Box sx={{ }}>
+                        <CircularProgress size={24} />
+                        <Typography sx={{ ml: 1 }}>Loading...</Typography>
+                    </Box>
+                 )}
+
+                <Table className={classes.table} size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell padding="checkbox" sx={{ width: '60px', ...classes.tableHeadCell }}>
+                        <Checkbox
+                          indeterminate={selectedDocs.length > 0 && selectedDocs.length < documents.length}
+                          checked={documents.length > 0 && selectedDocs.length === documents.length}
+                          onChange={handleSelectAllClick}
+                          color="primary"
+                          sx={{ color: theme.palette.primary.contrastText }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ width: '40%', ...classes.tableHeadCell }}>Name</TableCell>
+                      <TableCell sx={{ width: '25%', ...classes.tableHeadCell }}>Classification</TableCell>
+                      <TableCell sx={{ width: '10%', ...classes.tableHeadCell }}>Type</TableCell>
+                      <TableCell sx={{ width: '10%', ...classes.tableHeadCell }}>Date</TableCell>
+                      <TableCell sx={{ width: '15%', ...classes.tableHeadCell }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Array.isArray(documents) && documents.map((item) => {
+                       const isItemSelected = isSelected(item.id);
+                       const needsClassification = !item.isFolder && item.securityClassification === 'SELECT A CLASSIFICATION';
+                       const isDropTarget = dropTarget?.id === item.id;
+
+                       return (
+                          <TableRow
+                            key={item.id}
+                            hover
+                            selected={isItemSelected}
+                            onClick={(e) => {
+                              if (e.target.closest('.checkbox-cell') || 
+                                  e.target.closest('.MuiSelect-root') || 
+                                  e.target.closest('.actions-cell')) {
+                                return;
+                              }
+                              
+                              if (item.isFolder) {
                                 handleSelectDoc(item.id);
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell style={{ width: '40%' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {item.isFolder ? (
-                                <FolderIcon style={{ color: '#FFC107' }} />
-                              ) : (
-                                <FileIcon />
-                              )}
-                              {item.isFolder ? item.name : (item.name ? getFileNameWithoutExtension(item.name) : '')}
-                            </div>
-                          </TableCell>
-                          <TableCell style={{ width: '20%' }}>
-                            {!item.isFolder ? (
-                              <Select
-                                value={item.securityClassification || 'SELECT A CLASSIFICATION'}
-                                onChange={(e) => handleClassificationChange(item, e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ 
-                                  width: '100%',
-                                  backgroundColor: item.securityClassification === 'SELECT A CLASSIFICATION' 
-                                    ? 'rgba(244, 67, 54, 0.08)'
-                                    : undefined,
-                                  border: item.securityClassification === 'SELECT A CLASSIFICATION'
-                                    ? '2px solid #f44336'
-                                    : undefined,
-                                  borderRadius: '4px'
+                              } else {
+                                handleSelectDoc(item.id);
+                              }
+                            }}
+                            onDoubleClick={(e) => {
+                              if (e.target.closest('.checkbox-cell') || 
+                                  e.target.closest('.MuiSelect-root') || 
+                                  e.target.closest('.actions-cell')) {
+                                return;
+                              }
+                              
+                              if (item.isFolder) {
+                                handleFolderClick(item);
+                              }
+                            }}
+                            className={needsClassification ? classes.tableRowHighlight : ''}
+                            sx={{
+                              cursor: item.isFolder ? 'pointer' : 'default',
+                              ...(isDropTarget && classes.tableRowDropTarget),
+                              '&.Mui-selected': {
+                                 backgroundColor: theme.palette.action.selected + ' !important',
+                              },
+                              '&.Mui-selected:hover': {
+                                 backgroundColor: theme.palette.action.hover + ' !important',
+                              }
+                            }}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, item)}
+                            onDragOver={(e) => handleDragOver(e, item)}
+                            onDragLeave={(e) => handleDragLeave(e, item)}
+                            onDrop={(e) => handleDrop(e, item)}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={isItemSelected}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectDoc(item.id);
                                 }}
-                                size="small"
-                              >
-                                {SECURITY_CLASSIFICATIONS.map((classification) => (
-                                  <MenuItem key={classification} value={classification}>
-                                    {classification}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            ) : (
-                              <Typography variant="body2" color="textSecondary">
-                                N/A
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell style={{ width: '10%' }}>{item.type}</TableCell>
-                          <TableCell style={{ width: '15%' }}>{new Date(item.uploadDate).toLocaleDateString()}</TableCell>
-                          <TableCell style={{ width: '15%' }} className="actions-cell">
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              {!item.isFolder && (
-                                <>
-                                  <Tooltip title="Preview File">
-                                    <IconButton
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handlePreview(item);
-                                      }}
+                                color="primary"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                {item.isFolder ? (
+                                  <FolderIcon sx={{ color: '#FFC107' }} />
+                                ) : (
+                                  <FileIcon />
+                                )}
+                                <Typography variant="body2" noWrap>
+                                   {item.isFolder ? item.name : (item.name ? getFileNameWithoutExtension(item.name) : '')}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                               {!item.isFolder ? (
+                                 <Select
+                                   value={item.securityClassification || 'SELECT A CLASSIFICATION'}
+                                   onChange={(e) => handleClassificationChange(item, e.target.value)}
+                                   onClick={(e) => e.stopPropagation()}
+                                   variant="outlined"
+                                   size="small"
+                                   className={classes.classificationSelect}
+                                   sx={{
+                                     borderColor: needsClassification ? 'error.main' : undefined,
+                                     '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: needsClassification ? `${theme.palette.error.main} !important` : undefined,
+                                        borderWidth: needsClassification ? '2px !important' : undefined,
+                                     },
+                                     '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: needsClassification ? `${theme.palette.error.main} !important` : theme.palette.primary.main,
+                                        borderWidth: needsClassification ? '2px !important' : undefined,
+                                     },
+                                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: needsClassification ? `${theme.palette.error.main} !important` : undefined,
+                                        borderWidth: needsClassification ? '2px !important' : undefined,
+                                     }
+                                   }}
+                                 >
+                                   {SECURITY_CLASSIFICATIONS.map((classification) => (
+                                     <MenuItem key={classification} value={classification}>
+                                       {classification}
+                                     </MenuItem>
+                                   ))}
+                                 </Select>
+                               ) : (
+                                 <Typography variant="body2" color="textSecondary">N/A</Typography>
+                               )}
+                            </TableCell>
+                            <TableCell>
+                               <Typography variant="body2">{item.type}</Typography>
+                            </TableCell>
+                            <TableCell>
+                               <Typography variant="body2">{new Date(item.uploadDate).toLocaleDateString()}</Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box className={classes.actionCell}>
+                                {!item.isFolder && (
+                                  <>
+                                    <ViewButton
+                                      onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                                      tooltip="Preview File"
                                       size="small"
-                                    >
-                                      <ViewIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Download File">
-                                    <IconButton
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDownload(item);
-                                      }}
+                                    />
+                                    <DownloadButton
+                                      onClick={(e) => { e.stopPropagation(); handleDownload(item); }}
+                                      tooltip="Download File"
                                       size="small"
-                                    >
-                                      <DownloadIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                </>
-                              )}
-                              <Tooltip title={`Rename ${item.isFolder ? 'Folder' : 'File'}`}>
-                                <IconButton
+                                    />
+                                  </>
+                                )}
+                                <EditButton
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setItemToRename(item);
                                     setNewName(item.isFolder ? item.name : (item.name ? getFileNameWithoutExtension(item.name) : ''));
                                     setRenameDialogOpen(true);
                                   }}
+                                  tooltip={`Rename ${item.isFolder ? 'Folder' : 'File'}`}
                                   size="small"
-                                >
-                                  <EditIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title={`Delete ${item.isFolder ? 'Folder' : 'File'}`}>
-                                <IconButton
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(item);
-                                  }}
+                                />
+                                <DeleteButton
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(item); }}
+                                  tooltip={`Delete ${item.isFolder ? 'Folder' : 'File'}`}
                                   size="small"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                />
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                     })}
 
-                      {/* Add empty state handling */}
-                      {(!Array.isArray(documents) || documents.length === 0) && !isLoading && (
-                        <TableRow>
-                          <TableCell colSpan={6} align="center">
-                            <Typography variant="body1" color="textSecondary">
-                              No documents found
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                    {(!Array.isArray(documents) || documents.length === 0) && !isLoading && !isRefreshing && (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center">
+                          <Typography variant="body1" color="textSecondary" sx={{ p: 3 }}>
+                            No documents or folders found in this location.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </GradientBorderPaper>
 
-                      {/* Add loading state */}
-                      {isLoading && (
-                        <TableRow>
-                          <TableCell colSpan={6} align="center">
-                            <CircularProgress />
-                            <Typography variant="body1" color="textSecondary" style={{ marginTop: '10px' }}>
-                              Loading documents...
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-
-              {/* File Preview Section */}
-              <Paper className="paper" style={{ 
-                flex: '1 1 65%',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                minHeight: '300px'  // Add minimum height
-              }}>
-                {previewFile ? (
-                  <FilePreview file={previewFile} onFileUpdate={handleFileUpdate} />
-                ) : (
-                  <div style={{ 
-                    padding: '2rem', 
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px',
-                    color: 'rgba(0, 0, 0, 0.6)'
-                  }}>
-                    <ViewIcon style={{ fontSize: 48, opacity: 0.5 }} />
-                    <Typography variant="body1">
-                      Click the preview <ViewIcon style={{ fontSize: 16, verticalAlign: 'middle' }}/> button next to a file to view its contents
-                    </Typography>
-                  </div>
-                )}
-              </Paper>
-            </Grid>
+            <GradientBorderPaper elevation={1} className={classes.filePreviewPaper}>
+              {previewFile ? (
+                <FilePreview file={previewFile} onFileUpdate={handleFileUpdate} />
+              ) : (
+                <Box className={classes.emptyPreview}>
+                  <ViewIcon className={classes.emptyPreviewIcon}/>
+                  <Typography variant="body1">
+                    Select a file and click the <ViewIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mx: 0.5 }}/> preview button to view its contents.
+                  </Typography>
+                </Box>
+              )}
+            </GradientBorderPaper>
           </Grid>
-        </Container>
+        </Grid>
+      </StyledContainer>
 
-        {/* Create Folder Dialog */}
-        <Dialog
-          open={newFolderDialogOpen}
-          onClose={() => setNewFolderDialogOpen(false)}
-          aria-labelledby="form-dialog-title"
-        >
-          <DialogTitle id="form-dialog-title">Create New Folder</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Enter a name for the new folder
-            </DialogContentText>
-            <TextField
-              autoFocus
-              margin="dense"
-              id="name"
-              label="Folder Name"
-              type="text"
-              fullWidth
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleCreateFolder();
-                }
-              }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setNewFolderDialogOpen(false)} color="primary">
-              Cancel
-            </Button>
-            <Button onClick={handleCreateFolder} color="primary">
-              Create
-            </Button>
-          </DialogActions>
-        </Dialog>
+      <Dialog
+        open={newFolderDialogOpen}
+        onClose={() => setNewFolderDialogOpen(false)}
+        aria-labelledby="create-folder-dialog-title"
+      >
+        <DialogTitle id="create-folder-dialog-title">Create New Folder</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Enter a name for the new folder in the current directory ({currentPath || 'Root'}).
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="new-folder-name"
+            label="Folder Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateFolder(); } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewFolderDialogOpen(false)} color="primary">Cancel</Button>
+          <Button onClick={handleCreateFolder} color="primary" variant="contained">Create</Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Rename Dialog */}
-        <Dialog
-          open={renameDialogOpen}
-          onClose={() => {
-            setRenameDialogOpen(false);
-            setItemToRename(null);
-            setNewName("");
-          }}
-          aria-labelledby="rename-dialog-title"
-        >
-          <DialogTitle id="rename-dialog-title">
-            Rename {itemToRename?.isFolder ? 'Folder' : 'File'}
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Enter a new name for {itemToRename?.isFolder ? 
-                itemToRename?.name : 
-                getFileNameWithoutExtension(itemToRename?.name)}
-              {!itemToRename?.isFolder && (
-                <span style={{ color: 'text.secondary' }}>
-                  {itemToRename?.name.substring(itemToRename?.name.lastIndexOf('.'))}
-                </span>
-              )}
-            </DialogContentText>
-            <TextField
-              autoFocus
-              margin="dense"
-              id="name"
-              label="New Name"
-              type="text"
-              fullWidth
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleRename();
-                }
-              }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => {
-              setRenameDialogOpen(false);
-              setItemToRename(null);
-              setNewName("");
-            }} color="primary">
-              Cancel
-            </Button>
-            <Button onClick={handleRename} color="primary">
-              Rename
-            </Button>
-          </DialogActions>
-        </Dialog>
+      <Dialog
+        open={renameDialogOpen}
+        onClose={() => {
+          setRenameDialogOpen(false);
+          setItemToRename(null);
+          setNewName("");
+        }}
+        aria-labelledby="rename-dialog-title"
+      >
+        <DialogTitle id="rename-dialog-title">Rename {itemToRename?.isFolder ? 'Folder' : 'File'}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+             Enter a new name for "{itemToRename?.isFolder ? itemToRename?.name : getFileNameWithoutExtension(itemToRename?.name)}"
+             {!itemToRename?.isFolder && (
+               <Typography component="span" color="textSecondary">
+                 {itemToRename?.name.substring(itemToRename?.name.lastIndexOf('.'))}
+               </Typography>
+             )}
+           </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="rename-name"
+            label="New Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRename(); } }}
+          />
+        </DialogContent>
+        <DialogActions>
+           <Button onClick={() => {
+             setRenameDialogOpen(false);
+             setItemToRename(null);
+             setNewName("");
+           }} color="primary">Cancel</Button>
+           <Button onClick={handleRename} color="primary" variant="contained">Rename</Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Operation Progress */}
-        {operationProgress?.status && (
-          <div style={{
-            position: 'fixed',
-            bottom: 16,
-            right: 16,
-            padding: '16px',
-            backgroundColor: '#fff',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            zIndex: 1000
-          }}>
-            <Typography variant="body2">
-              {operationProgress.status}
-              {operationProgress.processed_items !== undefined && (
-                ` (${operationProgress.processed_items}/${operationProgress.total_items})`
-              )}
-            </Typography>
-          </div>
-        )}
+      <Snackbar
+        open={!!operationProgress}
+        autoHideDuration={4000}
+        onClose={() => setOperationProgress(null)}
+        message={typeof operationProgress === 'string' ? operationProgress : operationProgress?.status}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      />
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+          <Paper sx={{ bgcolor: 'error.main', color: 'error.contrastText', p: 2, borderRadius: 1 }}>
+              <Typography variant="body2">{error}</Typography>
+          </Paper>
+      </Snackbar>
 
-        {/* Error Display */}
-        {error && (
-          <div style={{
-            position: 'fixed',
-            bottom: 16,
-            right: 16,
-            padding: '16px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            zIndex: 1000
-          }}>
-            <Typography variant="body2">
-              {error}
-            </Typography>
-          </div>
-        )}
-      </main>
     </ErrorBoundary>
   );
 }
