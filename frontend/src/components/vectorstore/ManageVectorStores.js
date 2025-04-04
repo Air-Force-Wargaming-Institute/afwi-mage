@@ -1366,7 +1366,7 @@ function ManageVectorStores() {
       <Dialog
         open={filePreviewOpen}
         onClose={handleCloseFilePreview}
-        maxWidth="md"
+        maxWidth='lg'
         fullWidth
       >
         <DialogTitle style={{ paddingBottom: 8 }}>
@@ -2244,8 +2244,15 @@ function ManageVectorStores() {
           <Dialog
             open={detailsDialogOpen}
             onClose={handleCloseDetails}
-            maxWidth="xl"
+            maxWidth={false}
             fullWidth
+            PaperProps={{
+              style: { 
+                width: '95%', 
+                maxWidth: '2500px', 
+                height: '90vh'
+              }
+            }}
           >
             {selectedStore && <VectorStoreDetails 
               vectorStore={selectedStore} 
