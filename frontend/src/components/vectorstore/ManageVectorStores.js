@@ -456,7 +456,7 @@ function ManageVectorStores() {
     
     // Fetch more detailed information
     try {
-      const detailedStore = await getVectorStoreById(store.id);
+      const detailedStore = await getVectorStoreById(store.id, token);
       
       if (detailedStore) {
         console.log("Fetched vector store details:", detailedStore);
@@ -520,7 +520,7 @@ function ManageVectorStores() {
     setIsDeleting(true);
     
     try {
-      await deleteVectorStore(storeToDelete.id);
+      await deleteVectorStore(storeToDelete.id, token);
       
       // Update local state
       setVectorStores(prevStores => 
@@ -555,7 +555,7 @@ function ManageVectorStores() {
 
   const handleSaveEdit = async (updatedStore) => {
     try {
-      const result = await updateVectorStore(updatedStore.id, updatedStore);
+      const result = await updateVectorStore(updatedStore.id, updatedStore, token);
       
       // Update local state
       setVectorStores(prevStores => 
@@ -968,7 +968,7 @@ function ManageVectorStores() {
     if (!selectedStore) return;
     
     try {
-      const refreshedStore = await getVectorStoreById(selectedStore.id);
+      const refreshedStore = await getVectorStoreById(selectedStore.id, token);
       
       if (refreshedStore) {
         // Update selected store with refreshed information
@@ -1002,7 +1002,7 @@ function ManageVectorStores() {
     
     setIsCleaningBackups(true);
     try {
-      const result = await cleanupVectorStoreBackups();
+      const result = await cleanupVectorStoreBackups(3, token);
       setSnackbar({
         open: true,
         message: `${result.message} ${result.details}`,

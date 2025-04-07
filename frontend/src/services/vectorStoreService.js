@@ -31,7 +31,11 @@ export const getVectorStores = async (params = {}, token) => {
  */
 export const getVectorStoreById = async (id, token) => {
   try {
-    const response = await axios.get(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`));
+    const response = await axios.get(getGatewayUrl(`/api/embedding/vectorstores/${id}`), {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching vector store ${id}:`, error);
@@ -48,7 +52,11 @@ export const getVectorStoreById = async (id, token) => {
  */
 export const updateVectorStore = async (id, data, token) => {
   try {
-    const response = await axios.put(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`), data);
+    const response = await axios.put(getGatewayUrl(`/api/embedding/vectorstores/${id}`), data, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error(`Error updating vector store ${id}:`, error);
@@ -64,7 +72,11 @@ export const updateVectorStore = async (id, data, token) => {
  */
 export const deleteVectorStore = async (id, token) => {
   try {
-    const response = await axios.delete(getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}`));
+    const response = await axios.delete(getGatewayUrl(`/api/embedding/vectorstores/${id}`), {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error(`Error deleting vector store ${id}:`, error);
@@ -83,8 +95,13 @@ export const deleteVectorStore = async (id, token) => {
 export const testVectorStoreQuery = async (id, query, options = {}, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/query`), 
-      { query, ...options }
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/query`), 
+      { query, ...options },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     
     // Process and normalize the results to ensure consistent metadata structure
@@ -112,8 +129,13 @@ export const testVectorStoreQuery = async (id, query, options = {}, token) => {
 export const analyzeVectorStore = async (id, options = {}, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/analyze`),
-      options
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/analyze`),
+      options,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -133,8 +155,13 @@ export const analyzeVectorStore = async (id, options = {}, token) => {
 export const llmQueryVectorStore = async (id, query, options = {}, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/llm-query`),
-      { query, ...options }
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/llm-query`),
+      { query, ...options },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
 
     // Process sources if they exist
@@ -162,7 +189,11 @@ export const llmQueryVectorStore = async (id, query, options = {}, token) => {
  */
 export const getJobStatus = async (jobId, token) => {
   try {
-    const response = await axios.get(getApiUrl('EMBEDDING', `/api/embedding/status/${jobId}`));
+    const response = await axios.get(getGatewayUrl(`/api/embedding/status/${jobId}`), {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error(`Error getting job status for ${jobId}:`, error);
@@ -176,7 +207,11 @@ export const getJobStatus = async (jobId, token) => {
  */
 export const getEmbeddingModels = async (token) => {
   try {
-    const response = await axios.get(getApiUrl('EMBEDDING', '/api/embedding/models'));
+    const response = await axios.get(getGatewayUrl('/api/embedding/models'), {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error('Error fetching embedding models:', error);
@@ -194,8 +229,13 @@ export const getEmbeddingModels = async (token) => {
 export const addDocumentsToVectorStore = async (id, files, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/update`),
-      { vectorstore_id: id, files }
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/update`),
+      { vectorstore_id: id, files },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -213,8 +253,13 @@ export const addDocumentsToVectorStore = async (id, files, token) => {
 export const batchUpdateVectorStore = async (id, operations, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/batch_update`),
-      operations
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/batch_update`),
+      operations,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -233,8 +278,12 @@ export const batchUpdateVectorStore = async (id, operations, token) => {
 export const removeDocumentsFromVectorStore = async (id, documentIds, token) => {
   try {
     const response = await axios.delete(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${id}/documents`),
-      { data: { document_ids: documentIds } }
+      getGatewayUrl(`/api/embedding/vectorstores/${id}/documents`),
+      { data: { document_ids: documentIds },
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -251,7 +300,11 @@ export const removeDocumentsFromVectorStore = async (id, documentIds, token) => 
  */
 export const cleanupVectorStoreBackups = async (maxPerStore = 3, token) => {
   try {
-    const response = await axios.post(getApiUrl('EMBEDDING', '/api/embedding/cleanup-backups'), { max_per_store: maxPerStore });
+    const response = await axios.post(getGatewayUrl('/api/embedding/cleanup-backups'), { max_per_store: maxPerStore }, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     return response.data;
   } catch (error) {
     console.error('Error cleaning up vector store backups:', error);

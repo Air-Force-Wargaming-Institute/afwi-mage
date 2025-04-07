@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
   Box,
   Button,
@@ -33,6 +33,7 @@ import AccordionSummary from '@material-ui/core/AccordionSummary';
 import AccordionDetails from '@material-ui/core/AccordionDetails';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
+import { AuthContext } from '../../contexts/AuthContext';
 
 import { testVectorStoreQuery, analyzeVectorStore, llmQueryVectorStore } from '../../services/vectorStoreService';
 import { MetadataDisplay, SecurityClassification } from './MetadataDisplay';
@@ -344,6 +345,7 @@ const useStyles = makeStyles((theme) => ({
 
 const QueryTester = ({ vectorStore }) => {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [queryText, setQueryText] = useState('');
   const [queryResults, setQueryResults] = useState(null);
   const [displayedResults, setDisplayedResults] = useState([]);
@@ -465,7 +467,8 @@ const QueryTester = ({ vectorStore }) => {
           { 
             top_k: topK,
             score_threshold: scoreThreshold
-          }
+          },
+          token
         );
         
         // Update state with results
@@ -487,7 +490,8 @@ const QueryTester = ({ vectorStore }) => {
             score_threshold: scoreThreshold,
             use_llm: true,
             include_sources: true
-          }
+          },
+          token
         );
         
         setLlmResponse(response);
@@ -517,7 +521,8 @@ const QueryTester = ({ vectorStore }) => {
           sample_size: sampleSize,
           summary_length: 'long',
           sampling_strategy: samplingStrategy
-        }
+        },
+        token
       );
       
       // Log the raw response for debugging
