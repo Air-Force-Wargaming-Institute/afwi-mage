@@ -243,7 +243,7 @@ http:
         healthCheck:
           path: "/api/auth/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     chat-service:
@@ -253,7 +253,7 @@ http:
         healthCheck:
           path: "/api/chat/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     upload-service:
@@ -263,7 +263,7 @@ http:
         healthCheck:
           path: "/api/upload/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     agent-service:
@@ -273,7 +273,7 @@ http:
         healthCheck:
           path: "/api/agent/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     core-service:
@@ -283,7 +283,7 @@ http:
         healthCheck:
           path: "/api/core/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     extraction-service:
@@ -293,7 +293,7 @@ http:
         healthCheck:
           path: "/api/extraction/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     generation-service:
@@ -303,7 +303,7 @@ http:
         healthCheck:
           path: "/api/generation/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     review-service:
@@ -313,7 +313,7 @@ http:
         healthCheck:
           path: "/api/review/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     embedding-service:
@@ -323,7 +323,7 @@ http:
         healthCheck:
           path: "/api/embedding/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true
           
     direct-chat-service:
@@ -333,5 +333,5 @@ http:
         healthCheck:
           path: "/api/direct_chat/health"
           interval: "120s"
-          timeout: "120s"
+          timeout: "5s"
           followRedirects: true

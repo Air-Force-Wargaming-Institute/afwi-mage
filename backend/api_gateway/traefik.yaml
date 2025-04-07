@@ -58,5 +58,5 @@ serversTransport:
   maxIdleConnsPerHost: 10
   forwardingTimeouts:
     dialTimeout: 10s
-    responseHeaderTimeout: 10s
-    idleConnTimeout: 10s 
+    responseHeaderTimeout: 1200s
+    idleConnTimeout: 1200s 

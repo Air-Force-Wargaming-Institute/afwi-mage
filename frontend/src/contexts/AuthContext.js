@@ -170,7 +170,13 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       
       // Fetch user details
-      const userResponse = await authenticatedFetch(getGatewayUrl('/api/auth/users/me'));
+      const userResponse = await fetch(getGatewayUrl('/api/auth/users/me'),
+      {
+      headers: {
+        // Use the access_token variable directly, bypassing the potentially stale state
+        'Authorization': `Bearer ${access_token}`, 
+      },
+    });
       
       if (!userResponse.ok) throw new Error('Failed to fetch user details');
       
