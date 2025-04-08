@@ -19,7 +19,7 @@ class OllamaLLM:
     LLM integration class for Ollama models.
     """
     
-    def __init__(self, model: str = "llama3.2:latest", base_url: str = None):
+    def __init__(self, model: str = "huihui_ai/llama3.2-abliterate:latest", base_url: str = None):
         """
         Initialize Ollama LLM integration.
         
@@ -90,7 +90,7 @@ class OllamaLLM:
         """
         if preferred_models is None:
             # Default models in order of preference
-            preferred_models = ["llama3.2:latest", "llama3.1:latest"]
+            preferred_models = ["huihui_ai/llama3.2-abliterate:latest", "llama3.1:latest"]
         
         # Get available models
         available_models = self.get_available_models()

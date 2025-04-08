@@ -9,7 +9,7 @@ ollama:
   base_url: http://host.docker.internal:11434
   
   # Model identifier for Ollama
-  ollama_model: huihui_ai/granite3.2-abliterated:latest   
+  ollama_model: huihui_ai/llama3.2-abliterate:latest   
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused

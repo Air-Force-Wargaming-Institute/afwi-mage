@@ -466,7 +466,7 @@ def get_llm_response(prompt: str) -> str:
             
             # Use llama3.2 as a reasonable default model if available
             # Models like llama3.2, mistral, or gemma are good choices for this task
-            model = "llama3.2:latest"
+            model = "huihui_ai/llama3.2-abliterate:latest"
             
             # Log the model and URL being used
             logger.info(f"Using Ollama API at {url} with model {model}")
@@ -500,7 +500,7 @@ def get_llm_response(prompt: str) -> str:
                 logger.error(f"Error from Ollama API: Status {response.status_code}, message: {response.text}")
                 
                 # Try alternate model if the first one failed
-                if model == "llama3.2:latest":
+                if model == "huihui_ai/llama3.2-abliterate:latest":
                     logger.info("Trying fallback to mistral model")
                     payload["model"] = "mistral"
                     response = requests.post(url, json=payload, timeout=60)

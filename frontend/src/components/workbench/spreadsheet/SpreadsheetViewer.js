@@ -321,7 +321,13 @@ const SpreadsheetViewer = () => {
     }
     
     return (
-      <TableContainer component={Paper} variant="outlined" sx={{ height: '100%', overflow: 'auto' }}>
+      <TableContainer component={Paper} variant="outlined" sx={{ 
+        height: '100%', 
+        overflow: 'auto',
+        backgroundColor: 'rgba(30, 30, 30, 0.9)',
+        color: '#ffffff',
+        borderColor: 'rgba(66, 133, 244, 0.3)'
+      }}>
         <Table aria-label="spreadsheets table" size="small" stickyHeader>
           <TableHead>
             <TableRow>

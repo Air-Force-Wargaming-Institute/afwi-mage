@@ -95,7 +95,7 @@ if __name__ == "__main__":
     print("Available models:", models)
     
     # Check if specific model exists
-    model_name = "llama3.2:latest"
+    model_name = "huihui_ai/llama3.2-abliterate:latest"
     exists = ollama.model_exists(model_name)
     print(f"Model {model_name} exists: {exists}")
     

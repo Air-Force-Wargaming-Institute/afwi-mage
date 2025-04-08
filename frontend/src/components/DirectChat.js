@@ -2252,6 +2252,7 @@ const DocumentUploadPane = ({
             style={{
               fontWeight: 500,
               marginBottom: '8px',
+              fontSize: '1.2rem',
               color: 'rgba(255, 255, 255, 0.7)'
             }}
           >
@@ -2288,7 +2289,7 @@ const DocumentUploadPane = ({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Build Retrieval Databases
+            Click here to Build/Manage Retrieval Databases
           </Link>
         </div>
         

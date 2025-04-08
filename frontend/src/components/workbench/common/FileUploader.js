@@ -166,14 +166,15 @@ const FileUploader = ({
       <Paper
         variant="outlined"
         sx={{
-          backgroundColor: isDragging ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-          border: isDragging ? '2px dashed #1976d2' : '2px dashed #cccccc',
+          backgroundColor: isDragging ? 'rgba(66, 133, 244, 0.15)' : 'rgba(30, 30, 30, 0.9)',
+          border: isDragging ? '2px dashed #4285f4' : '2px dashed #333333',
           borderRadius: '8px',
           padding: '24px',
           textAlign: 'center',
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.6 : 1,
-          transition: 'all 0.2s ease'
+          transition: 'all 0.2s ease',
+          color: '#ffffff'
         }}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -190,14 +191,14 @@ const FileUploader = ({
           disabled={disabled}
         />
         
-        <CloudUploadIcon style={{ fontSize: 48, color: '#1976d2', marginBottom: '16px' }} />
+        <CloudUploadIcon style={{ fontSize: 48, color: '#4285f4', marginBottom: '16px' }} />
         
         {!file ? (
           <>
             <Typography variant="h6" gutterBottom>
               Drag & Drop File Here
             </Typography>
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" color="text.secondary">
               or {disabled ? '(Disabled)' : 'click to browse files'}
             </Typography>
             <Typography variant="caption" display="block" style={{ marginTop: '8px' }}>
@@ -214,7 +215,7 @@ const FileUploader = ({
             <Typography variant="h6" gutterBottom>
               {file.name}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" color="text.secondary">
               {(file.size / (1024 * 1024)).toFixed(2)}MB
             </Typography>
           </>
@@ -231,6 +232,22 @@ const FileUploader = ({
           onChange={(e) => setFileDescription(e.target.value)}
           margin="normal"
           disabled={uploading || disabled}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                borderColor: '#333333',
+              },
+              '&:hover fieldset': {
+                borderColor: '#4285f4',
+              },
+            },
+            '& .MuiInputLabel-root': {
+              color: '#bbbbbb',
+            },
+            '& .MuiInputBase-input': {
+              color: '#ffffff',
+            }
+          }}
         />
       )}
       
