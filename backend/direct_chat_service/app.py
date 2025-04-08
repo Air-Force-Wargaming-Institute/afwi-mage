@@ -1,11 +1,10 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Set, Tuple, Any
+from typing import Optional, Dict, Tuple, Any
 from datetime import datetime
 from config import config
-from langchain_ollama import ChatOllama
-from langchain_ollama import OllamaEmbeddings
+from vllm_chat import VLLMOpenAIChat
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -22,12 +21,19 @@ import logging
 # Add these imports for vectorstore functionality and fallback loading
 from langchain_community.vectorstores import FAISS
 
+# Update the import to use langchain_ollama
+from langchain_ollama.embeddings import OllamaEmbeddings
+
+log_dir = Path('/app/data/logs')
+log_dir.mkdir(parents=True, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
+    filename=log_dir / 'direct_chat_service.log',
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("direct_chat_service")
+logger = logging.getLogger(__name__)
 
 # Define constants for paths
 SESSIONS_DIR = Path("sessions")
@@ -125,18 +131,15 @@ chat_sessions: Dict[str, ChatSession] = {}
 document_metadata: Dict[str, Dict[str, DocumentMetadata]] = {}  # session_id -> {doc_id -> metadata}
 
 # Initialize LangChain components
-llm = ChatOllama(
-    base_url=config.ollama.base_url,
-    model=config.ollama.ollama_model,
-    temperature=config.ollama.temperature,
-    context_window=config.ollama.context_window,
-    top_k=config.ollama.top_k,
-    top_p=config.ollama.top_p,
-    repeat_penalty=config.ollama.repeat_penalty,
-    stop=config.ollama.stop,
-    num_gpu=config.ollama.num_gpu,
-    num_thread=config.ollama.num_thread,
-    f16=config.ollama.f16
+llm = VLLMOpenAIChat(
+    openai_api_base=config.vllm.chat_completion_url, # Connect to local vLLM server running on port 8000
+    openai_api_key="dummy-key",  # Required by the wrapper but not actually verified by vLLM
+    model_name=config.vllm.chat_model,
+    temperature=config.vllm.temperature,
+    top_p=config.vllm.top_p,
+    max_tokens=config.vllm.context_window,  # Using context_window as max_tokens
+    stop=config.vllm.stop
+
 )
 
 # Create chat prompt template
@@ -750,13 +753,16 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
                 logger.info(f"Session {request.session_id}: Attempting to load vectorstore from path: {vectorstore_path}")
                 logger.info(f"Session {request.session_id}: Path exists: {vectorstore_path.exists()}")
                 
-                # Initialize embeddings using Ollama's API instead of a separate embedding service
-                # This approach is similar to what chat_service uses
-                logger.info(f"Session {request.session_id}: Initializing embeddings with Ollama at: {config.ollama.base_url}")
+                # Initialize embeddings using vLLM's OpenAI-compatible API instead of Ollama
+                logger.info(f"Session {request.session_id}: Initializing embeddings with vLLM at {config.ollama.embedding_url}")
                 embeddings = OllamaEmbeddings(
-                    base_url=config.ollama.base_url,
-                    model="nomic-embed-text"  # Use specific embedding model that's available
+                    model=config.ollama.embedding_model,
+                    base_url=config.ollama.embedding_url,
+                    num_ctx=512,  # Context window size
+                    num_thread=8,  # Number of CPU threads to use
+                    keep_alive=300  # Keep model loaded for 5 minutes
                 )
+                
                 
                 # Load the FAISS vectorstore using the correct method for these versions
                 logger.info(f"Session {request.session_id}: Loading FAISS vectorstore from {vectorstore_path}")

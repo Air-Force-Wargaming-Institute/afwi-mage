@@ -26,12 +26,19 @@ def librarian(requester:str, agent_request:str, vs:str):
     retriever = RetrieverManager().get_retriever(vs)
     llm = LLMManager().get_llm()  # Uses default model from config
 
+    # --- Truncate the query for embedding if it's too long --- 
+    MAX_QUERY_LENGTH_CHARS = 6000  # ~2048 tokens * ~3 chars/token average
+    embedding_query = agent_request.strip()
+    if len(embedding_query) > MAX_QUERY_LENGTH_CHARS:
+        print(f"LIBRARIAN: Query too long ({len(embedding_query)} chars), truncating to {MAX_QUERY_LENGTH_CHARS} for embedding.")
+        embedding_query = embedding_query[:MAX_QUERY_LENGTH_CHARS]
+        
     # Begin by retrieving documents relevant to the agent request
-    relevant_docs = retriever.invoke(agent_request.strip()) if retriever else []
+    relevant_docs = retriever.invoke(embedding_query) if retriever else []
 
     # Print retrieved documents
     if relevant_docs:
-        print(f"LIBRARIAN: Retrieved {len(relevant_docs)} documents for {requester}'s request")
+        print(f"LIBRARIAN: Retrieved {len(relevant_docs)} documents for {requester}'s request using query: '{embedding_query[:100]}...' ")
         for i, doc in enumerate(relevant_docs[:TOP_N_DOCUMENTS]):
             print(f"LIBRARIAN: Document {i+1} content (first 150 chars): {doc.page_content[:150]}...")
             if hasattr(doc, 'metadata') and doc.metadata:
