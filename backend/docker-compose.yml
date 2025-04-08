@@ -1,5 +1,9 @@
 name: afwi-multi-agent-generative-engine
 
+include:
+  - vLLM/docker-compose.vllm.yml
+  - ollama/docker-compose.ollama.yml
+
 networks:
   app-network:
     driver: bridge
@@ -11,6 +15,8 @@ services:
       - ../data:/data
     command: >
       sh -c "mkdir -p /data/uploads && chmod -R 777 /data/uploads"
+    networks:
+      - app-network
 
   core:
     build: ./core_service
@@ -41,6 +47,10 @@ services:
       - "8009:8009"
     environment:
       - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
+      - VLLM_API_BASE=http://host.docker.internal:8007/v1
+      - VLLM_API_KEY=no_key
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview
     volumes:
       - ../data:/app/data
       - ./chat_service:/app
@@ -48,6 +58,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - init-data
+      - ollama
     networks:
       - app-network
 
@@ -63,6 +74,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=postgresql://postgres:password@agent_db:5434/agent_db
     depends_on:
       - init-data
     networks:
@@ -184,6 +196,7 @@ services:
       - CORE_SERVICE_URL=http://core:8000
       - API_KEY='None'
       - BASE_URL='None'
+      - OLLAMA_BASE_URL=http://ollama:11434
     depends_on:
       - init-data
     networks:
@@ -220,17 +233,78 @@ services:
       - ./direct_chat_service:/app
     environment:
       - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - MODEL_SERVICE_URL=http://model_service:8008
       - PYTHONPATH=/app
       - SERVICE_PORT=8011
+      - DATABASE_URL=postgresql://postgres:password@direct_chat_db:5433/direct_chat_db
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - init-data
+      - embedding
     networks:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
 
+  frontend:
+    build: ../frontend
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+    volumes:
+      - ../data:/data
+      - ../frontend:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - app-network
+
+  redis:
+    image: redis/redis-stack:7.4.0-v3-x86_64
+    ports:
+      - "6379:6379"
+      - "6380:8001"
+    networks:
+      - app-network
+
+  chat_db:
+    image: postgres:17.4
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=chat_db
+    networks:
+      - app-network
+      
+  # direct_chat_db:
+  #   image: postgres:17.4
+  #   ports:
+  #     - "5433:5433"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=direct_chat_db
+  #   networks:
+  #     - app-network
+
+  # agent_db:
+  #   image: postgres:17.4
+  #   ports:
+  #     - "5434:5434"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=agent_db
+  #   networks:
+  #     - app-network
+
 volumes:
   postgres_data:
   nltk_data_volume:
+  ollama_data:
 

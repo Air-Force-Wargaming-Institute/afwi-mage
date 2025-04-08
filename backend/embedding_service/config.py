@@ -98,12 +98,14 @@ for dir_path in [DATASET_DIR, EXTRACTION_DIR, UPLOAD_DIR, OUTPUT_DIR, LOG_DIR,
 # External service configuration
 CORE_SERVICE_URL = get_env("CORE_SERVICE_URL", "http://core:8000")
 OLLAMA_BASE_URL = get_env("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+OLLAMA_EMBEDDING_MODEL = get_env("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest")
+VLLM_BASE_URL = get_env("VLLM_BASE_URL", "http://host.docker.internal:8007/v1")
 LLM_API_KEY = get_env("LLM_API_KEY", "")
 LLM_BASE_URL = get_env("LLM_BASE_URL", "")
 
 # Embedding model configurations
-DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
-EMBEDDING_MODEL_VERSION = get_env("EMBEDDING_MODEL_VERSION", "latest")
+DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "/models/bge-base-en-v1.5")
+EMBEDDING_MODEL_VERSION = get_env("EMBEDDING_MODEL_VERSION", "")
 EMBEDDING_DIMENSION = get_env_int("EMBEDDING_DIMENSION", 768)
 
 # Chunking default parameters
@@ -138,25 +140,60 @@ def validate_config():
     if "*" in CORS_ORIGINS:
         logger.warning("CORS is configured to allow all origins ('*'), consider restricting this in production")
     
-    # Log Ollama configuration clearly
+    # Log Ollama configuration 
     logger.info(f"Ollama API URL configured as: {OLLAMA_BASE_URL}")
+    logger.info(f"Ollama embedding model configured as: {OLLAMA_EMBEDDING_MODEL}")
     
-    if not LLM_API_KEY and (not OLLAMA_BASE_URL or "localhost" in OLLAMA_BASE_URL or "host.docker.internal" in OLLAMA_BASE_URL):
-        logger.warning("Using local LLM setup, ensure Ollama is running if needed")
-        # Check if Ollama is accessible
+    # Check if Ollama is accessible
+    try:
+        response = requests.get(f"{OLLAMA_BASE_URL}", timeout=2)
+        if response.status_code == 200:
+            logger.info("Successfully connected to Ollama API")
+            try:
+                # Check if the model is available
+                model_response = requests.post(
+                    f"{OLLAMA_BASE_URL}/api/embeddings",
+                    json={"model": OLLAMA_EMBEDDING_MODEL, "prompt": "test"},
+                    timeout=5
+                )
+                if model_response.status_code == 200:
+                    embedding = model_response.json().get("embedding", [])
+                    dim = len(embedding)
+                    logger.info(f"Successfully generated embeddings using {OLLAMA_EMBEDDING_MODEL} (dim: {dim})")
+                    
+                    # Update the embedding dimension based on the actual model output
+                    global EMBEDDING_DIMENSION
+                    EMBEDDING_DIMENSION = dim
+                    logger.info(f"Setting EMBEDDING_DIMENSION to {EMBEDDING_DIMENSION} based on actual model output")
+                else:
+                    logger.warning(f"Ollama embedding model test failed with status code {model_response.status_code}")
+                    logger.warning(f"Response: {model_response.text}")
+            except Exception as e:
+                logger.warning(f"Failed to test Ollama embedding model: {str(e)}")
+        else:
+            logger.warning(f"Ollama API responded with status code {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Could not connect to Ollama API: {str(e)}")
+        logger.info("If using Docker, make sure 'host.docker.internal' resolves correctly")
+    
+    # Log vLLM configuration clearly (keep for backward compatibility)
+    logger.info(f"vLLM API URL configured as: {VLLM_BASE_URL}")
+    
+    if not LLM_API_KEY:
+        logger.warning("Using local LLM setup, ensure vLLM or Ollama is running if needed")
+        # Check if vLLM is accessible (kept for backward compatibility)
         try:
-            response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2)
+            response = requests.get(f"{VLLM_BASE_URL}/models", timeout=2)
             if response.status_code == 200:
-                logger.info("Successfully connected to Ollama API")
-                models = response.json().get("models", [])
-                logger.info(f"Available Ollama models: {[m.get('name') for m in models if 'name' in m]}")
+                logger.info("Successfully connected to vLLM API")
+                models = response.json()
+                logger.info(f"Available vLLM models: {models}")
             else:
-                logger.warning(f"Ollama API responded with status code {response.status_code}")
+                logger.warning(f"vLLM API responded with status code {response.status_code}")
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Could not connect to Ollama API: {str(e)}")
-            logger.info("If using Docker, make sure 'host.docker.internal' resolves to your host machine")
-    
-    logger.info(f"Embedding service configured with model: {DEFAULT_EMBEDDING_MODEL}")
+            logger.warning(f"Could not connect to vLLM API: {str(e)} (This is okay if using Ollama instead)")
+            
+    logger.info(f"Embedding service configured with dimension: {EMBEDDING_DIMENSION}")
     logger.info(f"Vector store directory: {VECTORSTORE_DIR}")
     logger.info(f"Upload directory: {UPLOAD_DIR}")
     logger.info(f"Job directory: {JOB_DIR}")

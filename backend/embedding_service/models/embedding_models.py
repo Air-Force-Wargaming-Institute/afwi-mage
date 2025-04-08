@@ -40,34 +40,22 @@ def get_embedding_model(model_name: str, **kwargs) -> Embeddings:
     Raises:
         ValueError: If the model name is not supported
     """
-    model_name = model_name.lower()
+    # Use VLLMOpenAIEmbeddings for all model requests
+    try:
+        # Try relative import first
+        from ..core.embedding import VLLMOpenAIEmbeddings
+    except ImportError:
+        # Try direct import
+        try:
+            from core.embedding import VLLMOpenAIEmbeddings
+        except ImportError:
+            raise ImportError("Could not import VLLMOpenAIEmbeddings from core.embedding")
     
-    if model_name == "openai-ada-002" or model_name == "text-embedding-ada-002":
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OpenAI API key not found in environment variables")
-        return OpenAIEmbeddings(openai_api_key=api_key, model="text-embedding-ada-002")
+    # Use "/models/bge-base-en-v1.5" as the default model
+    if model_name != "/models/bge-base-en-v1.5":
+        model_name = "/models/bge-base-en-v1.5"
     
-    elif model_name == "openai-3-small" or model_name == "text-embedding-3-small":
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OpenAI API key not found in environment variables")
-        return OpenAIEmbeddings(openai_api_key=api_key, model="text-embedding-3-small")
-    
-    elif model_name == "openai-3-large" or model_name == "text-embedding-3-large":
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OpenAI API key not found in environment variables")
-        return OpenAIEmbeddings(openai_api_key=api_key, model="text-embedding-3-large")
-    
-    elif model_name == "nomic-embed-text" or model_name == "nomic-ai/nomic-embed-text-v1.5":
-        return NomicEmbeddings(
-            model_name="nomic-ai/nomic-embed-text-v1.5", 
-            **kwargs
-        )
-    
-    else:
-        raise ValueError(f"Unsupported embedding model: {model_name}")
+    return VLLMOpenAIEmbeddings(model=model_name)
 
 
 def get_available_embedding_models() -> List[Dict[str, str]]:
@@ -79,27 +67,9 @@ def get_available_embedding_models() -> List[Dict[str, str]]:
     """
     return [
         {
-            "id": "nomic-embed-text",
-            "name": "Nomic Embed Text",
-            "description": "Nomic AI's text embedding model",
-            "provider": "Nomic AI"
-        },
-        {
-            "id": "openai-ada-002",
-            "name": "OpenAI Ada 002",
-            "description": "OpenAI's text-embedding-ada-002 model",
-            "provider": "OpenAI"
-        },
-        {
-            "id": "openai-3-small",
-            "name": "OpenAI Embedding 3 Small",
-            "description": "OpenAI's text-embedding-3-small model",
-            "provider": "OpenAI"
-        },
-        {
-            "id": "openai-3-large",
-            "name": "OpenAI Embedding 3 Large",
-            "description": "OpenAI's text-embedding-3-large model",
-            "provider": "OpenAI"
+            "id": "/models/bge-base-en-v1.5",
+            "name": "BGE Base English v1.5",
+            "description": "BGE Base embedding model optimized for English text",
+            "provider": "vLLM"
         }
     ] 

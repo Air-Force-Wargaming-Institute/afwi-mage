@@ -39,6 +39,7 @@ Thumbs.db
 /backend/extraction_service/nltk_data/*
 /backend/chat_service/chat_teams/*
 /data/vectorstores/*
+/models/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
 
@@ -73,7 +74,6 @@ Thumbs.db
 !data/
 !models/
 !data/**/
-!models/**/
 
 # Critical files that must be included
 !entrypoint.sh
@@ -89,6 +89,10 @@ Thumbs.db
 !user.py
 !app.py
 !user_routes.py
+
+# Legal Documentation
+!NOTICE.txt
+!DFARS_Reference_20250325.pdf
 
 # Python module files
 !__init__.py
@@ -126,6 +130,10 @@ __langchain+graph_documentation/
 # Conversation logs
 backend/chat_service/conversation_logs/*.json
 backend/chat_service/conversation_logs/**/*
+data/conversation_logs/*
 
 # But keep the directory itself
 !backend/chat_service/conversation_logs/.gitkeep
+
+#reference files
+backend/VLLM_Docs/*

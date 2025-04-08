@@ -3,7 +3,8 @@
 # Name of the local LLM to use 
 #LOCAL_LLM: 'NousResearch/Hermes-3-Llama-3.1-8B-GGUF/Hermes-3-Llama-3.1-8B.Q8_0.gguf'
 #LOCAL_LLM: 'hf.co/NousResearch/Hermes-3-Llama-3.1-8B-GGUF:Q8_0'
-LOCAL_LLM: "llama3:8b"
+LOCAL_LLM: "/models/DeepHermes-3-Llama-3-8B-Preview"
+EMBEDDING_MODEL: 'nomic-embed-text:latest'
 #LOCAL_LLM: "hermes3:8b"
 
 # Whether to use streaming LLM or not
@@ -16,8 +17,10 @@ API_KEY: 'None'
 # Base URL for where the LLM is hosted
 #BASE_URL: 'http://localhost:1234/v1'
 #BASE_URL: 'http://127.0.0.1:11434/v1'
-BASE_URL: 'http://host.docker.internal:11434/v1'
-OLLAMA_API_URL: 'http://host.docker.internal:11434'
+BASE_URL: 'http://host.docker.internal:8007/v1'
+BASE_URL_EMBEDDINGS: 'http://host.docker.internal:11434'
+
+#OLLAMA_API_URL: 'http://host.docker.internal:11434'
 # Run the LLM locally, "Yes" or "No"
 RUN_LOCAL: 'Yes'
 

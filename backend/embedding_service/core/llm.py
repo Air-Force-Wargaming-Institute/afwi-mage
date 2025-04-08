@@ -1,31 +1,32 @@
 """
-LLM integration functionality using Ollama.
+LLM integration functionality using vLLM.
 
 This module provides core LLM integration functionality, including:
-- Checking available Ollama models
-- Generating responses from Ollama LLMs
+- Checking available vLLM models
+- Generating responses from vLLM LLMs with OpenAI-compatible API
 """
 
 import os
 import logging
 import requests
+import json
 from typing import List, Dict, Any, Optional, Union
 
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
-class OllamaLLM:
+class VLLMLLM:
     """
-    LLM integration class for Ollama models.
+    LLM integration class for vLLM models using OpenAI-compatible API.
     """
     
-    def __init__(self, model: str = "llama3.2:latest", base_url: str = None):
+    def __init__(self, model: str = "/models/DeepHermes-3-Llama-3-8B-Preview", base_url: str = None):
         """
-        Initialize Ollama LLM integration.
+        Initialize vLLM LLM integration.
         
         Args:
-            model: Model name to use
-            base_url: Base URL for Ollama API
+            model: Model path to use
+            base_url: Base URL for vLLM API
         """
         self.model = model
         
@@ -34,28 +35,28 @@ class OllamaLLM:
             self.base_url = base_url
         else:
             try:
-                from ..config import OLLAMA_BASE_URL
-                self.base_url = OLLAMA_BASE_URL
+                from ..config import VLLM_BASE_URL
+                self.base_url = VLLM_BASE_URL
             except ImportError:
                 try:
-                    from config import OLLAMA_BASE_URL
-                    self.base_url = OLLAMA_BASE_URL
+                    from config import VLLM_BASE_URL
+                    self.base_url = VLLM_BASE_URL
                 except ImportError:
-                    self.base_url = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+                    self.base_url = os.environ.get("VLLM_BASE_URL", "http://host.docker.internal:8007/v1")
         
-        logger.info(f"Initializing OllamaLLM with model: {self.model} and base URL: {self.base_url}")
+        logger.info(f"Initializing VLLMLLM with model: {self.model} and base URL: {self.base_url}")
         
     def get_available_models(self) -> List[str]:
         """
-        Get list of available models from Ollama.
+        Get list of available models from vLLM.
         
         Returns:
-            List of available model names
+            List of available model paths
         """
         try:
-            # Format the API URL
+            # Format the API URL - vLLM OpenAI compatible API uses /models endpoint
             base_url = self.base_url.rstrip('/')
-            url = f"{base_url}/api/tags"
+            url = f"{base_url}/models"
             
             # Make the request
             response = requests.get(url, timeout=5)
@@ -66,16 +67,16 @@ class OllamaLLM:
             models = []
             
             # Extract model names from the response
-            if "models" in data:
-                for model in data["models"]:
-                    if "name" in model:
-                        models.append(model["name"])
+            if "data" in data:
+                for model in data["data"]:
+                    if "id" in model:
+                        models.append(model["id"])
             
-            logger.info(f"Found {len(models)} available Ollama models: {models}")
+            logger.info(f"Found {len(models)} available vLLM models: {models}")
             return models
             
         except Exception as e:
-            logger.error(f"Error getting available models from Ollama: {e}")
+            logger.error(f"Error getting available models from vLLM: {e}")
             return []
     
     def get_best_available_model(self, preferred_models: List[str] = None) -> str:
@@ -83,14 +84,16 @@ class OllamaLLM:
         Get the best available model, prioritizing from a list of preferred models.
         
         Args:
-            preferred_models: List of model names in order of preference
+            preferred_models: List of model paths in order of preference
             
         Returns:
-            Name of the best available model
+            Path of the best available model
         """
         if preferred_models is None:
             # Default models in order of preference
-            preferred_models = ["llama3.2:latest", "llama3.1:latest"]
+            preferred_models = [
+                "/models/DeepHermes-3-Llama-3-8B-Preview"
+            ]
         
         # Get available models
         available_models = self.get_available_models()
@@ -125,67 +128,80 @@ class OllamaLLM:
             Generated response
         """
         try:
-            # Format the API URL
+            # Format the API URL for chat completions
             base_url = self.base_url.rstrip('/')
-            url = f"{base_url}/api/generate"
+            url = f"{base_url}/chat/completions"
             
-            # Prepare the payload
+            # Prepare the payload for OpenAI-compatible chat API
             payload = {
                 "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": temperature,
-                    "top_p": top_p,
-                    "max_tokens": max_tokens
-                }
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": temperature,
+                "top_p": top_p,
+                "max_tokens": max_tokens
             }
             
             # Log request details (but not the prompt as it could be large)
-            logger.info(f"Sending generation request to {url} with model {self.model}")
+            logger.info(f"Sending chat completion request to {url} with model {self.model}")
             
             # Make the request
-            response = requests.post(url, json=payload, timeout=60)
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
             response.raise_for_status()
             
             # Parse the response
             result = response.json()
             
-            # Extract the generated text
-            if "response" in result:
-                logger.info(f"Generated response of length {len(result['response'])}")
-                return result["response"]
-            else:
-                logger.warning("No 'response' field in Ollama API response")
-                return ""
+            # Extract the generated text from OpenAI-compatible format
+            if "choices" in result and len(result["choices"]) > 0:
+                message = result["choices"][0].get("message", {})
+                if "content" in message:
+                    response_text = message["content"]
+                    logger.info(f"Generated response of length {len(response_text)}")
+                    return response_text
+                
+            logger.warning(f"No valid content found in vLLM API response: {result}")
+            return "I was unable to generate a response due to a technical issue with the language model."
         
+        except requests.exceptions.HTTPError as http_err:
+            logger.error(f"HTTP error from vLLM API: {http_err}")
+            # Try to extract error message from response
+            try:
+                error_json = response.json()
+                error_message = error_json.get('error', {}).get('message', str(http_err))
+                logger.error(f"vLLM API error message: {error_message}")
+                return f"Error generating response: {error_message}"
+            except:
+                return f"Error generating response: {http_err}"
         except Exception as e:
-            logger.error(f"Error generating response from Ollama: {e}")
+            logger.error(f"Error generating response from vLLM: {e}")
             return f"Error generating response: {str(e)}"
 
 # Singleton instance for reuse
-_ollama_llm = None
+_vllm_llm = None
 
-def get_ollama_llm(model: str = None) -> OllamaLLM:
+def get_vllm_llm(model: str = None) -> VLLMLLM:
     """
-    Get a singleton instance of OllamaLLM.
+    Get a singleton instance of VLLMLLM.
     
     Args:
-        model: Optional model name to use (defaults to best available)
+        model: Optional model path to use (defaults to best available)
         
     Returns:
-        OllamaLLM instance
+        VLLMLLM instance
     """
-    global _ollama_llm
+    global _vllm_llm
     
-    if _ollama_llm is None:
-        _ollama_llm = OllamaLLM()
+    if _vllm_llm is None:
+        _vllm_llm = VLLMLLM()
     
     # If a specific model is requested, update the instance
     if model is not None:
-        _ollama_llm.model = model
+        _vllm_llm.model = model
     
-    return _ollama_llm
+    return _vllm_llm
 
 def generate_with_best_model(prompt: str, options: Dict[str, Any] = None) -> str:
     """
@@ -198,7 +214,7 @@ def generate_with_best_model(prompt: str, options: Dict[str, Any] = None) -> str
     Returns:
         Generated response
     """
-    llm = get_ollama_llm()
+    llm = get_vllm_llm()
     
     # Find the best available model
     model = llm.get_best_available_model()
@@ -214,4 +230,7 @@ def generate_with_best_model(prompt: str, options: Dict[str, Any] = None) -> str
         temperature=options.get("temperature", 0.7),
         max_tokens=options.get("max_tokens", 1000),
         top_p=options.get("top_p", 0.9)
-    ) 
+    )
+
+# Maintain compatibility with old code
+get_ollama_llm = get_vllm_llm 
