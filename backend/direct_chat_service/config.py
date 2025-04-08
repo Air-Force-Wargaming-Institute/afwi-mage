@@ -1,12 +1,14 @@
 import os
 import yaml
-from typing import List, Dict, Any, Optional
+from typing import List
 from pydantic import BaseModel, Field
 
 
 class OllamaConfig(BaseModel):
     base_url: str
     ollama_model: str
+    embedding_url: str = None  # URL for embedding service
+    embedding_model: str = "nomic-embed"  # Model to use for embeddings
     temperature: float = Field(ge=0.0, le=1.0)
     context_window: int = Field(gt=0)
     top_p: float = Field(ge=0.0, le=1.0)
@@ -16,23 +18,22 @@ class OllamaConfig(BaseModel):
     num_gpu: int = Field(ge=0)
     num_thread: int = Field(ge=1)
     f16: bool = True
+    timeout: int = 300  # Timeout for requests in seconds
 
     model_config = {
         'protected_namespaces': ()
     }
 
-class vLLMConfig(BaseModel):
+class VLLMConfig(BaseModel):
     chat_completion_url: str
-    embedding_url: str
     chat_model: str
-    embedding_model: str
-    max_tokens: int = Field(gt=0, default=4096)
-    temperature: float = Field(ge=0.0, le=1.0, default=0.4)
-    timeout: int = Field(ge=30, default=300)  # Timeout in seconds
-    top_p: float = Field(ge=0.0, le=1.0, default=0.9)
-    top_k: int = Field(ge=1, le=100, default=10)
-    context_window: int = Field(gt=0, default=8000)
-    stop: List[str] = Field(default=["<|endoftext|>"])
+    max_tokens: int = 4096
+    temperature: float = 0.4
+    timeout: int = 300
+    top_p: float = 0.9
+    top_k: int = 10
+    context_window: int = 8000
+    stop: List[str] = ["<|endoftext|>"]
 
 class ServiceConfig(BaseModel):
     name: str
@@ -57,7 +58,7 @@ class ChatLoggingConfig(BaseModel):
 
 class Config(BaseModel):
     service: ServiceConfig
-    vllm: vLLMConfig
+    vllm: VLLMConfig
     api: ApiConfig
     cors: CorsConfig
     chat_logging: ChatLoggingConfig

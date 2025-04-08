@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Set, Tuple, Any
+from typing import Optional, Dict, Tuple, Any
 from datetime import datetime
 from config import config
 from vllm_chat import VLLMOpenAIChat
@@ -21,8 +21,8 @@ import logging
 # Add these imports for vectorstore functionality and fallback loading
 from langchain_community.vectorstores import FAISS
 
-# Add this import at the top with other imports
-from langchain_openai import OpenAIEmbeddings
+# Update the import to use langchain_ollama
+from langchain_ollama.embeddings import OllamaEmbeddings
 
 log_dir = Path('/app/data/logs')
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -754,13 +754,15 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
                 logger.info(f"Session {request.session_id}: Path exists: {vectorstore_path.exists()}")
                 
                 # Initialize embeddings using vLLM's OpenAI-compatible API instead of Ollama
-                logger.info(f"Session {request.session_id}: Initializing embeddings with vLLM at {config.vllm.embedding_url}")
-                embeddings = OpenAIEmbeddings(
-                    model=config.vllm.embedding_model,
-                    openai_api_base=config.vllm.embedding_url,
-                    openai_api_key="EMPTY",  # Not used by vLLM but required by the wrapper
-                    dimensions=768  # Specify the embedding dimensions for nomic-embed-text
+                logger.info(f"Session {request.session_id}: Initializing embeddings with vLLM at {config.ollama.embedding_url}")
+                embeddings = OllamaEmbeddings(
+                    model=config.ollama.embedding_model,
+                    base_url=config.ollama.embedding_url,
+                    num_ctx=512,  # Context window size
+                    num_thread=8,  # Number of CPU threads to use
+                    keep_alive=300  # Keep model loaded for 5 minutes
                 )
+                
                 
                 # Load the FAISS vectorstore using the correct method for these versions
                 logger.info(f"Session {request.session_id}: Loading FAISS vectorstore from {vectorstore_path}")

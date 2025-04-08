@@ -1,13 +1,13 @@
-FROM python:3.11-slim
+FROM mage-base:latest
 
+# Set working directory
+WORKDIR /app
 
-# No need to install dependencies as they're in the base image
-COPY requirements.txt .
-RUN pip install --cache-dir /tmp/pip-cache -r requirements.txt
 # Copy service-specific files
 COPY . .
 
 # Expose port for the service
 EXPOSE 8009
 
+# Make sure we're in the right directory and the app can be found
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]

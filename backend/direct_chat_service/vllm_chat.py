@@ -5,7 +5,7 @@ This module provides a LangChain chat model that connects to a vLLM server
 exposing an OpenAI-compatible API endpoint for chat completions.
 """
 
-from typing import Any, Dict, List, Mapping, Optional, Union, Iterator, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Union
 import logging
 import json
 
@@ -17,9 +17,8 @@ from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
 )
-from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
-from langchain_core.pydantic_v1 import root_validator, Field
 
 import requests
 

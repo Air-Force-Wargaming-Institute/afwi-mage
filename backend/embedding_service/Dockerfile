@@ -15,6 +15,9 @@ RUN touch /app/utils/__init__.py
 ENV UPLOAD_DIR="/app/data/uploads"
 ENV VECTORSTORE_DIR="/app/data/vectorstores"
 ENV DOC_STAGING_DIR="/app/doc_staging"
+ENV USE_OLLAMA_EMBEDDINGS="true"
+ENV OLLAMA_BASE_URL="http://ollama:11434"
+ENV OLLAMA_EMBEDDING_MODEL="nomic-embed-text:latest"
 
 # Make scripts executable
 RUN chmod +x /app/docker-start.py

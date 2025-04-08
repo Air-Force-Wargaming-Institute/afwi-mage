@@ -2,6 +2,7 @@ name: afwi-multi-agent-generative-engine
 
 include:
   - vLLM/docker-compose.vllm.yml
+  - ollama/docker-compose.ollama.yml
 
 networks:
   app-network:
@@ -14,6 +15,8 @@ services:
       - ../data:/data
     command: >
       sh -c "mkdir -p /data/uploads && chmod -R 777 /data/uploads"
+    networks:
+      - app-network
 
   core:
     build: ./core_service
@@ -44,7 +47,10 @@ services:
       - "8009:8009"
     environment:
       - CORE_SERVICE_URL=http://core:8000
-      - DATABASE_URL=DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
+      - DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
+      - VLLM_API_BASE=http://host.docker.internal:8007/v1
+      - VLLM_API_KEY=no_key
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview
     volumes:
       - ../data:/app/data
       - ./chat_service:/app
@@ -52,6 +58,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - init-data
+      - ollama
     networks:
       - app-network
 
@@ -67,7 +74,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - CORE_SERVICE_URL=http://core:8000
-      - DATABASE_URL=postgresql://postgres:password@agent_db:5433/agent_db
+      - DATABASE_URL=postgresql://postgres:password@agent_db:5434/agent_db
     depends_on:
       - init-data
     networks:
@@ -144,6 +151,7 @@ services:
       - CORE_SERVICE_URL=http://core:8000
       - API_KEY='None'
       - BASE_URL='None'
+      - OLLAMA_BASE_URL=http://ollama:11434
     depends_on:
       - init-data
     networks:
@@ -206,29 +214,30 @@ services:
     networks:
       - app-network
       
-  direct_chat_db:
-    image: postgres:17.4
-    ports:
-      - "5433:5433"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=direct_chat_db
-    networks:
-      - app-network
+  # direct_chat_db:
+  #   image: postgres:17.4
+  #   ports:
+  #     - "5433:5433"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=direct_chat_db
+  #   networks:
+  #     - app-network
 
-  agent_db:
-    image: postgres:17.4
-    ports:
-      - "5433:5433"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=direct_chat_db
-    networks:
-      - app-network
+  # agent_db:
+  #   image: postgres:17.4
+  #   ports:
+  #     - "5434:5434"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=agent_db
+  #   networks:
+  #     - app-network
 
 volumes:
   postgres_data:
   nltk_data_volume:
+  ollama_data:
 

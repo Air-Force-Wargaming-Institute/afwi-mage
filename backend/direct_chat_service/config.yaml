@@ -6,9 +6,7 @@ service:
 
 vllm:
   chat_completion_url: http://host.docker.internal:8007/v1
-  embedding_url: http://host.docker.internal:8007/v1
   chat_model: /models/DeepHermes-3-Llama-3-8B-Preview
-  embedding_model: /models/DeepHermes-3-Llama-3-8B-Preview
   max_tokens: 4096
   temperature: 0.4
   timeout: 300
@@ -16,9 +14,13 @@ vllm:
 ollama:
   # Base URL for Ollama API
   base_url: http://host.docker.internal:11434
+  # Embedding configuration
+  embedding_url: http://host.docker.internal:11434
+  embedding_model: nomic-embed-text:latest
+  timeout: 300
   
   # Model identifier for Ollama
-  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest  
+  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused

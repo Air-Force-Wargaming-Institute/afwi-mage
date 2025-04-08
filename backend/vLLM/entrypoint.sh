@@ -1,29 +1,40 @@
 #!/bin/bash
 set -e
 
-# Try to detect GPU count at runtime
-GPU_COUNT=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l || echo "1")
+# Print GPU information
+echo "GPU Information:"
+nvidia-smi
 
-# Make sure we have a valid number, default to 1 if detection fails
-if [[ ! "$GPU_COUNT" =~ ^[0-9]+$ ]] || [ "$GPU_COUNT" -lt 1 ]; then
-    GPU_COUNT=1
-fi
+# Print GPU memory status
+echo "Available GPU memory:"
+nvidia-smi --query-gpu=memory.total,memory.free,memory.used --format=csv
 
-echo "Detected $GPU_COUNT GPUs, using tensor parallel size: $GPU_COUNT"
+# Print environment variables
+echo "Environment variables:"
+env | grep -E "CUDA|GPU|MODEL|TENSOR"
 
-# Replace tensor-parallel-size parameter in command arguments
+echo "Starting vLLM server with tensor parallelism across 2 GPUs..."
+
+# Force tensor parallelism to 2 regardless of arguments
 ARGS=()
 for ARG in "$@"; do
     if [[ "$ARG" == "--tensor-parallel-size="* ]]; then
-        ARGS+=("--tensor-parallel-size=$GPU_COUNT")
+        ARGS+=("--tensor-parallel-size=2")
+    elif [[ "$ARG" == "--gpu-memory-utilization="* ]]; then
+        ARGS+=("--gpu-memory-utilization=0.8")
     else
         ARGS+=("$ARG")
     fi
 done
 
-# If tensor-parallel-size wasn't in the arguments, add it
+# Ensure tensor-parallel-size is set to 2
 if [[ ! " ${ARGS[*]} " =~ "--tensor-parallel-size=" ]]; then
-    ARGS+=("--tensor-parallel-size=$GPU_COUNT")
+    ARGS+=("--tensor-parallel-size=2")
+fi
+
+# Ensure gpu-memory-utilization is set to 0.8
+if [[ ! " ${ARGS[*]} " =~ "--gpu-memory-utilization=" ]]; then
+    ARGS+=("--gpu-memory-utilization=0.8")
 fi
 
 # Execute the command with modified arguments
