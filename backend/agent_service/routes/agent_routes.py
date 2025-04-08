@@ -16,6 +16,8 @@ SHARED_TEAMS_PATH = BUILDER_DIR / "TEAMS"
 SHARED_STRUCTURE_PATH = SHARED_TEAMS_PATH / "TEAM-TEMPLATE"
 SHARED_AGENTS_PATH = BUILDER_DIR / "AGENTS"
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 class AgentCreate(BaseModel):
