@@ -1,0 +1,11 @@
+NOTICE
+
+This software was developed by the Air Force Wargaming Institute and funded by the United States Government.
+
+It is released under Government Purpose Rights as defined in DFARS 252.227-7014(a)(12). Use, modification, and distribution are restricted to official U.S. Government purposes.
+
+No commercial use or distribution outside authorized government activities is permitted without prior written approval.
+
+For inquiries regarding licensing or usage, contact:
+LeMay Center, Air University
+Maxwell AFB, AL

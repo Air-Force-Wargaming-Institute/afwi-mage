@@ -90,6 +90,10 @@ Thumbs.db
 !app.py
 !user_routes.py
 
+# Legal Documentation
+!NOTICE.txt
+!DFARS_Reference_20250325.pdf
+
 # Python module files
 !__init__.py
 
