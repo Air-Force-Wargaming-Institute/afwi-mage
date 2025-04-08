@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   Typography,
   Paper,
@@ -44,6 +44,7 @@ import {
 } from '@material-ui/icons';
 import { makeStyles } from '@material-ui/core/styles';
 import { getDocuments, checkDocumentCompatibility } from '../../services/documentService';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -304,6 +305,7 @@ const getFolderPathFromPath = (path) => {
 
 const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected }) => {
   const classes = useStyles();
+  const { token } = useContext(AuthContext);
   const [currentPath, setCurrentPath] = useState('');
   const [documents, setDocuments] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
@@ -342,7 +344,7 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
     const fetchDocumentsFromPath = async () => {
       setLoading(true);
       try {
-        const fetchedDocuments = await getDocuments(currentPath);
+        const fetchedDocuments = await getDocuments(currentPath, token);
         
         // Map existing documents to a set of paths for easy lookup
         const existingDocumentPaths = new Set(existingDocuments.map(doc => doc.path || doc.filename));
@@ -461,7 +463,7 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
       const fetchAllDocuments = async () => {
         try {
           // Call the API with empty path to get root documents
-          const rootDocs = await getDocuments('');
+          const rootDocs = await getDocuments('', token);
           
           // Start recursive search from root documents
           let allDocs = [...rootDocs];
@@ -471,7 +473,7 @@ const DocumentSelector = ({ vectorStore, existingDocuments, onDocumentsSelected 
           while (foldersToProcess.length > 0) {
             const folderPath = foldersToProcess.shift();
             try {
-              const folderDocs = await getDocuments(folderPath);
+              const folderDocs = await getDocuments(folderPath, token);
               
               // Add folder path information to each document
               const enhancedDocs = folderDocs.map(doc => ({

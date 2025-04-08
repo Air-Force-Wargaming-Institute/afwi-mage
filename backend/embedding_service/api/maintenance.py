@@ -66,7 +66,7 @@ class SystemResourcesResponse(BaseModel):
     }
 
 
-@router.post("/cleanup-backups", response_model=CleanupBackupsResponse)
+@router.post("/api/embedding/maintenance/cleanup-backups", response_model=CleanupBackupsResponse)
 async def cleanup_vectorstore_backups(request: CleanupBackupsRequest):
     """
     Clean up old backup files for all vector stores.
@@ -88,7 +88,7 @@ async def cleanup_vectorstore_backups(request: CleanupBackupsRequest):
     )
 
 
-@router.get("/system-resources", response_model=SystemResourcesResponse)
+@router.get("/api/embedding/maintenance/system-resources", response_model=SystemResourcesResponse)
 async def get_system_resources():
     """
     Get current system resource information.

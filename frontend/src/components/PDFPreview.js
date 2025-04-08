@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Button, 
@@ -19,7 +19,8 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import InfoIcon from '@material-ui/icons/Info';
 import CheckCircleOutlineIcon from '@material-ui/icons/CheckCircleOutline';
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   pdfContainer: {
@@ -72,15 +73,20 @@ const useStyles = makeStyles((theme) => ({
 
 function PDFPreview({ file, onFileUpdate }) {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
 
   const handleDeletePage = async () => {
     try {
-      const response = await axios.post(getApiUrl('UPLOAD', '/api/upload/delete-pdf-page/'), {
+      const response = await axios.post(getGatewayUrl('/api/upload/delete-pdf-page/'), {
         file_path: file.path,
         page_number: pageNumber
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (response.data.success) {
         setNumPages(numPages - 1);
@@ -116,7 +122,7 @@ function PDFPreview({ file, onFileUpdate }) {
         </Tooltip>
       </div>
       <iframe
-        src={`${getApiUrl('UPLOAD', `/api/upload/files/${file.path}#page=${pageNumber}`)}`}
+        src={`${getApiUrl('UPLOAD', `/api/upload/files/${file.path}#page=${pageNumber}`)}`} //should this be getGatewayUrl?
         className={classes.iframe}
         title="PDF Preview"
       />

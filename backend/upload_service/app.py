@@ -26,7 +26,7 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "*"],  # Add your frontend URL
+    allow_origins=["http://localhost:3000", "http://localhost", "*"],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,11 +34,18 @@ app.add_middleware(
 
 logger.info("Configuring routes")
 # Include routers
-app.include_router(upload_router, prefix="/api/upload")
+# app.include_router(upload_router, prefix="/api/upload")
+app.include_router(upload_router)
+
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Upload Service API"}
+
+@app.get("/api/upload/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

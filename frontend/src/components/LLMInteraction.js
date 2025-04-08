@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { Typography, TextField, Button, Paper, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@material-ui/core';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 function LLMInteraction() {
+  const { user, token } = useContext(AuthContext);
   const [modelName, setModelName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState('');
@@ -18,7 +20,11 @@ function LLMInteraction() {
   const fetchAvailableModels = async () => {
     try {
       console.log('Fetching available models...');
-      const result = await axios.get(getApiUrl('GENERATION', '/api/generate/available-models'));
+      const result = await axios.get(getGatewayUrl('/api/generate/available-models'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       console.log('Available models:', result.data);
       setAvailableModels(result.data);
     } catch (error) {
@@ -30,7 +36,11 @@ function LLMInteraction() {
   const initializeModel = async () => {
     setIsInitializing(true);
     try {
-      await axios.post(getApiUrl('GENERATION', `/api/generate/initialize-model/${modelName}`));
+      await axios.post(getGatewayUrl(`/api/generate/initialize-model/${modelName}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       alert(`Model ${modelName} initialized successfully`);
     } catch (error) {
       console.error('Error initializing model:', error);
@@ -40,13 +50,17 @@ function LLMInteraction() {
     }
   };
 
-  const generateText = async () => {
+  const generateText = async () => { //I think this post isn't quite right
     setIsLoading(true);
     setResponse('');
     try {
-      const response = await axios.post(getApiUrl('GENERATION', `/api/generate/generate-text/${modelName}`), { prompt }, { 
+      const response = await axios.post(getGatewayUrl(`/api/generate/generate-text/${modelName}`), { prompt }, { 
         params: { stream: true },
         responseType: 'stream'
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       const reader = response.data.getReader();

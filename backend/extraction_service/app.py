@@ -14,11 +14,18 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(extraction_router, prefix="/api/extraction")
+# app.include_router(extraction_router, prefix="/api/extraction")
+app.include_router(extraction_router)
+
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Extraction Service API"}
+
+@app.get("/api/extraction/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Button, 
@@ -29,7 +29,8 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
 import robotIcon from '../../assets/robot-icon.png'; // Import the robot icon
-import { getApiUrl } from '../../config';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -259,6 +260,7 @@ const unescapeString = (str) => {
 };
 
 function AgentPortfolio() {
+  const { user, token } = useContext(AuthContext);
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   const [agents, setAgents] = useState([]);
@@ -292,7 +294,13 @@ function AgentPortfolio() {
     fetchAgents();
     const fetchModels = async () => {
       try {
-        const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+        const response = await axios.get(getGatewayUrl('/api/chat/models/ollama'),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
         const modelNames = response.data.models.map(model => model.name);
         setAvailableModels(modelNames);
       } catch (error) {
@@ -306,7 +314,13 @@ function AgentPortfolio() {
 
   const fetchAgents = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/list_agents/'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
       setAgents(response.data.agents);
     } catch (error) {
       console.error('Error fetching agents:', error);
@@ -393,7 +407,14 @@ function AgentPortfolio() {
         agent_instructions: sanitizeInput(newAgent.agent_instructions)
       };
 
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), sanitizedAgent);
+      const response = await axios.post(getGatewayUrl('/api/agent/create_agent/'),
+      sanitizedAgent,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setAgents([...agents, response.data]);
       setOpen(false);
       setSnackbar({
@@ -497,7 +518,13 @@ function AgentPortfolio() {
         llm_model: selectedAgent.llm_model
       };
 
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_agent/${selectedAgent.unique_id}`), sanitizedAgent);
+      await axios.put(getGatewayUrl(`/api/agent/update_agent/${selectedAgent.unique_id}`), 
+      sanitizedAgent,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setSnackbar({
         open: true,
         message: 'Agent updated successfully!',
@@ -522,7 +549,13 @@ function AgentPortfolio() {
 
   const handleDeleteConfirm = async () => {
     try {
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_agent/${agentToDelete.unique_id}`));
+      await axios.delete(getGatewayUrl(`/api/agent/delete_agent/${agentToDelete.unique_id}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setSnackbar({
         open: true,
         message: 'Agent deleted successfully!',
@@ -558,7 +591,14 @@ function AgentPortfolio() {
       const agentData = {
         ...duplicatedAgent
       };
-      await axios.post(getApiUrl('AGENT', '/api/agents/create_agent/'), agentData);
+      await axios.post(getGatewayUrl('/api/agent/create_agent/'), 
+      agentData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setSnackbar({
         open: true,
         message: `Agent ${duplicatedAgent.name} created successfully`,

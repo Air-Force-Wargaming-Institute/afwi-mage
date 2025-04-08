@@ -17,6 +17,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Define health check endpoints first to ensure they're not overridden
+@app.get("/api/core/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
+
 # Configure CORS
 origins = [
     "http://localhost:3000",
@@ -39,24 +45,23 @@ UPLOAD_DIR = BASE_DIR / 'data' / 'uploads'
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"Ensuring upload directory exists: {UPLOAD_DIR}")
 
-# Import routers
+# # Import core routes
+# try:
+#     from core_routes import router as core_router
+#     app.include_router(core_router, prefix="/api/core", tags=["core"])
+#     logger.info("Successfully mounted core routes at /api/core")
+# except Exception as e:
+#     logger.error(f"Error loading core_routes router: {str(e)}")
+#     logger.warning("Core routes not available - this may be expected if they're not used")
+
+# Import document routes
 try:
     from routes.document_library import router as document_router
-    app.include_router(document_router, prefix="/api", tags=["documents"])
-    logger.info("Successfully mounted document routes at /api")
+    app.include_router(document_router, tags=["documents"])
+    logger.info("Successfully mounted document routes")
 except Exception as e:
     logger.error(f"Error loading document_library router: {str(e)}")
     raise
-
-@app.get("/", tags=["health"])
-async def root():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "core",
-        "upload_dir": str(UPLOAD_DIR),
-        "upload_dir_exists": UPLOAD_DIR.exists()
-    }
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):

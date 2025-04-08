@@ -53,7 +53,7 @@ ollama:
 
 api:
   core_service_url: http://core:8000
-  prefix: /api/v1
+  prefix: /api/direct_chat
 
 cors:
   allowed_origins:

@@ -12,11 +12,4 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
     expose_headers=["X-Operation-ID"],  # Expose custom headers
-)
-
-# Include routers
-app.include_router(
-    document_library.router,
-    prefix="/api",
-    tags=["documents"]
 ) 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Typography, Button, Box, Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -13,7 +13,8 @@ import FileCopyIcon from '@material-ui/icons/FileCopy';
 import MuiAlert from '@material-ui/lab/Alert';
 import robotIcon from '../../assets/robot-icon.png'; // Import the custom icon
 import agentTeamIcon from '../../assets/agent-team.png';
-import { getApiUrl } from '../../config';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -183,6 +184,7 @@ const colorOptions = [
 ];
 
 function AgentTeams() {
+  const { user, token } = useContext(AuthContext);
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -221,7 +223,13 @@ function AgentTeams() {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/list_teams/'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       console.log("Teams received from backend:", response.data.teams);
       setTeams(response.data.teams);
     } catch (error) {
@@ -236,7 +244,13 @@ function AgentTeams() {
 
   const fetchAvailableAgents = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/list_agents/'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setAvailableAgents(response.data.agents);
       setAllAgents(response.data.agents);
       
@@ -258,7 +272,13 @@ function AgentTeams() {
 
   const fetchVectorstores = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_vs/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/list_vs/'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       console.log("Vectorstores received from backend:", response.data.vectorstores);
       setVectorstores(response.data.vectorstores);
     } catch (error) {
@@ -388,7 +408,13 @@ function AgentTeams() {
         vectorstore: newTeam.vectorstore || []
       };
 
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), submissionData);
+      const response = await axios.post(getGatewayUrl('/api/agent/create_team/'), submissionData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setTeams([...teams, response.data]);
       setOpen(false);
       setSnackbar({
@@ -430,7 +456,13 @@ function AgentTeams() {
       };
 
       console.log("Submitting team update with data:", submissionData);
-      await axios.put(getApiUrl('AGENT', `/api/agents/update_team/${editingTeam.unique_id}`), submissionData);
+      await axios.put(getGatewayUrl(`/api/agent/update_team/${editingTeam.unique_id}`),
+      submissionData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setEditOpen(false);
       setSnackbar({
         open: true,
@@ -476,7 +508,13 @@ function AgentTeams() {
   const handleDeleteConfirm = async () => {
     try {
       // Delete from agent and chat service TODO: do we need to delete from chat service?
-      await axios.delete(getApiUrl('AGENT', `/api/agents/delete_team/${teamToDelete.unique_id}`));
+      await axios.delete(getGatewayUrl(`/api/agent/delete_team/${teamToDelete.unique_id}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       //await axios.delete(getApiUrl('CHAT', `/delete_team/${teamToDelete.file_name}`));
       
       setDeleteConfirmOpen(false);
@@ -531,7 +569,14 @@ function AgentTeams() {
         vectorstore: team.vectorstore || []
       };
 
-      const response = await axios.post(getApiUrl('AGENT', '/api/agents/create_team/'), duplicateTeam);
+      const response = await axios.post(getGatewayUrl('/api/agent/create_team/'),
+      duplicateTeam,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setSnackbar({
         open: true,
         message: 'Team duplicated successfully!',
@@ -558,7 +603,13 @@ function AgentTeams() {
   // Add this new function to fetch agent descriptions
   const fetchAgentDescriptions = async () => {
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/list_agents/'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       const descriptions = {};
       response.data.agents.forEach(agent => {
         descriptions[agent.name] = agent.description;

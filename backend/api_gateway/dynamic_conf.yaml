@@ -1,0 +1,337 @@
+# Dynamic Traefik Configuration
+
+http:
+  # Global Middlewares
+  middlewares:
+    # Authentication middleware using ForwardAuth
+    auth-middleware:
+      forwardAuth:
+        address: "http://auth:8010/api/auth/users/validate-token"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-Username"
+          - "X-User-Permission"
+          - "Authorization"
+          - "X-Refreshed-Token"
+        authRequestHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "Accept"
+    
+    # New CORS middleware
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://127.0.0.1:3000"
+          - "http://localhost"
+          - "http://127.0.0.1"
+        accessControlAllowCredentials: true
+        accessControlAllowHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "x-requested-with"
+          - "Accept"
+          - "Origin"
+        accessControlMaxAge: 100
+        accessControlExposeHeaders:  # <-- SEPARATE SECTION for response headers
+          - "X-Refreshed-Token"
+          - "X-User-ID"
+          - "X-Username"
+          - "X-User-Permission"
+        addVaryHeader: true
+    
+    # Rate limiting middleware
+    rate-limit-default:
+      rateLimit:
+        average: 100
+        burst: 50
+    
+    rate-limit-auth:
+      rateLimit:
+        average: 60
+        burst: 20
+    
+    rate-limit-chat:
+      rateLimit:
+        average: 120
+        burst: 40
+    
+    rate-limit-upload:
+      rateLimit:
+        average: 30
+        burst: 10
+    
+    # Security headers middleware
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        contentSecurityPolicy: "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+    
+    # Path stripping middlewares
+    strip-api-prefix:
+      stripPrefix:
+        prefixes: 
+          - "/api"
+    
+    # Retry middleware
+    retry-middleware:
+      retry:
+        attempts: 3
+        initialInterval: "500ms"
+    
+    # Circuit breaker middleware
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
+    
+    # Compress middleware
+    compress:
+      compress: {}
+      
+  # Routers with corrected path patterns
+  routers:
+    # Health Check Router
+    health-check-router:
+      rule: "PathPrefix(`/health-status`)"
+      service: "api-health-service"
+      entryPoints:
+        - "web"
+        - "healthcheck"
+
+    # Auth Service Router
+    auth-router:
+      rule: "PathPrefix(`/api/auth`) || Path(`/api/auth/health`)"
+      service: "auth-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "security-headers"
+        - "rate-limit-auth"
+        - "compress"
+    
+    # Chat Service Router
+    chat-router:
+      rule: "PathPrefix(`/api/chat`) || Path(`/api/chat/health`)"
+      service: "chat-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        - "rate-limit-chat"
+        - "compress"
+        - "retry-middleware"
+        - "circuit-breaker"
+    
+    # Upload Service Router
+    upload-router:
+      rule: "PathPrefix(`/api/upload`) || Path(`/api/upload/health`)"
+      service: "upload-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        - "rate-limit-upload"
+      
+    # Core Service Router
+    core-router:
+      rule: "PathPrefix(`/api/core`) || Path(`/api/core/health`)"
+      service: "core-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Extraction Service Router - Corrected path
+    extraction-router:
+      rule: "PathPrefix(`/api/extraction`) || Path(`/api/extraction/health`)"
+      service: "extraction-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Generation Service Router
+    generation-router:
+      rule: "PathPrefix(`/api/generate`) || Path(`/api/generation/health`)"
+      service: "generation-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Review Service Router
+    review-router:
+      rule: "PathPrefix(`/api/review`) || Path(`/api/review/health`)"
+      service: "review-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Embedding Service Router
+    embedding-router:
+      rule: "PathPrefix(`/api/embedding`) || Path(`/api/embedding/health`)"
+      service: "embedding-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Agent Service Router
+    agent-router:
+      rule: "PathPrefix(`/api/agent`) || Path(`/api/agent/health`)"
+      service: "agent-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        
+    # Direct Chat Service Router - Supporting both old and new paths during transition
+    direct-chat-router:
+      rule: "PathPrefix(`/api/direct_chat`) || Path(`/api/direct_chat/health`)"
+      service: "direct-chat-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+      
+  # Services with consistent health check paths
+  services:
+    # Special API Health Status service
+    api-health-service:
+      loadBalancer:
+        servers:
+          - url: "http://traefik:8080/api/http/services"
+    
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth:8010"
+        healthCheck:
+          path: "/api/auth/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    chat-service:
+      loadBalancer:
+        servers:
+          - url: "http://chat:8009"
+        healthCheck:
+          path: "/api/chat/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    upload-service:
+      loadBalancer:
+        servers:
+          - url: "http://upload:8005"
+        healthCheck:
+          path: "/api/upload/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    agent-service:
+      loadBalancer:
+        servers:
+          - url: "http://agent:8001"
+        healthCheck:
+          path: "/api/agent/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    core-service:
+      loadBalancer:
+        servers:
+          - url: "http://core:8000"
+        healthCheck:
+          path: "/api/core/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    extraction-service:
+      loadBalancer:
+        servers:
+          - url: "http://extraction:8002"
+        healthCheck:
+          path: "/api/extraction/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    generation-service:
+      loadBalancer:
+        servers:
+          - url: "http://generation:8003"
+        healthCheck:
+          path: "/api/generation/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    review-service:
+      loadBalancer:
+        servers:
+          - url: "http://review:8004"
+        healthCheck:
+          path: "/api/review/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    embedding-service:
+      loadBalancer:
+        servers:
+          - url: "http://embedding:8006"
+        healthCheck:
+          path: "/api/embedding/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+          
+    direct-chat-service:
+      loadBalancer:
+        servers:
+          - url: "http://direct_chat_service1:8011"
+        healthCheck:
+          path: "/api/direct_chat/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true

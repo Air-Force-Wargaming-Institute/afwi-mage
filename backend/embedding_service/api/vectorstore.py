@@ -34,7 +34,9 @@ logger = logging.getLogger("embedding_service")
 
 config = get_config()
 # Create router
-router = APIRouter(prefix="/vectorstores", tags=["Vector Stores"])
+# router = APIRouter(prefix="/vectorstores", tags=["Vector Stores"])
+router = APIRouter(tags=["Vector Stores"])
+
 
 # Define model classes for API
 class VectorStoreInfo(BaseModel):
@@ -276,7 +278,7 @@ class UpdateVectorStoreMetadataResponse(BaseModel):
 
 
 
-@router.get("", response_model=List[VectorStoreInfo])
+@router.get("/api/embedding/vectorstores", response_model=List[VectorStoreInfo])
 async def list_vectorstores(manager: VectorStoreManager = Depends(get_vectorstore_manager)):
     """
     Get a list of all vector stores.
@@ -287,7 +289,7 @@ async def list_vectorstores(manager: VectorStoreManager = Depends(get_vectorstor
     return manager.list_vectorstores()
 
 
-@router.get("/{vectorstore_id}", response_model=VectorStoreDetailInfo)
+@router.get("/api/embedding/vectorstores/{vectorstore_id}", response_model=VectorStoreDetailInfo)
 async def get_vectorstore(vectorstore_id: str, manager: VectorStoreManager = Depends(get_vectorstore_manager)):
     """
     Get details of a specific vector store.
@@ -312,7 +314,7 @@ async def get_vectorstore(vectorstore_id: str, manager: VectorStoreManager = Dep
     return vs_info
 
 
-@router.post("", response_model=CreateVectorStoreResponse)
+@router.post("/api/embedding/vectorstores", response_model=CreateVectorStoreResponse)
 async def create_vectorstore(
     request: CreateVectorStoreRequest,
     background_tasks: BackgroundTasks,
@@ -374,7 +376,7 @@ async def create_vectorstore(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{vectorstore_id}/update", response_model=UpdateVectorStoreResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/update", response_model=UpdateVectorStoreResponse)
 async def update_vectorstore(
     vectorstore_id: str,
     request: UpdateVectorStoreRequest,
@@ -440,7 +442,7 @@ async def update_vectorstore(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{vectorstore_id}")
+@router.delete("/api/embedding/vectorstores/{vectorstore_id}")
 async def delete_vectorstore(
     vectorstore_id: str,
     manager: VectorStoreManager = Depends(get_vectorstore_manager)
@@ -468,7 +470,7 @@ async def delete_vectorstore(
     return {"success": True, "message": f"Vector store {vectorstore_id} deleted"}
 
 
-@router.post("/{vectorstore_id}/query", response_model=QueryResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/query", response_model=QueryResponse)
 async def query_vectorstore(
     vectorstore_id: str,
     query_request: QueryRequest,
@@ -591,7 +593,7 @@ async def query_vectorstore(
         raise HTTPException(status_code=500, detail=f"Error querying vector store: {str(e)}")
 
 
-@router.delete("/{vectorstore_id}/documents", response_model=RemoveDocumentsResponse)
+@router.delete("/api/embedding/vectorstores/{vectorstore_id}/documents", response_model=RemoveDocumentsResponse)
 async def remove_documents_from_vectorstore(
     vectorstore_id: str,
     request: RemoveDocumentsRequest,
@@ -725,7 +727,7 @@ async def process_document_removal(
             logger.error(f"Failed to mark job {job_id} as failed")
 
 
-@router.post("/{vectorstore_id}/batch_update", response_model=BatchUpdateResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/batch_update", response_model=BatchUpdateResponse)
 async def batch_update_vectorstore(
     vectorstore_id: str,
     request: BatchUpdateRequest,
@@ -1056,7 +1058,7 @@ async def process_batch_update(
             logger.error(f"Failed to mark job {job_id} as failed")
 
 
-@router.put("/{vectorstore_id}", response_model=UpdateVectorStoreMetadataResponse)
+@router.put("/api/embedding/vectorstores/{vectorstore_id}", response_model=UpdateVectorStoreMetadataResponse)
 async def update_vectorstore_metadata(
     vectorstore_id: str,
     request: UpdateVectorStoreMetadataRequest,
@@ -1141,7 +1143,7 @@ async def update_vectorstore_metadata(
         )
 
 
-@router.post("/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
 async def analyze_vectorstore(
     vectorstore_id: str,
     request: VectorStoreAnalysisRequest,
@@ -1738,7 +1740,7 @@ async def process_vectorstore_update(
         fail_job(job_id, str(e))
 
 
-@router.post("/{vectorstore_id}/llm-query", response_model=VectorStoreLLMQueryResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/llm-query", response_model=VectorStoreLLMQueryResponse)
 async def llm_query_vectorstore(
     vectorstore_id: str,
     query_request: VectorStoreLLMQueryRequest,

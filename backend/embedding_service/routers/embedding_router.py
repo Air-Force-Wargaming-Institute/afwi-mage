@@ -120,7 +120,9 @@ class UpdateVectorStoreResponse(BaseModel):
 
 
 # Create the router
-router = APIRouter(prefix="/api/embedding", tags=["embedding"])
+# router = APIRouter(prefix="/api/embedding", tags=["embedding"])
+router = APIRouter(tags=["embedding"])
+
 
 
 # Get vector store manager instance
@@ -129,19 +131,19 @@ def get_vectorstore_manager():
 
 
 # Define the routes
-@router.get("/models", response_model=List[EmbeddingModelInfo])
+@router.get("/api/embedding/models", response_model=List[EmbeddingModelInfo])
 async def get_models():
     """Get a list of available embedding models."""
     return get_available_embedding_models()
 
 
-@router.get("/vectorstores", response_model=List[VectorStoreInfo])
+@router.get("/api/embedding/vectorstores", response_model=List[VectorStoreInfo])
 async def list_vectorstores(manager: VectorStoreManager = Depends(get_vectorstore_manager)):
     """Get a list of all vector stores."""
     return manager.list_vectorstores()
 
 
-@router.get("/vectorstores/{vectorstore_id}", response_model=VectorStoreDetailInfo)
+@router.get("/api/embedding/vectorstores/{vectorstore_id}", response_model=VectorStoreDetailInfo)
 async def get_vectorstore(vectorstore_id: str, manager: VectorStoreManager = Depends(get_vectorstore_manager)):
     """Get details of a specific vector store."""
     vs_info = manager.get_vectorstore_info(vectorstore_id)
@@ -150,7 +152,7 @@ async def get_vectorstore(vectorstore_id: str, manager: VectorStoreManager = Dep
     return vs_info
 
 
-@router.post("/vectorstores", response_model=CreateVectorStoreResponse)
+@router.post("/api/embedding/vectorstores", response_model=CreateVectorStoreResponse)
 async def create_vectorstore(
     request: CreateVectorStoreRequest,
     background_tasks: BackgroundTasks,
@@ -274,7 +276,7 @@ async def create_vectorstore(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/vectorstores/{vectorstore_id}/update", response_model=UpdateVectorStoreResponse)
+@router.post("/api/embedding/vectorstores/{vectorstore_id}/update", response_model=UpdateVectorStoreResponse)
 async def update_vectorstore(
     vectorstore_id: str,
     request: UpdateVectorStoreRequest,
@@ -364,7 +366,7 @@ async def update_vectorstore(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/vectorstores/{vectorstore_id}")
+@router.delete("/api/embedding/vectorstores/{vectorstore_id}")
 async def delete_vectorstore(
     vectorstore_id: str,
     manager: VectorStoreManager = Depends(get_vectorstore_manager)
@@ -387,7 +389,7 @@ async def delete_vectorstore(
     }
 
 
-@router.get("/files")
+@router.get("/api/embedding/files")
 async def get_files():
     """Get a list of files available for embedding."""
     upload_dir = Path(UPLOAD_DIR)

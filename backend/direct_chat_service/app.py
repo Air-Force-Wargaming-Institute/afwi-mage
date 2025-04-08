@@ -46,9 +46,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add API router with prefix
-router = APIRouter(prefix=config.api.prefix)
-
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -225,11 +222,7 @@ def get_document_size(file_path: Path) -> int:
     except FileNotFoundError:
         return 0
 
-@router.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now()}
-
-@router.put("/chat/session/{session_id}/documents/{doc_id}/toggle")
+@app.put("/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/toggle")
 async def toggle_document_state(
     session_id: str,
     doc_id: str,
@@ -267,7 +260,7 @@ async def toggle_document_state(
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/chat/session/{session_id}/documents/states")
+@app.get("/api/direct_chat/chat/session/{session_id}/documents/states")
 async def get_document_states(session_id: str):
     """Get all document states for a session"""
     if session_id not in chat_sessions:
@@ -404,7 +397,7 @@ def cleanup_document_files(session_id: str, doc_id: str, user_id: str = DEFAULT_
         print(f"Traceback: {traceback.format_exc()}")
 
 # Add new endpoints for document management
-@router.delete("/chat/session/{session_id}/documents/{doc_id}")
+@app.delete("/api/direct_chat/chat/session/{session_id}/documents/{doc_id}")
 async def delete_document(
     session_id: str,
     doc_id: str,
@@ -457,7 +450,7 @@ async def delete_document(
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/chat/session/{session_id}")
+@app.delete("/api/direct_chat/chat/session/{session_id}")
 async def delete_session(
     session_id: str,
     background_tasks: BackgroundTasks
@@ -623,7 +616,7 @@ def load_session_metadata(session_id: str, user_id: str = DEFAULT_USER) -> Dict[
         return {}
 
 # Update the upload_document endpoint to save metadata after successful upload
-@router.post("/chat/session/{session_id}/documents/upload")
+@app.post("/api/direct_chat/chat/session/{session_id}/documents/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
     session_id: str,
@@ -695,7 +688,7 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
 # Add endpoint to check document processing status
-@router.get("/chat/session/{session_id}/documents/{doc_id}/status")
+@app.get("/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/status")
 async def get_document_status(session_id: str, doc_id: str):
     """Get the processing status of a document"""
     if session_id not in chat_sessions:
@@ -706,12 +699,18 @@ async def get_document_status(session_id: str, doc_id: str):
     
     return document_metadata[session_id][doc_id]
 
-# Add a root health check endpoint
-@app.get("/health")
-async def root_health_check():
-    return {"status": "healthy", "timestamp": datetime.now()}
+@app.get("/api/direct_chat/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
 
-@router.post("/chat/message", response_model=ChatResponse)
+# Add standardized endpoints mirroring the v1 endpoints
+@app.post("/api/direct_chat/chat/message", response_model=ChatResponse)
+async def standard_chat(request: ChatRequest, user_id: str = DEFAULT_USER):
+    """Standardized version of the chat endpoint following naming conventions."""
+    return await chat(request, user_id)
+
+@app.post("/api/direct_chat/chat/message", response_model=ChatResponse)
 async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
     try:
         # Ensure we have a valid history for this session
@@ -897,7 +896,7 @@ Answer:"""
         print(f"Error in chat: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing chat request: {str(e)}")
 
-@router.get("/chat/history/{session_id}")
+@app.get("/api/direct_chat/chat/history/{session_id}")
 async def get_chat_history(session_id: str, user_id: str = DEFAULT_USER):
     try:
         # Validate session directory with user_id
@@ -929,7 +928,7 @@ async def get_chat_history(session_id: str, user_id: str = DEFAULT_USER):
         print(f"Error in get_chat_history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/chat/session")
+@app.post("/api/direct_chat/chat/session")
 async def create_chat_session(user_id: str = DEFAULT_USER):
     """Create a new chat session"""
     session_id = str(uuid.uuid4())  # Move this outside the try block
@@ -974,7 +973,7 @@ async def create_chat_session(user_id: str = DEFAULT_USER):
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/chat/sessions")
+@app.get("/api/direct_chat/chat/sessions")
 async def get_chat_sessions(user_id: str = DEFAULT_USER):
     try:
         # Validate all session directories
@@ -1168,7 +1167,7 @@ async def startup_event():
 class UpdateSessionNameRequest(BaseModel):
     new_name: str
 
-@router.put("/chat/session/{session_id}/name")
+@app.put("/api/direct_chat/chat/session/{session_id}/name")
 async def update_session_name(
     session_id: str,
     request: UpdateSessionNameRequest,
@@ -1194,7 +1193,7 @@ async def update_session_name(
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/chat/session/{session_id}/documents/{doc_id}/classification")
+@app.put("/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/classification")
 async def update_document_classification(
     session_id: str,
     doc_id: str,
@@ -1221,13 +1220,13 @@ async def update_document_classification(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/test/thinking-format")
+@app.get("/api/direct_chat/test/thinking-format")
 async def test_thinking_format():
     return {
         "response": "Here is a sample response with thinking process.\n\n<details><summary>Thinking Process</summary>\n\nThis is where the thinking process would go.\n\n</details>"
     }
 
-@router.get("/vectorstores")
+@app.get("/api/direct_chat/vectorstores")
 async def list_vectorstores():
     """List all available vectorstores in the data/vectorstores directory with their names"""
     try:
@@ -1289,7 +1288,7 @@ async def list_vectorstores():
 class SetVectorstoreRequest(BaseModel):
     vectorstore: str
 
-@router.put("/chat/session/{session_id}/vectorstore")
+@app.put("/api/direct_chat/chat/session/{session_id}/vectorstore")
 async def set_session_vectorstore(
     session_id: str,
     request: SetVectorstoreRequest,
@@ -1341,7 +1340,7 @@ async def set_session_vectorstore(
         logger.error(f"Error setting vectorstore for session {session_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/chat/session/{session_id}/metadata")
+@app.get("/api/direct_chat/chat/session/{session_id}/metadata")
 async def get_session_metadata(
     session_id: str,
     user_id: str = DEFAULT_USER
@@ -1366,6 +1365,3 @@ async def get_session_metadata(
     except Exception as e:
         logger.error(f"Error getting metadata for session {session_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# Register the router with the app AFTER all endpoints are defined
-app.include_router(router)

@@ -1,12 +1,17 @@
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getGatewayUrl } from '../config';
 
 // Send a message to the direct chat service
-export const sendMessage = async (message, sessionId) => {
+export const sendMessage = async (message, sessionId, token) => {
   try {
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', '/chat/message'),
-      { message, session_id: sessionId }
+      getGatewayUrl('/api/direct_chat/chat/message'),
+      { message, session_id: sessionId },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -16,10 +21,15 @@ export const sendMessage = async (message, sessionId) => {
 };
 
 // Get chat history for a specific session
-export const getChatHistory = async (sessionId) => {
+export const getChatHistory = async (sessionId, token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/history/${sessionId}`)
+      getGatewayUrl(`/api/direct_chat/chat/history/${sessionId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -29,10 +39,16 @@ export const getChatHistory = async (sessionId) => {
 };
 
 // Create a new chat session
-export const createChatSession = async () => {
+export const createChatSession = async (token) => {
   try {
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', '/chat/session')
+      getGatewayUrl('/api/direct_chat/chat/session'),
+      {},
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -42,10 +58,15 @@ export const createChatSession = async () => {
 };
 
 // Delete a chat session
-export const deleteChatSession = async (sessionId) => {
+export const deleteChatSession = async (sessionId, token) => {
   try {
     await axios.delete(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
   } catch (error) {
     console.error('Error deleting chat session:', error);
@@ -54,10 +75,15 @@ export const deleteChatSession = async (sessionId) => {
 };
 
 // Get all chat sessions
-export const getAllChatSessions = async () => {
+export const getAllChatSessions = async (token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', '/chat/sessions')
+      getGatewayUrl('/api/direct_chat/chat/sessions'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -67,16 +93,17 @@ export const getAllChatSessions = async () => {
 };
 
 // Upload a document to a specific session
-export const uploadDocument = async (sessionId, file) => {
+export const uploadDocument = async (sessionId, file, token) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
     
     const response = await axios.post(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/upload`),
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/upload`),
       formData,
       {
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       }
@@ -89,10 +116,15 @@ export const uploadDocument = async (sessionId, file) => {
 };
 
 // Get document states for a session
-export const getDocumentStates = async (sessionId) => {
+export const getDocumentStates = async (sessionId, token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/states`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/states`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -102,10 +134,15 @@ export const getDocumentStates = async (sessionId) => {
 };
 
 // Get status of a specific document
-export const getDocumentStatus = async (sessionId, docId) => {
+export const getDocumentStatus = async (sessionId, docId, token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/status`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/${docId}/status`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -115,10 +152,15 @@ export const getDocumentStatus = async (sessionId, docId) => {
 };
 
 // Delete a document from a session
-export const deleteDocument = async (sessionId, docId) => {
+export const deleteDocument = async (sessionId, docId, token) => {
   try {
     await axios.delete(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/${docId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
   } catch (error) {
     console.error('Error deleting document:', error);
@@ -127,10 +169,16 @@ export const deleteDocument = async (sessionId, docId) => {
 };
 
 // Toggle document selection state
-export const toggleDocumentState = async (sessionId, docId) => {
+export const toggleDocumentState = async (sessionId, docId, token) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/toggle`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/${docId}/toggle`),
+      {},
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -140,11 +188,16 @@ export const toggleDocumentState = async (sessionId, docId) => {
 };
 
 // Update session name
-export const updateSessionName = async (sessionId, newName) => {
+export const updateSessionName = async (sessionId, newName, token) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/name`),
-      { new_name: newName }
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/name`),
+      { new_name: newName },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -153,24 +206,19 @@ export const updateSessionName = async (sessionId, newName) => {
   }
 };
 
-export const updateDocumentClassification = async (sessionId, docId, classification) => {
+export const updateDocumentClassification = async (sessionId, docId, classification, token) => {
   try {
-    const response = await fetch(
-      `${getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/documents/${docId}/classification`)}`,
+    const response = await axios.put(
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/documents/${docId}/classification`),
+      { classification },
       {
-        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ classification }),
+          'Authorization': `Bearer ${token}`
+        }
       }
     );
-
-    if (!response.ok) {
-      throw new Error(`Failed to update document classification: ${response.statusText}`);
-    }
-
-    return await response.json();
+    return response.data;
   } catch (error) {
     console.error('Error updating document classification:', error);
     throw error;
@@ -178,10 +226,15 @@ export const updateDocumentClassification = async (sessionId, docId, classificat
 };
 
 // Get available vectorstores
-export const getVectorstores = async () => {
+export const getVectorstores = async (token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', '/vectorstores')
+      getGatewayUrl('/api/direct_chat/vectorstores'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data.vectorstores;
   } catch (error) {
@@ -191,10 +244,15 @@ export const getVectorstores = async () => {
 };
 
 // Get session metadata
-export const getChatSessionMetadata = async (sessionId) => {
+export const getChatSessionMetadata = async (sessionId, token) => {
   try {
     const response = await axios.get(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/metadata`)
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/metadata`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -204,11 +262,16 @@ export const getChatSessionMetadata = async (sessionId) => {
 };
 
 // Set the vectorstore for a session
-export const setSessionVectorstore = async (sessionId, vectorstore) => {
+export const setSessionVectorstore = async (sessionId, vectorstore, token) => {
   try {
     const response = await axios.put(
-      getApiUrl('DIRECT_CHAT', `/chat/session/${sessionId}/vectorstore`),
-      { vectorstore }
+      getGatewayUrl(`/api/direct_chat/chat/session/${sessionId}/vectorstore`),
+      { vectorstore },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {

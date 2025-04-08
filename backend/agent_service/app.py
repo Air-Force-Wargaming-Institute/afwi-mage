@@ -28,11 +28,17 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(agent_routes.router, prefix="/api/agents")
+# app.include_router(agent_routes.router, prefix="/api/agent")
+app.include_router(agent_routes.router)
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE FineTune Agent Service API"}
+
+@app.get("/api/agent/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

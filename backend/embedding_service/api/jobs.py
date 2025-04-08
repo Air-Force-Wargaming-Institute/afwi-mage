@@ -29,7 +29,8 @@ except ImportError:
     )
 
 # Set up router
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+# router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(tags=["jobs"])
 
 
 class JobStatusResponse(BaseModel):
@@ -112,7 +113,7 @@ class JobStatsResponse(BaseModel):
     }
 
 
-@router.get("/{job_id}", response_model=JobStatusResponse)
+@router.get("/api/embedding/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(job_id: str):
     """
     Get the status of a job.
@@ -158,7 +159,7 @@ async def get_job_status(job_id: str):
 
 
 # Add an alias endpoint at /status/{job_id} for compatibility with the frontend
-@router.get("/status/{job_id}", response_model=JobStatusResponse)
+@router.get("/api/embedding/jobs/status/{job_id}", response_model=JobStatusResponse)
 async def get_job_status_alias(job_id: str):
     """
     Alias for get_job_status to maintain compatibility with frontend.
@@ -199,7 +200,7 @@ async def get_job_status_alias(job_id: str):
 
 
 # Add an endpoint to match the exact path the frontend is expecting
-@router.get("/status/{job_id}", response_model=JobStatusResponse)
+@router.get("/api/embedding/jobs/status/{job_id}", response_model=JobStatusResponse)
 async def get_status_endpoint(job_id: str):
     """
     Get job status by ID at the path the frontend expects.
@@ -213,7 +214,7 @@ async def get_status_endpoint(job_id: str):
     return await get_job_status(job_id)
 
 
-@router.get("", response_model=JobListResponse)
+@router.get("/api/embedding/jobs", response_model=JobListResponse)
 async def list_all_jobs(
     status: Optional[str] = None,
     operation_type: Optional[str] = None,
@@ -283,7 +284,7 @@ async def list_all_jobs(
     )
 
 
-@router.delete("/{job_id}", response_model=JobActionResponse)
+@router.delete("/api/embedding/jobs/{job_id}", response_model=JobActionResponse)
 async def cancel_job(job_id: str):
     """
     Cancel a running job.
@@ -320,7 +321,7 @@ async def cancel_job(job_id: str):
         )
 
 
-@router.get("/stats", response_model=JobStatsResponse)
+@router.get("/api/embedding/jobs/stats", response_model=JobStatsResponse)
 async def get_job_stats():
     """
     Get job statistics.

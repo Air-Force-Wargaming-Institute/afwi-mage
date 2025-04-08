@@ -85,7 +85,8 @@ except Exception as e:
     raise
 
 # Create a main router that includes all sub-routers
-main_router = APIRouter(prefix="/api/embedding")
+# main_router = APIRouter(prefix="/api/embedding")
+main_router = APIRouter()
 
 # Include all sub-routers
 for name, router in routers.items():
