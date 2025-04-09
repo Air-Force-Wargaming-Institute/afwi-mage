@@ -74,3 +74,10 @@ chat_logging:
   history_window: 100  # Number of messages to keep in memory
   max_token_window: 20000  # Maximum tokens to include in context
   max_new_tokens: 2500
+
+server:
+  host: "0.0.0.0"  # Listen on all available interfaces
+  port: 8011         # Port for the Direct Chat service
+  workers: 4         # Number of worker processes (adjust based on CPU cores)
+  reload: false      # Set to true for development auto-reload
+  log_level: "info"  # Logging level (debug, info, warning, error, critical)

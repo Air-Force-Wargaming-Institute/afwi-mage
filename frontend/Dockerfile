@@ -15,5 +15,5 @@ RUN npm run build
 # Install serve globally
 RUN npm install -g serve
 
-EXPOSE 80
-CMD ["serve", "-s", "build", "-p", "80"]
+EXPOSE 3000
+CMD ["serve", "-s", "build", "-p", "3000"]

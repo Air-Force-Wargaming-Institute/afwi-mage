@@ -12,3 +12,6 @@ aiofiles>=24.1.0
 pytest-shutil>=1.8.1
 faiss-cpu>=1.7.0
 vllm
+aiohttp
+requests
+langchain-ollama

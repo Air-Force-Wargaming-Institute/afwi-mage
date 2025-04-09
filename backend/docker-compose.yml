@@ -224,7 +224,7 @@ services:
    networks:
      - app-network
 
-  direct_chat_service1:
+  direct_chat_service:
     build: ./direct_chat_service
     ports:
       - "8011:8011"
@@ -250,13 +250,12 @@ services:
   frontend:
     build: ../frontend
     ports:
-      - "80:80"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PORT=80
+      - PORT=3000
     volumes:
       - ../data:/data
-      - ../frontend:/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -270,16 +269,16 @@ services:
     networks:
       - app-network
 
-  chat_db:
-    image: postgres:17.4
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=chat_db
-    networks:
-      - app-network
+  # chat_db:
+  #   image: postgres:17.4
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=chat_db
+  #   networks:
+  #     - app-network
       
   # direct_chat_db:
   #   image: postgres:17.4

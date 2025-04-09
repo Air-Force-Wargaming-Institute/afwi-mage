@@ -8,6 +8,7 @@ exposing an OpenAI-compatible API endpoint for chat completions.
 from typing import Any, Dict, List, Optional, Union
 import logging
 import json
+import aiohttp  # Add import for async HTTP requests
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -23,7 +24,7 @@ from langchain_core.callbacks.manager import CallbackManagerForLLMRun, AsyncCall
 import requests
 
 # Use the same logger as the main application
-logger = logging.getLogger("direct_chat_service")
+logger = logging.getLogger(__name__) # Use service logger if configured, else root
 
 class VLLMOpenAIChat(BaseChatModel):
     """Chat model that uses vLLM's OpenAI-compatible chat completions API."""
@@ -51,6 +52,9 @@ class VLLMOpenAIChat(BaseChatModel):
     
     streaming: bool = False
     """Whether to stream the results."""
+
+    # Add session property to reuse aiohttp session
+    _session: Optional[aiohttp.ClientSession] = None
     
     @property
     def _llm_type(self) -> str:
@@ -75,23 +79,64 @@ class VLLMOpenAIChat(BaseChatModel):
         """Convert LangChain messages to OpenAI format."""
         openai_messages = []
         for message in messages:
+            role = None
+            content = None
             if isinstance(message, HumanMessage):
-                openai_messages.append({"role": "user", "content": message.content})
+                role = "user"
+                content = message.content
             elif isinstance(message, AIMessage):
-                openai_messages.append({"role": "assistant", "content": message.content})
+                role = "assistant"
+                content = message.content
             elif isinstance(message, SystemMessage):
-                openai_messages.append({"role": "system", "content": message.content})
+                role = "system"
+                content = message.content
             elif isinstance(message, ChatMessage):
-                role = message.role
-                # Map 'human' to 'user' and 'ai' to 'assistant' if needed
-                if role == "human":
+                # Map common roles if needed
+                raw_role = message.role
+                if raw_role == "human":
                     role = "user"
-                elif role == "ai":
+                elif raw_role == "ai":
                     role = "assistant"
-                openai_messages.append({"role": role, "content": message.content})
+                else:
+                    role = raw_role # Use provided role
+                content = message.content
             else:
-                raise ValueError(f"Unsupported message type: {type(message)}")
+                logger.warning(f"Unsupported message type encountered: {type(message)}")
+                continue # Skip unsupported types
+            
+            if role and content is not None:
+                 openai_messages.append({"role": role, "content": content})
+            else:
+                 logger.warning(f"Could not convert message: {message}")
+
         return openai_messages
+
+    def _prepare_request_payload(
+        self, messages: List[BaseMessage], stop: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Prepare the request payload for the API call."""
+        # Combine stop sequences
+        stop_sequences = list(self.stop) if isinstance(self.stop, list) else [self.stop] if self.stop else []
+        if stop:
+            stop_sequences.extend(stop)
+        stop_sequences = list(set(stop_sequences)) # Remove duplicates
+
+        openai_messages = self._convert_messages_to_openai_format(messages)
+        
+        payload = {
+            "model": self.model_name,
+            "messages": openai_messages,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+        
+        if self.max_tokens is not None:
+            payload["max_tokens"] = self.max_tokens
+        
+        if stop_sequences:
+            payload["stop"] = stop_sequences
+
+        return payload
     
     def _generate(
         self,
@@ -100,77 +145,44 @@ class VLLMOpenAIChat(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """Generate chat completion using vLLM OpenAI-compatible API."""
+        """Generate chat completion synchronously."""
         if self.streaming:
-            raise ValueError("For streaming, please use _astream_chat method.")
+            # Streaming is typically handled by a different method (_stream or _astream)
+            raise NotImplementedError("Synchronous streaming not implemented for this model.")
         
-        # Combine stop sequences from instance and method parameters
-        if self.stop and stop:
-            stop_sequences = list(set(self.stop if isinstance(self.stop, list) else [self.stop] + stop))
-        elif self.stop:
-            stop_sequences = self.stop if isinstance(self.stop, list) else [self.stop]
-        else:
-            stop_sequences = stop
-
-        # Convert LangChain messages to OpenAI format
-        openai_messages = self._convert_messages_to_openai_format(messages)
-        
-        # Prepare request payload
-        payload = {
-            "model": self.model_name,
-            "messages": openai_messages,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-        }
-        
-        if self.max_tokens:
-            payload["max_tokens"] = self.max_tokens
-        
-        if stop_sequences:
-            payload["stop"] = stop_sequences
-        
-        # Make API request
+        payload = self._prepare_request_payload(messages, stop)
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.openai_api_key}"
         }
         
-        # Log the exact payload being sent
-        logger.info(f"VLLMOpenAIChat: Sending request to vLLM server at: {self.openai_api_base}")
-        logger.info(f"VLLMOpenAIChat: Request headers: {headers}")
+        api_url = f"{self.openai_api_base.rstrip('/')}/chat/completions"
+        logger.info(f"VLLMOpenAIChat (sync): Sending request to {api_url}")
+        # logger.debug(f"VLLMOpenAIChat (sync): Payload: {json.dumps(payload, indent=2)}")
         
-        # Log the full payload with formatted JSON for readability
-        logger.info(f"VLLMOpenAIChat: Request payload: {json.dumps(payload, indent=2)}")
-        
-        # Log message structure summary for quick debugging
-        logger.info(f"VLLMOpenAIChat: Message sequence: {[(m['role'], len(m['content'])) for m in openai_messages]}")
-        
-        # Detailed logging of each message (optional, can be verbose)
-        for i, msg in enumerate(openai_messages):
-            logger.debug(f"VLLMOpenAIChat: Message {i} ({msg['role']}): {msg['content'][:100]}...")
-        
-        response = requests.post(
-            f"{self.openai_api_base.rstrip('/')}/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        
-        # Log response status
-        logger.info(f"VLLMOpenAIChat: Response status: {response.status_code}")
-        
-        response.raise_for_status()
-        response_data = response.json()
-        
-        # Log response summary
-        logger.info(f"VLLMOpenAIChat: Response received: Model: {response_data.get('model')}, Tokens: {response_data.get('usage', {})}")
-        
-        # Extract and return the result
-        assistant_message = response_data["choices"][0]["message"]["content"]
-        
-        message = AIMessage(content=assistant_message)
-        generation = ChatGeneration(message=message)
-        
-        return ChatResult(generations=[generation])
+        try:
+            response = requests.post(api_url, headers=headers, json=payload)
+            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            response_data = response.json()
+            
+            logger.info(f"VLLMOpenAIChat (sync): Response received. Usage: {response_data.get('usage')}")
+            
+            if not response_data.get("choices") or not response_data["choices"][0].get("message"):
+                 logger.error(f"VLLMOpenAIChat (sync): Invalid response format: {response_data}")
+                 raise ValueError("Invalid response format from API")
+
+            assistant_message_content = response_data["choices"][0]["message"]["content"]
+            message = AIMessage(content=assistant_message_content)
+            generation = ChatGeneration(message=message)
+            
+            return ChatResult(generations=[generation])
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"VLLMOpenAIChat (sync): HTTP Request failed: {e}")
+            raise
+        except Exception as e:
+             logger.error(f"VLLMOpenAIChat (sync): Error processing response: {e}", exc_info=True)
+             raise
     
     async def _agenerate(
         self,
@@ -179,10 +191,57 @@ class VLLMOpenAIChat(BaseChatModel):
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """Asynchronously generate chat completion using vLLM OpenAI-compatible API."""
-        # This is a simple implementation that doesn't use true async
-        # In a real implementation, you'd want to use aiohttp or httpx for async requests
-        return self._generate(messages, stop, run_manager, **kwargs)
+        """Asynchronously generate chat completion using aiohttp."""
+        if self.streaming:
+             raise NotImplementedError("Asynchronous streaming not implemented for this model.")
+
+        payload = self._prepare_request_payload(messages, stop)
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.openai_api_key}"
+        }
+
+        api_url = f"{self.openai_api_base.rstrip('/')}/chat/completions"
+        logger.info(f"VLLMOpenAIChat (async): Sending request to {api_url}")
+        # logger.debug(f"VLLMOpenAIChat (async): Payload: {json.dumps(payload, indent=2)}")
+
+        # Ensure session exists and is open
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+            logger.info("VLLMOpenAIChat (async): Created new aiohttp ClientSession.")
+
+        try:
+            async with self._session.post(api_url, headers=headers, json=payload) as response:
+                response.raise_for_status() # Raise ClientResponseError for bad responses
+                response_data = await response.json()
+                
+                logger.info(f"VLLMOpenAIChat (async): Response received. Status: {response.status}. Usage: {response_data.get('usage')}")
+                
+                if not response_data.get("choices") or not response_data["choices"][0].get("message"):
+                    logger.error(f"VLLMOpenAIChat (async): Invalid response format: {response_data}")
+                    raise ValueError("Invalid response format from API")
+
+                assistant_message_content = response_data["choices"][0]["message"]["content"]
+                message = AIMessage(content=assistant_message_content)
+                generation = ChatGeneration(message=message)
+                
+                return ChatResult(generations=[generation])
+
+        except aiohttp.ClientError as e:
+            logger.error(f"VLLMOpenAIChat (async): HTTP Request failed: {e}")
+            # Potentially close session on certain errors? Decide policy.
+            # await self.aclose() 
+            raise
+        except Exception as e:
+            logger.error(f"VLLMOpenAIChat (async): Error processing response: {e}", exc_info=True)
+            raise
+
+    async def aclose(self):
+        """Close the aiohttp session if it exists and is open."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            logger.info("VLLMOpenAIChat (async): Closed aiohttp ClientSession.")
+            self._session = None
 
 # Example usage:
 """
