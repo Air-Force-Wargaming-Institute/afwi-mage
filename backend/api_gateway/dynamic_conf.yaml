@@ -329,7 +329,7 @@ http:
     direct-chat-service:
       loadBalancer:
         servers:
-          - url: "http://direct_chat_service1:8011"
+          - url: "http://direct_chat_service:8011"
         healthCheck:
           path: "/api/direct_chat/health"
           interval: "120s"
