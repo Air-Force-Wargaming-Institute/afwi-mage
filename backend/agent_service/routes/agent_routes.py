@@ -16,6 +16,8 @@ SHARED_TEAMS_PATH = BUILDER_DIR / "TEAMS"
 SHARED_STRUCTURE_PATH = SHARED_TEAMS_PATH / "TEAM-TEMPLATE"
 SHARED_AGENTS_PATH = BUILDER_DIR / "AGENTS"
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 class AgentCreate(BaseModel):
@@ -119,7 +121,7 @@ def sync_json_file(source_path: Path, dest_path: Path):
         logger.error(f"Error syncing file {source_path} to {dest_path}: {str(e)}")
         raise
 
-@router.post("/create_agent/")
+@router.post("/api/agent/create_agent/")
 async def create_agent(agent_data: AgentCreate):
     try:
         agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
@@ -155,7 +157,7 @@ async def create_agent(agent_data: AgentCreate):
         logger.error(f"Error creating agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating agent: {str(e)}")
 
-@router.post("/create_team/")
+@router.post("/api/agent/create_team/")
 async def create_team(team_data: TeamCreate):
     try:
         teams_file = TEAMS_PATH / "teams.json"
@@ -188,7 +190,7 @@ async def create_team(team_data: TeamCreate):
         logger.error(f"Error creating team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating team: {str(e)}")
 
-@router.get("/list_agents/")
+@router.get("/api/agent/list_agents/")
 async def list_agents():
     agents = []
     logger = logging.getLogger(__name__)
@@ -223,7 +225,7 @@ async def list_agents():
         logger.error(f"Error listing agents: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing agents: {str(e)}")
 
-@router.get("/list_teams/")
+@router.get("/api/agent/list_teams/")
 async def list_teams():
     teams = []
     logger = logging.getLogger(__name__)
@@ -283,7 +285,7 @@ async def list_teams():
         logger.error(f"Error listing teams: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing teams: {str(e)}")
 
-@router.put("/update_agent/{unique_id}")
+@router.put("/api/agent/update_agent/{unique_id}")
 async def update_agent(unique_id: str, agent_data: AgentCreate):
     try:
         agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
@@ -328,7 +330,7 @@ async def update_agent(unique_id: str, agent_data: AgentCreate):
         logger.error(f"Error updating agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating agent: {str(e)}")
 
-@router.delete("/delete_agent/{unique_id}")
+@router.delete("/api/agent/delete_agent/{unique_id}")
 async def delete_agent(unique_id: str):
     try:
         agents_file = INDIVIDUAL_AGENTS_PATH / "agents.json"
@@ -397,7 +399,7 @@ async def delete_agent(unique_id: str):
         logger.error(f"Error deleting agent: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting agent: {str(e)}")
 
-@router.put("/update_team/{unique_id}")
+@router.put("/api/agent/update_team/{unique_id}")
 async def update_team(unique_id: str, team_data: TeamCreate):
     try:
         teams_file = TEAMS_PATH / "teams.json"
@@ -460,7 +462,7 @@ async def update_team(unique_id: str, team_data: TeamCreate):
         logger.error(f"Error updating team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error updating team: {str(e)}")
 
-@router.delete("/delete_team/{unique_id}")
+@router.delete("/api/agent/delete_team/{unique_id}")
 async def delete_team(unique_id: str):
     try:
         teams_file = TEAMS_PATH / "teams.json"
@@ -501,7 +503,7 @@ async def delete_team(unique_id: str):
         logger.error(f"Error deleting team: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting team: {str(e)}")
 
-@router.get("/available_teams/")
+@router.get("/api/agent/available_teams/")
 async def get_available_teams():
     teams = []
     logger = logging.getLogger(__name__)
@@ -534,7 +536,7 @@ async def get_available_teams():
         logger.error(f"Error listing teams: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing teams: {str(e)}")
 
-@router.get("/list_vs/")
+@router.get("/api/agent/list_vs/")
 async def list_vectorstores():
     """
     List all available vectorstores from the /app/data/vectorstores/ directory.

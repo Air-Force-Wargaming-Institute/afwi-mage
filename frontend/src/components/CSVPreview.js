@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from '@material-ui/core';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 function CSVPreview({ filename }) {
+  const { user, token } = useContext(AuthContext);
   const [previewData, setPreviewData] = useState([]);
   const [error, setError] = useState(null);
 
@@ -11,7 +13,13 @@ function CSVPreview({ filename }) {
     const fetchCSVPreview = async () => {
       console.log("Fetching preview for:", filename);
       try {
-        const response = await axios.get(getApiUrl('EXTRACTION', `/api/extraction/csv-preview/${filename}`));
+        const response = await axios.get(getGatewayUrl(`/api/extraction/csv-preview/${filename}`),
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
         console.log("Preview data:", response.data);
         setPreviewData(response.data);
         setError(null);

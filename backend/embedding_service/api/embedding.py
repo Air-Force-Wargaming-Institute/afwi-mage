@@ -35,7 +35,8 @@ except ImportError as e:
             raise
 
 # Set up router
-router = APIRouter(prefix="/models", tags=["embedding models"])
+# router = APIRouter(prefix="/models", tags=["embedding models"])
+router = APIRouter(tags=["embedding models"])
 
 
 class EmbeddingModelInfo(BaseModel):
@@ -49,16 +50,16 @@ class EmbeddingModelInfo(BaseModel):
         "extra": "ignore",  # Equivalent to the old Config.extra = "ignore"
         "json_schema_extra": {
             "example": {
-                "id": "nomic-embed-text",
-                "name": "Nomic Embed Text",
-                "description": "Text embedding model from Nomic AI",
-                "provider": "Nomic AI"
+                "id": "/models/bge-base-en-v1.5",
+                "name": "BGE Base English v1.5",
+                "description": "BGE Base embedding model optimized for English text",
+                "provider": "vLLM"
             }
         }
     }
 
 
-@router.get("", response_model=List[EmbeddingModelInfo])
+@router.get("/api/embedding/models", response_model=List[EmbeddingModelInfo])
 async def get_models():
     """
     Get a list of available embedding models.

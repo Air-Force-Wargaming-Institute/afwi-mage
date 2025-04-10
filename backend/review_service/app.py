@@ -14,11 +14,17 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(review_router, prefix="/api/review")
+# app.include_router(review_router, prefix="/api/review")
+app.include_router(review_router)
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to AFWI MAGE Review Service API"}
+
+@app.get("/api/review/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

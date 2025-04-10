@@ -131,63 +131,104 @@ class VectorStoreManager:
         Args:
             name: Name of the vector store
             description: Description of the vector store
-            documents: List of documents to include in the vector store
+            documents: List of documents to add to the vector store
             embedding_model: Embedding model to use
             embedding_model_name: Name of the embedding model
             file_infos: List of file info dictionaries
-            chunk_size: Size of text chunks
+            chunk_size: Size of each chunk
             chunk_overlap: Overlap between chunks
             batch_size: Batch size for processing
             job_id: Optional job ID for tracking progress
             
         Returns:
             ID of the created vector store
+            
+        Raises:
+            Exception: If an error occurs during vector store creation
         """
-        # Log start of operation
-        logger.info(f"Creating vector store '{name}' with {len(documents)} documents")
-        
-        # Generate a unique ID for the vector store
+        # Create a unique ID for the vector store
         vs_id = str(uuid.uuid4())
         
-        # Create directory for vector store
+        # Create the vector store directory
         vs_dir = self.base_dir / vs_id
-        vs_dir.mkdir(exist_ok=True)
+        vs_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            # Process documents in batches to limit memory usage
-            logger.info(f"Creating vector store '{name}' with {len(documents)} documents")
-            
-            # Log a sample of document metadata
-            if documents:
-                logger.info(f"Sample document metadata: {json.dumps(documents[0].metadata, indent=2)}")
-            
-            # Update job progress if a job_id is provided
-            if job_id:
-                try:
-                    from core.job import update_job_progress
-                    update_job_progress(
-                        job_id, 
-                        10, 
-                        f"Creating vector store {vs_id} with {len(documents)} documents"
-                    )
-                except ImportError:
-                    # Job module might not be available or initialized
-                    logger.warning(f"Could not update job progress for job {job_id}")
-            
-            # Use batch processing to avoid memory issues
-            all_docs = []
-            for i in range(0, len(documents), batch_size):
-                batch = documents[i:i+batch_size]
-                logger.info(f"Processing batch {i//batch_size + 1}/{math.ceil(len(documents)/batch_size)}")
-                all_docs.extend(batch)
+            # Check if we have any documents
+            if not documents or len(documents) == 0:
+                logger.warning("Attempting to create a vector store with 0 documents")
                 
-                # Log progress if job_id provided
+                # Create metadata file for the empty vector store
+                vs_metadata = create_vectorstore_metadata(
+                    vs_id, 
+                    name, 
+                    description, 
+                    embedding_model_name,
+                    file_infos,
+                    chunk_size, 
+                    chunk_overlap
+                )
+                
+                metadata_file = vs_dir / "metadata.json"
+                save_metadata(vs_metadata, metadata_file)
+                
+                logger.info(f"Created metadata for empty vector store: {vs_id}")
+                
+                # Add a placeholder dummy document to initialize FAISS
+                dummy_text = "This is a placeholder document for empty vector stores."
+                dummy_doc = Document(
+                    page_content=dummy_text,
+                    metadata={"source": "placeholder", "is_placeholder": True}
+                )
+                
+                # Create FAISS vector store with the dummy document
+                dummy_docs = [dummy_doc]
+                vectorstore = FAISS.from_documents(dummy_docs, embedding_model)
+                
+                # Save the vector store
+                vectorstore.save_local(str(vs_dir))
+                logger.info(f"Successfully saved vector store with placeholder to {vs_dir}")
+                
+                # Clean up memory
+                del vectorstore
+                gc.collect()
+                
+                # Update job progress if a job_id is provided
                 if job_id:
                     try:
                         from core.job import update_job_progress
                         update_job_progress(
                             job_id,
-                            i + len(batch),
+                            0,
+                            "Created empty vector store with placeholder"
+                        )
+                    except ImportError:
+                        # Job module might not be available or initialized
+                        logger.warning(f"Could not update job progress for job {job_id}")
+                
+                return vs_id
+            
+            # Process documents in batches to avoid memory issues
+            # Split batches for embedding
+            gc.collect()
+            
+            all_docs = documents
+            logger.info(f"Creating embeddings for {len(all_docs)} documents")
+            
+            # Process in batches
+            batch_size = min(batch_size, len(all_docs))
+            
+            for i in range(0, len(all_docs), batch_size):
+                batch = all_docs[i:i + batch_size]
+                logger.info(f"Processing batch {i//batch_size + 1}/{math.ceil(len(documents)/batch_size)}: {len(batch)} documents")
+                
+                # Update job progress
+                if job_id:
+                    try:
+                        from core.job import update_job_progress
+                        update_job_progress(
+                            job_id,
+                            i,
                             f"Creating embeddings batch {i//batch_size + 1}/{math.ceil(len(documents)/batch_size)}"
                         )
                     except ImportError:
@@ -516,7 +557,7 @@ class VectorStoreManager:
                 
             try:
                 metadata = load_metadata(metadata_file)
-                embedding_model_name = metadata.get("embedding_model", "nomic-embed-text")
+                embedding_model_name = metadata.get("embedding_model", "/models/bge-base-en-v1.5")
             except Exception as e:
                 logger.error(f"Error loading vector store metadata: {str(e)}")
                 return []

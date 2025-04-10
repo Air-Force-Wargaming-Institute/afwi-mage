@@ -1,15 +1,21 @@
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
 
 /**
  * Get all documents in the specified path
  * @param {string} path - The path to list documents from
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with document list
  */
-export const getDocuments = async (path = '') => {
+export const getDocuments = async (path = '', token) => {
   try {
     const response = await axios.get(
-      getApiUrl('CORE', `/api/documents?path=${encodeURIComponent(path)}`)
+      getGatewayUrl(`/api/core/documents?path=${encodeURIComponent(path)}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -21,17 +27,23 @@ export const getDocuments = async (path = '') => {
 /**
  * Download a document
  * @param {string} path - Path to the document
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with document blob
  */
-export const downloadDocument = async (path) => {
+export const downloadDocument = async (path, token) => {
   try {
     const encodedPath = path.split('/')
       .map(segment => encodeURIComponent(segment))
       .join('/');
     
     const response = await axios.get(
-      getApiUrl('CORE', `/api/documents/${encodedPath}/download`),
-      { responseType: 'blob' }
+      getGatewayUrl(`/api/core/documents/${encodedPath}/download`),
+      { responseType: 'blob' },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error) {
@@ -43,12 +55,18 @@ export const downloadDocument = async (path) => {
 /**
  * Get documents that are already in a vector store
  * @param {string} vectorStoreId - The ID of the vector store
+ * @param {string} token - The authentication token
  * @returns {Promise} - Response with documents in the vector store
  */
-export const getVectorStoreDocuments = async (vectorStoreId) => {
+export const getVectorStoreDocuments = async (vectorStoreId, token) => {
   try {
     const response = await axios.get(
-      getApiUrl('EMBEDDING', `/api/embedding/vectorstores/${vectorStoreId}`)
+      getGatewayUrl(`/api/embedding/vectorstores/${vectorStoreId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data.files || [];
   } catch (error) {

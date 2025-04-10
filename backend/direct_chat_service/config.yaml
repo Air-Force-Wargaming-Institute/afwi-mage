@@ -4,12 +4,23 @@ service:
   port: 8011
   debug: true
 
+vllm:
+  chat_completion_url: http://host.docker.internal:8007/v1
+  chat_model: /models/DeepHermes-3-Llama-3-8B-Preview
+  max_tokens: 4096
+  temperature: 0.4
+  timeout: 300
+
 ollama:
   # Base URL for Ollama API
   base_url: http://host.docker.internal:11434
+  # Embedding configuration
+  embedding_url: http://host.docker.internal:11434
+  embedding_model: nomic-embed-text:latest
+  timeout: 300
   
   # Model identifier for Ollama
-  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest  
+  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused
@@ -40,10 +51,9 @@ ollama:
   # Useful for maintaining conversation format
   stop: ["Human:", "Assistant:"]
 
-
 api:
   core_service_url: http://core:8000
-  prefix: /api/v1
+  prefix: /api/direct_chat
 
 cors:
   allowed_origins:
@@ -64,3 +74,10 @@ chat_logging:
   history_window: 100  # Number of messages to keep in memory
   max_token_window: 20000  # Maximum tokens to include in context
   max_new_tokens: 2500
+
+server:
+  host: "0.0.0.0"  # Listen on all available interfaces
+  port: 8011         # Port for the Direct Chat service
+  workers: 4         # Number of worker processes (adjust based on CPU cores)
+  reload: false      # Set to true for development auto-reload
+  log_level: "info"  # Logging level (debug, info, warning, error, critical)

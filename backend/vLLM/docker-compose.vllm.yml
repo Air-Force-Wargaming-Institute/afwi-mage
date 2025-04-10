@@ -1,0 +1,40 @@
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vllm-chat
+    ports:
+      - "8007:8000"
+    environment:
+      - MAX_NUM_BATCHED_TOKENS=4096
+      - MAX_NUM_SEQS=256
+      - MAX_PADDING_LENGTH=256
+      - MAX_MODEL_LEN=65536
+      - QUANTIZATION=awq
+      - TRUST_REMOTE_CODE=true
+      - HF_DATASETS_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+      # GPU Allocation - 80% split across both GPUs
+      - GPU_MEMORY_UTILIZATION=0.8
+      - CUDA_VISIBLE_DEVICES=0,1
+      - NCCL_P2P_DISABLE=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    networks:
+      - app-network
+    ipc: host
+    command: >
+      --model /models/DeepHermes-3-Llama-3-8B-Preview
+      --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview
+      --dtype=half
+      --gpu-memory-utilization=0.8
+      --max-model-len=65536
+      --tensor-parallel-size=2
+    restart: unless-stopped

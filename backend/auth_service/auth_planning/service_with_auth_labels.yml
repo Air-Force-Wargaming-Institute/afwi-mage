@@ -1,0 +1,47 @@
+# Example Service Configuration with Authentication Labels
+
+  # Core Service with Authentication
+  core:
+    build: ./core_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
+      - UPLOAD_SERVICE_URL=http://upload:8005
+      - EXTRACTION_SERVICE_URL=http://extraction:8002
+      - GENERATION_SERVICE_URL=http://generation:8003
+      - AGENT_SERVICE_URL=http://agent:8001
+      - REVIEW_SERVICE_URL=http://review:8004
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../data:/app/data:rw
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+    labels:
+      # Enable Traefik for this service
+      - "traefik.enable=true"
+      
+      # Define the router for this service
+      - "traefik.http.routers.core.rule=PathPrefix(`/api/documents`) || Path(`/`)"
+      - "traefik.http.routers.core.entrypoints=web"
+      
+      # Set the port that Traefik will forward to
+      - "traefik.http.services.core.loadbalancer.server.port=8000"
+      
+      # Apply middlewares to enforce authentication
+      # For production
+      - "traefik.http.routers.core.middlewares=auth-jwt-prod,cors,compress,rate-limit-med"
+      
+      # For development (can be toggled via environment variables)
+      # - "traefik.http.routers.core.middlewares=auth-jwt-dev,cors,compress,rate-limit-med"
+      
+      # For disabled auth (can be toggled via environment variables)
+      # - "traefik.http.routers.core.middlewares=auth-none,cors,compress,rate-limit-med" 

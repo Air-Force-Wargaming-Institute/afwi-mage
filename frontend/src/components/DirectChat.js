@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo, useReducer } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useReducer, useContext } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -25,6 +25,8 @@ import {
   Fade,
   InputLabel,
   Link,
+  InputAdornment,
+  CircularProgress,
 } from '@material-ui/core';
 import { useTheme } from '@material-ui/core/styles';
 import SendIcon from '@material-ui/icons/Send';
@@ -48,6 +50,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import robotIcon from '../assets/robot-icon.png';
 import { useDirectChat, ACTIONS } from '../contexts/DirectChatContext';
+import { AuthContext } from '../contexts/AuthContext';
 import ReplayIcon from '@mui/icons-material/Replay';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
@@ -1786,6 +1789,7 @@ const DocumentUploadPane = ({
   onVectorstoreChange
 }) => {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -1807,7 +1811,7 @@ const DocumentUploadPane = ({
       
       try {
         setUploadError(null);
-        const states = await getDocumentStates(currentSessionId);
+        const states = await getDocumentStates(currentSessionId, token);
         const files = Object.entries(states).map(([docId, state]) => ({
           id: docId,
           name: state.originalName,
@@ -1829,7 +1833,7 @@ const DocumentUploadPane = ({
     };
 
     fetchDocumentStates();
-  }, [currentSessionId]);
+  }, [currentSessionId, token]);
 
   useEffect(() => {
     if (!currentSessionId || pollingIds.size === 0) return;
@@ -1839,7 +1843,7 @@ const DocumentUploadPane = ({
       
       for (const docId of pollingIds) {
         try {
-          const status = await getDocumentStatus(currentSessionId, docId);
+          const status = await getDocumentStatus(currentSessionId, docId, token);
           if (status.status !== 'pending') {
             // Update the file in the list
             setUploadedFiles(prev => prev.map(file => 
@@ -1860,7 +1864,7 @@ const DocumentUploadPane = ({
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [currentSessionId, pollingIds]);
+  }, [currentSessionId, pollingIds, token]);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     if (!currentSessionId) return;
@@ -1870,7 +1874,7 @@ const DocumentUploadPane = ({
     
     for (const file of acceptedFiles) {
       try {
-        const result = await uploadDocument(currentSessionId, file);
+        const result = await uploadDocument(currentSessionId, file, token);
         setUploadedFiles(prev => [...prev, {
           id: result.docId,
           name: file.name,
@@ -1889,7 +1893,7 @@ const DocumentUploadPane = ({
     }
     
     setIsUploading(false);
-  }, [currentSessionId]);
+  }, [currentSessionId, token]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
@@ -1900,7 +1904,7 @@ const DocumentUploadPane = ({
     if (!currentSessionId) return;
     
     try {
-      await deleteDocument(currentSessionId, docId);
+      await deleteDocument(currentSessionId, docId, token);
       setUploadedFiles(prev => prev.filter(file => file.id !== docId));
       setPollingIds(prev => {
         const updated = new Set(prev);
@@ -1915,7 +1919,7 @@ const DocumentUploadPane = ({
 
   const handleCheckboxChange = async (docId) => {
     try {
-      await toggleDocumentState(currentSessionId, docId);
+      await toggleDocumentState(currentSessionId, docId, token);
       setUploadedFiles(prev => prev.map(file => 
         file.id === docId ? { ...file, isChecked: !file.isChecked } : file
       ));
@@ -1927,7 +1931,7 @@ const DocumentUploadPane = ({
 
   const handleClassificationChange = async (docId, newClassification) => {
     try {
-      await updateDocumentClassification(currentSessionId, docId, newClassification);
+      await updateDocumentClassification(currentSessionId, docId, newClassification, token);
       setUploadedFiles(prev => prev.map(file => 
         file.id === docId ? { ...file, classification: newClassification } : file
       ));
@@ -2071,14 +2075,15 @@ const DirectChat = () => {
   const classes = useStyles();
   const theme = useTheme();
   const { state, dispatch } = useDirectChat();
+  const { token } = useContext(AuthContext);
   const messageEndRef = useRef(null);
   const inputRef = useRef(null);
   
-  // Local state management
-  const [messages, setMessages] = useState([]);
+  // Local state management - Replace array with object and isLoading with sendingSessions
+  const [messages, setMessages] = useState({}); // Change from array to object indexed by sessionId
   const [chatSessions, setChatSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [sendingSessions, setSendingSessions] = useState(new Set()); // Replace isLoading with Set
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [promptHelpOpen, setPromptHelpOpen] = useState(false);
@@ -2137,7 +2142,7 @@ const DirectChat = () => {
   useEffect(() => {
     const loadChatSessions = async () => {
       try {
-        const sessions = await getAllChatSessions();
+        const sessions = await getAllChatSessions(token);
         setChatSessions(sessions);
         // Set current session to the first one if none selected
         if (sessions.length > 0 && !currentSessionId) {
@@ -2148,28 +2153,39 @@ const DirectChat = () => {
       }
     };
     loadChatSessions();
-  }, [currentSessionId]);
+  }, [currentSessionId, token]);
 
   // Load chat history when session changes
   useEffect(() => {
     const loadChatHistory = async () => {
-      if (currentSessionId) {
+      if (currentSessionId && token) {
         try {
-          const history = await getChatHistory(currentSessionId);
-          setMessages(history);
+          const history = await getChatHistory(currentSessionId, token);
+          // Update messages for current session only
+          setMessages(prev => ({ ...prev, [currentSessionId]: history }));
         } catch (error) {
           setError('Failed to load chat history');
+          // Initialize with empty array on error
+          setMessages(prev => ({ ...prev, [currentSessionId]: [] }));
         }
       }
     };
     loadChatHistory();
-  }, [currentSessionId]);
+  }, [currentSessionId, token]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages[currentSessionId]?.length > 0) {
+      messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages[currentSessionId]]); // Only react to current session's messages
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
     const messageText = state.input.trim();
     
-    if (!messageText || !currentSessionId || isLoading) return;
+    // Check if this specific session is already loading
+    if (!messageText || !currentSessionId || sendingSessions.has(currentSessionId)) return;
 
     // Generate a unique ID for the message
     const userMessageId = `user-${Date.now()}`;
@@ -2182,15 +2198,22 @@ const DirectChat = () => {
       timestamp: new Date().toISOString()
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    // Update messages for current session only
+    setMessages(prev => ({
+      ...prev,
+      [currentSessionId]: [...(prev[currentSessionId] || []), userMessage]
+    }));
+    
     dispatch({ type: ACTIONS.SET_INPUT, payload: '' });
-    setIsLoading(true);
+    
+    // Set loading state for this session only
+    setSendingSessions(prev => new Set(prev).add(currentSessionId));
 
     try {
       // Send message to backend with session ID
-      const response = await sendMessage(messageText, currentSessionId);
+      const response = await sendMessage(messageText, currentSessionId, token);
       
-      // Add AI response to UI
+      // Add AI response to UI for current session only
       const aiMessage = {
         id: `ai-${Date.now()}`,
         text: response.message,
@@ -2198,7 +2221,10 @@ const DirectChat = () => {
         timestamp: new Date().toISOString()
       };
       
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => ({
+        ...prev,
+        [currentSessionId]: [...(prev[currentSessionId] || []), aiMessage]
+      }));
     } catch (error) {
       console.error("Error sending message:", error);
       const errorMessage = {
@@ -2207,20 +2233,33 @@ const DirectChat = () => {
         sender: 'system',
         timestamp: new Date().toISOString()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      
+      // Add error message to current session only
+      setMessages(prev => ({
+        ...prev,
+        [currentSessionId]: [...(prev[currentSessionId] || []), errorMessage]
+      }));
+      
       setError('Failed to send message');
     } finally {
-      setIsLoading(false);
+      // Clear loading state for this session only
+      setSendingSessions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentSessionId);
+        return newSet;
+      });
     }
   };
 
   const handleNewChat = async () => {
-    // Restore original implementation that directly creates a new session
     try {
-      const newSession = await createChatSession();
+      const newSession = await createChatSession(token);
       setChatSessions(prev => [newSession, ...prev]);
       setCurrentSessionId(newSession.id);
-      setMessages([]); // Clear messages for new session
+      
+      // Initialize messages for new session with empty array
+      setMessages(prev => ({ ...prev, [newSession.id]: [] }));
+      
       setClassificationLevel(0); // Reset classification to Unclassified
       resetCaveats(); // Reset all caveats checkboxes
       setSelectedVectorstore(''); // Reset vectorstore selection to default
@@ -2246,7 +2285,7 @@ const DirectChat = () => {
   
   const handleDeleteChat = async () => {
     try {
-      await deleteChatSession(deleteSessionId);
+      await deleteChatSession(deleteSessionId, token);
       setChatSessions(prev => prev.filter(session => session.id !== deleteSessionId));
       
       if (deleteSessionId === currentSessionId) {
@@ -2255,9 +2294,17 @@ const DirectChat = () => {
           setCurrentSessionId(remainingSessions[0].id);
         } else {
           setCurrentSessionId(null);
-          setMessages([]);
+          setMessages({}); // Reset to empty object instead of empty array
         }
       }
+      
+      // Remove deleted session from messages object
+      setMessages(prev => {
+        const newMessages = { ...prev };
+        delete newMessages[deleteSessionId];
+        return newMessages;
+      });
+      
     } catch (error) {
       setError('Failed to delete chat');
     } finally {
@@ -2271,7 +2318,19 @@ const DirectChat = () => {
   const handleSelectSession = async (sessionId) => {
     if (sessionId === currentSessionId) return;
     setCurrentSessionId(sessionId);
-    setMessages([]); // Clear messages before loading new ones
+    
+    // Don't clear messages anymore, as we're keeping them per session
+    // Only load if we don't already have messages for this session
+    if (!messages[sessionId]) {
+      try {
+        const history = await getChatHistory(sessionId, token);
+        setMessages(prev => ({ ...prev, [sessionId]: history }));
+      } catch (error) {
+        setError('Failed to load chat history');
+        setMessages(prev => ({ ...prev, [sessionId]: [] }));
+      }
+    }
+    
     setClassificationLevel(0); // Reset classification to Unclassified
     resetCaveats(); // Reset all caveats checkboxes
     
@@ -2308,21 +2367,49 @@ const DirectChat = () => {
   };
 
   const handleRetry = useCallback(async (failedMessage) => {
-    setIsLoading(true);
+    // Only allow retry if this session isn't already sending
+    if (!currentSessionId || sendingSessions.has(currentSessionId)) return;
+    
+    // Set loading state for this session only
+    setSendingSessions(prev => new Set(prev).add(currentSessionId));
+    
     try {
-      const response = await sendMessage(failedMessage);
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        text: response.message,
-        sender: 'ai',
-        timestamp: new Date().toISOString()
-      }]);
+      const response = await sendMessage(failedMessage, currentSessionId, token);
+      
+      // Add response to current session only
+      setMessages(prev => ({
+        ...prev,
+        [currentSessionId]: [...(prev[currentSessionId] || []), {
+          id: Date.now(),
+          text: response.message,
+          sender: 'ai',
+          timestamp: new Date().toISOString()
+        }]
+      }));
     } catch (error) {
       console.error('Error retrying message:', error);
+      
+      // Add error message to current session only
+      setMessages(prev => ({
+        ...prev,
+        [currentSessionId]: [...(prev[currentSessionId] || []), {
+          id: `error-retry-${Date.now()}`,
+          text: `Error: Failed to send message. ${error.message || 'Please try again.'}`,
+          sender: 'system',
+          timestamp: new Date().toISOString()
+        }]
+      }));
+      
+      setError('Failed to retry message');
     } finally {
-      setIsLoading(false);
+      // Clear loading state for this session only
+      setSendingSessions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentSessionId);
+        return newSet;
+      });
     }
-  }, []);
+  }, [currentSessionId, token]);
 
   const handleBookmark = useCallback((message) => {
     setBookmarkedMessages(prev => {
@@ -2353,7 +2440,7 @@ const DirectChat = () => {
     if (!editingSession || !editSessionName.trim()) return;
 
     try {
-      const response = await updateSessionName(editingSession.id, editSessionName.trim());
+      const response = await updateSessionName(editingSession.id, editSessionName.trim(), token);
       setChatSessions(prev => prev.map(session => 
         session.id === editingSession.id 
           ? response.session 
@@ -2367,7 +2454,7 @@ const DirectChat = () => {
 
   const handleDownloadSession = async (sessionId) => {
     try {
-      const history = await getChatHistory(sessionId);
+      const history = await getChatHistory(sessionId, token);
       const chatData = JSON.stringify(history, null, 2);
       const blob = new Blob([chatData], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
@@ -2421,7 +2508,7 @@ const DirectChat = () => {
       if (!isLoadingVectorstores) {
         setIsLoadingVectorstores(true);
         try {
-          const stores = await getVectorstores();
+          const stores = await getVectorstores(token);
           console.log("Loaded vectorstores:", stores);
           setVectorstores(stores);
           
@@ -2437,7 +2524,7 @@ const DirectChat = () => {
     };
     
     loadVectorstores();
-  }, [currentSessionId]); // Remove isLoadingVectorstores to prevent potential loops
+  }, [currentSessionId, token]); // Add token to the dependency array
 
   // Handle vectorstore change
   const handleVectorstoreChange = async (event) => {
@@ -2455,7 +2542,7 @@ const DirectChat = () => {
       
       // Then update backend
       console.log("Updating backend with vectorstore:", newVectorstore);
-      await setSessionVectorstore(currentSessionId, newVectorstore);
+      await setSessionVectorstore(currentSessionId, newVectorstore, token);
       console.log("Vectorstore set successfully");
     } catch (error) {
       console.error('Error setting vectorstore:', error);
@@ -2465,12 +2552,12 @@ const DirectChat = () => {
   // Cleanup
   useEffect(() => {
     return () => {
-      setMessages([]);
+      setMessages({}); // Use empty object instead of empty array
       setChatSessions([]);
       setBookmarkedMessages([]);
       setCurrentSessionId(null);
       setError(null);
-      setIsLoading(false);
+      setSendingSessions(new Set()); // Use empty Set instead of false
     };
   }, []);
 
@@ -2478,9 +2565,16 @@ const DirectChat = () => {
   console.log("Current vectorstore value:", selectedVectorstore);
   console.log("Available vectorstores:", vectorstores);
 
+  // Get current session's messages
+  const currentMessages = messages[currentSessionId] || [];
+  
+  // Check if current session is in loading state
+  const isCurrentSessionLoading = sendingSessions.has(currentSessionId);
+
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
+        {/* Chat log section */}
         <Paper className={classes.chatLog} elevation={3}>
           <Button 
             variant="contained" 
@@ -2544,6 +2638,8 @@ const DirectChat = () => {
             ))}
           </List>
         </Paper>
+        
+        {/* Chat area */}
         <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           {!currentSessionId && (
             <div className={classes.noSessionsOverlay}>
@@ -2577,13 +2673,14 @@ const DirectChat = () => {
             </div>
           </div>
           <MessageArea 
-            messages={messages}
+            messages={currentMessages} // Pass only current session's messages
             handleRetry={handleRetry}
             handleBookmark={handleBookmark}
             bookmarkedMessages={bookmarkedMessages}
-            isLoading={isLoading}
+            isLoading={isCurrentSessionLoading} // Pass loading state for current session
             classes={classes}
           />
+          
           <form onSubmit={handleSendMessage} className={classes.inputArea}>
             <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
               <IconButton 
@@ -2606,20 +2703,29 @@ const DirectChat = () => {
                 minRows={1}
                 maxRows={15}
                 fullWidth
+                // Disable only if current session is loading or no session selected
+                disabled={isCurrentSessionLoading || !currentSessionId}
                 InputProps={{
                   style: { 
                     maxHeight: '300px',
                     overflow: 'hidden' // Hide overflow on the Input component wrapper
-                  }
+                  },
+                  endAdornment: isCurrentSessionLoading ? (
+                    <InputAdornment position="end">
+                      <CircularProgress size={20} />
+                    </InputAdornment>
+                  ) : null
                 }}
               />
               <Button 
                 type="submit" 
                 variant="contained" 
                 color="primary" 
-                endIcon={<SendIcon />}
+                // Disable only if current session is loading, input is empty, or no session selected
+                disabled={isCurrentSessionLoading || !state.input.trim() || !currentSessionId}
+                endIcon={isCurrentSessionLoading ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
               >
-                Send
+                {isCurrentSessionLoading ? 'Sending...' : 'Send'}
               </Button>
             </div>
             
@@ -2773,14 +2879,19 @@ const DirectChat = () => {
             </div>
           </form>
         </Paper>
+        
+        {/* Document upload pane */}
         <DocumentUploadPane 
           currentSessionId={currentSessionId}
           vectorstores={vectorstores}
           selectedVectorstore={selectedVectorstore}
           isLoadingVectorstores={isLoadingVectorstores}
           onVectorstoreChange={handleVectorstoreChange}
+          token={token}
         />
       </div>
+      
+      {/* ... dialogs ... */}
       <Dialog
         open={helpDialogOpen}
         onClose={handleHelpClose}

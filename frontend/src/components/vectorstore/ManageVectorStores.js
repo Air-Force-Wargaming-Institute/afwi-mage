@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import {
   Typography,
   makeStyles,
@@ -63,6 +63,8 @@ import AssessmentIcon from '@material-ui/icons/Assessment';
 import TableChartIcon from '@material-ui/icons/TableChart';
 import CloudOffIcon from '@material-ui/icons/CloudOff';
 import CloseIcon from '@material-ui/icons/Close';
+import { AuthContext } from '../../contexts/AuthContext';
+import { getApiUrl, getGatewayUrl } from '../../config';
 
 // Import the vector store service for API integration
 import { 
@@ -83,7 +85,6 @@ import VectorStoreDetails from './VectorStoreDetails';
 
 // Import axios for API calls
 import axios from 'axios';
-import { API_ENDPOINTS, getApiUrl } from '../../config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -310,6 +311,7 @@ const useStyles = makeStyles((theme) => ({
 
 function ManageVectorStores() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [vectorStores, setVectorStores] = useState([]);
@@ -376,7 +378,7 @@ function ManageVectorStores() {
       setError(null);
       
       try {
-        const data = await getVectorStores();
+        const data = await getVectorStores({}, token);
         
         // Map API response fields to component fields
         const mappedData = data.map(store => ({
@@ -454,7 +456,7 @@ function ManageVectorStores() {
     
     // Fetch more detailed information
     try {
-      const detailedStore = await getVectorStoreById(store.id);
+      const detailedStore = await getVectorStoreById(store.id, token);
       
       if (detailedStore) {
         console.log("Fetched vector store details:", detailedStore);
@@ -518,7 +520,7 @@ function ManageVectorStores() {
     setIsDeleting(true);
     
     try {
-      await deleteVectorStore(storeToDelete.id);
+      await deleteVectorStore(storeToDelete.id, token);
       
       // Update local state
       setVectorStores(prevStores => 
@@ -553,7 +555,7 @@ function ManageVectorStores() {
 
   const handleSaveEdit = async (updatedStore) => {
     try {
-      const result = await updateVectorStore(updatedStore.id, updatedStore);
+      const result = await updateVectorStore(updatedStore.id, updatedStore, token);
       
       // Update local state
       setVectorStores(prevStores => 
@@ -966,7 +968,7 @@ function ManageVectorStores() {
     if (!selectedStore) return;
     
     try {
-      const refreshedStore = await getVectorStoreById(selectedStore.id);
+      const refreshedStore = await getVectorStoreById(selectedStore.id, token);
       
       if (refreshedStore) {
         // Update selected store with refreshed information
@@ -1000,7 +1002,7 @@ function ManageVectorStores() {
     
     setIsCleaningBackups(true);
     try {
-      const result = await cleanupVectorStoreBackups();
+      const result = await cleanupVectorStoreBackups(3, token);
       setSnackbar({
         open: true,
         message: `${result.message} ${result.details}`,
@@ -1295,9 +1297,13 @@ function ManageVectorStores() {
   
   // Fetch file preview from the backend server for existing files
   const fetchFilePreviewFromServer = (filePath, fileType) => {
-    const url = getApiUrl('UPLOAD', `/preview-tabular/${filePath}`);
+    const url = getGatewayUrl(`/api/upload/preview-tabular/${filePath}`);
     
-    axios.get(url)
+    axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then(response => {
         const data = response.data;
         setPreviewData({

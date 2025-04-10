@@ -9,8 +9,9 @@ This module provides API endpoints for:
 import logging
 import json
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from api.helpers import get_vectorstore_manager
 import os
 
 # Import from core module with proper error handling
@@ -19,18 +20,13 @@ try:
 except ImportError:
     from core.vectorstore import VectorStoreManager
 
-# Import from local modules with proper error handling
-try:
-    from .vectorstore import get_vectorstore_manager
-except ImportError:
-    from api.vectorstore import get_vectorstore_manager
 
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
 # Create router
-router = APIRouter(prefix="/llm", tags=["LLM Integration"])
-
+# router = APIRouter(prefix="/llm", tags=["LLM Integration"])
+router = APIRouter(tags=["LLM Integration"])
 
 class VectorStoreAnalysisRequest(BaseModel):
     """Request to analyze a vector store's content using an LLM."""
@@ -98,7 +94,7 @@ class VectorStoreLLMQueryResponse(BaseModel):
     }
 
 
-@router.post("/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
+@router.post("/api/embedding/llm/vectorstores/{vectorstore_id}/analyze", response_model=VectorStoreAnalysisResponse)
 async def analyze_vectorstore(
     vectorstore_id: str,
     request: VectorStoreAnalysisRequest,
@@ -179,7 +175,7 @@ async def analyze_vectorstore(
         raise HTTPException(status_code=500, detail=f"Error analyzing vector store: {str(e)}")
 
 
-@router.post("/vectorstores/{vectorstore_id}/query", response_model=VectorStoreLLMQueryResponse)
+@router.post("/api/embedding/llm/vectorstores/{vectorstore_id}/query", response_model=VectorStoreLLMQueryResponse)
 async def llm_query_vectorstore(
     vectorstore_id: str,
     query_request: VectorStoreLLMQueryRequest,
@@ -232,7 +228,7 @@ async def llm_query_vectorstore(
             metadata_list = [result.get("metadata", {}) for result in results]
             
             # Generate prompt for the LLM
-            prompt = generate_query_prompt(query_request.query, chunks_text, metadata_list)
+            prompt = generate_query_prompt(vectorstore_id, query_request.query)
             
             # Get LLM response
             llm_response = get_llm_response(prompt)
@@ -329,67 +325,61 @@ def generate_analysis_prompt(chunks: List[Dict[str, Any]], vectorstore_name: str
     return prompt
 
 
-def generate_query_prompt(query: str, chunks: List[str], metadata_list: List[Dict[str, Any]] = None) -> str:
+def generate_query_prompt(vs_id: str, query: str) -> str:
     """
-    Generate a prompt for LLM query responses based on retrieved chunks.
+    Generate a prompt for querying the vector store.
     
     Args:
-        query: The user's query
-        chunks: List of text chunks retrieved from the vector store
-        metadata_list: Optional list of metadata for each chunk
+        vs_id: ID of the vector store to query
+        query: Query to run against the vector store
         
     Returns:
-        A formatted prompt for the LLM
+        Generated prompt
     """
-    prompt = f"""
-    You are a helpful assistant answering questions based on specific information retrieved from a vector store.
+    # Import get_vectorstore_manager here to avoid circular imports
+    from api.vectorstore import get_vectorstore_manager
     
-    USER QUERY: {query}
-    
-    Below are the most relevant text chunks retrieved from the vector store to help answer this query:
-    
-    """
-    
-    # Add the chunks with their metadata
-    for i, chunk in enumerate(chunks):
-        prompt += f"CHUNK {i+1}:\n"
+    try:
+        # Get the vector store manager
+        manager = get_vectorstore_manager()
         
-        # Add relevant metadata if available
-        if metadata_list and i < len(metadata_list):
-            metadata = metadata_list[i]
-            if metadata:
-                # Include source information if available
-                source = metadata.get("filename", metadata.get("source", ""))
-                if source:
-                    prompt += f"Source: {source}\n"
-                
-                # Include page information if available
-                page = metadata.get("page_number", metadata.get("page", ""))
-                if page:
-                    prompt += f"Page: {page}\n"
-                    
-                # Include classification if available
-                classification = metadata.get("security_classification", "")
-                if classification:
-                    prompt += f"Classification: {classification}\n"
+        # Get information about the vector store
+        vs_info = manager.get_vectorstore_info(vs_id)
+        if not vs_info:
+            logger.error(f"Vector store {vs_id} not found")
+            return f"Error: Vector store {vs_id} not found"
         
-        # Add the chunk text
-        prompt += f"Content: {chunk}\n\n"
-    
-    prompt += """
-    INSTRUCTIONS:
-    1. Answer the user's query using ONLY the information provided in the chunks above.
-    2. If the information to answer the query is not contained in the provided chunks, say "I don't have enough information to answer this question based on the retrieved content."
-    3. Do not make up or infer information that is not explicitly stated in the chunks.
-    4. If different chunks have contradictory information, acknowledge this in your answer.
-    5. Use an objective, informative tone.
-    6. If appropriate, structure your answer with bullet points or numbered lists for clarity.
-    7. Focus on directly answering the query without unnecessary preamble.
-    
-    YOUR ANSWER:
-    """
-    
-    return prompt
+        # Get top chunks from the vector store for the query
+        chunks = manager.search_vectorstore(vs_id, query, top_k=5)
+        
+        # Format chunks for the prompt
+        formatted_chunks = []
+        for i, chunk in enumerate(chunks):
+            content = chunk.page_content.strip()
+            metadata = chunk.metadata
+            source = metadata.get("source", "unknown")
+            formatted_chunks.append(f"DOCUMENT {i+1} (source: {source}):\n{content}\n")
+        
+        # Combine chunks
+        chunks_text = "\n".join(formatted_chunks)
+        
+        # Generate the prompt
+        prompt = f"""You are a helpful assistant that answers questions based on the content of provided documents.
+
+QUERY: {query}
+
+DOCUMENTS:
+{chunks_text}
+
+Based on the provided documents, please answer the query. If the documents don't contain relevant information to answer the query, please state that clearly.
+
+ANSWER:"""
+        
+        return prompt
+        
+    except Exception as e:
+        logger.error(f"Error generating query prompt: {str(e)}")
+        return f"Error generating query prompt: {str(e)}"
 
 
 def get_llm_analysis(prompt: str) -> str:
@@ -427,11 +417,11 @@ def get_llm_response(prompt: str) -> str:
     """
     Get LLM response to a query prompt.
     
-    This function uses the Ollama API to generate responses to user queries.
+    This function uses the vLLM OpenAI-compatible API to generate responses to user queries.
     """
     try:
         # Log the LLM request
-        logger.info("Sending query request to LLM")
+        logger.info("Sending query request to vLLM")
         
         # Import the LLM module
         try:
@@ -448,72 +438,70 @@ def get_llm_response(prompt: str) -> str:
             return llm_response
             
         except ImportError:
-            # If the LLM module is not available, fall back to direct Ollama API call
-            logger.warning("LLM module not found, falling back to direct Ollama API call")
+            # If the LLM module is not available, fall back to direct vLLM API call
+            logger.warning("LLM module not found, falling back to direct vLLM API call")
             
-            # Get Ollama URL from config
+            # Get vLLM URL from config
             try:
-                from ..config import OLLAMA_BASE_URL
+                from ..config import VLLM_BASE_URL
             except ImportError:
                 try:
-                    from config import OLLAMA_BASE_URL
+                    from config import VLLM_BASE_URL
                 except ImportError:
-                    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+                    VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://host.docker.internal:8007/v1")
             
-            # Prepare Ollama API request
-            base_url = OLLAMA_BASE_URL.rstrip('/')
-            url = f"{base_url}/api/generate"
+            # Prepare vLLM API request
+            base_url = VLLM_BASE_URL.rstrip('/')
+            url = f"{base_url}/chat/completions"
             
-            # Use llama3.2 as a reasonable default model if available
-            # Models like llama3.2, mistral, or gemma are good choices for this task
-            model = "llama3.2:latest"
+            # Use the specified model path
+            model = "/models/DeepHermes-3-Llama-3-8B-Preview"
             
             # Log the model and URL being used
-            logger.info(f"Using Ollama API at {url} with model {model}")
+            logger.info(f"Using vLLM API at {url} with model {model}")
             
             payload = {
                 "model": model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.3,  # Lower temperature for more factual responses
-                    "top_p": 0.9,
-                    "max_tokens": 800
-                }
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,  # Lower temperature for more factual responses
+                "top_p": 0.9,
+                "max_tokens": 800
             }
             
             # Make the API request
             import requests
-            response = requests.post(url, json=payload, timeout=60)
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
             
             # Check for successful response
             if response.status_code == 200:
                 result = response.json()
-                llm_response = result.get("response", "")
-                
-                # Log success and response length
-                logger.info(f"Successfully received response from Ollama ({len(llm_response)} chars)")
-                
-                return llm_response
-            else:
-                # Log error and try fallback
-                logger.error(f"Error from Ollama API: Status {response.status_code}, message: {response.text}")
-                
-                # Try alternate model if the first one failed
-                if model == "llama3.2:latest":
-                    logger.info("Trying fallback to mistral model")
-                    payload["model"] = "mistral"
-                    response = requests.post(url, json=payload, timeout=60)
+                if "choices" in result and len(result["choices"]) > 0:
+                    message = result["choices"][0].get("message", {})
+                    llm_response = message.get("content", "")
                     
-                    if response.status_code == 200:
-                        result = response.json()
-                        llm_response = result.get("response", "")
-                        logger.info(f"Successfully received response from fallback model ({len(llm_response)} chars)")
-                        return llm_response
+                    # Log success and response length
+                    logger.info(f"Successfully received response from vLLM ({len(llm_response)} chars)")
+                    
+                    return llm_response
+                else:
+                    logger.error(f"Unexpected response format from vLLM API: {result}")
+                    return "The language model returned an unexpected response format. Please try again later."
+            else:
+                # Log error details
+                logger.error(f"Error from vLLM API: Status {response.status_code}, message: {response.text}")
                 
-                # If all real LLM attempts failed, return a generic fallback response
-                logger.warning("All LLM attempts failed, returning placeholder response")
-                return "Based on the provided information, I'm not able to generate a specific answer at this time due to technical difficulties with the language model. Please try your query again later, or contact support if this issue persists."
+                try:
+                    error_data = response.json()
+                    error_message = error_data.get("error", {}).get("message", "Unknown error")
+                    logger.error(f"vLLM API error: {error_message}")
+                    return f"The language model encountered an error: {error_message}. Please try again later."
+                except:
+                    # If all real LLM attempts failed, return a generic fallback response
+                    logger.warning("vLLM attempt failed, returning placeholder response")
+                    return "Based on the provided information, I'm not able to generate a specific answer at this time due to technical difficulties with the language model. Please try your query again later, or contact support if this issue persists."
     
     except Exception as e:
         # Log the error and return an error message

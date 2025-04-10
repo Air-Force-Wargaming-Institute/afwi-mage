@@ -91,11 +91,10 @@ app.add_middleware(
 # Include the main API router
 app.include_router(main_router)
 
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
+@app.get("/api/embedding/health")
+async def api_health_check():
     return {"status": "healthy"}
+
 
 
 @app.get("/api/embedding/system/status")
@@ -237,6 +236,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+# TODO: Stop using deprecated on_event
 @app.on_event("startup")
 async def startup_event():
     """Run tasks on application startup."""
@@ -282,6 +282,7 @@ async def startup_event():
         logger.warning(f"Error checking FAISS GPU support: {str(e)}")
 
 
+# TODO: Stop using deprecated on_event
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run tasks on application shutdown."""
