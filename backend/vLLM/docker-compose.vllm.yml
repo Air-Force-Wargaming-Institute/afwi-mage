@@ -38,9 +38,6 @@ services:
       --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview
       --dtype=half
       --gpu-memory-utilization=0.88
-      --max-model-len=8192
-      --tensor-parallel-size=1
-      # --gpu-memory-utilization=0.8
-      # --max-model-len=65536
-      # --tensor-parallel-size=2
+      --max-model-len=16384
+      --tensor-parallel-size=2
     restart: unless-stopped
