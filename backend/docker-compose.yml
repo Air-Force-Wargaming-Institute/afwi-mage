@@ -14,7 +14,13 @@ services:
     volumes:
       - ../data:/data
     command: >
-      sh -c "mkdir -p /data/uploads && chmod -R 777 /data/uploads"
+      sh -c "
+        mkdir -p /data/uploads && chmod -R 777 /data/uploads &&
+        mkdir -p /data/workbench/spreadsheets && 
+        chmod -R 777 /data/workbench &&
+        touch /data/workbench/spreadsheets/.gitkeep &&
+        echo 'Initialized data directories successfully'
+      "
     networks:
       - app-network
 
@@ -30,6 +36,7 @@ services:
       - AGENT_SERVICE_URL=http://agent:8001
       - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - WORKBENCH_SERVICE_URL=http://workbench:8020
       - DEBUG=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -202,6 +209,68 @@ services:
     networks:
       - app-network
 
+  workbench:
+    build: ./workbench_service
+    ports:
+      - "8020:8020"
+    volumes:
+      - ../data:/app/data
+      - ../data/workbench:/app/data/workbench
+      - ../data/workbench/spreadsheets:/app/data/workbench/spreadsheets
+      - ./models:/app/models
+      - ./workbench_service:/app
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - DEBUG=1
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+      - WORKBENCH_SPREADSHEETS_DIR=/app/data/workbench/spreadsheets
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+      - core
+      - embedding
+    networks:
+      - app-network
+    command: >
+      sh -c "
+        mkdir -p /app/data/workbench/spreadsheets && 
+        chmod -R 777 /app/data/workbench && 
+        ls -la /app/data/workbench && 
+        ls -la /app/data/workbench/spreadsheets &&
+        echo 'Directory structure verified!' &&
+        uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
+      "
+
+  # auth:
+  #  build: ./auth_service
+  #  volumes:
+  #    - ./auth_service:/app
+  #  depends_on:
+  #    db:
+  #      condition: service_healthy
+  #  environment:
+  #    - DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+  #    - SECRET_KEY=your-secret-key-here-change-in-production
+  #    - DISABLE_AUTH=false
+  #    - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+  #    - ACCESS_TOKEN_EXPIRE_MINUTES=60
+  #    - PORT=8010
+  #    - HOST=0.0.0.0
+  #    - PYTHONUNBUFFERED=1
+  #  ports:
+  #    - "8010:8010"
+  #  restart: always
+  #  networks:
+  #    - app-network
+  #  healthcheck:
+  #    test: ["CMD", "curl", "-f", "http://localhost:8010/api/health"]
+  #    interval: 10s
+  #    timeout: 5s
+  #    retries: 5
+  #    start_period: 10s
   auth:
    build: ./auth_service
    volumes:

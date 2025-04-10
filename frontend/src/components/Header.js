@@ -23,12 +23,14 @@ import robotIcon from '../assets/robot-icon.png';
 import { AuthContext } from '../contexts/AuthContext';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import agentTeamIcon from '../assets/agent-team.png';
+import BarChartIcon from '@material-ui/icons/BarChart';
 
 function Header() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const { logout, user } = useContext(AuthContext);
+  const auth = useContext(AuthContext) || { logout: () => {}, user: null };
+  const { logout, user } = auth;
   const history = useHistory();
 
   useEffect(() => {
@@ -101,17 +103,16 @@ function Header() {
                   onClick={() => setActiveTab('multi-agent')}
                 >
                   <img 
-                    src={agentTeamIcon} 
-                    alt="Multi-Agent Portal" 
+                    src={robotIcon} 
+                    alt="Agent Portal" 
                     style={{ 
-                      width: '24px', 
+                      width: '20px', 
                       height: '24px', 
-                      filter: 'invert(1)',
                       marginRight: '5px',
                       verticalAlign: 'middle'
                     }} 
                   /> 
-                  Multi-Agent Portal
+                  Agent Portal
                 </Link>
               </li>
               <li>
@@ -217,18 +218,21 @@ function Header() {
             </li>
             <li>
               <Link 
-                to="/multi-agent/builder" 
-                className={isActive('/multi-agent/builder')}
+                to="/multi-agent/team-chat" 
+                className={location.pathname.includes('/multi-agent/team-chat') ? 'active' : ''}
               >
-                <BuildIcon /> Builder
-              </Link>
-            </li>
-            <li>
-              <Link 
-                to="/multi-agent/chat" 
-                className={isActive('/multi-agent/chat')}
-              >
-                <QuestionAnswerIcon /> Multi-Agent Chat
+                <img 
+                  src={agentTeamIcon} 
+                  alt="Team Chat" 
+                  style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    filter: 'invert(1)',
+                    marginRight: '5px',
+                    verticalAlign: 'middle'
+                  }} 
+                /> 
+                Multi-Agent Chat
               </Link>
             </li>
             <li>
@@ -237,6 +241,14 @@ function Header() {
                 className={isActive('/multi-agent/direct-chat')}
               >
                 <ChatIcon /> Direct Chat
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/multi-agent/workbench" 
+                className={isActive('/multi-agent/workbench')}
+              >
+                <BarChartIcon /> Analysis Workbench
               </Link>
             </li>
           </ul>

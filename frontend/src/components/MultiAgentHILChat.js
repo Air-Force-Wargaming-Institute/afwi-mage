@@ -72,10 +72,10 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2),
-    height: 'calc(100vh - 215px)',
-    maxHeight: 'calc(100vh - 128px)',
+    height: '100%', // Changed from fixed calculation to use 100% of parent
+    maxHeight: '100%', // Changed to use full parent height
     overflow: 'hidden',
-    marginTop: '10px',
+    marginTop: 0, // Removed top margin to use full height
     width: '100%',
     maxWidth: '100%',
   },
@@ -105,7 +105,7 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    height: '100%', 
     flexShrink: 0,
     overflow: 'hidden',
     backgroundColor: theme.palette.background.default,
@@ -120,6 +120,7 @@ const useStyles = makeStyles((theme) => ({
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
+    minHeight: 0, // Added to ensure proper flex behavior
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -262,6 +263,9 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
+    position: 'relative', // Added to ensure proper placement
+    minHeight: '64px', // Set minimum height to ensure it's always visible
+    zIndex: 5, // Added to keep above other elements
   },
   input: {
     flexGrow: 1,
