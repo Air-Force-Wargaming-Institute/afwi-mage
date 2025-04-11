@@ -118,8 +118,8 @@ logger.info("Configuring CORS to allow all origins (*)")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins with wildcard
-    allow_credentials=False,  # Must be False when using wildcard origins
+    allow_origins=["http://localhost:3000","http://localhost","*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
@@ -132,29 +132,33 @@ try:
     from api.jobs import router as jobs_router
     
     # Include routers
-    app.include_router(spreadsheet_router, prefix="/api/workbench/spreadsheets", tags=["Spreadsheets"])
-    app.include_router(visualization_router, prefix="/api/workbench/visualizations", tags=["Visualizations"])
-    app.include_router(jobs_router, prefix="/api/workbench/jobs", tags=["Jobs"])
+    # app.include_router(spreadsheet_router, prefix="/api/workbench/spreadsheets", tags=["Spreadsheets"])
+    # app.include_router(visualization_router, prefix="/api/workbench/visualizations", tags=["Visualizations"])
+    # app.include_router(jobs_router, prefix="/api/workbench/jobs", tags=["Jobs"])
+    app.include_router(spreadsheet_router, tags=["Spreadsheets"])
+    app.include_router(visualization_router, tags=["Visualizations"])
+    app.include_router(jobs_router, tags=["Jobs"])
 except ImportError as e:
     logger.warning(f"Could not import one or more routers: {e}")
     logger.warning("API endpoints will be limited until routers are properly implemented")
 
-@app.get("/health")
+@app.get("/api/workbench/health")
 async def health_check():
-    """Simple health check endpoint."""
-    # Include file system status in health check
-    fs_status = {
-        "metadata_file_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR / "metadata.json"),
-        "spreadsheets_dir_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR),
-        "spreadsheets_dir_writable": os.access(WORKBENCH_SPREADSHEETS_DIR, os.W_OK),
-        "running_in_docker": IN_DOCKER
-    }
+    # """Simple health check endpoint."""
+    # # Include file system status in health check
+    # fs_status = {
+    #     "metadata_file_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR / "metadata.json"),
+    #     "spreadsheets_dir_exists": os.path.exists(WORKBENCH_SPREADSHEETS_DIR),
+    #     "spreadsheets_dir_writable": os.access(WORKBENCH_SPREADSHEETS_DIR, os.W_OK),
+    #     "running_in_docker": IN_DOCKER
+    # }
     
-    return {
-        "status": "healthy", 
-        "service": "workbench",
-        "filesystem": fs_status
-    }
+    # return {
+    #     "status": "healthy", 
+    #     "service": "workbench",
+    #     "filesystem": fs_status
+    # }
+    return {"status": "healthy"}
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):

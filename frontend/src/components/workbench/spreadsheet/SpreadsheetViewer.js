@@ -31,6 +31,8 @@ import '../../../App.css'; // Import App.css for styling
 import FileUploader from '../common/FileUploader';
 import SpreadsheetModal from '../common/SpreadsheetModal';
 import { toast, Toaster } from 'react-hot-toast';
+import { getGatewayUrl } from '../../../config';
+import { AuthContext } from '../../../contexts/AuthContext';
 
 const SpreadsheetViewer = () => {
   const { 
@@ -47,6 +49,7 @@ const SpreadsheetViewer = () => {
     updateSpreadsheet,
     activeView
   } = useContext(WorkbenchContext);
+  const { token } = useContext(AuthContext);
   
   // Helper function to format file size
   const formatFileSize = (bytes) => {
@@ -118,11 +121,16 @@ const SpreadsheetViewer = () => {
       // Return promise for upload completion
       return new Promise((resolve, reject) => {
         // Use the proper URL with apiBaseUrl
-        const url = apiBaseUrl.endsWith('/') 
-          ? `${apiBaseUrl}api/workbench/spreadsheets/upload`
-          : `${apiBaseUrl}/api/workbench/spreadsheets/upload`;
+        const url = getGatewayUrl('/api/workbench/spreadsheets/upload');
         
         xhr.open('POST', url);
+
+        // **** ADD AUTHORIZATION HEADER ****
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        } else {
+           console.warn('No auth token available for XHR upload request.');
+        }
         
         xhr.onload = function() {
           if (xhr.status >= 200 && xhr.status < 300) {
@@ -158,9 +166,7 @@ const SpreadsheetViewer = () => {
   const handleDownloadSpreadsheet = async (spreadsheetId, filename) => {
     try {
       // Construct the download URL using apiBaseUrl
-      const baseUrl = apiBaseUrl.endsWith('/') 
-        ? `${apiBaseUrl}api/workbench/spreadsheets` 
-        : `${apiBaseUrl}/api/workbench/spreadsheets`;
+      const baseUrl = `http://localhost:8020/api/workbench/spreadsheets`
       
       const downloadUrl = `${baseUrl}/${spreadsheetId}/download`;
       

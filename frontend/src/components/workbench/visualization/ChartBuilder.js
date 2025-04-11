@@ -281,7 +281,6 @@ const ChartBuilder = () => {
                     </MenuItem>
                     {/* Actual spreadsheets would be populated here */}
                     <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem>
-                    <MenuItem value="upload">Upload New Data</MenuItem>
                   </Select>
                 </FormControl>
                 {renderDataContext()}

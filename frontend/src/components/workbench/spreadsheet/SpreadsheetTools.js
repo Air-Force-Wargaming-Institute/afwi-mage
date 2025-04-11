@@ -173,6 +173,7 @@ const SpreadsheetTools = () => {
       // Persist columns immediately after fetching
       persistState({ selectedSheet: sheetName, columns: fetchedColumns }); // Persist selectedSheet here too
 
+      /* Commenting out this potentially problematic preview read on sheet change
       const previewResult = await performCellOperation(activeSpreadsheetId, {
         operation: 'read',
         sheet_name: sheetName,
@@ -182,6 +183,7 @@ const SpreadsheetTools = () => {
       if (previewResult.success) {
         // setPreviewData(previewResult.data.values); // Removed unused state update
       }
+      */
     } catch (err) {
       console.error('Error fetching column information:', err);
     }

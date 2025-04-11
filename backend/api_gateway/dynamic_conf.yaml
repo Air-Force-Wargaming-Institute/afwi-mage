@@ -27,6 +27,7 @@ http:
           - POST
           - PUT
           - DELETE
+          - PATCH
           - OPTIONS
         accessControlAllowOriginList:
           - "http://localhost:3000"
@@ -227,6 +228,17 @@ http:
         - "cors-headers"
         - "auth-middleware"
         - "security-headers"
+
+    # Workbench Service Router
+    workbench-router:
+      rule: "PathPrefix(`/api/workbench`) || Path(`/api/workbench/health`)"
+      service: "workbench-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
       
   # Services with consistent health check paths
   services:
@@ -332,6 +344,16 @@ http:
           - url: "http://direct_chat_service:8011"
         healthCheck:
           path: "/api/direct_chat/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+
+    workbench-service:
+      loadBalancer:
+        servers:
+          - url: "http://workbench:8020"
+        healthCheck:
+          path: "/api/workbench/health"
           interval: "120s"
           timeout: "5s"
           followRedirects: true

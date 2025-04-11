@@ -138,7 +138,7 @@ class SpreadsheetUpdateRequest(BaseModel):
         }
     }
 
-@router.get("/list", response_model=List[SpreadsheetInfo])
+@router.get("/api/workbench/spreadsheets/list", response_model=List[SpreadsheetInfo])
 async def list_spreadsheets():
     """
     List all available spreadsheets.
@@ -151,7 +151,7 @@ async def list_spreadsheets():
     # Get all spreadsheets from the manager
     return spreadsheet_manager.list_spreadsheets()
 
-@router.post("/upload")
+@router.post("/api/workbench/spreadsheets/upload")
 async def upload_spreadsheet(
     file: UploadFile = File(...),
     description: Optional[str] = Form(None)
@@ -189,7 +189,7 @@ async def upload_spreadsheet(
         "description": description
     }
 
-@router.post("/{spreadsheet_id}/operate", response_model=OperationResult)
+@router.post("/api/workbench/spreadsheets/{spreadsheet_id}/operate", response_model=OperationResult)
 async def operate_on_cells(
     spreadsheet_id: str,
     operation: CellOperation,
@@ -241,7 +241,7 @@ async def operate_on_cells(
             "error": f"Unsupported operation: {operation.operation}"
         }
 
-@router.get("/{spreadsheet_id}/info", response_model=SpreadsheetInfo)
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/info", response_model=SpreadsheetInfo)
 async def get_spreadsheet_info(spreadsheet_id: str):
     """
     Get information about a specific spreadsheet.
@@ -269,7 +269,7 @@ async def get_spreadsheet_info(spreadsheet_id: str):
     except HTTPException as e:
         raise e
 
-@router.get("/{spreadsheet_id}/sheets")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/sheets")
 async def get_spreadsheet_sheets(spreadsheet_id: str):
     """
     Get the list of sheets in a spreadsheet.
@@ -312,7 +312,7 @@ async def get_spreadsheet_sheets(spreadsheet_id: str):
     except HTTPException as e:
         raise e
 
-@router.get("/{spreadsheet_id}/summary")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/summary")
 async def get_spreadsheet_summary(
     spreadsheet_id: str,
     sheet_name: Optional[str] = None
@@ -356,7 +356,7 @@ async def get_spreadsheet_summary(
             detail=f"Error analyzing spreadsheet: {str(e)}"
         )
 
-@router.delete("/{spreadsheet_id}")
+@router.delete("/api/workbench/spreadsheets/{spreadsheet_id}")
 async def delete_spreadsheet(spreadsheet_id: str):
     """
     Delete a spreadsheet and its metadata.
@@ -388,7 +388,7 @@ async def delete_spreadsheet(spreadsheet_id: str):
             detail=f"Error deleting spreadsheet: {str(e)}"
         )
 
-@router.get("/{spreadsheet_id}/download")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/download")
 async def download_spreadsheet(spreadsheet_id: str):
     """
     Download a spreadsheet file.
@@ -435,7 +435,7 @@ async def download_spreadsheet(spreadsheet_id: str):
             detail=f"Error downloading spreadsheet: {str(e)}"
         )
 
-@router.patch("/{spreadsheet_id}")
+@router.patch("/api/workbench/spreadsheets/{spreadsheet_id}")
 async def update_spreadsheet(spreadsheet_id: str, request: SpreadsheetUpdateRequest):
     """
     Update spreadsheet metadata.
@@ -499,7 +499,7 @@ async def update_spreadsheet(spreadsheet_id: str, request: SpreadsheetUpdateRequ
             detail=f"Error updating spreadsheet: {str(e)}"
         )
 
-@router.post("/{spreadsheet_id}/transform", response_model=TransformationResult)
+@router.post("/api/workbench/spreadsheets/{spreadsheet_id}/transform", response_model=TransformationResult)
 async def transform_spreadsheet(
     spreadsheet_id: str,
     request: TransformationRequest,

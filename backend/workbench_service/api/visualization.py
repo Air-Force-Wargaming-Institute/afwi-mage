@@ -90,7 +90,7 @@ class Visualization(BaseModel):
         }
     }
 
-@router.post("/generate", response_model=Visualization)
+@router.post("/api/workbench/visualizations/generate", response_model=Visualization)
 async def generate_visualization(request: VisualizationRequest, background_tasks: BackgroundTasks):
     """
     Generate visualization code from natural language.
@@ -146,7 +146,7 @@ async def generate_visualization(request: VisualizationRequest, background_tasks
             detail=f"Failed to generate visualization: {str(e)}"
         )
 
-@router.post("/{visualization_id}/execute", response_model=Visualization)
+@router.post("/api/workbench/visualizations/{visualization_id}/execute", response_model=Visualization)
 async def execute_code(visualization_id: str, request: CodeExecutionRequest):
     """
     Execute modified visualization code.
@@ -185,7 +185,7 @@ async def execute_code(visualization_id: str, request: CodeExecutionRequest):
             detail=f"Failed to execute code: {str(e)}"
         )
 
-@router.get("/list", response_model=List[Visualization])
+@router.get("/api/workbench/visualizations/list", response_model=List[Visualization])
 async def list_visualizations():
     """
     List all available visualizations.
@@ -208,7 +208,7 @@ async def list_visualizations():
         }
     ]
 
-@router.get("/{visualization_id}", response_model=Visualization)
+@router.get("/api/workbench/visualizations/{visualization_id}", response_model=Visualization)
 async def get_visualization(visualization_id: str):
     """
     Get information about a specific visualization.

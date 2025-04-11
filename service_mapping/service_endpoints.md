@@ -185,7 +185,7 @@
 | `/api/auth/users/{user_id}`      | PUT    | Update user                            | Occasional     |
 | `/api/auth/users/{user_id}`      | DELETE | Delete user                            | Rare           |
 
-### Direct Chat Service (Port 8011+)
+### Direct Chat Service (Port 8011)
 
 | Endpoint                                                                       | Method | Description                                        | Usage Pattern  |
 |--------------------------------------------------------------------------------|--------|----------------------------------------------------|----------------|
@@ -206,6 +206,29 @@
 | `/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/classification` | PUT    | Update document classification                     | Occasional     |
 | `/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/toggle`         | PUT    | Toggle the checked state of a document             | Occasional     |
 | `/api/direct_chat/chat/session/{session_id}/documents/{doc_id}/status`         | GET    | Get the processing status of a document            | Occasional     |
+
+### Workbench Service (Port 8020)
+
+| Endpoint                                                                       | Method | Description                                             | Usage Pattern  |
+|--------------------------------------------------------------------------------|--------|---------------------------------------------------------|----------------|
+| `/api/workbench/health`                                                        | GET    | Health check endpoint for the API gateway               | Monitoring     |
+| `/api/workbench/spreadsheets/list`                                             | GET    | List all available spreadsheets                         | Heavy usage    |
+| `/api/workbench/spreadsheets/upload`                                           | POST   | Upload a new spreadsheet                                | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}/operate`                         | POST   | Perform an operation on cells in a spreadsheet          | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}/info`                            | GET    | Get information about a specifc spreadsheet             | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}/sheets`                          | GET    | Get the list of sheets in a spreadsheet                 | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}/summary`                         | GET    | Get a statistical summary of the data in a spreadsheet  | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}`                                 | DELETE | Delete a spreadsheet and its metadata                   | Occasional     |
+| `/api/workbench/spreadsheets/{spreadsheet_id}`                                 | PATCH  | Update spreadsheet metadata                             | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}/download`                        | GET    | Download a spreadsheet file                             | Regular access |
+| `/api/workbench/spreadsheets/{spreadsheet_id}transform`                        | POST   | Transform spreadsheet columns using LLM processing      | Regular access |
+| `/api/workbench/visualizations/generate`                                       | POST   | Generate visualization code from natural language       | Regular access |
+| `/api/workbench/visualizations/{visualization_id}/execute`                     | POST   | Execute modified visualization code                     | Regular access |
+| `/api/workbench/visualizations/list`                                           | GET    | List all available visualizations                       | Regular access |
+| `/api/workbench/visualizations/{visualization_id}`                             | GET    | Get information about a specific visualization          | Regular access |
+| `/api/workbench/jobs/list`                                                     | GET    | List background jobs in creation date descending        | Regular access |
+| `/api/workbench/jobs/{job_id}`                                                 | GET    | Get the status and details of a specific job            | Regular access |
+| `/api/workbench/jobs/{job_id}/cancel`                                          | POST   | Request cancellation of a running job                   | Rare           |
 
 ## Traffic Distribution
 
