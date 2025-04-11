@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo, useReducer, useContext } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useReducer, useContext, forwardRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Container, 
@@ -916,6 +916,16 @@ const useStyles = makeStyles((theme) => ({
     transformOrigin: 'bottom center',
     animation: '$dropRibbonUp 0.3s ease-out',
   },
+  '@keyframes dropRibbon': {
+    from: {
+      opacity: 0,
+      transform: 'scaleY(0)',
+    },
+    to: {
+      opacity: 1,
+      transform: 'scaleY(1)',
+    },
+  },
   '@keyframes dropRibbonDown': {
     from: {
       transform: 'scaleY(0)',
@@ -1418,8 +1428,16 @@ const MessageContent = ({
                   />
                 ),
                 ul: (props) => <ul {...props} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />,
-                ol: (props) => <ol {...props} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />,
-                li: (props) => <li {...props} style={{ textAlign: 'left' }} />,
+                ol: (props) => {
+                  // Remove or convert non-standard boolean attributes
+                  const { ordered, ...sanitizedProps } = props;
+                  return <ol {...sanitizedProps} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />;
+                },
+                li: (props) => {
+                  // Remove or convert non-standard boolean attributes
+                  const { ordered, ...sanitizedProps } = props;
+                  return <li {...sanitizedProps} style={{ textAlign: 'left' }} />;
+                },
               }}
               className={classes.markdown}
               skipHtml={false}
@@ -1449,7 +1467,17 @@ const MessageContent = ({
                           rehypePlugins={[rehypeRaw]}
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            code: CodeBlock
+                            code: CodeBlock,
+                            ol: (props) => {
+                              // Remove or convert non-standard boolean attributes
+                              const { ordered, ...sanitizedProps } = props;
+                              return <ol {...sanitizedProps} style={{ margin: '8px 0', paddingLeft: '20px', textAlign: 'left' }} />;
+                            },
+                            li: (props) => {
+                              // Remove or convert non-standard boolean attributes
+                              const { ordered, ...sanitizedProps } = props;
+                              return <li {...sanitizedProps} style={{ textAlign: 'left' }} />;
+                            }
                           }}
                           className={classes.markdown}
                         >
@@ -1647,14 +1675,16 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
   const renderMessage = useCallback((message) => {
     const isBookmarked = bookmarkedMessages.some(msg => msg.messageId === message.id);
     const isUserMessage = message.sender === 'user';
+    // Ensure message has an ID, fallback to index + timestamp if undefined
+    const messageId = message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
       <Box 
         sx={isUserMessage ? stableMessageStyles.userWrapper : stableMessageStyles.aiWrapper}
-        key={`message-wrapper-${message.id}`}
+        key={`message-wrapper-${messageId}`}
       >
         <Box 
-          id={`message-${message.id}`}
+          id={`message-${messageId}`}
           className={`${classes.message} ${
             isUserMessage ? classes.userMessage : classes.aiMessage
           }`}
@@ -1670,8 +1700,8 @@ const MessageArea = memo(({ messages, handleRetry, handleBookmark, bookmarkedMes
                 ? () => handleRetry(messages[messages.length - 2]?.text) 
                 : undefined
             }
-            messageId={message.id}
-            onBookmark={() => handleBookmark(message)}
+            messageId={messageId}
+            onBookmark={() => handleBookmark({...message, id: messageId})}
             isBookmarked={isBookmarked}
             expandedSections={expandedSections}
             onToggleExpand={handleToggleExpand}
@@ -2161,8 +2191,13 @@ const DirectChat = () => {
       if (currentSessionId && token) {
         try {
           const history = await getChatHistory(currentSessionId, token);
+          // Make sure all messages have valid IDs
+          const validatedHistory = history.map(msg => ({
+            ...msg,
+            id: msg.id || `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          }));
           // Update messages for current session only
-          setMessages(prev => ({ ...prev, [currentSessionId]: history }));
+          setMessages(prev => ({ ...prev, [currentSessionId]: validatedHistory }));
         } catch (error) {
           setError('Failed to load chat history');
           // Initialize with empty array on error
@@ -2324,7 +2359,12 @@ const DirectChat = () => {
     if (!messages[sessionId]) {
       try {
         const history = await getChatHistory(sessionId, token);
-        setMessages(prev => ({ ...prev, [sessionId]: history }));
+        // Ensure all messages have valid IDs
+        const validatedHistory = history.map(msg => ({
+          ...msg,
+          id: msg.id || `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+        setMessages(prev => ({ ...prev, [sessionId]: validatedHistory }));
       } catch (error) {
         setError('Failed to load chat history');
         setMessages(prev => ({ ...prev, [sessionId]: [] }));
@@ -2441,9 +2481,11 @@ const DirectChat = () => {
 
     try {
       const response = await updateSessionName(editingSession.id, editSessionName.trim(), token);
+      // Update the session in the chat sessions array
+      // Make sure we handle both possible response formats (with or without .session wrapper)
       setChatSessions(prev => prev.map(session => 
         session.id === editingSession.id 
-          ? response.session 
+          ? (response.session || { ...session, name: editSessionName.trim() })
           : session
       ));
       handleEditDialogClose();
@@ -2571,6 +2613,11 @@ const DirectChat = () => {
   // Check if current session is in loading state
   const isCurrentSessionLoading = sendingSessions.has(currentSessionId);
 
+  // Create a forwardRef wrapper for IconButton to use with Tooltip
+  const TooltipIconButton = forwardRef((props, ref) => (
+    <IconButton {...props} ref={ref} />
+  ));
+
   return (
     <Container className={classes.root} maxWidth="xl">
       <div className={classes.chatContainer}>
@@ -2599,7 +2646,7 @@ const DirectChat = () => {
                       secondary={
                         <Typography 
                           variant="caption" 
-                          color="textSecondary" transparent
+                          color="textSecondary" 
                           style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
                         >
                           {new Date(session.created_at).toLocaleDateString('en-US', {
@@ -2616,20 +2663,41 @@ const DirectChat = () => {
                     />
                   </div>
                   <div className={classes.sessionActions}>
-                    <Tooltip title="Edit">
-                      <IconButton edge="end" aria-label="edit" onClick={() => handleEditSession(session.id)}>
+                    <Tooltip title="Edit" arrow placement="top">
+                      <TooltipIconButton
+                        edge="end"
+                        aria-label="edit"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering session selection
+                          handleEditSession(session.id);
+                        }}
+                      >
                         <EditIcon />
-                      </IconButton>
+                      </TooltipIconButton>
                     </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton edge="end" aria-label="delete" onClick={(e) => handleDeleteConfirmation(e, session.id)}>
+                    <Tooltip title="Delete" arrow placement="top">
+                      <TooltipIconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering session selection
+                          handleDeleteConfirmation(e, session.id);
+                        }}
+                      >
                         <DeleteIcon />
-                      </IconButton>
+                      </TooltipIconButton>
                     </Tooltip>
-                    <Tooltip title="Download">
-                      <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)}>
+                    <Tooltip title="Download" arrow placement="top">
+                      <TooltipIconButton
+                        edge="end"
+                        aria-label="download"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering session selection
+                          handleDownloadSession(session.id);
+                        }}
+                      >
                         <GetAppIcon />
-                      </IconButton>
+                      </TooltipIconButton>
                     </Tooltip>
                   </div>
                 </ListItem>
@@ -2663,13 +2731,13 @@ const DirectChat = () => {
               >
                 FULLSCREEN
               </Typography>
-              <IconButton
+              <TooltipIconButton
                 className={classes.fullscreenButton}
                 onClick={toggleFullscreen}
                 size="small"
               >
                 {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              </IconButton>
+              </TooltipIconButton>
             </div>
           </div>
           <MessageArea 
@@ -2683,14 +2751,14 @@ const DirectChat = () => {
           
           <form onSubmit={handleSendMessage} className={classes.inputArea}>
             <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-              <IconButton 
+              <TooltipIconButton
                 onClick={handlePromptHelpOpen}
                 size="small"
                 className={classes.inputHelpIcon}
                 title="Prompt Engineering Tips"
               >
                 <HelpOutlineIcon />
-              </IconButton>
+              </TooltipIconButton>
               <TextField
                 inputRef={inputRef}
                 className={classes.input}
@@ -2900,13 +2968,13 @@ const DirectChat = () => {
       >
         <DialogTitle id="help-dialog-title" className={classes.dialogTitle}>
           <Typography variant="h6">Multi-Agent Team System</Typography>
-          <IconButton
+          <TooltipIconButton
             aria-label="close"
             className={classes.closeButton}
             onClick={handleHelpClose}
           >
             <CloseIcon />
-          </IconButton>
+          </TooltipIconButton>
         </DialogTitle>
         <DialogContent className={classes.dialogContent}>
           <Typography>
@@ -2958,13 +3026,13 @@ const DirectChat = () => {
       >
         <DialogTitle id="prompt-help-dialog-title" className={classes.dialogTitle}>
           <Typography variant="h6">Effective Prompt Engineering Tips</Typography>
-          <IconButton
+          <TooltipIconButton
             aria-label="close"
             className={classes.closeButton}
             onClick={handlePromptHelpClose}
           >
             <CloseIcon />
-          </IconButton>
+          </TooltipIconButton>
         </DialogTitle>
         <DialogContent className={classes.dialogContent}>
           <div className={classes.promptTip}>
