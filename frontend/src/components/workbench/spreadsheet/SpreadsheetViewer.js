@@ -27,10 +27,26 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditIcon from '@mui/icons-material/Edit';
 import '../../../App.css'; // Import App.css for styling
 import FileUploader from '../common/FileUploader';
 import SpreadsheetModal from '../common/SpreadsheetModal';
 import { toast, Toaster } from 'react-hot-toast';
+// Import styled components
+import {
+  GradientBorderPaper,
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  useContainerStyles
+} from '../../../styles/StyledComponents';
+// Import action buttons
+import {
+  DeleteButton,
+  EditButton,
+  DownloadButton,
+  ViewButton,
+  DeleteActionButton
+} from '../../../styles/ActionButtons';
 
 const SpreadsheetViewer = () => {
   const { 
@@ -321,86 +337,64 @@ const SpreadsheetViewer = () => {
     }
     
     return (
-      <TableContainer component={Paper} variant="outlined" sx={{ 
-        height: '100%', 
-        overflow: 'auto',
-        backgroundColor: 'rgba(30, 30, 30, 0.9)',
-        color: '#ffffff',
-        borderColor: 'rgba(66, 133, 244, 0.3)'
-      }}>
-        <Table aria-label="spreadsheets table" size="small" stickyHeader>
-          <TableHead>
-            <TableRow>
-              <TableCell>Filename</TableCell>
-              <TableCell>Upload Date</TableCell>
-              <TableCell>Sheets</TableCell>
-              <TableCell>Size</TableCell>
-              <TableCell width="280">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {spreadsheets.map((sheet) => (
-              <TableRow key={sheet.id}>
-                <TableCell>
-                  {sheet.filename}
-                  {sheet.is_transformed && (
-                    <Chip 
-                      size="small" 
-                      label="Transformed" 
-                      color="secondary" 
-                      sx={{ ml: 1 }} 
-                    />
-                  )}
-                </TableCell>
-                <TableCell>{new Date(sheet.upload_date).toLocaleString()}</TableCell>
-                <TableCell>{sheet.sheet_count}</TableCell>
-                <TableCell>{formatFileSize(sheet.size_bytes)}</TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button 
-                      size="small" 
-                      variant="contained" 
-                      color="primary"
-                      startIcon={<VisibilityIcon />}
-                      onClick={() => handleViewSpreadsheet(sheet.id, sheet.filename)}
-                    >
-                      View
-                    </Button>
-                    <Button 
-                      size="small" 
-                      variant="outlined" 
-                      color="primary"
-                      startIcon={<FileDownloadIcon />}
-                      onClick={() => handleDownloadSpreadsheet(sheet.id, sheet.filename)}
-                    >
-                      Download
-                    </Button>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="secondary"
-                        onClick={() => handleRenameClick(sheet.id, sheet.filename)}
-                      >
-                        Rename
-                      </Button>
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        color="error"
-                        startIcon={<DeleteOutlineIcon />}
-                        onClick={() => handleDeleteClick(sheet.id, sheet.filename)}
-                      >
-                        Delete
-                      </Button>
-                    </Box>
-                  </Box>
-                </TableCell>
+      <GradientBorderPaper elevation={2}>
+        <TableContainer sx={{ 
+          height: '100%', 
+          overflow: 'auto',
+        }}>
+          <Table aria-label="spreadsheets table" size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Filename</TableCell>
+                <TableCell>Upload Date</TableCell>
+                <TableCell>Sheets</TableCell>
+                <TableCell>Size</TableCell>
+                <TableCell width="280">Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {spreadsheets.map((sheet) => (
+                <TableRow key={sheet.id}>
+                  <TableCell>
+                    {sheet.filename}
+                    {sheet.is_transformed && (
+                      <Chip 
+                        size="small" 
+                        label="Transformed" 
+                        color="secondary" 
+                        sx={{ ml: 1 }} 
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell>{new Date(sheet.upload_date).toLocaleString()}</TableCell>
+                  <TableCell>{sheet.sheet_count}</TableCell>
+                  <TableCell>{formatFileSize(sheet.size_bytes)}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <ViewButton 
+                        onClick={() => handleViewSpreadsheet(sheet.id, sheet.filename)}
+                        tooltip="View Spreadsheet"
+                      />
+                      <DownloadButton
+                        onClick={() => handleDownloadSpreadsheet(sheet.id, sheet.filename)}
+                        tooltip="Download Spreadsheet" 
+                      />
+                      <EditButton
+                        onClick={() => handleRenameClick(sheet.id, sheet.filename)}
+                        tooltip="Rename Spreadsheet"
+                      />
+                      <DeleteButton
+                        onClick={() => handleDeleteClick(sheet.id, sheet.filename)}
+                        tooltip="Delete Spreadsheet"
+                      />
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </GradientBorderPaper>
     );
   };
   
@@ -432,23 +426,18 @@ const SpreadsheetViewer = () => {
         }}
       />
       
-      <Paper sx={{ p: 2, mb: 2, flex: 'none' }}>
+      <AnimatedGradientPaper elevation={3} sx={{ mb: 2, flex: 'none' }}>
         <Typography variant="h5" sx={{ mb: 2 }}>Upload/Manage Spreadsheets</Typography>
         
         <Grid container spacing={2} sx={{ height: 'calc(100vh - 230px)' }}>
           {/* Upload Panel - 20% width */}
           <Grid item xs={12} md={3} lg={2.4}>
-            <Paper
-              elevation={0}
-              variant="outlined"
-              sx={{ 
-                p: 2, 
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}
-            >
+            <SubtleGlowPaper elevation={2} sx={{ 
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
               <Typography variant="h6" gutterBottom>
                 Upload Files
               </Typography>
@@ -467,32 +456,27 @@ const SpreadsheetViewer = () => {
                   disabled={isLoading}
                 />
               </Box>
-            </Paper>
+            </SubtleGlowPaper>
           </Grid>
           
           {/* Spreadsheet List - 80% width */}
           <Grid item xs={12} md={9} lg={9.6}>
-            <Paper
-              elevation={0}
-              variant="outlined"
-              sx={{ 
-                p: 2,
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}
-            >
+            <GradientBorderPaper elevation={2} sx={{ 
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
               <Typography variant="h6" gutterBottom>
                 Original Uploaded Spreadsheets
               </Typography>
               <Box sx={{ flex: 1, overflow: 'hidden' }}>
                 {renderSpreadsheetList()}
               </Box>
-            </Paper>
+            </GradientBorderPaper>
           </Grid>
         </Grid>
-      </Paper>
+      </AnimatedGradientPaper>
       
       {/* Spreadsheet Modal */}
       <SpreadsheetModal
@@ -508,22 +492,68 @@ const SpreadsheetViewer = () => {
         onClose={handleCancelDelete}
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
+        PaperProps={{
+          style: {
+            backgroundColor: 'rgba(30, 30, 35, 0.95)',
+            backgroundImage: 'linear-gradient(rgba(30, 30, 35, 0.97), rgba(20, 20, 25, 0.95))',
+            color: '#ffffff',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            borderRadius: '10px',
+            border: '1px solid rgba(66, 133, 244, 0.1)'
+          }
+        }}
+        sx={{
+          '& .MuiBackdrop-root': {
+            backgroundColor: 'rgba(0, 0, 0, 0.7)'
+          }
+        }}
       >
-        <DialogTitle id="delete-dialog-title">
+        <DialogTitle 
+          id="delete-dialog-title"
+          sx={{ 
+            color: '#ffffff',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '16px 24px'
+          }}
+        >
           {"Confirm Spreadsheet Deletion"}
         </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="delete-dialog-description">
+        <DialogContent sx={{ padding: '24px' }}>
+          <DialogContentText 
+            id="delete-dialog-description"
+            sx={{ color: 'rgba(255, 255, 255, 0.8)' }}
+          >
             Are you sure you want to delete "{spreadsheetToDelete?.filename}"? This action is permanent and cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete} color="primary">
-            Cancel
+        <DialogActions sx={{ 
+          padding: '16px 24px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          justifyContent: 'space-between'
+        }}>
+          <Button 
+            onClick={handleCancelDelete} 
+            color="primary"
+            sx={{ 
+              color: '#4285f4',
+              '&:hover': {
+                backgroundColor: 'rgba(66, 133, 244, 0.08)'
+              }
+            }}
+          >
+            CANCEL
           </Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained" autoFocus>
+          <DeleteActionButton 
+            onClick={handleConfirmDelete} 
+            autoFocus
+            sx={{
+              '& svg': {
+                marginRight: '8px'
+              }
+            }}
+          >
             Delete
-          </Button>
+          </DeleteActionButton>
         </DialogActions>
       </Dialog>
       

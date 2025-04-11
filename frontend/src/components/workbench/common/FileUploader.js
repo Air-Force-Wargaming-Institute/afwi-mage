@@ -3,8 +3,6 @@ import {
   Box,
   Button,
   Typography,
-  TextField,
-  Paper,
   CircularProgress,
   LinearProgress,
   Alert,
@@ -19,6 +17,12 @@ import InfoIcon from '@mui/icons-material/Info';
 import ArticleIcon from '@mui/icons-material/Article';
 import DownloadIcon from '@mui/icons-material/Download';
 import '../../../App.css'; // Import global styles
+// Import styled components
+import { 
+  SubtleGlowPaper, 
+  GradientBorderPaper, 
+  useContainerStyles 
+} from '../../../styles/StyledComponents';
 
 /**
  * FileUploader Component
@@ -29,7 +33,6 @@ import '../../../App.css'; // Import global styles
  * @param {Function} props.onUpload Callback function when file is uploaded
  * @param {Array<string>} props.allowedFileTypes Array of allowed file extensions (e.g. ['.xlsx', '.csv'])
  * @param {number} props.maxFileSizeMB Maximum file size in MB
- * @param {string} props.description Optional description of the file uploader
  * @param {boolean} props.disabled Whether the uploader is disabled
  * @param {Function} props.onError Callback function when error occurs
  */
@@ -37,22 +40,20 @@ const FileUploader = ({
   onUpload,
   allowedFileTypes = ['.xlsx', '.csv', '.xls'],
   maxFileSizeMB = 10,
-  description,
   disabled = false,
   onError
 }) => {
   const [file, setFile] = useState(null);
-  const [fileDescription, setFileDescription] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+  const containerClasses = useContainerStyles();
   
   // Reset the component state
   const resetState = () => {
     setFile(null);
-    setFileDescription('');
     setUploading(false);
     setUploadProgress(0);
     setError(null);
@@ -133,8 +134,8 @@ const FileUploader = ({
     setError(null);
     
     try {
-      // Call the onUpload callback with the file and description
-      await onUpload(file, fileDescription, (progress) => {
+      // Call the onUpload callback with the file
+      await onUpload(file, '', (progress) => {
         setUploadProgress(progress);
       }, () => {
         // Success callback
@@ -162,19 +163,24 @@ const FileUploader = ({
   
   return (
     <Box>
-      {/* Drop Zone */}
-      <Paper
-        variant="outlined"
+      {/* Drop Zone - Apply the containerClasses.dropzone styling from StyledComponents.js */}
+      <Box
+        className={`${containerClasses.dropzone} ${isDragging ? 'active' : ''}`}
         sx={{
-          backgroundColor: isDragging ? 'rgba(66, 133, 244, 0.15)' : 'rgba(30, 30, 30, 0.9)',
-          border: isDragging ? '2px dashed #4285f4' : '2px dashed #333333',
-          borderRadius: '8px',
           padding: '24px',
-          textAlign: 'center',
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          color: '#ffffff',
+          backgroundColor: isDragging ? 'rgba(40, 40, 40, 0.9)' : 'rgba(30, 30, 30, 0.9)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '200px',
           opacity: disabled ? 0.6 : 1,
-          transition: 'all 0.2s ease',
-          color: '#ffffff'
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          '&:hover': {
+            borderColor: (theme) => theme.palette.primary.main,
+            backgroundColor: 'rgba(40, 40, 40, 0.9)',
+          }
         }}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -191,24 +197,34 @@ const FileUploader = ({
           disabled={disabled}
         />
         
-        <CloudUploadIcon style={{ fontSize: 48, color: '#4285f4', marginBottom: '16px' }} />
+        {/* Center the cloud icon */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <CloudUploadIcon style={{ fontSize: 48, color: '#4285f4' }} />
+        </Box>
         
         {!file ? (
           <>
-            <Typography variant="h6" gutterBottom>
-              Drag & Drop File Here
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              or {disabled ? '(Disabled)' : 'click to browse files'}
-            </Typography>
-            <Typography variant="caption" display="block" style={{ marginTop: '8px' }}>
-              Allowed file types: {allowedFileTypes.join(', ')}
-            </Typography>
-            {maxFileSizeMB > 0 && (
-              <Typography variant="caption" display="block">
-                Maximum file size: {maxFileSizeMB}MB
+            {/* Center the main text elements */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Drag & Drop File Here
               </Typography>
-            )}
+              <Typography variant="body2" color="text.secondary">
+                or {disabled ? '(Disabled)' : 'click to browse files'}
+              </Typography>
+            </Box>
+            
+            {/* Leave these texts with their original alignment */}
+            <Box sx={{ textAlign: 'left', mt: 2 }}>
+              <Typography variant="caption" display="block">
+                Allowed file types: {allowedFileTypes.join(', ')}
+              </Typography>
+              {maxFileSizeMB > 0 && (
+                <Typography variant="caption" display="block">
+                  Maximum file size: {maxFileSizeMB}MB
+                </Typography>
+              )}
+            </Box>
           </>
         ) : (
           <>
@@ -220,36 +236,7 @@ const FileUploader = ({
             </Typography>
           </>
         )}
-      </Paper>
-      
-      {/* File Description */}
-      {file && (
-        <TextField
-          fullWidth
-          label="File Description (Optional)"
-          variant="outlined"
-          value={fileDescription}
-          onChange={(e) => setFileDescription(e.target.value)}
-          margin="normal"
-          disabled={uploading || disabled}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              '& fieldset': {
-                borderColor: '#333333',
-              },
-              '&:hover fieldset': {
-                borderColor: '#4285f4',
-              },
-            },
-            '& .MuiInputLabel-root': {
-              color: '#bbbbbb',
-            },
-            '& .MuiInputBase-input': {
-              color: '#ffffff',
-            }
-          }}
-        />
-      )}
+      </Box>
       
       {/* Error Message */}
       {error && (
@@ -278,9 +265,18 @@ const FileUploader = ({
             color="primary"
             onClick={handleUpload}
             disabled={uploading || disabled}
-            startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+            startIcon={
+              uploading ? 
+                <CircularProgress 
+                  size={20} 
+                  sx={{ color: 'white' }} 
+                /> : 
+                <CloudUploadIcon />
+            }
           >
-            {uploading ? `Uploading (${uploadProgress}%)` : 'Upload'}
+            <span style={{ color: 'white' }}>
+              {uploading ? `Uploading (${uploadProgress}%)` : 'Upload'}
+            </span>
           </Button>
         </Box>
       )}
@@ -288,7 +284,15 @@ const FileUploader = ({
       {/* Upload Progress */}
       {uploading && (
         <Box sx={{ width: '100%', marginTop: '16px' }}>
-          <LinearProgress variant="determinate" value={uploadProgress} />
+          <LinearProgress 
+            variant="determinate" 
+            value={uploadProgress} 
+            sx={{
+              '& .MuiLinearProgress-bar': {
+                backgroundColor: '#4285f4'
+              }
+            }}
+          />
         </Box>
       )}
     </Box>

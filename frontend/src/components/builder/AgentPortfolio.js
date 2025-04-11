@@ -641,7 +641,9 @@ function AgentPortfolio() {
   return (
     <div className={classes.root}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-      GradientBorderPaper
+        <Typography variant="h4">
+          Agent Portfolio
+        </Typography>
         <Button 
           variant="contained" 
           color="primary" 

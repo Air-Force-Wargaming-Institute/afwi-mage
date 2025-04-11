@@ -72,32 +72,32 @@ let theme = createTheme({
     fontWeightMedium: 600,
     fontWeightBold: 700,
     h1: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 700,
       fontSize: '2.7rem',
     },
     h2: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 700,
       fontSize: '2rem',
     },
     h3: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 500,
       fontSize: '1.7rem',
     },
     h4: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 500,
       fontSize: '1.4rem',
     },
     h5: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 500,
       fontSize: '1.25rem',
     },
     h6: {
-      fontFamily: '"Oswald", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"League Spartan", "Roboto", "Helvetica", "Arial", sans-serif',
       fontWeight: 500,
       fontSize: '1.1rem',
     },
@@ -151,7 +151,7 @@ let theme = createTheme({
     MuiCssBaseline: {
       '@global': {
         '@import': [
-          'url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&display=swap")',
+          'url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;700&display=swap")',
           'url("https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700&display=swap")',
         ],
         body: {

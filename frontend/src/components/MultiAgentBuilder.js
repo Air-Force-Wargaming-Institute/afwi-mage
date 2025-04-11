@@ -44,7 +44,7 @@ function MultiAgentBuilder() {
         style={{ 
           width: '20px', 
           height: '26px',
-          filter: location.pathname === '/multi-agent/team-chat/builder/agent-portfolio' ? 'none' : 'invert(1)'
+          filter: location.pathname === '/multi-agent/team-chat/builder/agent-portfolio' ? 'none' : 'invert(32%) sepia(69%) saturate(2411%) hue-rotate(182deg) brightness(94%) contrast(101%)'
         }} 
       />,
       component: AgentPortfolio
@@ -59,7 +59,7 @@ function MultiAgentBuilder() {
         style={{ 
           width: '24px', 
           height: '24px',
-          filter: location.pathname === '/multi-agent/team-chat/builder/agent-teams' ? 'invert(1)' : 'none'
+          filter: location.pathname === '/multi-agent/team-chat/builder/agent-teams' ? 'invert(1)' : 'invert(32%) sepia(69%) saturate(2411%) hue-rotate(182deg) brightness(94%) contrast(101%)'
         }} 
       />,
       component: AgentTeams

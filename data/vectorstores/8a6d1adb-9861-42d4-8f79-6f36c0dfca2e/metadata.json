@@ -7,7 +7,7 @@
   "chunk_overlap": 100,
   "file_count": 1,
   "created_at": "2025-03-12T19:51:16.445812",
-  "updated_at": "2025-04-04T02:40:00.256904",
+  "updated_at": "2025-04-11T18:26:05.805016",
   "files": [
     {
       "filename": "2022-12-05 Hypersonics Landscape.pdf",
@@ -28,13 +28,13 @@
       "added_at": "2025-03-12T21:56:22.902798"
     },
     {
-      "filename": "2024-02-12-3 ITOW - On Maritime Strategic Access.pdf",
-      "original_path": "doc_staging/2024-02-12-3 ITOW - On Maritime Strategic Access.pdf",
-      "staging_path": "doc_staging/2024-02-12-3 ITOW - On Maritime Strategic Access.pdf",
+      "filename": "2024-02-20 Complex Systems Engineering.pdf",
+      "original_path": "doc_staging/2024-02-20 Complex Systems Engineering.pdf",
+      "staging_path": "doc_staging/2024-02-20 Complex Systems Engineering.pdf",
       "file_type": "pdf",
-      "document_id": "9747aa0c-c47b-4f87-a9e7-fb89db6a4264",
-      "size_bytes": 2802783,
-      "added_at": "2025-04-04T02:39:39.733925"
+      "document_id": "6c8996ed-f49a-4a21-bc51-f8423109e556",
+      "size_bytes": 1487720,
+      "added_at": "2025-04-11T18:25:54.903033"
     }
   ]
 }

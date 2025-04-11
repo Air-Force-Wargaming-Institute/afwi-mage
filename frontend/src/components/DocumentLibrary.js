@@ -128,6 +128,9 @@ const useStyles = makeStyles((theme) => ({
   },
   sectionTitle: {
     marginBottom: theme.spacing(2),
+    fontWeight: 'bold',
+    color: theme.custom.gradients.gradient1,
+    fontSize: '2rem',
   },
   tipsList: {
     listStyle: 'none',
@@ -307,6 +310,7 @@ function DocumentLibrary() {
   const classes = useStyles();
   const theme = useTheme();
   const containerClasses = useContainerStyles();
+  const [audioDragOver, setAudioDragOver] = useState(false);
 
   const draggedItem = state?.draggedItem;
   const dropTarget = state?.dropTarget;
@@ -487,6 +491,33 @@ function DocumentLibrary() {
       console.error('Error uploading files:', error);
       setError('Failed to upload files: ' + error.message);
     }
+  };
+
+  const handleAudioDragOver = (e) => {
+    e.preventDefault();
+    setAudioDragOver(true);
+  };
+
+  const handleAudioDragLeave = (e) => {
+    e.preventDefault();
+    setAudioDragOver(false);
+  };
+
+  const handleAudioDrop = async (e) => {
+    e.preventDefault();
+    setAudioDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    await handleAudioFiles(files);
+  };
+
+  const handleAudioSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    await handleAudioFiles(files);
+  };
+
+  const handleAudioFiles = async (files) => {
+    console.log('Audio files for transcription:', files);
+    // TODO: Implement transcription API call here
   };
 
   const handleDelete = async (item) => {
@@ -1027,9 +1058,11 @@ function DocumentLibrary() {
             </GradientText>
 
             <GradientBorderPaper elevation={2} className={classes.paperSection}>
+            <GradientText sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
               <Typography variant="h6" className={classes.sectionTitle}>
                 Upload Documents
               </Typography>
+              </GradientText>
               <Typography variant="subtitle2" color="textSecondary" gutterBottom>
                 Add new PDF, DOCX, or TXT documents to the library
               </Typography>
@@ -1053,7 +1086,43 @@ function DocumentLibrary() {
                   </Button>
                 </label>
                 <Typography variant="body2" sx={{ mt: 1.5 }}>
-                  or drag and drop files here
+                  or drag and drop PDF, DOCX, or TXT files here
+                </Typography>
+              </Box>
+            </GradientBorderPaper>
+
+            <GradientBorderPaper elevation={2} className={classes.paperSection}>
+              <GradientText sx={{ mt: 1, display: 'block', textAlign: 'center'}}>
+                <Typography variant="h6" className={classes.sectionTitle}>
+                  Audio Transciption
+                </Typography>
+              </GradientText>
+              <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                Upload audio files for transcription. Supported formats: m4a, mp3, webm, mp4, mpga, wav, mpeg.
+              </Typography>
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1.5 }}>
+                When processing is complete, a PDF transcription of your audio file will appear in the document library.
+              </Typography>
+              <Box className={`${containerClasses.dropzone} ${audioDragOver ? 'active' : ''}`}
+                   onDragOver={handleAudioDragOver}
+                   onDragLeave={handleAudioDragLeave}
+                   onDrop={handleAudioDrop}
+                   sx={{ my: 2.5, p: 2.5 }}>
+                <input
+                  type="file"
+                  id="audio-upload"
+                  multiple
+                  accept=".m4a,.mp3,.webm,.mp4,.mpga,.wav,.mpeg"
+                  style={{ display: 'none' }}
+                  onChange={handleAudioSelect}
+                />
+                <label htmlFor="audio-upload">
+                  <Button component="span" variant="contained" color="primary" startIcon={<UploadIcon />}>
+                    Upload Audio
+                  </Button>
+                </label>
+                <Typography variant="body2" sx={{ mt: 1.5 }}>
+                  or drag and drop m4a, mp3, webm, mp4, mpga, wav, mpeg audio files here
                 </Typography>
               </Box>
             </GradientBorderPaper>

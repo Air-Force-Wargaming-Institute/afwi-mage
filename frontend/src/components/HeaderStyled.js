@@ -384,7 +384,7 @@ function HeaderStyled() {
                   onClick={() => setActiveTab('document-library')}
                 >
                   <Box component="span" className="link-content">
-                    <FolderIcon /> Document Library
+                    <FolderIcon /> Library
                   </Box>
                 </Link>
               </li>
