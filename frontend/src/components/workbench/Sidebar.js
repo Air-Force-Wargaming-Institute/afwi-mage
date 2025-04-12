@@ -14,13 +14,14 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TransformIcon from '@mui/icons-material/Transform';
 import { WorkbenchContext } from '../../contexts/WorkbenchContext';
+import { GradientText } from '../../styles/StyledComponents';
 import '../../App.css'; // Import App.css for styling
 
 // Create styled component for the animated sidebar
 const AnimatedSidebar = styled(Paper)(({ theme }) => ({
   position: 'relative',
   padding: theme.spacing(2),
-  height: '100%',
+  height: 'fit-content',
   width: '250px',
   marginRight: '16px',
   backgroundColor: 'transparent',
@@ -31,6 +32,7 @@ const AnimatedSidebar = styled(Paper)(({ theme }) => ({
   overflow: 'hidden',
   boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
   background: 'transparent',
+  alignSelf: 'flex-start',
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -114,18 +116,6 @@ const NavItem = styled(ListItem)(({ theme, active }) => ({
   },
 }));
 
-const SidebarTitle = styled(Typography)(({ theme }) => ({
-  fontWeight: 600,
-  marginBottom: theme.spacing(2),
-  fontSize: '1.1rem',
-  padding: theme.spacing(1),
-  borderRadius: theme.shape.borderRadius,
-  background: 'rgba(66, 133, 244, 0.15)',
-  textAlign: 'center',
-  color: '#ffffff',
-  textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-}));
-
 const Sidebar = () => {
   const { selectedTool, setSelectedTool } = useContext(WorkbenchContext);
 
@@ -156,11 +146,13 @@ const Sidebar = () => {
 
   return (
     <AnimatedSidebar elevation={3}>
-      <SidebarTitle>
-        Analysis Tools
-      </SidebarTitle>
+      <Box sx={{ mb: 0, textAlign: 'center' }}>
+        <GradientText variant="h6" component="h2" fontWeight="600" className="section-title">
+          Analysis Tools
+        </GradientText>
+      </Box>
       
-      <Divider sx={{ my: 2, opacity: 0.6 }} />
+      <Divider sx={{ mt: 0.5, mb: 0, opacity: 0.6 }} />
       
       <List sx={{ px: 0.5 }}>
         {tools.map((tool) => (

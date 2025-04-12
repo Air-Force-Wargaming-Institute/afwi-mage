@@ -37,7 +37,8 @@ import {
   GradientBorderPaper,
   AnimatedGradientPaper,
   SubtleGlowPaper,
-  useContainerStyles
+  useContainerStyles,
+  GradientText
 } from '../../../styles/StyledComponents';
 // Import action buttons
 import {
@@ -399,7 +400,14 @@ const SpreadsheetViewer = () => {
   };
   
   return (
-    <Container maxWidth="xl" sx={{ height: 'calc(100vh - 170px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Container maxWidth="xl" sx={{ 
+      height: 'calc(100vh - 170px)', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      overflow: 'hidden',
+      px: { xs: 2, sm: 3 },
+      width: '100%'
+    }}>
       {/* Toast notifications */}
       <Toaster 
         position="top-right"
@@ -426,57 +434,67 @@ const SpreadsheetViewer = () => {
         }}
       />
       
-      <AnimatedGradientPaper elevation={3} sx={{ mb: 2, flex: 'none' }}>
-        <Typography variant="h5" sx={{ mb: 2 }}>Upload/Manage Spreadsheets</Typography>
-        
-        <Grid container spacing={2} sx={{ height: 'calc(100vh - 230px)' }}>
-          {/* Upload Panel - 20% width */}
-          <Grid item xs={12} md={3} lg={2.4}>
-            <SubtleGlowPaper elevation={2} sx={{ 
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}>
-              <Typography variant="h6" gutterBottom>
-                Upload Files
-              </Typography>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Upload your spreadsheet files here. Supported formats: XLSX, XLS, CSV
-              </Typography>
-              
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
-                <FileUploader
-                  onUpload={handleUploadFile}
-                  acceptedFileTypes={['.xlsx', '.xls', '.csv']}
-                  uploadButtonText="Upload Spreadsheet"
-                  showDescription={true}
-                  descriptionLabel="Description (optional)"
-                  maxFileSizeMB={50}
-                  disabled={isLoading}
-                />
-              </Box>
-            </SubtleGlowPaper>
-          </Grid>
-          
-          {/* Spreadsheet List - 80% width */}
-          <Grid item xs={12} md={9} lg={9.6}>
-            <GradientBorderPaper elevation={2} sx={{ 
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}>
-              <Typography variant="h6" gutterBottom>
-                Original Uploaded Spreadsheets
-              </Typography>
-              <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                {renderSpreadsheetList()}
-              </Box>
-            </GradientBorderPaper>
-          </Grid>
+      <Box sx={{ mb: 3 }}>
+        <GradientText variant="h5" component="h1" gutterBottom className="section-title">
+          Upload/Manage Spreadsheets
+        </GradientText>
+      </Box>
+      
+      <Grid container spacing={3} sx={{ height: 'calc(100vh - 230px)' }}>
+        {/* Upload Panel - 20% width */}
+        <Grid item xs={12} md={3} lg={2.4}>
+          <SubtleGlowPaper elevation={2} sx={{ 
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            p: 3,
+            boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+          }}>
+            <Typography variant="h6" gutterBottom fontWeight="600" color="primary.main">
+              Upload Files
+            </Typography>
+            <Typography variant="body2" color="textSecondary" paragraph>
+              Upload your spreadsheet files here. Supported formats: XLSX, XLS, CSV
+            </Typography>
+            
+            <Box sx={{ flex: 1, overflow: 'auto' }}>
+              <FileUploader
+                onUpload={handleUploadFile}
+                acceptedFileTypes={['.xlsx', '.xls', '.csv']}
+                uploadButtonText="Upload Spreadsheet"
+                showDescription={true}
+                descriptionLabel="Description (optional)"
+                maxFileSizeMB={50}
+                disabled={isLoading}
+              />
+            </Box>
+          </SubtleGlowPaper>
         </Grid>
-      </AnimatedGradientPaper>
+        
+        {/* Spreadsheet List - 80% width */}
+        <Grid item xs={12} md={9} lg={9.6}>
+          <GradientBorderPaper elevation={3} sx={{ 
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            p: 3,
+            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+            '&::before': {
+              background: '#121212',
+              borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+            }
+          }}>
+            <Typography variant="h6" gutterBottom fontWeight="600" color="primary.main">
+              Original Uploaded Spreadsheets
+            </Typography>
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+              {renderSpreadsheetList()}
+            </Box>
+          </GradientBorderPaper>
+        </Grid>
+      </Grid>
       
       {/* Spreadsheet Modal */}
       <SpreadsheetModal

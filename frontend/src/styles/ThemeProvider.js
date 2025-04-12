@@ -47,6 +47,21 @@ const GlobalStyles = () => {
         }
       }
       
+      @keyframes borderGradientAnimation {
+        0% {
+          background-position: 0% 50%;
+          filter: brightness(1.2) saturate(1.2);
+        }
+        50% {
+          background-position: 100% 50%;
+          filter: brightness(1.4) saturate(1.4);
+        }
+        100% {
+          background-position: 0% 50%;
+          filter: brightness(1.2) saturate(1.2);
+        }
+      }
+      
       @keyframes textGlow {
         0% {
           filter: brightness(0.9);

@@ -852,7 +852,7 @@ const SpreadsheetTools = () => {
                 variant="outlined"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: theme => theme.shape?.borderRadius || 10,
+                    borderRadius: '5px 5px 0 0',
                     backgroundColor: '#121212',
                     '&:hover .MuiOutlinedInput-notchedOutline': {
                       borderColor: 'primary.main',
@@ -901,7 +901,7 @@ const SpreadsheetTools = () => {
                             backgroundColor: columns.find(col => col.name === value) ? 
                               getColumnTypeInfo(columns.find(col => col.name === value).dtype).color + '20' : 
                               undefined,
-                            borderRadius: theme => theme.shape?.borderRadius/2 || 5,
+                            borderRadius: '20px',
                             '& .MuiChip-label': {
                               color: 'white',
                               fontWeight: 500,
@@ -917,22 +917,22 @@ const SpreadsheetTools = () => {
                         maxHeight: 300,
                       },
                       sx: {
-                        bgcolor: 'background.default',
+                        bgcolor: '#121212',
                         color: 'white',
-                        borderRadius: theme => theme.shape?.borderRadius || 10,
-                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                        border: '1px solid',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match other dropdowns
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
                         '& .MuiMenuItem-root': {
                           color: 'white',
                           '&:hover': {
-                            bgcolor: 'action.hover',
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
                           },
                           '&.Mui-selected': {
-                            bgcolor: 'primary.main',
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
                             color: 'white',
                             '&:hover': {
-                              bgcolor: 'primary.dark',
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
                             }
                           },
                           '&.Mui-disabled': {
@@ -944,6 +944,15 @@ const SpreadsheetTools = () => {
                         }
                       }
                     },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
                   }}
                 >
                   {columns.map((column) => (
@@ -1067,7 +1076,7 @@ const SpreadsheetTools = () => {
                         variant="outlined"
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: theme => theme.shape?.borderRadius || 10,
+                            borderRadius: '5px 5px 0 0',
                             backgroundColor: '#121212',
                             color: 'white',
                             '&:hover .MuiOutlinedInput-notchedOutline': {
@@ -1110,7 +1119,7 @@ const SpreadsheetTools = () => {
                               sx: {
                                 bgcolor: '#121212',
                                 color: 'white',
-                                borderRadius: theme => theme.shape?.borderRadius || 10,
+                                borderRadius: '0 0 20px 20px',
                                 boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                                 border: '1px solid',
                                 borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1163,7 +1172,7 @@ const SpreadsheetTools = () => {
                           }}
                           sx={{
                             '& .MuiOutlinedInput-root': {
-                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              borderRadius: '5px 5px 0 0',
                               backgroundColor: '#121212',
                               '&:hover .MuiOutlinedInput-notchedOutline': {
                                 borderColor: 'primary.main',
@@ -1198,7 +1207,7 @@ const SpreadsheetTools = () => {
                           variant="outlined"
                           sx={{
                             '& .MuiOutlinedInput-root': {
-                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              borderRadius: '5px 5px 0 0',
                               backgroundColor: '#121212',
                               color: 'white',
                               '&:hover .MuiOutlinedInput-notchedOutline': {
@@ -1243,7 +1252,7 @@ const SpreadsheetTools = () => {
                                 sx: {
                                   bgcolor: '#121212',
                                   color: 'white',
-                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  borderRadius: '0 0 20px 20px',
                                   boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                                   border: '1px solid',
                                   borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1300,7 +1309,7 @@ const SpreadsheetTools = () => {
                         variant="outlined"
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: theme => theme.shape?.borderRadius || 10,
+                            borderRadius: '5px 5px 0 0',
                             backgroundColor: '#121212',
                             color: 'white',
                             '&:hover .MuiOutlinedInput-notchedOutline': {
@@ -1344,7 +1353,7 @@ const SpreadsheetTools = () => {
                               sx: {
                                 bgcolor: '#121212',
                                 color: 'white',
-                                borderRadius: theme => theme.shape?.borderRadius || 10,
+                                borderRadius: '0 0 20px 20px',
                                 boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                                 border: '1px solid',
                                 borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1510,7 +1519,7 @@ const SpreadsheetTools = () => {
                           variant="outlined"
                           sx={{
                             '& .MuiOutlinedInput-root': {
-                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              borderRadius: '5px 5px 0 0',
                               backgroundColor: '#121212',
                               color: 'white',
                               '&:hover .MuiOutlinedInput-notchedOutline': {
@@ -1546,7 +1555,7 @@ const SpreadsheetTools = () => {
                                 sx: {
                                   bgcolor: '#121212',
                                   color: 'white',
-                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  borderRadius: '0 0 20px 20px',
                                   boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                                   border: '1px solid',
                                   borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -1736,7 +1745,7 @@ const SpreadsheetTools = () => {
                       variant="outlined"
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          borderRadius: theme => theme.shape?.borderRadius || 10,
+                          borderRadius: '5px 5px 0 0',
                           backgroundColor: '#121212',
                           color: 'text.primary',
                           '&:hover .MuiOutlinedInput-notchedOutline': {
@@ -1789,7 +1798,7 @@ const SpreadsheetTools = () => {
                             sx: {
                               bgcolor: '#121212',
                               color: 'white',
-                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              borderRadius: '0 0 20px 20px',
                               boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                               border: '1px solid rgba(255, 255, 255, 0.15)',
                               '& .MuiMenuItem-root': {
@@ -2634,600 +2643,639 @@ const SpreadsheetTools = () => {
         </Alert>
       )}
       
-      <AnimatedGradientPaper elevation={3} style={{ marginTop: '24px', width: '100%' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <FormControl 
-              fullWidth 
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: theme => theme.shape?.borderRadius || 10,
-                  backgroundColor: '#121212',
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'primary.main',
-                    borderWidth: '1px',
+      <Box
+        sx={{
+          marginTop: '24px',
+          width: '100%',
+          position: 'relative',
+          borderRadius: '20px',
+          padding: '3px', // This creates space for the gradient border
+          background: 'linear-gradient(to right, rgb(129, 177, 255), rgb(95, 127, 255), rgb(165, 165, 165))',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.7)',
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            width: '100%',
+            height: '100%',
+            padding: theme => theme.spacing(3),
+            borderRadius: '17px', // 20px - 3px to fit inside the parent
+            backgroundImage: 'linear-gradient(135deg, rgba(29, 39, 70, 0.95) 0%, rgba(25, 25, 35, 0.95) 100%)',
+          }}
+        >
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <FormControl 
+                fullWidth 
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '5px 5px 0 0',
+                    backgroundColor: '#121212',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '1px',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '2px',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'white',
+                    },
+                    '& fieldset': {
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
                   },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'primary.main',
-                    borderWidth: '2px',
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
                   },
-                  '& .MuiSelect-icon': {
+                  '& .MuiInputBase-input': {
                     color: 'white',
                   },
-                  '& fieldset': {
-                    borderColor: 'divider',
-                  },
-                  color: 'white'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  '&.Mui-focused': {
-                    color: 'primary.main',
-                  }
-                },
-                '& .MuiInputBase-input': {
-                  color: 'white',
-                },
-                '& .MuiSelect-select': {
-                  color: 'white',
-                  backgroundColor: '#121212',
-                }
-              }}
-            >
-              <InputLabel>Select Spreadsheet</InputLabel>
-              <Select
-                value={activeSpreadsheetId}
-                onChange={(e) => handleSpreadsheetChange(e.target.value)}
-                label="Select Spreadsheet"
-                sx={{
-                  bgcolor: '#121212 !important',
-                  color: 'white !important',
                   '& .MuiSelect-select': {
-                    bgcolor: '#121212 !important',
-                    color: 'white !important',
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.3) !important'
-                  }
-                }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      bgcolor: 'background.default',
-                      color: 'text.primary',
-                      borderRadius: theme => theme.shape?.borderRadius || 10,
-                      boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '& .MuiMenuItem-root': {
-                        color: 'text.primary',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
-                        '&.Mui-selected': {
-                          bgcolor: 'primary.main',
-                          color: 'white',
-                          '&:hover': {
-                            bgcolor: 'primary.dark',
-                          }
-                        }
-                      },
-                      '& .MuiDivider-root': {
-                        borderColor: 'divider'
-                      }
-                    }
+                    color: 'white',
+                    backgroundColor: '#121212',
                   }
                 }}
               >
-                <MenuItem value="" disabled>
-                  <em>Select a spreadsheet</em>
-                </MenuItem>
-                <MenuItem 
-                  value="upload_new" 
-                  sx={{ 
-                    color: 'primary.main',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
+                <InputLabel>Select Spreadsheet</InputLabel>
+                <Select
+                  value={activeSpreadsheetId}
+                  onChange={(e) => handleSpreadsheetChange(e.target.value)}
+                  label="Select Spreadsheet"
+                  sx={{
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                    '& .MuiSelect-select': {
+                      bgcolor: '#121212 !important',
+                      color: 'white !important',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                    }
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: '#121212',
+                        color: 'white',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match the input field
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
+                            }
+                          }
+                        },
+                        '& .MuiDivider-root': {
+                          borderColor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
                   }}
                 >
-                  <CloudUploadIcon />
-                  Upload new spreadsheet...
-                </MenuItem>
-                <Divider sx={{ my: 1, borderColor: 'divider' }} />
-                {spreadsheets.map((sheet) => (
-                  <MenuItem key={sheet.id} value={sheet.id}>
-                    {sheet.filename}
+                  <MenuItem value="" disabled>
+                    <em>Select a spreadsheet</em>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl 
-              fullWidth 
-              variant="outlined" 
-              disabled={!activeSpreadsheetId || sheetNames.length === 0}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: theme => theme.shape?.borderRadius || 10,
-                  backgroundColor: '#121212',
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'primary.main',
-                    borderWidth: '1px',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'primary.main',
-                    borderWidth: '2px',
-                  },
-                  '&.Mui-disabled': {
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255, 255, 255, 0.23)',
+                  <MenuItem 
+                    value="upload_new" 
+                    sx={{ 
+                      color: 'primary.main',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}
+                  >
+                    <CloudUploadIcon />
+                    Upload new spreadsheet...
+                  </MenuItem>
+                  <Divider sx={{ my: 1, borderColor: 'divider' }} />
+                  {spreadsheets.map((sheet) => (
+                    <MenuItem key={sheet.id} value={sheet.id}>
+                      {sheet.filename}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl 
+                fullWidth 
+                variant="outlined" 
+                disabled={!activeSpreadsheetId || sheetNames.length === 0}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '5px 5px 0 0',
+                    backgroundColor: '#121212',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '1px',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '2px',
+                    },
+                    '&.Mui-disabled': {
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '& .MuiSelect-icon': {
+                        color: 'rgba(255, 255, 255, 0.4)',
+                      }
                     },
                     '& .MuiSelect-icon': {
+                      color: 'white',
+                    },
+                    '& fieldset': {
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    },
+                    '&.Mui-disabled': {
                       color: 'rgba(255, 255, 255, 0.4)',
                     }
                   },
-                  '& .MuiSelect-icon': {
+                  '& .MuiInputBase-input': {
                     color: 'white',
                   },
-                  '& fieldset': {
-                    borderColor: 'divider',
-                  },
-                  color: 'white'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  '&.Mui-focused': {
-                    color: 'primary.main',
-                  },
-                  '&.Mui-disabled': {
-                    color: 'rgba(255, 255, 255, 0.4)',
-                  }
-                },
-                '& .MuiInputBase-input': {
-                  color: 'white',
-                },
-                '& .MuiSelect-select': {
-                  color: 'white',
-                  backgroundColor: '#121212',
-                }
-              }}
-            >
-              <InputLabel>Select Sheet</InputLabel>
-              <Select
-                value={selectedSheet}
-                onChange={(e) => handleSheetChange(e.target.value)}
-                label="Select Sheet"
-                sx={{
-                  bgcolor: '#121212 !important',
-                  color: 'white !important',
                   '& .MuiSelect-select': {
-                    bgcolor: '#121212 !important',
-                    color: 'white !important',
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.3) !important'
-                  }
-                }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      bgcolor: 'background.default',
-                      color: 'text.primary',
-                      borderRadius: theme => theme.shape?.borderRadius || 10,
-                      boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '& .MuiMenuItem-root': {
-                        color: 'text.primary',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
-                        '&.Mui-selected': {
-                          bgcolor: 'primary.main',
-                          color: 'white',
-                          '&:hover': {
-                            bgcolor: 'primary.dark',
-                          }
-                        },
-                        '&.Mui-disabled': {
-                          color: 'text.disabled',
-                        }
-                      },
-                      '& .MuiListSubheader-root': {
-                        color: 'text.secondary',
-                      }
-                    }
+                    color: 'white',
+                    backgroundColor: '#121212',
                   }
                 }}
               >
-                <MenuItem value="" disabled>
-                  <em>Select a sheet</em>
-                </MenuItem>
-                {sheetNames.map((sheet) => (
-                  <MenuItem key={sheet} value={sheet}>
-                    {sheet}
+                <InputLabel>Select Sheet</InputLabel>
+                <Select
+                  value={selectedSheet}
+                  onChange={(e) => handleSheetChange(e.target.value)}
+                  label="Select Sheet"
+                  sx={{
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                    '& .MuiSelect-select': {
+                      bgcolor: '#121212 !important',
+                      color: 'white !important',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                    }
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: '#121212',
+                        color: 'white',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match the input field
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
+                            }
+                          },
+                          '&.Mui-disabled': {
+                            color: 'rgba(255, 255, 255, 0.38)',
+                          }
+                        },
+                        '& .MuiDivider-root': {
+                          borderColor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select a sheet</em>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                  {sheetNames.map((sheet) => (
+                    <MenuItem key={sheet} value={sheet}>
+                      {sheet}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
-        </Grid>
-        
-        {activeSpreadsheetId && selectedSheet && columns.length > 0 && (
-          <Box mt={4} style={{ overflow: 'visible' }}>
-            <Divider 
-              style={{ 
-                margin: '24px 0',
-                backgroundImage: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
-                height: '2px',
-                opacity: 0.7
-              }}
-            >
-              <Chip 
-                label="Transformation Configuration" 
-                color="primary"
+          
+          {activeSpreadsheetId && selectedSheet && columns.length > 0 && (
+            <Box mt={4} style={{ overflow: 'visible' }}>
+              <Divider 
+                style={{ 
+                  margin: '24px 0',
+                  backgroundImage: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+                  height: '2px',
+                  opacity: 0.7
+                }}
+              >
+                <Chip 
+                  label="Transformation Configuration" 
+                  color="primary"
+                  sx={{
+                    background: theme => theme.custom?.gradients?.gradient1 || 'linear-gradient(to right,rgb(129, 177, 255),rgb(95, 127, 255),rgb(165, 165, 165))',
+                    color: 'white',
+                    fontWeight: 600,
+                    '& .MuiChip-label': {
+                      color: 'white'
+                    }
+                  }}
+                />
+              </Divider>
+              
+              <Stepper 
+                activeStep={activeStep} 
+                orientation="vertical" 
+                style={{ overflow: 'visible' }}
                 sx={{
-                  background: theme => theme.custom?.gradients?.gradient1 || 'linear-gradient(to right,rgb(129, 177, 255),rgb(95, 127, 255),rgb(165, 165, 165))',
-                  color: 'white',
-                  fontWeight: 600,
-                  '& .MuiChip-label': {
-                    color: 'white'
+                  '& .MuiStepLabel-root': {
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                    '&:hover': {
+                      backgroundColor: 'rgba(66, 133, 244, 0.08)',
+                      cursor: 'pointer'
+                    }
+                  },
+                  '& .MuiStepLabel-label.Mui-active': {
+                    fontWeight: 'bold',
+                    color: 'primary.main'
                   }
                 }}
-              />
-            </Divider>
-            
-            <Stepper 
-              activeStep={activeStep} 
-              orientation="vertical" 
-              style={{ overflow: 'visible' }}
-              sx={{
-                '& .MuiStepLabel-root': {
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(66, 133, 244, 0.08)',
-                    cursor: 'pointer'
-                  }
-                },
-                '& .MuiStepLabel-label.Mui-active': {
-                  fontWeight: 'bold',
-                  color: 'primary.main'
-                }
-              }}
-            >
-              <Step>
-                <StepLabel onClick={() => handleStepClick(0)} sx={{ '&:hover': { cursor: 'pointer' } }}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    width: '100%',
-                    justifyContent: 'flex-start'
-                  }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
-                      Select Input Columns
-                    </Typography>
-                    {activeStep > 0 && selectedInputColumns.length > 0 && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
-                        pl: 2,
-                        ml: 2,
-                        maxWidth: 'calc(100% - 200px)',
-                        flexGrow: 1
-                      }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
-                          Selected Input Columns:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
-                          {selectedInputColumns.slice(0, 3).map(col => (
-                            <Chip
-                              key={col}
-                              label={col}
-                              size="large"
-                              sx={{
-                                fontSize: '1rem',
-                                height: '20px',
-                                backgroundColor: columns.find(c => c.name === col)
-                                  ? getColumnTypeInfo(columns.find(c => c.name === col).dtype).color + '20'
-                                  : undefined,
-                                color: 'white',
-                                fontWeight: 500,
-                                '& .MuiChip-label': {
+              >
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(0)} sx={{ '&:hover': { cursor: 'pointer' } }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Select Input Columns
+                      </Typography>
+                      {activeStep > 0 && selectedInputColumns.length > 0 && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Selected Input Columns:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
+                            {selectedInputColumns.slice(0, 3).map(col => (
+                              <Chip
+                                key={col}
+                                label={col}
+                                size="large"
+                                sx={{
+                                  fontSize: '1rem',
+                                  height: '20px',
+                                  backgroundColor: columns.find(c => c.name === col)
+                                    ? getColumnTypeInfo(columns.find(c => c.name === col).dtype).color + '20'
+                                    : undefined,
                                   color: 'white',
-                                }
-                              }}
-                            />
-                          ))}
-                          {selectedInputColumns.length > 3 && (
-                            <Chip
-                              label={`+${selectedInputColumns.length - 3} more`}
-                              size="large"
-                              sx={{ 
-                                fontSize: '1rem', 
-                                height: '20px',
-                                color: 'white',
-                                '& .MuiChip-label': {
+                                  fontWeight: 500,
+                                  '& .MuiChip-label': {
+                                    color: 'white',
+                                  }
+                                }}
+                              />
+                            ))}
+                            {selectedInputColumns.length > 3 && (
+                              <Chip
+                                label={`+${selectedInputColumns.length - 3} more`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px',
                                   color: 'white',
-                                }
-                              }}
-                            />
-                          )}
+                                  '& .MuiChip-label': {
+                                    color: 'white',
+                                  }
+                                }}
+                              />
+                            )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(0)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
-                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                        '&:hover': {
-                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                      disabled={selectedInputColumns.length === 0}
-                    >
-                      Continue
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel onClick={() => handleStepClick(1)} 
-                  sx={{ 
-                    '&:hover': { cursor: selectedInputColumns.length > 0 ? 'pointer' : 'not-allowed' },
-                    opacity: selectedInputColumns.length > 0 ? 1 : 0.7
-                  }}
-                >
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    width: '100%',
-                    justifyContent: 'flex-start'
-                  }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
-                      Define Output Columns
-                    </Typography>
-                    {activeStep > 1 && outputColumns.some(c => c.name) && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
-                        pl: 2,
-                        ml: 2,
-                        maxWidth: 'calc(100% - 200px)',
-                        flexGrow: 1
-                      }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
-                          Output Columns:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
-                          {outputColumns.slice(0, 5).filter(c => c.name).map((col, idx) => (
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(0)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={selectedInputColumns.length === 0}
+                      >
+                        Continue
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(1)} 
+                    sx={{ 
+                      '&:hover': { cursor: selectedInputColumns.length > 0 ? 'pointer' : 'not-allowed' },
+                      opacity: selectedInputColumns.length > 0 ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Define Output Columns
+                      </Typography>
+                      {activeStep > 1 && outputColumns.some(c => c.name) && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Output Columns:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
+                            {outputColumns.slice(0, 5).filter(c => c.name).map((col, idx) => (
+                              <Chip
+                                key={idx}
+                                label={`${col.name} (${col.outputType})`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px',
+                                  color: 'white',
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  }
+                                }}
+                              />
+                            ))}
+                            {outputColumns.filter(c => c.name).length > 5 && (
+                              <Chip
+                                label={`+${outputColumns.filter(c => c.name).length - 5} more`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px', 
+                                  color: 'white',
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  }
+                                }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(1)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={!outputColumns[0].name}
+                      >
+                        Continue
+                      </Button>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(2)} 
+                    sx={{ 
+                      '&:hover': { cursor: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 'pointer' : 'not-allowed' },
+                      opacity: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Advanced Options
+                      </Typography>
+                      {activeStep > 2 && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Settings:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
                             <Chip
-                              key={idx}
-                              label={`${col.name} (${col.outputType})`}
+                              label={createDuplicate ? "Create Copy" : "Modify Original"}
                               size="large"
                               sx={{ 
                                 fontSize: '1rem', 
                                 height: '20px',
-                                color: 'white',
+                                '& .MuiChip-label': {
+                                  color: 'white'
+                                }
+                              }}
+                              color={createDuplicate ? "success" : "warning"}
+                            />
+                            <Chip
+                              label={`Headers in Context: ${advancedOptions.includeHeaders ? 'Yes' : 'No'}`}
+                              size="large"
+                              sx={{ 
+                                fontSize: '1rem', 
+                                height: '20px',
                                 '& .MuiChip-label': {
                                   color: 'white'
                                 }
                               }}
                             />
-                          ))}
-                          {outputColumns.filter(c => c.name).length > 5 && (
-                            <Chip
-                              label={`+${outputColumns.filter(c => c.name).length - 5} more`}
-                              size="large"
-                              sx={{ 
-                                fontSize: '1rem', 
-                                height: '20px', 
-                                color: 'white',
-                                '& .MuiChip-label': {
-                                  color: 'white'
-                                }
-                              }}
-                            />
-                          )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(1)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
-                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                        '&:hover': {
-                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                      disabled={!outputColumns[0].name}
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel onClick={() => handleStepClick(2)} 
-                  sx={{ 
-                    '&:hover': { cursor: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 'pointer' : 'not-allowed' },
-                    opacity: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 1 : 0.7
-                  }}
-                >
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    width: '100%',
-                    justifyContent: 'flex-start'
-                  }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
-                      Advanced Options
-                    </Typography>
-                    {activeStep > 2 && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
-                        pl: 2,
-                        ml: 2,
-                        maxWidth: 'calc(100% - 200px)',
-                        flexGrow: 1
-                      }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
-                          Settings:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
-                          <Chip
-                            label={createDuplicate ? "Create Copy" : "Modify Original"}
-                            size="large"
-                            sx={{ 
-                              fontSize: '1rem', 
-                              height: '20px',
-                              '& .MuiChip-label': {
-                                color: 'white'
-                              }
-                            }}
-                            color={createDuplicate ? "success" : "warning"}
-                          />
-                          <Chip
-                            label={`Headers in Context: ${advancedOptions.includeHeaders ? 'Yes' : 'No'}`}
-                            size="large"
-                            sx={{ 
-                              fontSize: '1rem', 
-                              height: '20px',
-                              '& .MuiChip-label': {
-                                color: 'white'
-                              }
-                            }}
-                          />
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(2)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
-                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                        '&:hover': {
-                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                      disabled={outputColumns.some(col => !col.description.trim())}
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel onClick={() => handleStepClick(3)} 
-                  sx={{ 
-                    '&:hover': { 
-                      cursor: (selectedInputColumns.length > 0 && 
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(2)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={outputColumns.some(col => !col.description.trim())}
+                      >
+                        Continue
+                      </Button>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(3)} 
+                    sx={{ 
+                      '&:hover': { 
+                        cursor: (selectedInputColumns.length > 0 && 
+                               outputColumns.some(col => col.name) && 
+                               !outputColumns.some(col => !col.description.trim())) ? 'pointer' : 'not-allowed' 
+                      },
+                      opacity: (selectedInputColumns.length > 0 && 
                              outputColumns.some(col => col.name) && 
-                             !outputColumns.some(col => !col.description.trim())) ? 'pointer' : 'not-allowed' 
-                    },
-                    opacity: (selectedInputColumns.length > 0 && 
-                           outputColumns.some(col => col.name) && 
-                           !outputColumns.some(col => !col.description.trim())) ? 1 : 0.7
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 3 ? 'primary.main' : 'inherit'}>
-                      Review and Execute
-                    </Typography>
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(3)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                      disabled={isTransforming}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-            </Stepper>
-          </Box>
-        )}
-        
-        {activeSpreadsheetId && !selectedSheet && (
-          <Box mt={4} textAlign="center">
-            <Typography color="textSecondary">
-              Please select a sheet to continue
-            </Typography>
-          </Box>
-        )}
-        
-        {!activeSpreadsheetId && (
-          <Box mt={4} textAlign="center">
-            <Typography color="textSecondary">
-              Please select a spreadsheet to begin transformation
-            </Typography>
-          </Box>
-        )}
-      </AnimatedGradientPaper>
+                             !outputColumns.some(col => !col.description.trim())) ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 3 ? 'primary.main' : 'inherit'}>
+                        Review and Execute
+                      </Typography>
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(3)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                        disabled={isTransforming}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+              </Stepper>
+            </Box>
+          )}
+          
+          {activeSpreadsheetId && !selectedSheet && (
+            <Box mt={4} textAlign="center">
+              <Typography color="textSecondary">
+                Please select a sheet to continue
+              </Typography>
+            </Box>
+          )}
+          
+          {!activeSpreadsheetId && (
+            <Box mt={4} textAlign="center">
+              <Typography color="textSecondary">
+                Please select a spreadsheet to begin transformation
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
     </div>
   );
 };

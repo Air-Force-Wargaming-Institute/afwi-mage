@@ -361,7 +361,8 @@ const WorkbenchDashboard = () => {
       height: '100%',
       width: '100%', 
       display: 'flex',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      alignItems: 'flex-start'
     }}>
       {/* Left sidebar */}
       <Sidebar />
