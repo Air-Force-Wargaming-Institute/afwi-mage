@@ -44,7 +44,7 @@ EMBEDDING_SERVICE_URL = os.environ.get("EMBEDDING_SERVICE_URL", "http://embeddin
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "huihui_ai/llama3.2-abliterate:latest")
+DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "llama3.2:3b")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
 
 # Job configuration

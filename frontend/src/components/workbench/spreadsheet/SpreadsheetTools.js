@@ -463,6 +463,13 @@ const SpreadsheetTools = () => {
     } else if (field.startsWith('typeOption.')) {
       // Handle nested type option changes
       const optionKey = field.split('.')[1];
+      
+      // Ensure typeOptions exists
+      if (!updatedOutputColumns[index].typeOptions) {
+        updatedOutputColumns[index].typeOptions = {};
+      }
+      
+      // Create a new reference for typeOptions to ensure state update
       updatedOutputColumns[index] = {
         ...updatedOutputColumns[index],
         typeOptions: {
@@ -470,6 +477,10 @@ const SpreadsheetTools = () => {
           [optionKey]: value
         }
       };
+      
+      // Log to help diagnose issues
+      console.log(`Updating ${optionKey} to:`, value);
+      console.log("Updated column:", updatedOutputColumns[index]);
     } else {
       // Handle regular field changes
       updatedOutputColumns[index] = {
@@ -478,7 +489,8 @@ const SpreadsheetTools = () => {
       };
     }
     
-    setOutputColumns(updatedOutputColumns);
+    // Explicitly force update with a new reference
+    setOutputColumns([...updatedOutputColumns]);
   };
 
   // Handle column definition change (Create New or Use Existing)
@@ -752,6 +764,32 @@ const SpreadsheetTools = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
+  // Add this new function to handle direct step selection
+  const handleStepClick = (stepIndex) => {
+    // Validation rules - only allow clicking on steps if prerequisites are met
+    if (stepIndex === 0) {
+      // Always allow going to step 0
+      setActiveStep(0);
+    } else if (stepIndex === 1) {
+      // Only allow going to step 1 if there are input columns selected
+      if (selectedInputColumns.length > 0) {
+        setActiveStep(1);
+      }
+    } else if (stepIndex === 2) {
+      // Only allow going to step 2 if there are input columns and at least one output column with a name
+      if (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) {
+        setActiveStep(2);
+      }
+    } else if (stepIndex === 3) {
+      // Only allow going to step 3 if all prerequisites are met
+      if (selectedInputColumns.length > 0 && 
+          outputColumns.some(col => col.name) &&
+          !outputColumns.some(col => !col.description.trim())) {
+        setActiveStep(3);
+      }
+    }
+  };
+
   // Convert sample values to string representation
   const formatSampleValues = (values) => {
     if (!values || !Array.isArray(values)) return 'No samples';
@@ -912,7 +950,7 @@ const SpreadsheetTools = () => {
                     <MenuItem key={column.name} value={column.name}>
                       <Box display="flex" alignItems="center" width="100%">
                         <Box>
-                          <Typography variant="body1">{column.name}</Typography>
+                          <Typography variant="body1" fontWeight="600" sx={{ color: '#FFFFFF', fontSize: '1.1rem' }}>{column.name}</Typography>
                           <Typography variant="caption" color="textSecondary">
                             {getColumnTypeInfo(column.dtype).label} • {column.unique_count} unique values
                           </Typography>
@@ -953,8 +991,15 @@ const SpreadsheetTools = () => {
                               <Typography variant="caption" display="block" color="textSecondary">
                                 Type: {getColumnTypeInfo(columnInfo?.dtype || 'object').label}
                               </Typography>
-                              <Typography variant="caption" display="block" color="textSecondary">
-                                Sample values: {formatSampleValues(columnInfo?.sample_values)}
+                              <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
+                                display: 'block', 
+                                mt: 0.5,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '100%'
+                              }}>
+                                Sample: {formatSampleValues(columnInfo?.sample_values)}
                               </Typography>
                               {columnInfo?.null_count > 0 && (
                                 <Typography variant="caption" display="block" color="error">
@@ -1336,6 +1381,202 @@ const SpreadsheetTools = () => {
                       </FormControl>
                     </Grid>
                     
+                    {/* Type-specific options that render conditionally */}
+                    {column.outputType === 'boolean' && (
+                      <Grid item xs={12}>
+                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="True Value"
+                              variant="outlined"
+                              value={column.typeOptions && column.typeOptions.trueValue !== undefined ? column.typeOptions.trueValue : 'Yes'}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                console.log("Setting True Value to:", newValue);
+                                handleOutputColumnChange(index, 'typeOption.trueValue', newValue);
+                              }}
+                              placeholder="e.g., Yes, True, 1"
+                              InputLabelProps={{
+                                style: { color: 'rgba(255, 255, 255, 0.7)' }
+                              }}
+                              InputProps={{
+                                style: { color: 'white' }
+                              }}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  backgroundColor: '#121212',
+                                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '1px',
+                                  },
+                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '2px',
+                                  },
+                                  '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                  }
+                                }
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="False Value"
+                              variant="outlined"
+                              value={column.typeOptions && column.typeOptions.falseValue !== undefined ? column.typeOptions.falseValue : 'No'}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                console.log("Setting False Value to:", newValue);
+                                handleOutputColumnChange(index, 'typeOption.falseValue', newValue);
+                              }}
+                              placeholder="e.g., No, False, 0"
+                              InputLabelProps={{
+                                style: { color: 'rgba(255, 255, 255, 0.7)' }
+                              }}
+                              InputProps={{
+                                style: { color: 'white' }
+                              }}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  backgroundColor: '#121212',
+                                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '1px',
+                                  },
+                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '2px',
+                                  },
+                                  '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                  }
+                                }
+                              }}
+                            />
+                          </Grid>
+                        </Grid>
+                      </Grid>
+                    )}
+                    
+                    {column.outputType === 'list' && (
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Allowed Values (comma-separated)"
+                          variant="outlined"
+                          value={column.typeOptions?.options || ''}
+                          onChange={(e) => handleOutputColumnChange(index, 'typeOption.options', e.target.value)}
+                          placeholder="e.g., Red, Green, Blue, Yellow"
+                          helperText="Enter the possible values separated by commas"
+                          InputLabelProps={{
+                            style: { color: 'rgba(255, 255, 255, 0.7)' }
+                          }}
+                          InputProps={{
+                            style: { color: 'white' }
+                          }}
+                          FormHelperTextProps={{
+                            style: { color: 'rgba(255, 255, 255, 0.5)' }
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              backgroundColor: '#121212',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                    )}
+                    
+                    {column.outputType === 'number' && (
+                      <Grid item xs={12}>
+                        <FormControl 
+                          fullWidth 
+                          variant="outlined"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              backgroundColor: '#121212',
+                              color: 'white',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& .MuiSelect-icon': {
+                                color: 'white',
+                              },
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              '&.Mui-focused': {
+                                color: 'primary.main',
+                              }
+                            }
+                          }}
+                        >
+                          <InputLabel>Number Format</InputLabel>
+                          <Select
+                            value={column.typeOptions?.format || 'decimal'}
+                            onChange={(e) => handleOutputColumnChange(index, 'typeOption.format', e.target.value)}
+                            label="Number Format"
+                            MenuProps={{
+                              PaperProps: {
+                                sx: {
+                                  bgcolor: '#121212',
+                                  color: 'white',
+                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                                  border: '1px solid',
+                                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                                  '& .MuiMenuItem-root': {
+                                    color: 'white',
+                                    backgroundColor: '#121212',
+                                    '&:hover': {
+                                      bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                    },
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.main',
+                                      color: 'white',
+                                      '&:hover': {
+                                        bgcolor: 'primary.dark',
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }}
+                          >
+                            <MenuItem value="decimal">Decimal (1.23)</MenuItem>
+                            <MenuItem value="integer">Integer (123)</MenuItem>
+                            <MenuItem value="currency">Currency ($123.45)</MenuItem>
+                            <MenuItem value="percentage">Percentage (12.3%)</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    )}
+                    
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -1593,15 +1834,20 @@ const SpreadsheetTools = () => {
             
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <SubtleGlowPaper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(33, 150, 243, 0.04)', 
-                    border: '1px solid',
-                    borderColor: 'primary.light', 
+                    bgcolor: 'rgba(33, 150, 243, 0.12)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    height: '100%'
+                    height: '100%',
+                    background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="primary.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1621,26 +1867,26 @@ const SpreadsheetTools = () => {
                     Input Columns
                   </Typography>
                   <List dense sx={{ 
-                    bgcolor: 'background.paper', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'divider',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
                     overflow: 'hidden',
                     '& .MuiListItem-root': {
                       borderBottom: '1px solid',
-                      borderColor: 'divider',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
                       '&:last-child': {
                         borderBottom: 'none'
                       },
                       '&:hover': {
-                        bgcolor: 'action.hover'
+                        bgcolor: 'rgba(66, 133, 244, 0.1)'
                       }
                     },
                     '& .MuiTypography-root': {
-                      color: 'text.primary'
+                      color: 'white'
                     },
                     '& .MuiTypography-caption': {
-                      color: 'text.secondary'
+                      color: 'rgba(255, 255, 255, 0.7)'
                     }
                   }}>
                     {selectedInputColumns.map((column) => {
@@ -1650,10 +1896,10 @@ const SpreadsheetTools = () => {
                           <ListItemText 
                             primary={
                               <Box display="flex" alignItems="center">
-                                <Typography variant="body2" fontWeight="500">{column}</Typography>
+                                <Typography variant="body1" fontWeight="600" sx={{ color: '#FFFFFF', fontSize: '1.1rem' }}>{column}</Typography>
                                 <Chip 
                                   label={getColumnTypeInfo(columnInfo?.dtype || 'object').label}
-                                  size="small"
+                                  size="medium"
                                   sx={{ 
                                     ml: 1, 
                                     height: 20, 
@@ -1669,13 +1915,14 @@ const SpreadsheetTools = () => {
                                   {columnInfo?.unique_count} unique values
                                   {columnInfo?.null_count > 0 && ` • ${columnInfo.null_count} missing values`}
                                 </Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ 
+                                <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
                                   display: 'block', 
                                   mt: 0.5,
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
-                                  maxWidth: '100%'
+                                  maxWidth: '100%',
+                                  fontSize: '.8rem'
                                 }}>
                                   Sample: {formatSampleValues(columnInfo?.sample_values)}
                                 </Typography>
@@ -1686,19 +1933,24 @@ const SpreadsheetTools = () => {
                       );
                     })}
                   </List>
-                </SubtleGlowPaper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12} md={6}>
-                <SubtleGlowPaper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(76, 175, 80, 0.08)', 
-                    border: '1px solid',
-                    borderColor: 'success.light',
+                    bgcolor: 'rgba(76, 175, 80, 0.15)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    height: '100%'
+                    height: '100%',
+                    background: theme => 'linear-gradient(135deg, #34a853, #60c26a, #34a853)',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="success.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1718,17 +1970,26 @@ const SpreadsheetTools = () => {
                     Output Columns
                   </Typography>
                   <List dense sx={{ 
-                    bgcolor: 'white', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
                     overflow: 'hidden',
                     '& .MuiListItem-root': {
                       borderBottom: '1px solid',
-                      borderColor: 'grey.100',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
                       '&:last-child': {
                         borderBottom: 'none'
+                      },
+                      '&:hover': {
+                        bgcolor: 'rgba(66, 133, 244, 0.1)'
                       }
+                    },
+                    '& .MuiTypography-root': {
+                      color: 'white'
+                    },
+                    '& .MuiTypography-caption': {
+                      color: 'rgba(255, 255, 255, 0.7)'
                     }
                   }}>
                     {outputColumns.map((column, index) => (
@@ -1736,7 +1997,7 @@ const SpreadsheetTools = () => {
                         <ListItemText 
                           primary={
                             <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.5}>
-                              <Typography variant="body2" fontWeight="500" color={column.isNew ? "success.main" : "primary.main"}>
+                              <Typography variant="body1" fontWeight="600" sx={{ color: column.isNew ? "success.light" : "primary.light", fontSize: '1.1rem' }}>
                                 {column.name}
                               </Typography>
                               <Chip 
@@ -1749,7 +2010,13 @@ const SpreadsheetTools = () => {
                                 label={column.outputType} 
                                 size="small"
                                 variant="outlined"
-                                sx={{ height: 20 }}
+                                sx={{ 
+                                  height: 20,
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  },
+                                  borderColor: 'rgba(255, 255, 255, 0.3)'
+                                }}
                               />
                             </Box>
                           }
@@ -1773,10 +2040,10 @@ const SpreadsheetTools = () => {
                                 </Typography>
                               )}
                               
-                              <Typography variant="caption" color="textSecondary" sx={{ 
+                              <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
                                 display: 'block', 
                                 mt: 0.5,
-                                fontSize: '0.7rem',
+                                fontSize: '.8rem',
                                 maxHeight: '3em',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -1791,19 +2058,24 @@ const SpreadsheetTools = () => {
                       </ListItem>
                     ))}
                   </List>
-                </SubtleGlowPaper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12}>
-                <SubtleGlowPaper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 152, 0, 0.08)', 
-                    border: '1px solid',
-                    borderColor: 'warning.light',
+                    bgcolor: 'rgba(255, 152, 0, 0.15)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    height: '100%'
+                    height: '100%',
+                    background: theme => 'linear-gradient(135deg, #fbbc05, #ffd04c, #fbbc05)',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="warning.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1826,14 +2098,15 @@ const SpreadsheetTools = () => {
                     display: 'grid', 
                     gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
                     gap: 2,
-                    bgcolor: 'white', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
-                    p: 2
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    p: 2,
+                    color: 'white'
                   }}>
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Data Protection</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Data Protection</Typography>
                       <Box display="flex" alignItems="center" mb={1}>
                         <Box 
                           component="span" 
@@ -1847,7 +2120,7 @@ const SpreadsheetTools = () => {
                             mr: 1,
                             border: '1px solid',
                             borderColor: createDuplicate ? 'success.main' : 'error.main',
-                            bgcolor: createDuplicate ? 'success.main' : 'white',
+                            bgcolor: createDuplicate ? 'success.main' : 'transparent',
                             color: createDuplicate ? 'white' : 'error.main',
                             fontSize: '0.75rem',
                             fontWeight: 'bold'
@@ -1855,14 +2128,14 @@ const SpreadsheetTools = () => {
                         >
                           {createDuplicate ? '✓' : '×'}
                         </Box>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 500 }}>
                           {createDuplicate ? "Create copy (preserves original)" : "Modify original spreadsheet"}
                         </Typography>
                       </Box>
                     </Box>
                     
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Context Options</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Context Options</Typography>
                       <Box display="flex" alignItems="center" mb={1}>
                         <Box 
                           component="span" 
@@ -1876,7 +2149,7 @@ const SpreadsheetTools = () => {
                             mr: 1,
                             border: '1px solid',
                             borderColor: advancedOptions.includeHeaders ? 'success.main' : 'error.main',
-                            bgcolor: advancedOptions.includeHeaders ? 'success.main' : 'white',
+                            bgcolor: advancedOptions.includeHeaders ? 'success.main' : 'transparent',
                             color: advancedOptions.includeHeaders ? 'white' : 'error.main',
                             fontSize: '0.75rem',
                             fontWeight: 'bold'
@@ -1884,14 +2157,14 @@ const SpreadsheetTools = () => {
                         >
                           {advancedOptions.includeHeaders ? '✓' : '×'}
                         </Box>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 500 }}>
                           Include column headers in context
                         </Typography>
                       </Box>
                     </Box>
                     
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Error Handling</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Error Handling</Typography>
                       <Box display="flex" alignItems="center">
                         <Chip 
                           label={
@@ -1909,12 +2182,12 @@ const SpreadsheetTools = () => {
                                 ? 'error'
                                 : 'info'
                           }
-                          sx={{ height: 24 }}
+                          sx={{ height: 24, '& .MuiChip-label': { fontSize: '0.95rem', fontWeight: 500 } }}
                         />
                       </Box>
                     </Box>
                   </Box>
-                </SubtleGlowPaper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12}>
@@ -1986,7 +2259,7 @@ const SpreadsheetTools = () => {
                 
                 {isTransforming && (
                   <Box mt={2} display="flex" flexDirection="column" alignItems="center">
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
                       {processingMode === 'preview' ? 'Processing sample data...' : 'Processing all data...'}
                     </Typography>
                     <Box width="100%" mt={1}>
@@ -2024,46 +2297,151 @@ const SpreadsheetTools = () => {
                   style={{ maxHeight: '400px', overflow: 'auto' }}
                   sx={{
                     borderRadius: theme => theme.shape?.borderRadius || 10,
+                    position: 'relative',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '5px',
+                      background: theme => theme.palette.background.default,
+                      zIndex: 11,
+                    },
                     '& .MuiTableHead-root': {
-                      background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4, #63a4ff)',
+                      background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right,rgb(24, 51, 95),rgb(36, 52, 74))',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10,
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        height: '100%',
+                        pointerEvents: 'none',
+                      },
                       '& .MuiTableCell-root': {
                         fontWeight: 'bold',
-                        color: 'white'
+                        color: 'rgba(255, 255, 255, 0.9) !important',
+                        fontSize: '1rem'
                       }
                     },
+                    '& .MuiTable-root': {
+                      borderCollapse: 'separate',
+                      borderSpacing: 0,
+                    },
                     '& .MuiTableRow-root:nth-of-type(even)': {
-                      bgcolor: 'background.lighter'
+                      bgcolor: 'rgba(38,38,38,0.9)'
                     },
                     '& .MuiTableRow-root:nth-of-type(odd)': {
-                      bgcolor: 'background.paper'
+                      bgcolor: 'rgba(74, 74, 74, 0.9)'
                     },
                     '& .MuiTableRow-root:hover': {
-                      bgcolor: 'action.hover',
-                      transition: theme => theme.custom?.transition || 'all 0.3s ease'
+                      bgcolor: 'rgba(38, 38, 38, 0.38)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '& .MuiTableCell-root': {
+                        color: '#FFFFFF !important'
+                      }
                     },
                     '& .MuiTableCell-root': {
-                      color: 'text.primary',
-                      borderBottom: '1px solid',
-                      borderColor: 'divider'
+                      color: '#FFFFFF !important',
+                      fontWeight: 500
                     }
                   }}
                 >
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        {outputPreview[0].map((header, index) => (
-                          <TableCell key={index} style={{ fontWeight: 'bold' }}>
-                            {header}
-                          </TableCell>
-                        ))}
+                        {outputPreview[0].map((header, index) => {
+                          const isInputColumn = selectedInputColumns.includes(header);
+                          const isOutputColumn = outputColumns.some(col => col.name === header);
+                          
+                          return (
+                            <TableCell 
+                              key={index} 
+                              style={{ 
+                                fontWeight: 'bold', 
+                                color: 'rgb(255, 255, 255) !important', 
+                                fontSize: '1rem',
+                                position: 'relative',
+                                backgroundColor: isInputColumn 
+                                  ? 'rgba(66, 133, 244, 0.3)' 
+                                  : isOutputColumn 
+                                    ? 'rgba(52, 168, 83, 0.3)' 
+                                    : 'transparent'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {isInputColumn && (
+                                    <Box component="span" sx={{ 
+                                      fontSize: '0.7rem', 
+                                      bgcolor: 'primary.main', 
+                                      color: 'white', 
+                                      px: 0.5, 
+                                      borderRadius: '3px',
+                                      height: '18px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}>
+                                      INPUT
+                                    </Box>
+                                  )}
+                                  {isOutputColumn && (
+                                    <Box component="span" sx={{ 
+                                      fontSize: '0.7rem', 
+                                      bgcolor: 'success.main', 
+                                      color: 'white', 
+                                      px: 0.5, 
+                                      borderRadius: '3px',
+                                      height: '18px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}>
+                                      OUTPUT
+                                    </Box>
+                                  )}
+                                  <Box component="span" sx={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                    {header}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {outputPreview.slice(1).map((row, rowIndex) => (
                         <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
+                          {row.map((cell, cellIndex) => {
+                            const header = outputPreview[0][cellIndex];
+                            const isInputColumn = selectedInputColumns.includes(header);
+                            const isOutputColumn = outputColumns.some(col => col.name === header);
+                            
+                            return (
+                              <TableCell 
+                                key={cellIndex}
+                                sx={{ 
+                                  borderLeft: isInputColumn 
+                                    ? '2px solid rgba(66, 133, 244, 0.5)' 
+                                    : isOutputColumn 
+                                      ? '2px solid rgba(52, 168, 83, 0.5)' 
+                                      : 'none',
+                                  backgroundColor: isInputColumn 
+                                    ? 'rgba(66, 133, 244, 0.05)' 
+                                    : isOutputColumn 
+                                      ? 'rgba(52, 168, 83, 0.05)' 
+                                      : 'transparent'
+                                }}
+                              >
+                                {cell}
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -2513,7 +2891,8 @@ const SpreadsheetTools = () => {
                   borderRadius: '4px',
                   transition: theme => theme.custom?.transition || 'all 0.3s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.03)'
+                    backgroundColor: 'rgba(66, 133, 244, 0.08)',
+                    cursor: 'pointer'
                   }
                 },
                 '& .MuiStepLabel-label.Mui-active': {
@@ -2523,17 +2902,30 @@ const SpreadsheetTools = () => {
               }}
             >
               <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'}>
+                <StepLabel onClick={() => handleStepClick(0)} sx={{ '&:hover': { cursor: 'pointer' } }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    width: '100%',
+                    justifyContent: 'flex-start'
+                  }}>
+                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
                       Select Input Columns
                     </Typography>
                     {activeStep > 0 && selectedInputColumns.length > 0 && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                        pl: 2,
+                        ml: 2,
+                        maxWidth: 'calc(100% - 200px)',
+                        flexGrow: 1
+                      }}>
+                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
                           Selected Input Columns:
                         </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
                           {selectedInputColumns.slice(0, 3).map(col => (
                             <Chip
                               key={col}
@@ -2599,30 +2991,62 @@ const SpreadsheetTools = () => {
               </Step>
               
               <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'}>
+                <StepLabel onClick={() => handleStepClick(1)} 
+                  sx={{ 
+                    '&:hover': { cursor: selectedInputColumns.length > 0 ? 'pointer' : 'not-allowed' },
+                    opacity: selectedInputColumns.length > 0 ? 1 : 0.7
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    width: '100%',
+                    justifyContent: 'flex-start'
+                  }}>
+                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
                       Define Output Columns
                     </Typography>
                     {activeStep > 1 && outputColumns.some(c => c.name) && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                        pl: 2,
+                        ml: 2,
+                        maxWidth: 'calc(100% - 200px)',
+                        flexGrow: 1
+                      }}>
+                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
                           Output Columns:
                         </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {outputColumns.slice(0, 3).filter(c => c.name).map((col, idx) => (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
+                          {outputColumns.slice(0, 5).filter(c => c.name).map((col, idx) => (
                             <Chip
                               key={idx}
                               label={`${col.name} (${col.outputType})`}
                               size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
+                              sx={{ 
+                                fontSize: '1rem', 
+                                height: '20px',
+                                color: 'white',
+                                '& .MuiChip-label': {
+                                  color: 'white'
+                                }
+                              }}
                             />
                           ))}
-                          {outputColumns.filter(c => c.name).length > 3 && (
+                          {outputColumns.filter(c => c.name).length > 5 && (
                             <Chip
-                              label={`+${outputColumns.filter(c => c.name).length - 3} more`}
+                              label={`+${outputColumns.filter(c => c.name).length - 5} more`}
                               size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
+                              sx={{ 
+                                fontSize: '1rem', 
+                                height: '20px', 
+                                color: 'white',
+                                '& .MuiChip-label': {
+                                  color: 'white'
+                                }
+                              }}
                             />
                           )}
                         </Box>
@@ -2663,27 +3087,57 @@ const SpreadsheetTools = () => {
               </Step>
               
               <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'}>
+                <StepLabel onClick={() => handleStepClick(2)} 
+                  sx={{ 
+                    '&:hover': { cursor: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 'pointer' : 'not-allowed' },
+                    opacity: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 1 : 0.7
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    width: '100%',
+                    justifyContent: 'flex-start'
+                  }}>
+                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
                       Advanced Options
                     </Typography>
                     {activeStep > 2 && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                        pl: 2,
+                        ml: 2,
+                        maxWidth: 'calc(100% - 200px)',
+                        flexGrow: 1
+                      }}>
+                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
                           Settings:
                         </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
                           <Chip
                             label={createDuplicate ? "Create Copy" : "Modify Original"}
                             size="large"
-                            sx={{ fontSize: '1rem', height: '20px' }}
+                            sx={{ 
+                              fontSize: '1rem', 
+                              height: '20px',
+                              '& .MuiChip-label': {
+                                color: 'white'
+                              }
+                            }}
                             color={createDuplicate ? "success" : "warning"}
                           />
                           <Chip
                             label={`Headers in Context: ${advancedOptions.includeHeaders ? 'Yes' : 'No'}`}
                             size="large"
-                            sx={{ fontSize: '1rem', height: '20px' }}
+                            sx={{ 
+                              fontSize: '1rem', 
+                              height: '20px',
+                              '& .MuiChip-label': {
+                                color: 'white'
+                              }
+                            }}
                           />
                         </Box>
                       </Box>
@@ -2723,7 +3177,18 @@ const SpreadsheetTools = () => {
               </Step>
               
               <Step>
-                <StepLabel>
+                <StepLabel onClick={() => handleStepClick(3)} 
+                  sx={{ 
+                    '&:hover': { 
+                      cursor: (selectedInputColumns.length > 0 && 
+                             outputColumns.some(col => col.name) && 
+                             !outputColumns.some(col => !col.description.trim())) ? 'pointer' : 'not-allowed' 
+                    },
+                    opacity: (selectedInputColumns.length > 0 && 
+                           outputColumns.some(col => col.name) && 
+                           !outputColumns.some(col => !col.description.trim())) ? 1 : 0.7
+                  }}
+                >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 3 ? 'primary.main' : 'inherit'}>
                       Review and Execute

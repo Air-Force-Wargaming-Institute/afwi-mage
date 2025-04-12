@@ -66,6 +66,9 @@ Thumbs.db
 *.docx
 *.txt
 *.gguf
+*.csv
+*.xlsx
+*.xls
 !requirements.txt
 !README.md
 
