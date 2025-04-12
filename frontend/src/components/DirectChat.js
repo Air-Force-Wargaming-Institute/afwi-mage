@@ -2396,7 +2396,6 @@ const DirectChat = () => {
   const [chatSessions, setChatSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [promptHelpOpen, setPromptHelpOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -2701,7 +2700,7 @@ const DirectChat = () => {
   };
 
   const toggleFullscreen = () => {
-    setIsFullscreen(prev => !prev);
+    dispatch({ type: ACTIONS.SET_FULLSCREEN, payload: !state.isFullscreen }); // Dispatch context action
   };
 
   const handleHelpOpen = () => {
@@ -2875,7 +2874,7 @@ const DirectChat = () => {
             </div>
           </div>
         </div>
-        <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
+        <Paper className={`${classes.chatArea} ${!currentSessionId ? 'disabled' : ''} ${state.isFullscreen ? classes.fullscreen : ''}`} elevation={3}>
           {!currentSessionId && (
             <div className={classes.noSessionsOverlay}>
               <Typography variant="h6" color="textSecondary">
@@ -2885,7 +2884,7 @@ const DirectChat = () => {
           )}
           <div className={classes.buttonBar}>
             <Typography className={classes.sessionName}>
-              {isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
+              {state.isFullscreen && chatSessions.find(session => session.id === currentSessionId)?.name}
             </Typography>
             
             {/* Removed Vectorstore Dropdown */}
@@ -2903,7 +2902,7 @@ const DirectChat = () => {
                 onClick={toggleFullscreen}
                 size="small"
               >
-                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                {state.isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
               </IconButton>
             </div>
           </div>

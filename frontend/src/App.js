@@ -50,9 +50,8 @@ const AuthenticatedRoutes = () => {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'auto',
-          position: 'relative',
-          zIndex: 2,
           pt: 10,
+          zIndex: 1001
         }}
       >
         <Switch>
@@ -143,7 +142,6 @@ function App() {
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           backgroundAttachment: 'fixed',
-                          overflow: 'hidden'
                         }}>
                           <AuthenticatedRoutes />
                         </Box>

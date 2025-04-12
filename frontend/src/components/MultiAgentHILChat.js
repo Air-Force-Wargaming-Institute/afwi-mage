@@ -1208,14 +1208,14 @@ const useStyles = makeStyles((theme) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1300,
+    zIndex: 2000, // Increased zIndex substantially to ensure it's above other elements
     width: '100vw',
     height: '100vh',
     maxHeight: '100vh',
     maxWidth: '100vw',
     borderRadius: 0,
     padding: theme.spacing(2),
-    backgroundColor: 'transparent',
+    backgroundColor: theme.palette.background.paper, // Use theme background color
   },
   fullscreenText: {
     color: theme.palette.text.secondary,
