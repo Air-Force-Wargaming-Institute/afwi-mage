@@ -2608,12 +2608,12 @@ const SpreadsheetTools = () => {
 
   // Main component render
   return (
-    <div style={{ width: '100%' }}>
-      <GradientText variant="h5" component="h1" gutterBottom className="section-title">
+    <div style={{ width: '100%', marginTop: '-10px' }}>
+      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
         Column Transformation Tool
       </GradientText>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
         Transform spreadsheet columns with AI assistance. Select input columns, specify output format, 
         and provide transformation instructions. The system will process the data and create new columns 
         based on your requirements.

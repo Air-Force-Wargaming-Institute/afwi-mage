@@ -147,7 +147,7 @@ const Sidebar = () => {
   return (
     <AnimatedSidebar elevation={3}>
       <Box sx={{ mb: 0, textAlign: 'center' }}>
-        <GradientText variant="h6" component="h2" fontWeight="600" className="section-title">
+        <GradientText variant="h5" component="h3" fontWeight="600" className="section-title">
           Analysis Tools
         </GradientText>
       </Box>

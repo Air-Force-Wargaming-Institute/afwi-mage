@@ -375,7 +375,7 @@ const WorkbenchDashboard = () => {
         display: 'flex', 
         flexDirection: 'column',
         overflowY: 'auto',
-        padding: '16px'
+        padding: '0 16px 16px 16px'
       }}>
         {/* Regular error notification */}
         {error && (

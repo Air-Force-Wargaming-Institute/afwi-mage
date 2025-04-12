@@ -95,10 +95,11 @@ const CodeEditor = ({ code, setCode, readOnly }) => {
         style: { 
           fontFamily: 'monospace', 
           fontSize: '0.9rem',
-          backgroundColor: '#121212',
+          backgroundColor: '#1A1A1A',
           color: '#f0f0f0',
           padding: '12px',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
         }
       }}
       variant="outlined"
@@ -107,10 +108,15 @@ const CodeEditor = ({ code, setCode, readOnly }) => {
           borderRadius: theme => theme.shape?.borderRadius || 10,
           '&:hover .MuiOutlinedInput-notchedOutline': {
             borderColor: 'primary.main',
+            borderWidth: '1px',
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: 'primary.main',
+            borderWidth: '2px',
           },
+          '& fieldset': {
+            borderColor: 'transparent',
+          }
         }
       }}
     />
@@ -282,12 +288,12 @@ const ChartBuilder = () => {
   };
 
   return (
-    <div>
-      <GradientText variant="h5" component="h1" gutterBottom className="section-title">
+    <div style={{ marginTop: '-10px' }}>
+      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
         Data Visualization
       </GradientText>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
         Create visualizations from Excel data using natural language requests.
       </Typography>
       
@@ -303,7 +309,14 @@ const ChartBuilder = () => {
             
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Data Source</InputLabel>
                   <Select
                     value={selectedFile}
@@ -312,13 +325,43 @@ const ChartBuilder = () => {
                     disabled={connectionError}
                     sx={{
                       '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'rgba(255, 255, 255, 0.23)'
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
                       },
                       '&:hover .MuiOutlinedInput-notchedOutline': {
                         borderColor: 'primary.main'
                       },
                       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                         borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
                       }
                     }}
                   >
@@ -348,17 +391,26 @@ const ChartBuilder = () => {
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: theme => theme.shape?.borderRadius || 10,
+                      backgroundColor: '#121212',
                       '&:hover .MuiOutlinedInput-notchedOutline': {
                         borderColor: 'primary.main',
+                        borderWidth: '1px',
                       },
                       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                         borderColor: 'primary.main',
+                        borderWidth: '2px',
                       },
+                      '& fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }
                     },
                     '& .MuiInputLabel-root': {
                       color: 'rgba(255, 255, 255, 0.7)',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      }
                     },
-                    '& .MuiOutlinedInput-input': {
+                    '& .MuiInputBase-input': {
                       color: 'white',
                     },
                   }}
@@ -366,7 +418,14 @@ const ChartBuilder = () => {
               </Grid>
               
               <Grid item xs={12}>
-                <FormControl fullWidth style={{ marginBottom: '16px' }}>
+                <FormControl fullWidth style={{ marginBottom: '16px' }} sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Chart Type</InputLabel>
                   <Select
                     value={selectedChartType}
@@ -382,6 +441,36 @@ const ChartBuilder = () => {
                       },
                       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                         borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
                       }
                     }}
                   >
@@ -411,7 +500,14 @@ const ChartBuilder = () => {
               {useSeaborn && (
                 <>
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Style</InputLabel>
                       <Select
                         value={selectedStyle}
@@ -427,6 +523,36 @@ const ChartBuilder = () => {
                           },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                             borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
                           }
                         }}
                       >
@@ -439,7 +565,14 @@ const ChartBuilder = () => {
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Color Palette</InputLabel>
                       <Select
                         value={selectedPalette}
@@ -455,6 +588,36 @@ const ChartBuilder = () => {
                           },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                             borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
                           }
                         }}
                       >
@@ -501,7 +664,18 @@ const ChartBuilder = () => {
         
         {/* Right panel - Output */}
         <Grid item xs={12} md={7}>
-          <AnimatedGradientPaper elevation={3} sx={{ p: 3, height: '100%' }}>
+          <GradientBorderPaper elevation={3} sx={{ 
+            p: 3, 
+            height: '100%',
+            borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
+            borderRadius: 2,
+            background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+            '&::before': {
+              background: '#121212',
+              borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+            }
+          }}>
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
@@ -512,10 +686,12 @@ const ChartBuilder = () => {
                   color: 'rgba(255, 255, 255, 0.7)',
                   '&.Mui-selected': {
                     color: 'primary.main',
-                  }
+                  },
+                  fontWeight: 500
                 },
                 '& .MuiTabs-indicator': {
                   backgroundColor: 'primary.main',
+                  height: '3px'
                 }
               }}
             >
@@ -600,7 +776,14 @@ const ChartBuilder = () => {
                 </Box>
                 
                 {/* Visualization Output */}
-                <SubtleGlowPaper sx={{ mt: 3, p: 0, overflow: 'hidden' }}>
+                <SubtleGlowPaper sx={{ 
+                  mt: 3, 
+                  p: 0, 
+                  overflow: 'hidden',
+                  backgroundColor: '#1A1A1A',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px'
+                }}>
                   {dataContext && dataContext.loading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
                       <CircularProgress size={40} />
@@ -624,7 +807,7 @@ const ChartBuilder = () => {
                 </SubtleGlowPaper>
               </Box>
             )}
-          </AnimatedGradientPaper>
+          </GradientBorderPaper>
         </Grid>
       </Grid>
     </div>

@@ -406,7 +406,8 @@ const SpreadsheetViewer = () => {
       flexDirection: 'column', 
       overflow: 'hidden',
       px: { xs: 2, sm: 3 },
-      width: '100%'
+      width: '100%',
+      mt: '-10px'
     }}>
       {/* Toast notifications */}
       <Toaster 
@@ -434,8 +435,8 @@ const SpreadsheetViewer = () => {
         }}
       />
       
-      <Box sx={{ mb: 3 }}>
-        <GradientText variant="h5" component="h1" gutterBottom className="section-title">
+      <Box sx={{ mb: 2 }}>
+        <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
           Upload/Manage Spreadsheets
         </GradientText>
       </Box>
