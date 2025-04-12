@@ -6,12 +6,62 @@
         "agents": [
             "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
             "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593",
-            "7094e92e-e1e6-420f-be8e-1c59929662bc"
+            "0c1437ac-305a-48e1-876a-f5b22a37f593"
         ],
         "color": "#FF0000",
         "created_at": "2025-03-13T16:04:27.991879Z",
-        "last_modified": "2025-04-02T16:39:34.735311Z",
+        "last_modified": "2025-04-12T06:09:34.342037Z",
+        "vectorstore": [
+            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+        ]
+    },
+    {
+        "name": "US Team",
+        "unique_id": "4208b6be-7b64-47bd-8b60-5f3be42e1c91",
+        "description": "china 4 team Synthesis Agent - Consolidates agent collaborations, reports, and research results for final output to the use",
+        "agents": [
+            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
+            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
+            "0c1437ac-305a-48e1-876a-f5b22a37f593",
+            "7094e92e-e1e6-420f-be8e-1c59929662bc"
+        ],
+        "color": "#0000FF",
+        "created_at": "2025-04-12T05:43:43.647995Z",
+        "last_modified": "2025-04-12T06:07:29.008049Z",
+        "vectorstore": [
+            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+        ]
+    },
+    {
+        "name": "NATO Team",
+        "unique_id": "499ee3b7-0fe6-40e0-a2f7-2d9b477de467",
+        "description": "NATO 4 team",
+        "agents": [
+            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
+            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
+            "0c1437ac-305a-48e1-876a-f5b22a37f593",
+            "7094e92e-e1e6-420f-be8e-1c59929662bc"
+        ],
+        "color": "#32CD32",
+        "created_at": "2025-04-12T05:43:56.294583Z",
+        "last_modified": "2025-04-12T06:41:18.017275Z",
+        "vectorstore": [
+            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+        ]
+    },
+    {
+        "name": "Analysis Team",
+        "unique_id": "d7ab9fce-6a2c-40e9-a2c4-078e6cbabbbe",
+        "description": "Analysis team",
+        "agents": [
+            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
+            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
+            "0c1437ac-305a-48e1-876a-f5b22a37f593",
+            "7094e92e-e1e6-420f-be8e-1c59929662bc"
+        ],
+        "color": "#808080",
+        "created_at": "2025-04-12T05:44:40.972402Z",
+        "last_modified": "2025-04-12T06:44:43.323425Z",
         "vectorstore": [
             "8430a1e2-4350-4ff3-8de2-4d9311f26677"
         ]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { 
   Button, 
@@ -21,15 +21,21 @@ import {
   CardHeader,
   IconButton,
   Tooltip,
-  Link
+  Link,
+  InputAdornment,
+  Checkbox
 } from '@material-ui/core';
 import MuiAlert from '@material-ui/lab/Alert';
 import { makeStyles } from '@material-ui/core/styles';
 import DeleteIcon from '@material-ui/icons/Delete';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
+import SearchIcon from '@material-ui/icons/Search';
+import SortIcon from '@material-ui/icons/Sort';
+import FilterListIcon from '@material-ui/icons/FilterList';
 import robotIcon from '../../assets/robot-icon.png'; // Import the robot icon
 import { getApiUrl } from '../../config';
+import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -77,7 +83,9 @@ const useStyles = makeStyles((theme) => ({
   },
   agentName: {
     fontWeight: 'bold',
-    fontSize: '0.8rem', // Change from 0.9rem to 0.8rem
+    fontSize: '1.2rem', // Increased font size
+    color: 'white', // Set color for better clarity/brightness
+    textDecoration: 'underline',
   },
   cardContent: {
     flexGrow: 1,
@@ -184,13 +192,39 @@ const useStyles = makeStyles((theme) => ({
     paddingTop: theme.spacing(2),
   },
   agentDescription: {
-    fontSize: '0.5rem', // Change from 0.4rem to 0.5rem
+    fontSize: '0.75rem', // Change from 0.5rem to 0.75rem
   },
   characterCount: {
     fontSize: '0.75rem',
     color: theme.palette.text.secondary,
     textAlign: 'right',
     marginTop: theme.spacing(0.5),
+  },
+  controlsContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing(2),
+    gap: theme.spacing(2),
+    flexWrap: 'wrap',
+  },
+  searchField: {
+    flexGrow: 1,
+    minWidth: '200px',
+  },
+  formControl: {
+    minWidth: 150,
+  },
+  colorFilterItem: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  colorFilterSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    marginRight: theme.spacing(1),
+    border: '1px solid #ccc',
   },
 }));
 
@@ -287,6 +321,11 @@ function AgentPortfolio() {
   const [formErrors, setFormErrors] = useState({});
   const [editFormErrors, setEditFormErrors] = useState({});
   const [availableModels, setAvailableModels] = useState([]);
+
+  // --- State for Search, Filter, Sort ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterColors, setFilterColors] = useState([]);
+  const [sortOrder, setSortOrder] = useState('created_desc');
 
   useEffect(() => {
     fetchAgents();
@@ -638,84 +677,252 @@ function AgentPortfolio() {
     </IconButton>
   );
 
+  // --- Handlers for Search, Filter, Sort ---
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  const handleFilterColorsChange = (event) => {
+    const { value } = event.target;
+    // On autofill we get a stringified value. Ensure it's always an array.
+    const selectedColors = typeof value === 'string' ? value.split(',') : value;
+    setFilterColors(selectedColors);
+  };
+
+  const handleSortOrderChange = (event) => {
+    setSortOrder(event.target.value);
+  };
+
+  // --- Memoized calculation for displayed agents ---
+  const displayedAgents = useMemo(() => {
+    let filteredAgents = [...agents];
+
+    // 1. Search Filter
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      filteredAgents = filteredAgents.filter(agent =>
+        (agent.name && agent.name.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (agent.description && agent.description.toLowerCase().includes(lowerCaseSearchTerm)) 
+      );
+    }
+
+    // 2. Color Filter (multi-select)
+    if (filterColors.length > 0) { // Check if the array has selected colors
+        filteredAgents = filteredAgents.filter(agent => agent.color && filterColors.includes(agent.color)); // Check for inclusion and ensure agent.color exists
+    }
+
+    // 3. Sorting
+    // Ensure dates are valid Date objects for comparison
+    filteredAgents.sort((a, b) => {
+        const dateA_created = a.createdAt ? new Date(a.createdAt) : new Date(0);
+        const dateB_created = b.createdAt ? new Date(b.createdAt) : new Date(0);
+        const dateA_modified = a.modifiedAt ? new Date(a.modifiedAt) : dateA_created;
+        const dateB_modified = b.modifiedAt ? new Date(b.modifiedAt) : dateB_created;
+
+      switch (sortOrder) {
+        case 'name_asc':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'name_desc':
+          return (b.name || '').localeCompare(a.name || '');
+        case 'created_asc':
+          return (isNaN(dateA_created) || isNaN(dateB_created)) ? 0 : dateA_created - dateB_created;
+        case 'created_desc':
+           return (isNaN(dateA_created) || isNaN(dateB_created)) ? 0 : dateB_created - dateA_created;
+        case 'modified_asc':
+           return (isNaN(dateA_modified) || isNaN(dateB_modified)) ? 0 : dateA_modified - dateB_modified;
+        case 'modified_desc':
+            return (isNaN(dateA_modified) || isNaN(dateB_modified)) ? 0 : dateB_modified - dateA_modified;
+        default:
+          // Fallback to created_desc
+           return (isNaN(dateA_created) || isNaN(dateB_created)) ? 0 : dateB_created - dateA_created;
+      }
+    });
+
+    return filteredAgents;
+  }, [agents, searchTerm, filterColors, sortOrder]);
+  
+  // --- Get unique colors present in the current agents list for filter dropdown ---
+  const uniqueAgentColors = useMemo(() => {
+    const colors = new Set(agents.map(agent => agent.color).filter(color => !!color));
+    return Array.from(colors).sort(); 
+  }, [agents]);
+
   return (
     <div className={classes.root}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h4">
-          Agent Portfolio
-        </Typography>
+        <GradientText component="div">
+          <Typography variant="h2">
+            Agent Portfolio
+          </Typography>
+        </GradientText>
         <Button 
           variant="contained" 
           color="primary" 
           onClick={handleOpen} 
-          className={classes.createButton}
         >
           Create New Agent
         </Button>
       </Box>
 
-      <Grid container spacing={2}> {/* Reduce spacing */}
-        {agents.map((agent, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}> {/* Change md to 3 for 4 cards per row */}
-            <Card 
-              className={classes.card} 
-              style={{ borderColor: agent.color }}
-              onClick={(event) => handleTileClick(agent, event)}
-            >
-              <CardHeader
-                className={classes.cardHeader}
-                avatar={
-                  <div className={classes.colorSquare} style={{ backgroundColor: agent.color }}>
-                    <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                  </div>
+      {/* --- Search, Filter, Sort Controls --- */}
+      <Box className={classes.controlsContainer}>
+         <TextField
+          label="Search Agents"
+          variant="outlined"
+          size="small"
+          className={classes.searchField}
+          value={searchTerm}
+          onChange={handleSearchChange}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}> 
+          <FormControl variant="outlined" size="small" className={classes.formControl}>
+            <InputLabel id="filter-color-label">Filter by Color</InputLabel>
+            <Select
+              labelId="filter-color-label"
+              multiple
+              value={filterColors}
+              onChange={handleFilterColorsChange}
+              label="Filter by Color"
+              renderValue={(selected) => {
+                if (selected.length === 0) {
+                  return <em>All Colors</em>;
                 }
-                title={<Typography className={classes.agentName}>{agent.name}</Typography>}
-              />
-              <CardContent className={classes.cardContent}>
-                <Typography 
-                  variant="body2" 
-                  color="textSecondary" 
-                  component="p"
-                  className={classes.agentDescription} // Add this line
-                >
-                  {agent.description}
-                </Typography>
-              </CardContent>
-              <CardActions className={classes.cardActions}>
-                <div className={classes.dateInfo}>
-                  Created: {formatDate(agent.createdAt)}<br />
-                  Modified: {formatDate(agent.modifiedAt)}
-                </div>
-                <div className={`${classes.actionButtons} action-buttons`}>
-                  <Tooltip title="Duplicate Agent">
-                    <IconButton 
-                      aria-label="duplicate" 
-                      className={`${classes.duplicateIcon} ${classes.actionIcon}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDuplicateClick(agent);
-                      }}
-                    >
-                      <FileCopyIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete Agent">
-                    <IconButton 
-                      aria-label="delete" 
-                      className={`${classes.deleteIcon} ${classes.actionIcon}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(agent);
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </div>
-              </CardActions>
-            </Card>
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Box 
+                        key={value} 
+                        className={classes.colorFilterSwatch} 
+                        style={{ backgroundColor: value, margin: '1px'}} 
+                       />
+                    ))}
+                  </Box>
+                );
+              }}
+              MenuProps={{
+                variant: "menu", 
+                getContentAnchorEl: null
+              }}
+            >
+              {uniqueAgentColors.map((color) => (
+                <MenuItem key={color} value={color} className={classes.colorFilterItem}>
+                   <Checkbox checked={filterColors.indexOf(color) > -1} size="small" />
+                   <Box className={classes.colorFilterSwatch} style={{ backgroundColor: color }} />
+                   {color}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {filterColors.length > 0 && (
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => setFilterColors([])}
+              sx={{ 
+                padding: '4px 8px',
+                minWidth: 'auto',
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </Box>
+        <FormControl variant="outlined" size="small" className={classes.formControl}>
+          <InputLabel id="sort-order-label">Sort By</InputLabel>
+          <Select
+            labelId="sort-order-label"
+            value={sortOrder}
+            onChange={handleSortOrderChange}
+            label="Sort By"
+          >
+            <MenuItem value="created_desc">Date Created (Newest)</MenuItem>
+            <MenuItem value="created_asc">Date Created (Oldest)</MenuItem>
+            <MenuItem value="modified_desc">Date Modified (Newest)</MenuItem>
+            <MenuItem value="modified_asc">Date Modified (Oldest)</MenuItem>
+            <MenuItem value="name_asc">Name (A-Z)</MenuItem>
+            <MenuItem value="name_desc">Name (Z-A)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      <Grid container spacing={2}> 
+         {/* --- Map over displayedAgents instead of agents --- */}
+        {displayedAgents.length === 0 ? (
+          <Grid item xs={12}>
+             <Typography variant="subtitle1" align="center" color="textSecondary">
+                No agents found matching your criteria.
+             </Typography>
           </Grid>
-        ))}
+        ) : (
+          displayedAgents.map((agent, index) => (
+            <Grid item xs={12} sm={6} md={3} key={agent.unique_id}> {/* Use unique_id for key */}
+              <Card 
+                className={classes.card} 
+                style={{ borderColor: agent.color }}
+                onClick={(event) => handleTileClick(agent, event)}
+              >
+                <CardHeader
+                  className={classes.cardHeader}
+                  avatar={
+                    <div className={classes.colorSquare} style={{ backgroundColor: agent.color }}>
+                      <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                    </div>
+                  }
+                  title={<Typography className={classes.agentName}>{agent.name}</Typography>}
+                />
+                <CardContent className={classes.cardContent}>
+                  <Typography 
+                    variant="body2" 
+                    color="textSecondary" 
+                    component="p"
+                    className={classes.agentDescription}
+                  >
+                    {agent.description}
+                  </Typography>
+                </CardContent>
+                <CardActions className={classes.cardActions}>
+                  <div className={classes.dateInfo}>
+                    Created: {formatDate(agent.createdAt)}<br />
+                    Modified: {formatDate(agent.modifiedAt)}
+                  </div>
+                  <div className={`${classes.actionButtons} action-buttons`}>
+                    <Tooltip title="Duplicate Agent">
+                      <IconButton 
+                        aria-label="duplicate" 
+                        className={`${classes.duplicateIcon} ${classes.actionIcon}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateClick(agent);
+                        }}
+                      >
+                        <FileCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Agent">
+                      <IconButton 
+                        aria-label="delete" 
+                        className={`${classes.deleteIcon} ${classes.actionIcon}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(agent);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))
+        )}
       </Grid>
 
       <Dialog 
@@ -839,8 +1046,8 @@ function AgentPortfolio() {
         open={detailsOpen} 
         onClose={handleCloseDetails} 
         aria-labelledby="agent-details-title"
-        maxWidth="md" // Changed from default to 'md' for a wider dialog
-        fullWidth // This ensures the dialog takes the full width specified by maxWidth
+        maxWidth="md"
+        fullWidth
       >
         <DialogTitle id="agent-details-title" className={classes.dialogTitle}>
           <Typography variant="h6">
