@@ -49,6 +49,7 @@
     "rehype-sanitize": "^5.0.1",
     "remark-gfm": "^3.0.1",
     "remark-math": "^5.1.1",
+    "wavesurfer.js": "^6.6.4",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
   },

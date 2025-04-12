@@ -14,12 +14,14 @@ import BuildRetrievalDatabases from './components/BuildRetrievalDatabases';
 import ManageVectorStores from './components/vectorstore/ManageVectorStores';
 import LibrarianAgents from './components/LibrarianAgents';
 import DocumentLibrary from './components/DocumentLibrary';
+import RecordTranscribeStandalone from './components/transcription/RecordTranscribe';
 import UserGuide from './components/UserGuide';
 import { ExtractionProvider } from './contexts/ExtractionContext';
 import { GenerationProvider } from './contexts/GenerationContext';
 import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { HILChatProvider } from './contexts/HILChatContext';
+import { TranscriptionProvider } from './contexts/TranscriptionContext';
 import DirectChat from './components/DirectChat';
 import { DirectChatProvider } from './contexts/DirectChatContext';
 import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
@@ -38,11 +40,13 @@ import Login from './components/Login';
 const AuthenticatedRoutes = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  const isStandaloneTranscriber = location.pathname === '/record-transcribe-standalone'; // Check for standalone route
   const { user } = useContext(AuthContext) || { user: null };
   
   return (
     <>
-      {!isLoginPage && <HeaderStyled />}
+      {/* Only show header if not login page and not standalone transcriber */}
+      {!isLoginPage && !isStandaloneTranscriber && <HeaderStyled />}
       <Box 
         component="main" 
         sx={{
@@ -50,7 +54,7 @@ const AuthenticatedRoutes = () => {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'auto',
-          pt: 10,
+          pt: isStandaloneTranscriber ? 0 : 10, // No padding-top for standalone
           zIndex: 1001
         }}
       >
@@ -58,6 +62,10 @@ const AuthenticatedRoutes = () => {
           <Route exact path="/login">
             <Redirect to="/home" />
           </Route>
+          {/* Define the standalone route outside the main layout structure */}
+          {/* We'll handle it separately in the main App component structure */}
+          
+          {/* Routes inside the main layout */}
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
@@ -98,22 +106,24 @@ const AuthenticatedRoutes = () => {
           <Redirect to="/home" />
         </Switch>
       </Box>
-      {/* AFWI MAGE Coin Logo */}
-      <Box
-        component="img"
-        src={AFWIMageCoin}
-        alt="AFWI MAGE Coin"
-        sx={{
-          position: 'fixed',
-          bottom: 40,
-          left: 40,
-          width: 300,
-          height: 'auto',
-          zIndex: 1,
-          opacity: 0.9,
-          pointerEvents: 'none'
-        }}
-      />
+      {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber */}
+      {!isStandaloneTranscriber && (
+        <Box
+          component="img"
+          src={AFWIMageCoin}
+          alt="AFWI MAGE Coin"
+          sx={{
+            position: 'fixed',
+            bottom: 40,
+            left: 40,
+            width: 300,
+            height: 'auto',
+            zIndex: 1,
+            opacity: 0.9,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
     </>
   );
 };
@@ -131,21 +141,39 @@ function App() {
                 <HILChatProvider>
                   <AuthProvider>
                     <WorkbenchProvider>
-                      <Router>
-                        <CssBaseline />
-                        <Box sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          minHeight: '100vh',
-                          backgroundColor: theme.palette.background.default,
-                          backgroundImage: `url(${backgroundImage})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          backgroundAttachment: 'fixed',
-                        }}>
-                          <AuthenticatedRoutes />
-                        </Box>
-                      </Router>
+                      <TranscriptionProvider>
+                        <Router>
+                          <CssBaseline />
+                          {/* Use Switch at the top level to handle the standalone route */}
+                          <Switch>
+                            {/* Standalone Route - renders ONLY the component with necessary providers */}
+                            <Route path="/record-transcribe-standalone">
+                              <Box sx={{
+                                minHeight: '100vh', // Ensure it takes full height
+                                backgroundColor: theme.palette.background.default, // Apply theme background
+                              }}>
+                                <RecordTranscribeStandalone />
+                              </Box>
+                            </Route>
+
+                            {/* All other routes go through the standard authenticated layout */}
+                            <Route path="/">
+                              <Box sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                minHeight: '100vh',
+                                backgroundColor: theme.palette.background.default,
+                                backgroundImage: `url(${backgroundImage})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                backgroundAttachment: 'fixed',
+                              }}>
+                                <AuthenticatedRoutes />
+                              </Box>
+                            </Route>
+                          </Switch>
+                        </Router>
+                      </TranscriptionProvider>
                     </WorkbenchProvider>
                   </AuthProvider>
                 </HILChatProvider>

@@ -43,6 +43,7 @@ import {
   ArrowBack as ArrowBackIcon,
   DragIndicator as DragIcon,
   Reply as MoveUpIcon,
+  Mic as MicIcon,
 } from '@material-ui/icons';
 import FilePreview from './FilePreview';
 import axios from 'axios';
@@ -1124,6 +1125,30 @@ function DocumentLibrary() {
                 <Typography variant="body2" sx={{ mt: 1.5 }}>
                   or drag and drop m4a, mp3, webm, mp4, mpga, wav, mpeg audio files here
                 </Typography>
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <Button 
+                  variant="contained" 
+                  color="secondary" 
+                  onClick={() => {
+                    // Open the standalone window directly
+                    const url = '/record-transcribe-standalone'; // Use the new dedicated route
+                    const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+                    const recordTranscribeWindow = window.open(url, 'RecordTranscribeWindow', windowFeatures);
+                    
+                    if (recordTranscribeWindow) {
+                      recordTranscribeWindow.document.title = 'MAGE - Record & Transcribe Live';
+                    } else {
+                      console.error('Failed to open the Record & Transcribe window. Please check your browser pop-up settings.');
+                      // Optionally show an error message to the user
+                      setError('Failed to open pop-up window. Please allow pop-ups for this site.');
+                    }
+                  }}
+                  startIcon={<MicIcon />}
+                >
+                  Record & Transcribe Live
+                </Button>
               </Box>
             </GradientBorderPaper>
 
