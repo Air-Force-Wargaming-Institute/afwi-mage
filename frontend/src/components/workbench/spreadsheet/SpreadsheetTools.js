@@ -788,7 +788,7 @@ const SpreadsheetTools = () => {
               elevation={2} 
               sx={{ 
                 p: 2,
-                bgcolor: 'rgba(33, 150, 243, 0.04)', 
+                bgcolor: 'rgba(33, 150, 243, 0.08)', 
                 borderColor: 'primary.light'
               }}
             >
@@ -815,8 +815,7 @@ const SpreadsheetTools = () => {
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: theme => theme.shape?.borderRadius || 10,
-                    backgroundColor: 'transparent',
-                    color: 'white',
+                    backgroundColor: '#121212',
                     '&:hover .MuiOutlinedInput-notchedOutline': {
                       borderColor: 'primary.main',
                       borderWidth: '1px',
@@ -826,11 +825,12 @@ const SpreadsheetTools = () => {
                       borderWidth: '2px',
                     },
                     '& .MuiSelect-icon': {
-                      color: 'primary.main',
+                      color: 'white',
                     },
                     '& fieldset': {
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                    }
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
                   },
                   '& .MuiInputLabel-root': {
                     color: 'rgba(255, 255, 255, 0.7)',
@@ -843,6 +843,7 @@ const SpreadsheetTools = () => {
                   },
                   '& .MuiSelect-select': {
                     color: 'white',
+                    backgroundColor: '#121212',
                   }
                 }}
               >
@@ -864,7 +865,8 @@ const SpreadsheetTools = () => {
                               undefined,
                             borderRadius: theme => theme.shape?.borderRadius/2 || 5,
                             '& .MuiChip-label': {
-                              color: 'text.primary',
+                              color: 'white',
+                              fontWeight: 500,
                             }
                           }}
                         />
@@ -978,7 +980,7 @@ const SpreadsheetTools = () => {
               elevation={2} 
               sx={{ 
                 p: 2,
-                bgcolor: 'rgba(76, 175, 80, 0.04)', 
+                bgcolor: 'rgba(76, 175, 80, 0.08)', 
                 borderColor: 'success.light',
                 overflow: 'visible'
               }}
@@ -1005,11 +1007,12 @@ const SpreadsheetTools = () => {
                   key={index} 
                   mb={2} 
                   p={2} 
-                  border="1px solid #e0e0e0" 
+                  border="1px solid"
+                  borderColor="rgba(255, 255, 255, 0.15)" 
                   borderRadius="4px"
                   position="relative"
-                  bgcolor="white"
-                  boxShadow="0 1px 3px rgba(0,0,0,0.05)"
+                  bgcolor="#1E1E1E"
+                  boxShadow="0 4px 8px rgba(0, 0, 0, 0.25)"
                   style={{ overflow: 'visible' }}
                 >
                   <Grid container spacing={2}>
@@ -1020,7 +1023,7 @@ const SpreadsheetTools = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             borderRadius: theme => theme.shape?.borderRadius || 10,
-                            backgroundColor: 'transparent',
+                            backgroundColor: '#121212',
                             color: 'white',
                             '&:hover .MuiOutlinedInput-notchedOutline': {
                               borderColor: 'primary.main',
@@ -1031,7 +1034,7 @@ const SpreadsheetTools = () => {
                               borderWidth: '2px',
                             },
                             '& .MuiSelect-icon': {
-                              color: 'primary.main',
+                              color: 'white',
                             },
                             '& fieldset': {
                               borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -1048,6 +1051,7 @@ const SpreadsheetTools = () => {
                           },
                           '& .MuiSelect-select': {
                             color: 'white',
+                            backgroundColor: '#121212',
                           }
                         }}
                       >
@@ -1059,7 +1063,7 @@ const SpreadsheetTools = () => {
                           MenuProps={{
                             PaperProps: {
                               sx: {
-                                bgcolor: 'background.default',
+                                bgcolor: '#121212',
                                 color: 'white',
                                 borderRadius: theme => theme.shape?.borderRadius || 10,
                                 boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
@@ -1067,8 +1071,9 @@ const SpreadsheetTools = () => {
                                 borderColor: 'rgba(255, 255, 255, 0.15)',
                                 '& .MuiMenuItem-root': {
                                   color: 'white',
+                                  backgroundColor: '#121212',
                                   '&:hover': {
-                                    bgcolor: 'action.hover',
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)',
                                   },
                                   '&.Mui-selected': {
                                     bgcolor: 'primary.main',
@@ -1079,6 +1084,7 @@ const SpreadsheetTools = () => {
                                   },
                                   '&.Mui-disabled': {
                                     color: 'rgba(255, 255, 255, 0.38)',
+                                    backgroundColor: '#121212',
                                   }
                                 },
                                 '& .MuiListSubheader-root': {
@@ -1113,8 +1119,7 @@ const SpreadsheetTools = () => {
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: theme => theme.shape?.borderRadius || 10,
-                              backgroundColor: 'transparent',
-                              color: 'white',
+                              backgroundColor: '#121212',
                               '&:hover .MuiOutlinedInput-notchedOutline': {
                                 borderColor: 'primary.main',
                                 borderWidth: '1px',
@@ -1135,6 +1140,10 @@ const SpreadsheetTools = () => {
                             },
                             '& .MuiInputBase-input': {
                               color: 'white',
+                            },
+                            '& .MuiFormHelperText-root': {
+                              color: 'rgba(255, 255, 255, 0.5)',
+                              marginLeft: 0
                             }
                           }}
                         />
@@ -1145,7 +1154,7 @@ const SpreadsheetTools = () => {
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: theme => theme.shape?.borderRadius || 10,
-                              backgroundColor: 'transparent',
+                              backgroundColor: '#121212',
                               color: 'white',
                               '&:hover .MuiOutlinedInput-notchedOutline': {
                                 borderColor: 'primary.main',
@@ -1156,11 +1165,12 @@ const SpreadsheetTools = () => {
                                 borderWidth: '2px',
                               },
                               '& .MuiSelect-icon': {
-                                color: 'primary.main',
+                                color: 'white',
                               },
                               '& fieldset': {
-                                borderColor: 'rgba(255, 255, 255, 0.3)',
-                              }
+                                borderColor: 'divider',
+                              },
+                              color: 'white'
                             },
                             '& .MuiInputLabel-root': {
                               color: 'rgba(255, 255, 255, 0.7)',
@@ -1170,6 +1180,10 @@ const SpreadsheetTools = () => {
                             },
                             '& .MuiInputBase-input': {
                               color: 'white',
+                            },
+                            '& .MuiSelect-select': {
+                              color: 'white',
+                              backgroundColor: '#121212',
                             }
                           }}
                         >
@@ -1182,7 +1196,7 @@ const SpreadsheetTools = () => {
                             MenuProps={{
                               PaperProps: {
                                 sx: {
-                                  bgcolor: 'background.default',
+                                  bgcolor: '#121212',
                                   color: 'white',
                                   borderRadius: theme => theme.shape?.borderRadius || 10,
                                   boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
@@ -1190,8 +1204,9 @@ const SpreadsheetTools = () => {
                                   borderColor: 'rgba(255, 255, 255, 0.15)',
                                   '& .MuiMenuItem-root': {
                                     color: 'white',
+                                    backgroundColor: '#121212',
                                     '&:hover': {
-                                      bgcolor: 'action.hover',
+                                      bgcolor: 'rgba(66, 133, 244, 0.1)',
                                     },
                                     '&.Mui-selected': {
                                       bgcolor: 'primary.main',
@@ -1202,6 +1217,7 @@ const SpreadsheetTools = () => {
                                     },
                                     '&.Mui-disabled': {
                                       color: 'rgba(255, 255, 255, 0.38)',
+                                      backgroundColor: '#121212',
                                     }
                                   },
                                   '& .MuiListSubheader-root': {
@@ -1240,7 +1256,7 @@ const SpreadsheetTools = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             borderRadius: theme => theme.shape?.borderRadius || 10,
-                            backgroundColor: 'transparent',
+                            backgroundColor: '#121212',
                             color: 'white',
                             '&:hover .MuiOutlinedInput-notchedOutline': {
                               borderColor: 'primary.main',
@@ -1251,11 +1267,12 @@ const SpreadsheetTools = () => {
                               borderWidth: '2px',
                             },
                             '& .MuiSelect-icon': {
-                              color: 'primary.main',
+                              color: 'white',
                             },
                             '& fieldset': {
-                              borderColor: 'rgba(255, 255, 255, 0.3)',
-                            }
+                              borderColor: 'divider',
+                            },
+                            color: 'white'
                           },
                           '& .MuiInputLabel-root': {
                             color: 'rgba(255, 255, 255, 0.7)',
@@ -1268,6 +1285,7 @@ const SpreadsheetTools = () => {
                           },
                           '& .MuiSelect-select': {
                             color: 'white',
+                            backgroundColor: '#121212',
                           }
                         }}
                       >
@@ -1279,7 +1297,7 @@ const SpreadsheetTools = () => {
                           MenuProps={{
                             PaperProps: {
                               sx: {
-                                bgcolor: 'background.default',
+                                bgcolor: '#121212',
                                 color: 'white',
                                 borderRadius: theme => theme.shape?.borderRadius || 10,
                                 boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
@@ -1287,8 +1305,9 @@ const SpreadsheetTools = () => {
                                 borderColor: 'rgba(255, 255, 255, 0.15)',
                                 '& .MuiMenuItem-root': {
                                   color: 'white',
+                                  backgroundColor: '#121212',
                                   '&:hover': {
-                                    bgcolor: 'action.hover',
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)',
                                   },
                                   '&.Mui-selected': {
                                     bgcolor: 'primary.main',
@@ -1299,6 +1318,7 @@ const SpreadsheetTools = () => {
                                   },
                                   '&.Mui-disabled': {
                                     color: 'rgba(255, 255, 255, 0.38)',
+                                    backgroundColor: '#121212',
                                   }
                                 },
                                 '& .MuiListSubheader-root': {
@@ -1328,11 +1348,19 @@ const SpreadsheetTools = () => {
                         placeholder="Instructions for how to transform the input columns into this output column"
                         required
                         helperText="Be specific about the format, calculations, or transformations to apply"
+                        InputLabelProps={{
+                          style: { color: 'rgba(255, 255, 255, 0.7)' }
+                        }}
+                        InputProps={{
+                          style: { color: 'white' }
+                        }}
+                        FormHelperTextProps={{
+                          style: { color: 'rgba(255, 255, 255, 0.5)' }
+                        }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             borderRadius: theme => theme.shape?.borderRadius || 10,
-                            backgroundColor: 'transparent',
-                            color: 'white',
+                            backgroundColor: '#121212',
                             '&:hover .MuiOutlinedInput-notchedOutline': {
                               borderColor: 'primary.main',
                               borderWidth: '1px',
@@ -1355,7 +1383,7 @@ const SpreadsheetTools = () => {
                             color: 'white',
                           },
                           '& .MuiFormHelperText-root': {
-                            color: 'text.secondary',
+                            color: 'rgba(255, 255, 255, 0.5)',
                             marginLeft: 0
                           }
                         }}
@@ -1389,7 +1417,7 @@ const SpreadsheetTools = () => {
               elevation={2} 
               sx={{ 
                 p: 2,
-                bgcolor: 'rgba(255, 152, 0, 0.04)', 
+                bgcolor: 'rgba(255, 152, 0, 0.08)', 
                 borderColor: 'warning.light'
               }}
             >
@@ -1411,11 +1439,13 @@ const SpreadsheetTools = () => {
               </Typography>
             
               <Box sx={{ 
-                bgcolor: 'white', 
+                bgcolor: '#121212', 
                 p: 3, 
                 border: '1px solid', 
-                borderColor: 'grey.200',
-                borderRadius: '8px'
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                color: 'white',
+                boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
               }}>
                 <Grid container spacing={3}>
                   <Grid item xs={12}>
@@ -1428,8 +1458,12 @@ const SpreadsheetTools = () => {
                         />
                       }
                       label="Create duplicate spreadsheet (recommended)"
+                      sx={{ 
+                        color: 'white',
+                        '& .MuiFormControlLabel-label': { color: 'white' }
+                      }}
                     />
-                    <Typography variant="caption" display="block" color="textSecondary" style={{ marginLeft: '30px' }}>
+                    <Typography variant="caption" display="block" color="rgba(255, 255, 255, 0.7)" sx={{ marginLeft: '30px' }}>
                       When enabled, transforms will be applied to a copy of the original spreadsheet. 
                       This preserves your original data.
                     </Typography>
@@ -1445,8 +1479,12 @@ const SpreadsheetTools = () => {
                         />
                       }
                       label="Include column headers in context"
+                      sx={{ 
+                        color: 'white',
+                        '& .MuiFormControlLabel-label': { color: 'white' }
+                      }}
                     />
-                    <Typography variant="caption" display="block" color="textSecondary" style={{ marginLeft: '30px' }}>
+                    <Typography variant="caption" display="block" color="rgba(255, 255, 255, 0.7)" sx={{ marginLeft: '30px' }}>
                       Provides column names to the AI to improve understanding of data meaning.
                     </Typography>
                   </Grid>
@@ -1458,7 +1496,8 @@ const SpreadsheetTools = () => {
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: theme => theme.shape?.borderRadius || 10,
-                          backgroundColor: 'background.paper',
+                          backgroundColor: '#121212',
+                          color: 'text.primary',
                           '&:hover .MuiOutlinedInput-notchedOutline': {
                             borderColor: 'primary.main',
                             borderWidth: '1px',
@@ -1468,21 +1507,25 @@ const SpreadsheetTools = () => {
                             borderWidth: '2px',
                           },
                           '& .MuiSelect-icon': {
-                            color: 'primary.main',
+                            color: 'white',
                           },
                           '& fieldset': {
                             borderColor: 'divider',
-                          }
+                          },
+                          color: 'white'
                         },
                         '& .MuiInputLabel-root': {
-                          color: 'text.secondary',
+                          color: 'rgba(255, 255, 255, 0.7) !important',
                           '&.Mui-focused': {
-                            color: 'primary.main',
+                            color: 'primary.main !important',
                           }
                         },
-                        '& .MuiFormHelperText-root': {
-                          color: 'text.secondary',
-                          marginLeft: 0
+                        '& .MuiInputBase-input': {
+                          color: 'text.primary',
+                        },
+                        '& .MuiSelect-select': {
+                          color: 'text.primary',
+                          backgroundColor: '#121212',
                         }
                       }}
                     >
@@ -1491,15 +1534,28 @@ const SpreadsheetTools = () => {
                         value={advancedOptions.errorHandling}
                         onChange={(e) => handleAdvancedOptionChange('errorHandling', e.target.value)}
                         label="Error Handling"
+                        sx={{
+                          color: 'white',
+                          '& .MuiSelect-select': {
+                            color: 'white !important'
+                          },
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                          }
+                        }}
                         MenuProps={{
                           PaperProps: {
                             sx: {
-                              bgcolor: 'background.paper',
+                              bgcolor: '#121212',
+                              color: 'white',
                               borderRadius: theme => theme.shape?.borderRadius || 10,
                               boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
                               '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
                                 '&:hover': {
-                                  bgcolor: 'action.hover',
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
                                 },
                                 '&.Mui-selected': {
                                   bgcolor: 'primary.main',
@@ -1517,7 +1573,7 @@ const SpreadsheetTools = () => {
                         <MenuItem value="stop">Stop on Error</MenuItem>
                         <MenuItem value="retry">Retry on Error (up to 3 times)</MenuItem>
                       </Select>
-                      <FormHelperText>
+                      <FormHelperText sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                         Determines how to handle errors encountered during processing.
                       </FormHelperText>
                     </FormControl>
@@ -1565,17 +1621,26 @@ const SpreadsheetTools = () => {
                     Input Columns
                   </Typography>
                   <List dense sx={{ 
-                    bgcolor: 'white', 
+                    bgcolor: 'background.paper', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
+                    borderColor: 'divider',
                     overflow: 'hidden',
                     '& .MuiListItem-root': {
                       borderBottom: '1px solid',
-                      borderColor: 'grey.100',
+                      borderColor: 'divider',
                       '&:last-child': {
                         borderBottom: 'none'
+                      },
+                      '&:hover': {
+                        bgcolor: 'action.hover'
                       }
+                    },
+                    '& .MuiTypography-root': {
+                      color: 'text.primary'
+                    },
+                    '& .MuiTypography-caption': {
+                      color: 'text.secondary'
                     }
                   }}>
                     {selectedInputColumns.map((column) => {
@@ -1629,7 +1694,7 @@ const SpreadsheetTools = () => {
                   elevation={0} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(76, 175, 80, 0.04)', 
+                    bgcolor: 'rgba(76, 175, 80, 0.08)', 
                     border: '1px solid',
                     borderColor: 'success.light',
                     borderRadius: 2,
@@ -1734,7 +1799,7 @@ const SpreadsheetTools = () => {
                   elevation={0} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 152, 0, 0.04)', 
+                    bgcolor: 'rgba(255, 152, 0, 0.08)', 
                     border: '1px solid',
                     borderColor: 'warning.light',
                     borderRadius: 2,
@@ -1967,11 +2032,19 @@ const SpreadsheetTools = () => {
                       }
                     },
                     '& .MuiTableRow-root:nth-of-type(even)': {
-                      bgcolor: 'rgba(33, 150, 243, 0.04)'
+                      bgcolor: 'background.lighter'
+                    },
+                    '& .MuiTableRow-root:nth-of-type(odd)': {
+                      bgcolor: 'background.paper'
                     },
                     '& .MuiTableRow-root:hover': {
-                      bgcolor: 'rgba(33, 150, 243, 0.08)',
+                      bgcolor: 'action.hover',
                       transition: theme => theme.custom?.transition || 'all 0.3s ease'
+                    },
+                    '& .MuiTableCell-root': {
+                      color: 'text.primary',
+                      borderBottom: '1px solid',
+                      borderColor: 'divider'
                     }
                   }}
                 >
@@ -2192,9 +2265,9 @@ const SpreadsheetTools = () => {
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: theme => theme.shape?.borderRadius || 10,
-                  backgroundColor: 'transparent',
+                  backgroundColor: '#121212',
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'primary.main',
                     borderWidth: '1px',
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -2205,7 +2278,7 @@ const SpreadsheetTools = () => {
                     color: 'white',
                   },
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'divider',
                   },
                   color: 'white'
                 },
@@ -2214,6 +2287,13 @@ const SpreadsheetTools = () => {
                   '&.Mui-focused': {
                     color: 'primary.main',
                   }
+                },
+                '& .MuiInputBase-input': {
+                  color: 'white',
+                },
+                '& .MuiSelect-select': {
+                  color: 'white',
+                  backgroundColor: '#121212',
                 }
               }}
             >
@@ -2222,19 +2302,30 @@ const SpreadsheetTools = () => {
                 value={activeSpreadsheetId}
                 onChange={(e) => handleSpreadsheetChange(e.target.value)}
                 label="Select Spreadsheet"
+                sx={{
+                  bgcolor: '#121212 !important',
+                  color: 'white !important',
+                  '& .MuiSelect-select': {
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                  },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                  }
+                }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
-                      bgcolor: theme => theme.palette.background.paper, // Use theme's paper background
-                      color: 'white',
+                      bgcolor: 'background.default',
+                      color: 'text.primary',
                       borderRadius: theme => theme.shape?.borderRadius || 10,
                       boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                      border: '1px solid', // Add explicit border
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid',
+                      borderColor: 'divider',
                       '& .MuiMenuItem-root': {
-                        color: 'white',
+                        color: 'text.primary',
                         '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.08)',
+                          bgcolor: 'action.hover',
                         },
                         '&.Mui-selected': {
                           bgcolor: 'primary.main',
@@ -2243,6 +2334,9 @@ const SpreadsheetTools = () => {
                             bgcolor: 'primary.dark',
                           }
                         }
+                      },
+                      '& .MuiDivider-root': {
+                        borderColor: 'divider'
                       }
                     }
                   }
@@ -2281,9 +2375,9 @@ const SpreadsheetTools = () => {
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: theme => theme.shape?.borderRadius || 10,
-                  backgroundColor: 'transparent',
+                  backgroundColor: '#121212',
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'primary.main',
                     borderWidth: '1px',
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -2295,14 +2389,14 @@ const SpreadsheetTools = () => {
                       borderColor: 'rgba(255, 255, 255, 0.23)',
                     },
                     '& .MuiSelect-icon': {
-                      color: 'rgba(255, 255, 255, 0.3)',
+                      color: 'rgba(255, 255, 255, 0.4)',
                     }
                   },
                   '& .MuiSelect-icon': {
                     color: 'white',
                   },
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'divider',
                   },
                   color: 'white'
                 },
@@ -2312,8 +2406,15 @@ const SpreadsheetTools = () => {
                     color: 'primary.main',
                   },
                   '&.Mui-disabled': {
-                    color: 'rgba(255, 255, 255, 0.3)',
+                    color: 'rgba(255, 255, 255, 0.4)',
                   }
+                },
+                '& .MuiInputBase-input': {
+                  color: 'white',
+                },
+                '& .MuiSelect-select': {
+                  color: 'white',
+                  backgroundColor: '#121212',
                 }
               }}
             >
@@ -2322,18 +2423,30 @@ const SpreadsheetTools = () => {
                 value={selectedSheet}
                 onChange={(e) => handleSheetChange(e.target.value)}
                 label="Select Sheet"
+                sx={{
+                  bgcolor: '#121212 !important',
+                  color: 'white !important',
+                  '& .MuiSelect-select': {
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                  },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                  }
+                }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
                       bgcolor: 'background.default',
-                      color: 'white',
+                      color: 'text.primary',
                       borderRadius: theme => theme.shape?.borderRadius || 10,
                       boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid',
+                      borderColor: 'divider',
                       '& .MuiMenuItem-root': {
-                        color: 'white',
+                        color: 'text.primary',
                         '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.08)',
+                          bgcolor: 'action.hover',
                         },
                         '&.Mui-selected': {
                           bgcolor: 'primary.main',
@@ -2341,7 +2454,13 @@ const SpreadsheetTools = () => {
                           '&:hover': {
                             bgcolor: 'primary.dark',
                           }
+                        },
+                        '&.Mui-disabled': {
+                          color: 'text.disabled',
                         }
+                      },
+                      '& .MuiListSubheader-root': {
+                        color: 'text.secondary',
                       }
                     }
                   }
@@ -2425,7 +2544,12 @@ const SpreadsheetTools = () => {
                                 height: '20px',
                                 backgroundColor: columns.find(c => c.name === col)
                                   ? getColumnTypeInfo(columns.find(c => c.name === col).dtype).color + '20'
-                                  : undefined
+                                  : undefined,
+                                color: 'white',
+                                fontWeight: 500,
+                                '& .MuiChip-label': {
+                                  color: 'white',
+                                }
                               }}
                             />
                           ))}
@@ -2433,7 +2557,14 @@ const SpreadsheetTools = () => {
                             <Chip
                               label={`+${selectedInputColumns.length - 3} more`}
                               size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
+                              sx={{ 
+                                fontSize: '1rem', 
+                                height: '20px',
+                                color: 'white',
+                                '& .MuiChip-label': {
+                                  color: 'white',
+                                }
+                              }}
                             />
                           )}
                         </Box>
