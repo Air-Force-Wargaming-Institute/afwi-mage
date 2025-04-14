@@ -43,6 +43,27 @@ import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import '../../../App.css'; // Import App.css for styling
 import JobMonitor from '../common/JobMonitor'; // Import JobMonitor component
+// Import styled components
+import {
+  GradientBorderPaper,
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  GradientCornersPaper,
+  GradientBorderCard,
+  GradientText,
+  HighContrastGradientPaper,
+  useContainerStyles
+} from '../../../styles/StyledComponents';
+
+// Import action buttons
+import {
+  DeleteButton,
+  EditButton,
+  AddButton,
+  DeleteActionButton,
+  DeleteText,
+  DELETE_COLOR
+} from '../../../styles/ActionButtons';
 
 /**
  * SpreadsheetTools component for LLM-powered column transformations
@@ -444,6 +465,13 @@ const SpreadsheetTools = () => {
     } else if (field.startsWith('typeOption.')) {
       // Handle nested type option changes
       const optionKey = field.split('.')[1];
+      
+      // Ensure typeOptions exists
+      if (!updatedOutputColumns[index].typeOptions) {
+        updatedOutputColumns[index].typeOptions = {};
+      }
+      
+      // Create a new reference for typeOptions to ensure state update
       updatedOutputColumns[index] = {
         ...updatedOutputColumns[index],
         typeOptions: {
@@ -451,6 +479,10 @@ const SpreadsheetTools = () => {
           [optionKey]: value
         }
       };
+      
+      // Log to help diagnose issues
+      console.log(`Updating ${optionKey} to:`, value);
+      console.log("Updated column:", updatedOutputColumns[index]);
     } else {
       // Handle regular field changes
       updatedOutputColumns[index] = {
@@ -459,7 +491,8 @@ const SpreadsheetTools = () => {
       };
     }
     
-    setOutputColumns(updatedOutputColumns);
+    // Explicitly force update with a new reference
+    setOutputColumns([...updatedOutputColumns]);
   };
 
   // Handle column definition change (Create New or Use Existing)
@@ -733,6 +766,32 @@ const SpreadsheetTools = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
+  // Add this new function to handle direct step selection
+  const handleStepClick = (stepIndex) => {
+    // Validation rules - only allow clicking on steps if prerequisites are met
+    if (stepIndex === 0) {
+      // Always allow going to step 0
+      setActiveStep(0);
+    } else if (stepIndex === 1) {
+      // Only allow going to step 1 if there are input columns selected
+      if (selectedInputColumns.length > 0) {
+        setActiveStep(1);
+      }
+    } else if (stepIndex === 2) {
+      // Only allow going to step 2 if there are input columns and at least one output column with a name
+      if (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) {
+        setActiveStep(2);
+      }
+    } else if (stepIndex === 3) {
+      // Only allow going to step 3 if all prerequisites are met
+      if (selectedInputColumns.length > 0 && 
+          outputColumns.some(col => col.name) &&
+          !outputColumns.some(col => !col.description.trim())) {
+        setActiveStep(3);
+      }
+    }
+  };
+
   // Convert sample values to string representation
   const formatSampleValues = (values) => {
     if (!values || !Array.isArray(values)) return 'No samples';
@@ -765,15 +824,12 @@ const SpreadsheetTools = () => {
       case 0: // Select input columns
         return (
           <Box mt={2}>
-            <Paper 
-              elevation={0} 
+            <SubtleGlowPaper 
+              elevation={2} 
               sx={{ 
-                p: 2, 
-                bgcolor: 'rgba(33, 150, 243, 0.04)', 
-                border: '1px solid',
-                borderColor: 'primary.light', 
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                p: 2,
+                bgcolor: 'rgba(33, 150, 243, 0.08)', 
+                borderColor: 'primary.light'
               }}
             >
               <Typography variant="subtitle2" fontWeight="600" color="primary.main" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
@@ -793,7 +849,44 @@ const SpreadsheetTools = () => {
                 Select Columns to Use for Transformation
               </Typography>
 
-              <FormControl fullWidth variant="outlined" style={{ marginBottom: '20px' }}>
+              <FormControl 
+                fullWidth 
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '5px 5px 0 0',
+                    backgroundColor: '#121212',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '1px',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '2px',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'white',
+                    },
+                    '& fieldset': {
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                  },
+                  '& .MuiSelect-select': {
+                    color: 'white',
+                    backgroundColor: '#121212',
+                  }
+                }}
+              >
                 <InputLabel>Input Columns</InputLabel>
                 <Select
                   multiple
@@ -809,7 +902,12 @@ const SpreadsheetTools = () => {
                           sx={{ 
                             backgroundColor: columns.find(col => col.name === value) ? 
                               getColumnTypeInfo(columns.find(col => col.name === value).dtype).color + '20' : 
-                              undefined 
+                              undefined,
+                            borderRadius: '20px',
+                            '& .MuiChip-label': {
+                              color: 'white',
+                              fontWeight: 500,
+                            }
                           }}
                         />
                       ))}
@@ -820,14 +918,50 @@ const SpreadsheetTools = () => {
                       style: {
                         maxHeight: 300,
                       },
+                      sx: {
+                        bgcolor: '#121212',
+                        color: 'white',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match other dropdowns
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
+                            }
+                          },
+                          '&.Mui-disabled': {
+                            color: 'rgba(255, 255, 255, 0.38)',
+                          }
+                        },
+                        '& .MuiListSubheader-root': {
+                          color: 'rgba(255, 255, 255, 0.7)',
+                        }
+                      }
                     },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
                   }}
                 >
                   {columns.map((column) => (
                     <MenuItem key={column.name} value={column.name}>
                       <Box display="flex" alignItems="center" width="100%">
                         <Box>
-                          <Typography variant="body1">{column.name}</Typography>
+                          <Typography variant="body1" fontWeight="600" sx={{ color: '#FFFFFF', fontSize: '1.1rem' }}>{column.name}</Typography>
                           <Typography variant="caption" color="textSecondary">
                             {getColumnTypeInfo(column.dtype).label} • {column.unique_count} unique values
                           </Typography>
@@ -856,11 +990,10 @@ const SpreadsheetTools = () => {
                       const columnInfo = columns.find(col => col.name === colName);
                       return (
                         <Grid item xs={12} sm={6} md={4} key={colName}>
-                          <Card variant="outlined" sx={{ 
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                          <GradientBorderCard sx={{ 
+                            transition: theme => theme.custom?.transition || 'all 0.3s ease',
                             '&:hover': {
-                              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
                               transform: 'translateY(-2px)'
                             }
                           }}>
@@ -869,8 +1002,15 @@ const SpreadsheetTools = () => {
                               <Typography variant="caption" display="block" color="textSecondary">
                                 Type: {getColumnTypeInfo(columnInfo?.dtype || 'object').label}
                               </Typography>
-                              <Typography variant="caption" display="block" color="textSecondary">
-                                Sample values: {formatSampleValues(columnInfo?.sample_values)}
+                              <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
+                                display: 'block', 
+                                mt: 0.5,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '100%'
+                              }}>
+                                Sample: {formatSampleValues(columnInfo?.sample_values)}
                               </Typography>
                               {columnInfo?.null_count > 0 && (
                                 <Typography variant="caption" display="block" color="error">
@@ -878,29 +1018,26 @@ const SpreadsheetTools = () => {
                                 </Typography>
                               )}
                             </CardContent>
-                          </Card>
+                          </GradientBorderCard>
                         </Grid>
                       );
                     })}
                   </Grid>
                 </Box>
               )}
-            </Paper>
+            </SubtleGlowPaper>
           </Box>
         );
 
       case 1: // Configure output columns
         return (
           <Box mt={2} style={{ overflow: 'visible' }}>
-            <Paper 
-              elevation={0} 
+            <SubtleGlowPaper 
+              elevation={2} 
               sx={{ 
-                p: 2, 
-                bgcolor: 'rgba(76, 175, 80, 0.04)', 
-                border: '1px solid',
-                borderColor: 'success.light', 
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                p: 2,
+                bgcolor: 'rgba(76, 175, 80, 0.08)', 
+                borderColor: 'success.light',
                 overflow: 'visible'
               }}
             >
@@ -926,21 +1063,92 @@ const SpreadsheetTools = () => {
                   key={index} 
                   mb={2} 
                   p={2} 
-                  border="1px solid #e0e0e0" 
+                  border="1px solid"
+                  borderColor="rgba(255, 255, 255, 0.15)" 
                   borderRadius="4px"
                   position="relative"
-                  bgcolor="white"
-                  boxShadow="0 1px 3px rgba(0,0,0,0.05)"
+                  bgcolor="#1E1E1E"
+                  boxShadow="0 4px 8px rgba(0, 0, 0, 0.25)"
                   style={{ overflow: 'visible' }}
                 >
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth variant="outlined">
+                      <FormControl 
+                        fullWidth 
+                        variant="outlined"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '5px 5px 0 0',
+                            backgroundColor: '#121212',
+                            color: 'white',
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '1px',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '2px',
+                            },
+                            '& .MuiSelect-icon': {
+                              color: 'white',
+                            },
+                            '& fieldset': {
+                              borderColor: 'rgba(255, 255, 255, 0.3)',
+                            }
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&.Mui-focused': {
+                              color: 'primary.main',
+                            }
+                          },
+                          '& .MuiInputBase-input': {
+                            color: 'white',
+                          },
+                          '& .MuiSelect-select': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                          }
+                        }}
+                      >
                         <InputLabel>Column Definition</InputLabel>
                         <Select
                           value={column.isNew ? "create_new" : "use_existing"}
                           onChange={(e) => handleColumnDefinitionChange(index, e.target.value)}
                           label="Column Definition"
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                bgcolor: '#121212',
+                                color: 'white',
+                                borderRadius: '0 0 20px 20px',
+                                boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                                border: '1px solid',
+                                borderColor: 'rgba(255, 255, 255, 0.15)',
+                                '& .MuiMenuItem-root': {
+                                  color: 'white',
+                                  backgroundColor: '#121212',
+                                  '&:hover': {
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                  },
+                                  '&.Mui-selected': {
+                                    bgcolor: 'primary.main',
+                                    color: 'white',
+                                    '&:hover': {
+                                      bgcolor: 'primary.dark',
+                                    }
+                                  },
+                                  '&.Mui-disabled': {
+                                    color: 'rgba(255, 255, 255, 0.38)',
+                                    backgroundColor: '#121212',
+                                  }
+                                },
+                                '& .MuiListSubheader-root': {
+                                  color: 'rgba(255, 255, 255, 0.7)',
+                                }
+                              }
+                            }
+                          }}
                         >
                           <MenuItem value="create_new">Create New Column</MenuItem>
                           <MenuItem value="use_existing">Overwrite Existing Column</MenuItem>
@@ -958,15 +1166,122 @@ const SpreadsheetTools = () => {
                           onChange={(e) => handleOutputColumnChange(index, 'name', e.target.value)}
                           placeholder="e.g., Transformed_Sales"
                           required
+                          InputLabelProps={{
+                            style: { color: 'rgba(255, 255, 255, 0.7)' }
+                          }}
+                          InputProps={{
+                            style: { color: 'white' }
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '5px 5px 0 0',
+                              backgroundColor: '#121212',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              '&.Mui-focused': {
+                                color: 'primary.main',
+                              }
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                            },
+                            '& .MuiFormHelperText-root': {
+                              color: 'rgba(255, 255, 255, 0.5)',
+                              marginLeft: 0
+                            }
+                          }}
                         />
                       ) : (
-                        <FormControl fullWidth variant="outlined">
+                        <FormControl 
+                          fullWidth 
+                          variant="outlined"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '5px 5px 0 0',
+                              backgroundColor: '#121212',
+                              color: 'white',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& .MuiSelect-icon': {
+                                color: 'white',
+                              },
+                              '& fieldset': {
+                                borderColor: 'divider',
+                              },
+                              color: 'white'
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              '&.Mui-focused': {
+                                color: 'primary.main',
+                              }
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                            },
+                            '& .MuiSelect-select': {
+                              color: 'white',
+                              backgroundColor: '#121212',
+                            }
+                          }}
+                        >
                           <InputLabel>Existing Column</InputLabel>
                           <Select
                             value={column.name}
                             onChange={(e) => handleOutputColumnChange(index, 'name', e.target.value)}
                             label="Existing Column"
                             displayEmpty
+                            MenuProps={{
+                              PaperProps: {
+                                sx: {
+                                  bgcolor: '#121212',
+                                  color: 'white',
+                                  borderRadius: '0 0 20px 20px',
+                                  boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                                  border: '1px solid',
+                                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                                  '& .MuiMenuItem-root': {
+                                    color: 'white',
+                                    backgroundColor: '#121212',
+                                    '&:hover': {
+                                      bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                    },
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.main',
+                                      color: 'white',
+                                      '&:hover': {
+                                        bgcolor: 'primary.dark',
+                                      }
+                                    },
+                                    '&.Mui-disabled': {
+                                      color: 'rgba(255, 255, 255, 0.38)',
+                                      backgroundColor: '#121212',
+                                    }
+                                  },
+                                  '& .MuiListSubheader-root': {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                  }
+                                }
+                              }
+                            }}
                           >
                             <MenuItem value="" disabled>
                               <em>Select a column</em>
@@ -991,43 +1306,170 @@ const SpreadsheetTools = () => {
                     </Grid>
                     
                     <Grid item xs={12}>
-                      <FormControl fullWidth variant="outlined">
+                      <FormControl 
+                        fullWidth 
+                        variant="outlined"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: '5px 5px 0 0',
+                            backgroundColor: '#121212',
+                            color: 'white',
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '1px',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '2px',
+                            },
+                            '& .MuiSelect-icon': {
+                              color: 'white',
+                            },
+                            '& fieldset': {
+                              borderColor: 'divider',
+                            },
+                            color: 'white'
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&.Mui-focused': {
+                              color: 'primary.main',
+                            }
+                          },
+                          '& .MuiInputBase-input': {
+                            color: 'white',
+                          },
+                          '& .MuiSelect-select': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                          }
+                        }}
+                      >
                         <InputLabel>Output Type</InputLabel>
                         <Select
                           value={column.outputType}
                           onChange={(e) => handleOutputColumnChange(index, 'outputType', e.target.value)}
                           label="Output Type"
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                bgcolor: '#121212',
+                                color: 'white',
+                                borderRadius: '0 0 20px 20px',
+                                boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                                border: '1px solid',
+                                borderColor: 'rgba(255, 255, 255, 0.15)',
+                                '& .MuiMenuItem-root': {
+                                  color: 'white',
+                                  backgroundColor: '#121212',
+                                  '&:hover': {
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                  },
+                                  '&.Mui-selected': {
+                                    bgcolor: 'primary.main',
+                                    color: 'white',
+                                    '&:hover': {
+                                      bgcolor: 'primary.dark',
+                                    }
+                                  },
+                                  '&.Mui-disabled': {
+                                    color: 'rgba(255, 255, 255, 0.38)',
+                                    backgroundColor: '#121212',
+                                  }
+                                },
+                                '& .MuiListSubheader-root': {
+                                  color: 'rgba(255, 255, 255, 0.7)',
+                                }
+                              }
+                            }
+                          }}
                         >
                           <MenuItem value="text">Free Text</MenuItem>
-                          <MenuItem value="boolean">Boolean (Yes/No)</MenuItem>
+                          <MenuItem value="boolean">Boolean or Polar Categories (Yes/No)</MenuItem>
                           <MenuItem value="list">List of Options</MenuItem>
                           <MenuItem value="number">Number</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
                     
-                    {/* Conditional UI based on output type */}
+                    {/* Type-specific options that render conditionally */}
                     {column.outputType === 'boolean' && (
-                      <Grid container item xs={12} spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="True Value"
-                            variant="outlined"
-                            value={column.typeOptions.trueValue}
-                            onChange={(e) => handleOutputColumnChange(index, 'typeOption.trueValue', e.target.value)}
-                            placeholder="e.g., Yes, True, 1"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="False Value"
-                            variant="outlined"
-                            value={column.typeOptions.falseValue}
-                            onChange={(e) => handleOutputColumnChange(index, 'typeOption.falseValue', e.target.value)}
-                            placeholder="e.g., No, False, 0"
-                          />
+                      <Grid item xs={12}>
+                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="True Value"
+                              variant="outlined"
+                              value={column.typeOptions && column.typeOptions.trueValue !== undefined ? column.typeOptions.trueValue : 'Yes'}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                console.log("Setting True Value to:", newValue);
+                                handleOutputColumnChange(index, 'typeOption.trueValue', newValue);
+                              }}
+                              placeholder="e.g., Yes, True, 1"
+                              InputLabelProps={{
+                                style: { color: 'rgba(255, 255, 255, 0.7)' }
+                              }}
+                              InputProps={{
+                                style: { color: 'white' }
+                              }}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  backgroundColor: '#121212',
+                                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '1px',
+                                  },
+                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '2px',
+                                  },
+                                  '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                  }
+                                }
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="False Value"
+                              variant="outlined"
+                              value={column.typeOptions && column.typeOptions.falseValue !== undefined ? column.typeOptions.falseValue : 'No'}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                console.log("Setting False Value to:", newValue);
+                                handleOutputColumnChange(index, 'typeOption.falseValue', newValue);
+                              }}
+                              placeholder="e.g., No, False, 0"
+                              InputLabelProps={{
+                                style: { color: 'rgba(255, 255, 255, 0.7)' }
+                              }}
+                              InputProps={{
+                                style: { color: 'white' }
+                              }}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                                  backgroundColor: '#121212',
+                                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '1px',
+                                  },
+                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'primary.main',
+                                    borderWidth: '2px',
+                                  },
+                                  '& fieldset': {
+                                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                                  }
+                                }
+                              }}
+                            />
+                          </Grid>
                         </Grid>
                       </Grid>
                     )}
@@ -1036,29 +1478,111 @@ const SpreadsheetTools = () => {
                       <Grid item xs={12}>
                         <TextField
                           fullWidth
-                          label="Comma-separated List of Options"
+                          label="Allowed Values (comma-separated)"
                           variant="outlined"
-                          value={column.typeOptions.options}
+                          value={column.typeOptions?.options || ''}
                           onChange={(e) => handleOutputColumnChange(index, 'typeOption.options', e.target.value)}
-                          placeholder="e.g., Red, Green, Blue"
-                          helperText="Enter possible values separated by commas"
+                          placeholder="e.g., Red, Green, Blue, Yellow"
+                          helperText="Enter the possible values separated by commas"
+                          InputLabelProps={{
+                            style: { color: 'rgba(255, 255, 255, 0.7)' }
+                          }}
+                          InputProps={{
+                            style: { color: 'white' }
+                          }}
+                          FormHelperTextProps={{
+                            style: { color: 'rgba(255, 255, 255, 0.5)' }
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: theme => theme.shape?.borderRadius || 10,
+                              backgroundColor: '#121212',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            }
+                          }}
                         />
                       </Grid>
                     )}
                     
                     {column.outputType === 'number' && (
                       <Grid item xs={12}>
-                        <FormControl fullWidth variant="outlined">
+                        <FormControl 
+                          fullWidth 
+                          variant="outlined"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '5px 5px 0 0',
+                              backgroundColor: '#121212',
+                              color: 'white',
+                              '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '1px',
+                              },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: 'primary.main',
+                                borderWidth: '2px',
+                              },
+                              '& .MuiSelect-icon': {
+                                color: 'white',
+                              },
+                              '& fieldset': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'rgba(255, 255, 255, 0.7)',
+                              '&.Mui-focused': {
+                                color: 'primary.main',
+                              }
+                            }
+                          }}
+                        >
                           <InputLabel>Number Format</InputLabel>
                           <Select
-                            value={column.typeOptions.format}
+                            value={column.typeOptions?.format || 'decimal'}
                             onChange={(e) => handleOutputColumnChange(index, 'typeOption.format', e.target.value)}
                             label="Number Format"
+                            MenuProps={{
+                              PaperProps: {
+                                sx: {
+                                  bgcolor: '#121212',
+                                  color: 'white',
+                                  borderRadius: '0 0 20px 20px',
+                                  boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                                  border: '1px solid',
+                                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                                  '& .MuiMenuItem-root': {
+                                    color: 'white',
+                                    backgroundColor: '#121212',
+                                    '&:hover': {
+                                      bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                    },
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.main',
+                                      color: 'white',
+                                      '&:hover': {
+                                        bgcolor: 'primary.dark',
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }}
                           >
-                            <MenuItem value="decimal">Decimal (e.g., 123.45)</MenuItem>
-                            <MenuItem value="integer">Integer (e.g., 123)</MenuItem>
-                            <MenuItem value="percentage">Percentage (e.g., 45%)</MenuItem>
-                            <MenuItem value="currency">Currency (e.g., $123.45)</MenuItem>
+                            <MenuItem value="decimal">Decimal (1.23)</MenuItem>
+                            <MenuItem value="integer">Integer (123)</MenuItem>
+                            <MenuItem value="currency">Currency ($123.45)</MenuItem>
+                            <MenuItem value="percentage">Percentage (12.3%)</MenuItem>
                           </Select>
                         </FormControl>
                       </Grid>
@@ -1076,49 +1600,77 @@ const SpreadsheetTools = () => {
                         placeholder="Instructions for how to transform the input columns into this output column"
                         required
                         helperText="Be specific about the format, calculations, or transformations to apply"
+                        InputLabelProps={{
+                          style: { color: 'rgba(255, 255, 255, 0.7)' }
+                        }}
+                        InputProps={{
+                          style: { color: 'white' }
+                        }}
+                        FormHelperTextProps={{
+                          style: { color: 'rgba(255, 255, 255, 0.5)' }
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: theme => theme.shape?.borderRadius || 10,
+                            backgroundColor: '#121212',
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '1px',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main',
+                              borderWidth: '2px',
+                            },
+                            '& fieldset': {
+                              borderColor: 'rgba(255, 255, 255, 0.3)',
+                            }
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            '&.Mui-focused': {
+                              color: 'primary.main',
+                            }
+                          },
+                          '& .MuiInputBase-input': {
+                            color: 'white',
+                          },
+                          '& .MuiFormHelperText-root': {
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            marginLeft: 0
+                          }
+                        }}
                       />
                     </Grid>
                   </Grid>
                   
                   {outputColumns.length > 1 && (
-                    <IconButton 
-                      size="medium" 
-                      color="error" 
+                    <DeleteButton
                       onClick={() => handleRemoveOutputColumn(index)}
-                      style={{ position: 'absolute', top: 8, right: 8 }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                      tooltip="Remove output column"
+                      sx={{ position: 'absolute', top: 8, right: 8 }}
+                    />
                   )}
                 </Box>
               ))}
               
-              <Button
-                startIcon={<AddIcon />}
+              <AddButton
                 onClick={handleAddOutputColumn}
-                variant="outlined"
-                color="primary"
-                size="medium"
-                style={{ marginTop: '8px' }}
-              >
-                Add Output Column
-              </Button>
-            </Paper>
+                tooltip="Add Output Column"
+                sx={{ marginTop: '8px' }}
+              />
+            </SubtleGlowPaper>
           </Box>
         );
 
       case 2: // Advanced options (replacing Transformation Instructions)
         return (
           <Box mt={2}>
-            <Paper 
-              elevation={0} 
+            <SubtleGlowPaper 
+              elevation={2} 
               sx={{ 
-                p: 2, 
-                bgcolor: 'rgba(255, 152, 0, 0.04)', 
-                border: '1px solid',
-                borderColor: 'warning.light', 
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                p: 2,
+                bgcolor: 'rgba(255, 152, 0, 0.08)', 
+                borderColor: 'warning.light'
               }}
             >
               <Typography variant="subtitle2" fontWeight="600" color="warning.main" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
@@ -1139,11 +1691,13 @@ const SpreadsheetTools = () => {
               </Typography>
             
               <Box sx={{ 
-                bgcolor: 'white', 
+                bgcolor: '#121212', 
                 p: 3, 
                 border: '1px solid', 
-                borderColor: 'grey.200',
-                borderRadius: '8px'
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                color: 'white',
+                boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
               }}>
                 <Grid container spacing={3}>
                   <Grid item xs={12}>
@@ -1156,8 +1710,12 @@ const SpreadsheetTools = () => {
                         />
                       }
                       label="Create duplicate spreadsheet (recommended)"
+                      sx={{ 
+                        color: 'white',
+                        '& .MuiFormControlLabel-label': { color: 'white' }
+                      }}
                     />
-                    <Typography variant="caption" display="block" color="textSecondary" style={{ marginLeft: '30px' }}>
+                    <Typography variant="caption" display="block" color="rgba(255, 255, 255, 0.7)" sx={{ marginLeft: '30px' }}>
                       When enabled, transforms will be applied to a copy of the original spreadsheet. 
                       This preserves your original data.
                     </Typography>
@@ -1173,32 +1731,108 @@ const SpreadsheetTools = () => {
                         />
                       }
                       label="Include column headers in context"
+                      sx={{ 
+                        color: 'white',
+                        '& .MuiFormControlLabel-label': { color: 'white' }
+                      }}
                     />
-                    <Typography variant="caption" display="block" color="textSecondary" style={{ marginLeft: '30px' }}>
+                    <Typography variant="caption" display="block" color="rgba(255, 255, 255, 0.7)" sx={{ marginLeft: '30px' }}>
                       Provides column names to the AI to improve understanding of data meaning.
                     </Typography>
                   </Grid>
                   
                   <Grid item xs={12}>
-                    <FormControl fullWidth variant="outlined">
+                    <FormControl 
+                      fullWidth 
+                      variant="outlined"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '5px 5px 0 0',
+                          backgroundColor: '#121212',
+                          color: 'text.primary',
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main',
+                            borderWidth: '1px',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main',
+                            borderWidth: '2px',
+                          },
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          },
+                          '& fieldset': {
+                            borderColor: 'divider',
+                          },
+                          color: 'white'
+                        },
+                        '& .MuiInputLabel-root': {
+                          color: 'rgba(255, 255, 255, 0.7) !important',
+                          '&.Mui-focused': {
+                            color: 'primary.main !important',
+                          }
+                        },
+                        '& .MuiInputBase-input': {
+                          color: 'text.primary',
+                        },
+                        '& .MuiSelect-select': {
+                          color: 'text.primary',
+                          backgroundColor: '#121212',
+                        }
+                      }}
+                    >
                       <InputLabel>Error Handling</InputLabel>
                       <Select
                         value={advancedOptions.errorHandling}
                         onChange={(e) => handleAdvancedOptionChange('errorHandling', e.target.value)}
                         label="Error Handling"
+                        sx={{
+                          color: 'white',
+                          '& .MuiSelect-select': {
+                            color: 'white !important'
+                          },
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
                         <MenuItem value="continue">Continue on Error</MenuItem>
                         <MenuItem value="stop">Stop on Error</MenuItem>
                         <MenuItem value="retry">Retry on Error (up to 3 times)</MenuItem>
                       </Select>
-                      <FormHelperText>
+                      <FormHelperText sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                         Determines how to handle errors encountered during processing.
                       </FormHelperText>
                     </FormControl>
                   </Grid>
                 </Grid>
               </Box>
-            </Paper>
+            </SubtleGlowPaper>
           </Box>
         );
 
@@ -1211,16 +1845,20 @@ const SpreadsheetTools = () => {
             
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(33, 150, 243, 0.04)', 
-                    border: '1px solid',
-                    borderColor: 'primary.light', 
+                    bgcolor: 'rgba(33, 150, 243, 0.12)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    height: '100%'
+                    height: '100%',
+                    background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="primary.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1240,17 +1878,26 @@ const SpreadsheetTools = () => {
                     Input Columns
                   </Typography>
                   <List dense sx={{ 
-                    bgcolor: 'white', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
                     overflow: 'hidden',
                     '& .MuiListItem-root': {
                       borderBottom: '1px solid',
-                      borderColor: 'grey.100',
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
                       '&:last-child': {
                         borderBottom: 'none'
+                      },
+                      '&:hover': {
+                        bgcolor: 'rgba(66, 133, 244, 0.1)'
                       }
+                    },
+                    '& .MuiTypography-root': {
+                      color: 'white'
+                    },
+                    '& .MuiTypography-caption': {
+                      color: 'rgba(255, 255, 255, 0.7)'
                     }
                   }}>
                     {selectedInputColumns.map((column) => {
@@ -1260,10 +1907,10 @@ const SpreadsheetTools = () => {
                           <ListItemText 
                             primary={
                               <Box display="flex" alignItems="center">
-                                <Typography variant="body2" fontWeight="500">{column}</Typography>
+                                <Typography variant="body1" fontWeight="600" sx={{ color: '#FFFFFF', fontSize: '1.1rem' }}>{column}</Typography>
                                 <Chip 
                                   label={getColumnTypeInfo(columnInfo?.dtype || 'object').label}
-                                  size="small"
+                                  size="medium"
                                   sx={{ 
                                     ml: 1, 
                                     height: 20, 
@@ -1279,13 +1926,14 @@ const SpreadsheetTools = () => {
                                   {columnInfo?.unique_count} unique values
                                   {columnInfo?.null_count > 0 && ` • ${columnInfo.null_count} missing values`}
                                 </Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ 
+                                <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
                                   display: 'block', 
                                   mt: 0.5,
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
-                                  maxWidth: '100%'
+                                  maxWidth: '100%',
+                                  fontSize: '.8rem'
                                 }}>
                                   Sample: {formatSampleValues(columnInfo?.sample_values)}
                                 </Typography>
@@ -1296,20 +1944,24 @@ const SpreadsheetTools = () => {
                       );
                     })}
                   </List>
-                </Paper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(76, 175, 80, 0.04)', 
-                    border: '1px solid',
-                    borderColor: 'success.light',
+                    bgcolor: 'rgba(76, 175, 80, 0.15)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    height: '100%'
+                    height: '100%',
+                    background: theme => 'linear-gradient(135deg, #34a853, #60c26a, #34a853)',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="success.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1329,18 +1981,26 @@ const SpreadsheetTools = () => {
                     Output Columns
                   </Typography>
                   <List dense sx={{ 
-                    bgcolor: 'white', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
                     overflow: 'hidden',
                     '& .MuiListItem-root': {
                       borderBottom: '1px solid',
-                      borderColor: 'grey.100',
-                      p: 1.5,
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
                       '&:last-child': {
                         borderBottom: 'none'
+                      },
+                      '&:hover': {
+                        bgcolor: 'rgba(66, 133, 244, 0.1)'
                       }
+                    },
+                    '& .MuiTypography-root': {
+                      color: 'white'
+                    },
+                    '& .MuiTypography-caption': {
+                      color: 'rgba(255, 255, 255, 0.7)'
                     }
                   }}>
                     {outputColumns.map((column, index) => (
@@ -1348,7 +2008,7 @@ const SpreadsheetTools = () => {
                         <ListItemText 
                           primary={
                             <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.5}>
-                              <Typography variant="body2" fontWeight="500" color={column.isNew ? "success.main" : "primary.main"}>
+                              <Typography variant="body1" fontWeight="600" sx={{ color: column.isNew ? "success.light" : "primary.light", fontSize: '1.1rem' }}>
                                 {column.name}
                               </Typography>
                               <Chip 
@@ -1361,7 +2021,13 @@ const SpreadsheetTools = () => {
                                 label={column.outputType} 
                                 size="small"
                                 variant="outlined"
-                                sx={{ height: 20 }}
+                                sx={{ 
+                                  height: 20,
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  },
+                                  borderColor: 'rgba(255, 255, 255, 0.3)'
+                                }}
                               />
                             </Box>
                           }
@@ -1385,10 +2051,10 @@ const SpreadsheetTools = () => {
                                 </Typography>
                               )}
                               
-                              <Typography variant="caption" color="textSecondary" sx={{ 
+                              <Typography variant="caption" color="rgba(255, 255, 255, 0.7)" sx={{ 
                                 display: 'block', 
                                 mt: 0.5,
-                                fontSize: '0.7rem',
+                                fontSize: '.8rem',
                                 maxHeight: '3em',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -1403,19 +2069,24 @@ const SpreadsheetTools = () => {
                       </ListItem>
                     ))}
                   </List>
-                </Paper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12}>
-                <Paper 
-                  elevation={0} 
+                <GradientBorderPaper 
+                  elevation={3} 
                   sx={{ 
                     p: 2, 
-                    bgcolor: 'rgba(255, 152, 0, 0.04)', 
-                    border: '1px solid',
-                    borderColor: 'warning.light',
+                    bgcolor: 'rgba(255, 152, 0, 0.15)', 
+                    borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
                     borderRadius: 2,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    height: '100%',
+                    background: theme => 'linear-gradient(135deg, #fbbc05, #ffd04c, #fbbc05)',
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    '&::before': {
+                      background: '#121212',
+                      borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+                    },
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight="600" color="warning.main" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -1438,14 +2109,15 @@ const SpreadsheetTools = () => {
                     display: 'grid', 
                     gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
                     gap: 2,
-                    bgcolor: 'white', 
+                    bgcolor: '#121212', 
                     borderRadius: '4px', 
                     border: '1px solid', 
-                    borderColor: 'grey.200',
-                    p: 2
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    p: 2,
+                    color: 'white'
                   }}>
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Data Protection</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Data Protection</Typography>
                       <Box display="flex" alignItems="center" mb={1}>
                         <Box 
                           component="span" 
@@ -1459,7 +2131,7 @@ const SpreadsheetTools = () => {
                             mr: 1,
                             border: '1px solid',
                             borderColor: createDuplicate ? 'success.main' : 'error.main',
-                            bgcolor: createDuplicate ? 'success.main' : 'white',
+                            bgcolor: createDuplicate ? 'success.main' : 'transparent',
                             color: createDuplicate ? 'white' : 'error.main',
                             fontSize: '0.75rem',
                             fontWeight: 'bold'
@@ -1467,14 +2139,14 @@ const SpreadsheetTools = () => {
                         >
                           {createDuplicate ? '✓' : '×'}
                         </Box>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 500 }}>
                           {createDuplicate ? "Create copy (preserves original)" : "Modify original spreadsheet"}
                         </Typography>
                       </Box>
                     </Box>
                     
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Context Options</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Context Options</Typography>
                       <Box display="flex" alignItems="center" mb={1}>
                         <Box 
                           component="span" 
@@ -1488,7 +2160,7 @@ const SpreadsheetTools = () => {
                             mr: 1,
                             border: '1px solid',
                             borderColor: advancedOptions.includeHeaders ? 'success.main' : 'error.main',
-                            bgcolor: advancedOptions.includeHeaders ? 'success.main' : 'white',
+                            bgcolor: advancedOptions.includeHeaders ? 'success.main' : 'transparent',
                             color: advancedOptions.includeHeaders ? 'white' : 'error.main',
                             fontSize: '0.75rem',
                             fontWeight: 'bold'
@@ -1496,14 +2168,14 @@ const SpreadsheetTools = () => {
                         >
                           {advancedOptions.includeHeaders ? '✓' : '×'}
                         </Box>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 500 }}>
                           Include column headers in context
                         </Typography>
                       </Box>
                     </Box>
                     
                     <Box>
-                      <Typography variant="subtitle2" gutterBottom>Error Handling</Typography>
+                      <Typography variant="subtitle2" gutterBottom sx={{ fontSize: '1.1rem', color: '#FFFFFF', fontWeight: 600 }}>Error Handling</Typography>
                       <Box display="flex" alignItems="center">
                         <Chip 
                           label={
@@ -1521,12 +2193,12 @@ const SpreadsheetTools = () => {
                                 ? 'error'
                                 : 'info'
                           }
-                          sx={{ height: 24 }}
+                          sx={{ height: 24, '& .MuiChip-label': { fontSize: '0.95rem', fontWeight: 500 } }}
                         />
                       </Box>
                     </Box>
                   </Box>
-                </Paper>
+                </GradientBorderPaper>
               </Grid>
               
               <Grid item xs={12}>
@@ -1536,7 +2208,11 @@ const SpreadsheetTools = () => {
                       severity="success" 
                       variant="filled"
                       icon={<PlayArrowIcon />}
-                      style={{ marginBottom: '16px' }}
+                      sx={{ 
+                        marginBottom: '16px',
+                        borderRadius: theme => theme.shape?.borderRadius || 10,
+                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                      }}
                     >
                       Preview successful! Processed {transformationResults.previewRows} rows.
                     </Alert>
@@ -1549,9 +2225,11 @@ const SpreadsheetTools = () => {
                         sx={{ 
                           px: 3,
                           py: 1,
-                          boxShadow: 2,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
                           '&:hover': {
-                            boxShadow: 3
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
                           }
                         }}
                       >
@@ -1577,9 +2255,11 @@ const SpreadsheetTools = () => {
                       sx={{ 
                         px: 3,
                         py: 1,
-                        boxShadow: 2,
+                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
                         '&:hover': {
-                          boxShadow: 3
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          transform: 'translateY(-2px)'
                         }
                       }}
                     >
@@ -1590,7 +2270,7 @@ const SpreadsheetTools = () => {
                 
                 {isTransforming && (
                   <Box mt={2} display="flex" flexDirection="column" alignItems="center">
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
                       {processingMode === 'preview' ? 'Processing sample data...' : 'Processing all data...'}
                     </Typography>
                     <Box width="100%" mt={1}>
@@ -1601,7 +2281,15 @@ const SpreadsheetTools = () => {
                 
                 {transformationError && (
                   <Box mt={2}>
-                    <Alert severity="error" variant="filled" onClose={() => setTransformationError(null)}>
+                    <Alert 
+                      severity="error" 
+                      variant="filled" 
+                      sx={{
+                        borderRadius: theme => theme.shape?.borderRadius || 10,
+                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                      }}
+                      onClose={() => setTransformationError(null)}
+                    >
                       {transformationError}
                     </Alert>
                   </Box>
@@ -1616,42 +2304,155 @@ const SpreadsheetTools = () => {
                 </Typography>
                 
                 <TableContainer 
-                  component={Paper} 
-                  variant="outlined" 
+                  component={GradientBorderPaper} 
                   style={{ maxHeight: '400px', overflow: 'auto' }}
                   sx={{
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    borderRadius: theme => theme.shape?.borderRadius || 10,
+                    position: 'relative',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '5px',
+                      background: theme => theme.palette.background.default,
+                      zIndex: 11,
+                    },
                     '& .MuiTableHead-root': {
-                      bgcolor: 'primary.light',
+                      background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right,rgb(24, 51, 95),rgb(36, 52, 74))',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10,
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        height: '100%',
+                        pointerEvents: 'none',
+                      },
                       '& .MuiTableCell-root': {
                         fontWeight: 'bold',
-                        color: 'white'
+                        color: 'rgba(255, 255, 255, 0.9) !important',
+                        fontSize: '1rem'
                       }
                     },
+                    '& .MuiTable-root': {
+                      borderCollapse: 'separate',
+                      borderSpacing: 0,
+                    },
                     '& .MuiTableRow-root:nth-of-type(even)': {
-                      bgcolor: 'rgba(33, 150, 243, 0.04)'
+                      bgcolor: 'rgba(38,38,38,0.9)'
+                    },
+                    '& .MuiTableRow-root:nth-of-type(odd)': {
+                      bgcolor: 'rgba(74, 74, 74, 0.9)'
+                    },
+                    '& .MuiTableRow-root:hover': {
+                      bgcolor: 'rgba(38, 38, 38, 0.38)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '& .MuiTableCell-root': {
+                        color: '#FFFFFF !important'
+                      }
+                    },
+                    '& .MuiTableCell-root': {
+                      color: '#FFFFFF !important',
+                      fontWeight: 500
                     }
                   }}
                 >
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        {outputPreview[0].map((header, index) => (
-                          <TableCell key={index} style={{ fontWeight: 'bold' }}>
-                            {header}
-                          </TableCell>
-                        ))}
+                        {outputPreview[0].map((header, index) => {
+                          const isInputColumn = selectedInputColumns.includes(header);
+                          const isOutputColumn = outputColumns.some(col => col.name === header);
+                          
+                          return (
+                            <TableCell 
+                              key={index} 
+                              style={{ 
+                                fontWeight: 'bold', 
+                                color: 'rgb(255, 255, 255) !important', 
+                                fontSize: '1rem',
+                                position: 'relative',
+                                backgroundColor: isInputColumn 
+                                  ? 'rgba(66, 133, 244, 0.3)' 
+                                  : isOutputColumn 
+                                    ? 'rgba(52, 168, 83, 0.3)' 
+                                    : 'transparent'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {isInputColumn && (
+                                    <Box component="span" sx={{ 
+                                      fontSize: '0.7rem', 
+                                      bgcolor: 'primary.main', 
+                                      color: 'white', 
+                                      px: 0.5, 
+                                      borderRadius: '3px',
+                                      height: '18px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}>
+                                      INPUT
+                                    </Box>
+                                  )}
+                                  {isOutputColumn && (
+                                    <Box component="span" sx={{ 
+                                      fontSize: '0.7rem', 
+                                      bgcolor: 'success.main', 
+                                      color: 'white', 
+                                      px: 0.5, 
+                                      borderRadius: '3px',
+                                      height: '18px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}>
+                                      OUTPUT
+                                    </Box>
+                                  )}
+                                  <Box component="span" sx={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                    {header}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {outputPreview.slice(1).map((row, rowIndex) => (
                         <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
+                          {row.map((cell, cellIndex) => {
+                            const header = outputPreview[0][cellIndex];
+                            const isInputColumn = selectedInputColumns.includes(header);
+                            const isOutputColumn = outputColumns.some(col => col.name === header);
+                            
+                            return (
+                              <TableCell 
+                                key={cellIndex}
+                                sx={{ 
+                                  borderLeft: isInputColumn 
+                                    ? '2px solid rgba(66, 133, 244, 0.5)' 
+                                    : isOutputColumn 
+                                      ? '2px solid rgba(52, 168, 83, 0.5)' 
+                                      : 'none',
+                                  backgroundColor: isInputColumn 
+                                    ? 'rgba(66, 133, 244, 0.05)' 
+                                    : isOutputColumn 
+                                      ? 'rgba(52, 168, 83, 0.05)' 
+                                      : 'transparent'
+                                }}
+                              >
+                                {cell}
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1664,7 +2465,14 @@ const SpreadsheetTools = () => {
                     color="primary"
                     startIcon={<SaveIcon />}
                     disabled={isTransforming}
-                    sx={{ boxShadow: 1 }}
+                    sx={{ 
+                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.1)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.2)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
                   >
                     Save Transformation
                   </Button>
@@ -1674,7 +2482,14 @@ const SpreadsheetTools = () => {
                     color="secondary"
                     onClick={handleReset}
                     disabled={isTransforming}
-                    sx={{ boxShadow: 1 }}
+                    sx={{ 
+                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.1)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.2)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
                   >
                     Reset
                   </Button>
@@ -1685,10 +2500,8 @@ const SpreadsheetTools = () => {
             {/* Add JobMonitor for tracking transformation jobs */}
             {transformationResults?.job_id && transformationResults?.status !== 'preview_success' && (
               <Box mt={4}>
-                <Box sx={{
-                  backgroundColor: 'info.lighter',
+                <HighContrastGradientPaper sx={{
                   p: 3,
-                  borderRadius: 2,
                   mb: 2,
                   border: '1px solid',
                   borderColor: 'info.light'
@@ -1721,9 +2534,11 @@ const SpreadsheetTools = () => {
                       sx={{
                         px: 2,
                         py: 1,
-                        boxShadow: 2,
+                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
                         '&:hover': {
-                          boxShadow: 3
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          transform: 'translateY(-2px)'
                         }
                       }}
                     >
@@ -1735,13 +2550,19 @@ const SpreadsheetTools = () => {
                       onClick={handleAnotherTransformation}
                       sx={{
                         px: 2,
-                        py: 1
+                        py: 1,
+                        boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.1)',
+                        transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                        '&:hover': {
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.2)',
+                          transform: 'translateY(-2px)'
+                        }
                       }}
                     >
                       Execute Another Transformation on the Current Spreadsheet
                     </Button>
                   </Box>
-                </Box>
+                </HighContrastGradientPaper>
                 
                 <Typography variant="subtitle1" gutterBottom>Job Status</Typography>
                 <JobMonitor 
@@ -1789,12 +2610,12 @@ const SpreadsheetTools = () => {
 
   // Main component render
   return (
-    <div style={{ width: '100%' }}>
-      <Typography variant="h5" component="h1" gutterBottom className="section-title">
+    <div style={{ width: '100%', marginTop: '-10px' }}>
+      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
         Column Transformation Tool
-      </Typography>
+      </GradientText>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
         Transform spreadsheet columns with AI assistance. Select input columns, specify output format, 
         and provide transformation instructions. The system will process the data and create new columns 
         based on your requirements.
@@ -1810,311 +2631,653 @@ const SpreadsheetTools = () => {
       />
       
       {uploadError && (
-        <Alert severity="error" style={{ marginBottom: '16px' }} onClose={() => setUploadError(null)}>
+        <Alert 
+          severity="error" 
+          variant="filled"
+          sx={{
+            marginBottom: '16px',
+            borderRadius: theme => theme.shape?.borderRadius || 10,
+            boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+          }}
+          onClose={() => setUploadError(null)}
+        >
           {uploadError}
         </Alert>
       )}
       
-      <Paper elevation={0} style={{ marginTop: '24px', padding: '24px', width: '100%' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth variant="outlined">
-              <InputLabel>Select Spreadsheet</InputLabel>
-              <Select
-                value={activeSpreadsheetId}
-                onChange={(e) => handleSpreadsheetChange(e.target.value)}
-                label="Select Spreadsheet"
+      <Box
+        sx={{
+          marginTop: '24px',
+          width: '100%',
+          position: 'relative',
+          borderRadius: '20px',
+          padding: '3px', // This creates space for the gradient border
+          background: 'linear-gradient(to right, rgb(129, 177, 255), rgb(95, 127, 255), rgb(165, 165, 165))',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.7)',
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            width: '100%',
+            height: '100%',
+            padding: theme => theme.spacing(3),
+            borderRadius: '17px', // 20px - 3px to fit inside the parent
+            backgroundImage: 'linear-gradient(135deg, rgba(29, 39, 70, 0.95) 0%, rgba(25, 25, 35, 0.95) 100%)',
+          }}
+        >
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <FormControl 
+                fullWidth 
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '5px 5px 0 0',
+                    backgroundColor: '#121212',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '1px',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '2px',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'white',
+                    },
+                    '& fieldset': {
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                  },
+                  '& .MuiSelect-select': {
+                    color: 'white',
+                    backgroundColor: '#121212',
+                  }
+                }}
               >
-                <MenuItem value="" disabled>
-                  <em>Select a spreadsheet</em>
-                </MenuItem>
-                <MenuItem value="upload_new" style={{ color: '#1976d2' }}>
-                  <CloudUploadIcon style={{ marginRight: '8px' }} />
-                  Upload new spreadsheet...
-                </MenuItem>
-                <Divider />
-                {spreadsheets.map((sheet) => (
-                  <MenuItem key={sheet.id} value={sheet.id}>
-                    {sheet.filename}
+                <InputLabel>Select Spreadsheet</InputLabel>
+                <Select
+                  value={activeSpreadsheetId}
+                  onChange={(e) => handleSpreadsheetChange(e.target.value)}
+                  label="Select Spreadsheet"
+                  sx={{
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                    '& .MuiSelect-select': {
+                      bgcolor: '#121212 !important',
+                      color: 'white !important',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                    }
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: '#121212',
+                        color: 'white',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match the input field
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
+                            }
+                          }
+                        },
+                        '& .MuiDivider-root': {
+                          borderColor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select a spreadsheet</em>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                  <MenuItem 
+                    value="upload_new" 
+                    sx={{ 
+                      color: 'primary.main',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}
+                  >
+                    <CloudUploadIcon />
+                    Upload new spreadsheet...
+                  </MenuItem>
+                  <Divider sx={{ my: 1, borderColor: 'divider' }} />
+                  {spreadsheets.map((sheet) => (
+                    <MenuItem key={sheet.id} value={sheet.id}>
+                      {sheet.filename}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl 
+                fullWidth 
+                variant="outlined" 
+                disabled={!activeSpreadsheetId || sheetNames.length === 0}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '5px 5px 0 0',
+                    backgroundColor: '#121212',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '1px',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'primary.main',
+                      borderWidth: '2px',
+                    },
+                    '&.Mui-disabled': {
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '& .MuiSelect-icon': {
+                        color: 'rgba(255, 255, 255, 0.4)',
+                      }
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'white',
+                    },
+                    '& fieldset': {
+                      borderColor: 'divider',
+                    },
+                    color: 'white'
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    },
+                    '&.Mui-disabled': {
+                      color: 'rgba(255, 255, 255, 0.4)',
+                    }
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                  },
+                  '& .MuiSelect-select': {
+                    color: 'white',
+                    backgroundColor: '#121212',
+                  }
+                }}
+              >
+                <InputLabel>Select Sheet</InputLabel>
+                <Select
+                  value={selectedSheet}
+                  onChange={(e) => handleSheetChange(e.target.value)}
+                  label="Select Sheet"
+                  sx={{
+                    bgcolor: '#121212 !important',
+                    color: 'white !important',
+                    '& .MuiSelect-select': {
+                      bgcolor: '#121212 !important',
+                      color: 'white !important',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.3) !important'
+                    }
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: '#121212',
+                        color: 'white',
+                        borderRadius: '0 0 20px 20px', // Fixed value to match the input field
+                        overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
+                        border: '1px solid rgba(66, 133, 244, 0.3)',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(66, 133, 244, 0.2)',
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.3)',
+                            }
+                          },
+                          '&.Mui-disabled': {
+                            color: 'rgba(255, 255, 255, 0.38)',
+                          }
+                        },
+                        '& .MuiDivider-root': {
+                          borderColor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'center',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'center',
+                    },
+                    getContentAnchorEl: null // Ensure the menu is properly positioned
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select a sheet</em>
+                  </MenuItem>
+                  {sheetNames.map((sheet) => (
+                    <MenuItem key={sheet} value={sheet}>
+                      {sheet}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
           
-          <Grid item xs={12} sm={6}>
-            <FormControl 
-              fullWidth 
-              variant="outlined" 
-              disabled={!activeSpreadsheetId || sheetNames.length === 0}
-            >
-              <InputLabel>Select Sheet</InputLabel>
-              <Select
-                value={selectedSheet}
-                onChange={(e) => handleSheetChange(e.target.value)}
-                label="Select Sheet"
+          {activeSpreadsheetId && selectedSheet && columns.length > 0 && (
+            <Box mt={4} style={{ overflow: 'visible' }}>
+              <Divider 
+                style={{ 
+                  margin: '24px 0',
+                  backgroundImage: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+                  height: '2px',
+                  opacity: 0.7
+                }}
               >
-                <MenuItem value="" disabled>
-                  <em>Select a sheet</em>
-                </MenuItem>
-                {sheetNames.map((sheet) => (
-                  <MenuItem key={sheet} value={sheet}>
-                    {sheet}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-        
-        {activeSpreadsheetId && selectedSheet && columns.length > 0 && (
-          <Box mt={4} style={{ overflow: 'visible' }}>
-            <Divider style={{ margin: '24px 0' }}>
-              <Chip 
-                label="Transformation Configuration" 
-                color="primary"
-              />
-            </Divider>
-            
-            <Stepper 
-              activeStep={activeStep} 
-              orientation="vertical" 
-              style={{ overflow: 'visible' }}
-              sx={{
-                '& .MuiStepLabel-root': {
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  transition: 'background-color 0.2s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.03)'
+                <Chip 
+                  label="Transformation Configuration" 
+                  color="primary"
+                  sx={{
+                    background: theme => theme.custom?.gradients?.gradient1 || 'linear-gradient(to right,rgb(129, 177, 255),rgb(95, 127, 255),rgb(165, 165, 165))',
+                    color: 'white',
+                    fontWeight: 600,
+                    '& .MuiChip-label': {
+                      color: 'white'
+                    }
+                  }}
+                />
+              </Divider>
+              
+              <Stepper 
+                activeStep={activeStep} 
+                orientation="vertical" 
+                style={{ overflow: 'visible' }}
+                sx={{
+                  '& .MuiStepLabel-root': {
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                    '&:hover': {
+                      backgroundColor: 'rgba(66, 133, 244, 0.08)',
+                      cursor: 'pointer'
+                    }
+                  },
+                  '& .MuiStepLabel-label.Mui-active': {
+                    fontWeight: 'bold',
+                    color: 'primary.main'
                   }
-                },
-                '& .MuiStepLabel-label.Mui-active': {
-                  fontWeight: 'bold',
-                  color: 'primary.main'
-                }
-              }}
-            >
-              <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'}>
-                      Select Input Columns
-                    </Typography>
-                    {activeStep > 0 && selectedInputColumns.length > 0 && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
-                          Selected Input Columns:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {selectedInputColumns.slice(0, 3).map(col => (
+                }}
+              >
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(0)} sx={{ '&:hover': { cursor: 'pointer' } }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 0 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Select Input Columns
+                      </Typography>
+                      {activeStep > 0 && selectedInputColumns.length > 0 && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Selected Input Columns:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
+                            {selectedInputColumns.slice(0, 3).map(col => (
+                              <Chip
+                                key={col}
+                                label={col}
+                                size="large"
+                                sx={{
+                                  fontSize: '1rem',
+                                  height: '20px',
+                                  backgroundColor: columns.find(c => c.name === col)
+                                    ? getColumnTypeInfo(columns.find(c => c.name === col).dtype).color + '20'
+                                    : undefined,
+                                  color: 'white',
+                                  fontWeight: 500,
+                                  '& .MuiChip-label': {
+                                    color: 'white',
+                                  }
+                                }}
+                              />
+                            ))}
+                            {selectedInputColumns.length > 3 && (
+                              <Chip
+                                label={`+${selectedInputColumns.length - 3} more`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px',
+                                  color: 'white',
+                                  '& .MuiChip-label': {
+                                    color: 'white',
+                                  }
+                                }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(0)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={selectedInputColumns.length === 0}
+                      >
+                        Continue
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(1)} 
+                    sx={{ 
+                      '&:hover': { cursor: selectedInputColumns.length > 0 ? 'pointer' : 'not-allowed' },
+                      opacity: selectedInputColumns.length > 0 ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Define Output Columns
+                      </Typography>
+                      {activeStep > 1 && outputColumns.some(c => c.name) && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Output Columns:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
+                            {outputColumns.slice(0, 5).filter(c => c.name).map((col, idx) => (
+                              <Chip
+                                key={idx}
+                                label={`${col.name} (${col.outputType})`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px',
+                                  color: 'white',
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  }
+                                }}
+                              />
+                            ))}
+                            {outputColumns.filter(c => c.name).length > 5 && (
+                              <Chip
+                                label={`+${outputColumns.filter(c => c.name).length - 5} more`}
+                                size="large"
+                                sx={{ 
+                                  fontSize: '1rem', 
+                                  height: '20px', 
+                                  color: 'white',
+                                  '& .MuiChip-label': {
+                                    color: 'white'
+                                  }
+                                }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(1)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={!outputColumns[0].name}
+                      >
+                        Continue
+                      </Button>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(2)} 
+                    sx={{ 
+                      '&:hover': { cursor: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 'pointer' : 'not-allowed' },
+                      opacity: (selectedInputColumns.length > 0 && outputColumns.some(col => col.name)) ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%',
+                      justifyContent: 'flex-start'
+                    }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'} sx={{ mr: 2 }}>
+                        Advanced Options
+                      </Typography>
+                      {activeStep > 2 && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          borderLeft: '1px solid rgba(255, 255, 255, 0.2)', 
+                          pl: 2,
+                          ml: 2,
+                          maxWidth: 'calc(100% - 200px)',
+                          flexGrow: 1
+                        }}>
+                          <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1, whiteSpace: 'nowrap' }}>
+                            Settings:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, overflow: 'hidden' }}>
                             <Chip
-                              key={col}
-                              label={col}
+                              label={createDuplicate ? "Create Copy" : "Modify Original"}
                               size="large"
-                              sx={{
-                                fontSize: '1rem',
+                              sx={{ 
+                                fontSize: '1rem', 
                                 height: '20px',
-                                backgroundColor: columns.find(c => c.name === col)
-                                  ? getColumnTypeInfo(columns.find(c => c.name === col).dtype).color + '20'
-                                  : undefined
+                                '& .MuiChip-label': {
+                                  color: 'white'
+                                }
+                              }}
+                              color={createDuplicate ? "success" : "warning"}
+                            />
+                            <Chip
+                              label={`Headers in Context: ${advancedOptions.includeHeaders ? 'Yes' : 'No'}`}
+                              size="large"
+                              sx={{ 
+                                fontSize: '1rem', 
+                                height: '20px',
+                                '& .MuiChip-label': {
+                                  color: 'white'
+                                }
                               }}
                             />
-                          ))}
-                          {selectedInputColumns.length > 3 && (
-                            <Chip
-                              label={`+${selectedInputColumns.length - 3} more`}
-                              size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
-                            />
-                          )}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(0)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: 2,
-                        '&:hover': {
-                          boxShadow: 3
-                        }
-                      }}
-                      disabled={selectedInputColumns.length === 0}
-                    >
-                      Continue
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 1 ? 'primary.main' : 'inherit'}>
-                      Define Output Columns
-                    </Typography>
-                    {activeStep > 1 && outputColumns.some(c => c.name) && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
-                          Output Columns:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {outputColumns.slice(0, 3).filter(c => c.name).map((col, idx) => (
-                            <Chip
-                              key={idx}
-                              label={`${col.name} (${col.outputType})`}
-                              size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
-                            />
-                          ))}
-                          {outputColumns.filter(c => c.name).length > 3 && (
-                            <Chip
-                              label={`+${outputColumns.filter(c => c.name).length - 3} more`}
-                              size="large"
-                              sx={{ fontSize: '1rem', height: '20px' }}
-                            />
-                          )}
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(1)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: 2,
-                        '&:hover': {
-                          boxShadow: 3
-                        }
-                      }}
-                      disabled={!outputColumns[0].name}
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 2 ? 'primary.main' : 'inherit'}>
-                      Advanced Options
-                    </Typography>
-                    {activeStep > 2 && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, maxWidth: '60%' }}>
-                        <Typography variant="caption" fontWeight="500" color="text.secondary" sx={{ mr: 1 }}>
-                          Settings:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          <Chip
-                            label={createDuplicate ? "Create Copy" : "Modify Original"}
-                            size="large"
-                            sx={{ fontSize: '1rem', height: '20px' }}
-                            color={createDuplicate ? "success" : "warning"}
-                          />
-                          <Chip
-                            label={`Headers in Context: ${advancedOptions.includeHeaders ? 'Yes' : 'No'}`}
-                            size="large"
-                            sx={{ fontSize: '1rem', height: '20px' }}
-                          />
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(2)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={handleNext}
-                      sx={{ 
-                        mt: 1, 
-                        mr: 1,
-                        px: 3,
-                        boxShadow: 2,
-                        '&:hover': {
-                          boxShadow: 3
-                        }
-                      }}
-                      disabled={outputColumns.some(col => !col.description.trim())}
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-              
-              <Step>
-                <StepLabel>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 3 ? 'primary.main' : 'inherit'}>
-                      Review and Execute
-                    </Typography>
-                  </Box>
-                </StepLabel>
-                <StepContent>
-                  {getStepContent(3)}
-                  <Box sx={{ mb: 2, mt: 2 }}>
-                    <Button
-                      onClick={handleBack}
-                      sx={{ mt: 1, mr: 1 }}
-                      disabled={isTransforming}
-                    >
-                      Back
-                    </Button>
-                  </Box>
-                </StepContent>
-              </Step>
-            </Stepper>
-          </Box>
-        )}
-        
-        {activeSpreadsheetId && !selectedSheet && (
-          <Box mt={4} textAlign="center">
-            <Typography color="textSecondary">
-              Please select a sheet to continue
-            </Typography>
-          </Box>
-        )}
-        
-        {!activeSpreadsheetId && (
-          <Box mt={4} textAlign="center">
-            <Typography color="textSecondary">
-              Please select a spreadsheet to begin transformation
-            </Typography>
-          </Box>
-        )}
-      </Paper>
+                      )}
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(2)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleNext}
+                        sx={{ 
+                          mt: 1, 
+                          mr: 1,
+                          px: 3,
+                          boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                          transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        disabled={outputColumns.some(col => !col.description.trim())}
+                      >
+                        Continue
+                      </Button>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+                
+                <Step>
+                  <StepLabel onClick={() => handleStepClick(3)} 
+                    sx={{ 
+                      '&:hover': { 
+                        cursor: (selectedInputColumns.length > 0 && 
+                               outputColumns.some(col => col.name) && 
+                               !outputColumns.some(col => !col.description.trim())) ? 'pointer' : 'not-allowed' 
+                      },
+                      opacity: (selectedInputColumns.length > 0 && 
+                             outputColumns.some(col => col.name) && 
+                             !outputColumns.some(col => !col.description.trim())) ? 1 : 0.7
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight="600" color={activeStep >= 3 ? 'primary.main' : 'inherit'}>
+                        Review and Execute
+                      </Typography>
+                    </Box>
+                  </StepLabel>
+                  <StepContent>
+                    {getStepContent(3)}
+                    <Box sx={{ mb: 2, mt: 2 }}>
+                      <Button
+                        onClick={handleBack}
+                        sx={{ mt: 1, mr: 1 }}
+                        disabled={isTransforming}
+                      >
+                        Back
+                      </Button>
+                    </Box>
+                  </StepContent>
+                </Step>
+              </Stepper>
+            </Box>
+          )}
+          
+          {activeSpreadsheetId && !selectedSheet && (
+            <Box mt={4} textAlign="center">
+              <Typography color="textSecondary">
+                Please select a sheet to continue
+              </Typography>
+            </Box>
+          )}
+          
+          {!activeSpreadsheetId && (
+            <Box mt={4} textAlign="center">
+              <Typography color="textSecondary">
+                Please select a spreadsheet to begin transformation
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
     </div>
   );
 };

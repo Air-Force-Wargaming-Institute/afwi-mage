@@ -29,6 +29,7 @@ import {
   ListItemIcon,
   Checkbox
 } from '@material-ui/core';
+import { useTheme } from '@material-ui/core/styles';
 import SendIcon from '@material-ui/icons/Send';
 import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
@@ -57,6 +58,9 @@ import SchoolIcon from '@mui/icons-material/School';
 import TuneIcon from '@mui/icons-material/Tune';
 import PersonIcon from '@mui/icons-material/Person';
 import LoadingScreen from './LoadingScreen';
+import { GradientText } from '../styles/StyledComponents';
+import robotIcon from '../assets/robot-icon.png';
+import agentTeamIcon from '../assets/agent-team.png';
 
 // Simple function to replace triple backticks with spaces
 const removeTripleBackticks = (text) => {
@@ -78,6 +82,10 @@ const useStyles = makeStyles((theme) => ({
     marginTop: 0, // Removed top margin to use full height
     width: '100%',
     maxWidth: '100%',
+    backgroundColor: 'transparent', // Add transparency to main container
+    backgroundImage: 'none', // Remove any background image
+    position: 'relative', // Add relative positioning for correct layering
+    zIndex: 1, // Add z-index for proper stacking
   },
   chatContainer: {
     display: 'flex',
@@ -88,17 +96,85 @@ const useStyles = makeStyles((theme) => ({
     width: '100%',
     gap: theme.spacing(2),
     paddingRight: theme.spacing(2),
+    backgroundColor: 'transparent',
+    position: 'relative',
+    zIndex: 2,
   },
   sessionsList: {
+    padding: theme.spacing(1),
+    paddingBottom: theme.spacing(3),
+    position: 'relative',
+    zIndex: 2,
+    overflowY: 'auto',
+    height: '100%',
+    width: '100%',
+    backgroundColor: 'transparent',
+    borderRadius: theme.shape.borderRadius,
+    '&::-webkit-scrollbar': {
+      width: '6px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[500],
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.grey[600],
+      },
+    },
+  },
+  chatLogContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 1,
+  },
+  innerSessionsContainer: {
+    flexGrow: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    width: '100%',
+  },
+  chatSessionsContainer: {
     width: '16%',
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
     overflow: 'hidden',
-    '& > *:not(:first-child)': {
-      overflow: 'auto',
+    backgroundColor: 'transparent',
+    position: 'relative',
+    padding: theme.spacing(3),
+    background: `${theme.custom.gradients.gradient1}`,
+    border: `${theme.custom.borderWidth.hairline}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxSizing: 'border-box',
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.hairline,
+      left: theme.custom.borderWidth.hairline,
+      right: theme.custom.borderWidth.hairline,
+      bottom: theme.custom.borderWidth.hairline,
+      background: theme.palette.background.paper,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.hairline/2,
+      zIndex: 0,
     },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+    },
+    '&:hover': {
+      boxShadow: theme.custom.boxShadowLarge,
+    }
   },
   chatArea: {
     width: '84%',
@@ -108,9 +184,37 @@ const useStyles = makeStyles((theme) => ({
     height: '100%', 
     flexShrink: 0,
     overflow: 'hidden',
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: 'transparent',
     position: 'relative',
-    borderRadius: '12px',
+    borderTop: `${theme.custom.borderWidth.extraThick}px solid transparent`,
+    borderLeft: `3px solid ${theme.palette.primary.main}`,
+    borderRight: `3px solid ${theme.palette.primary.main}`,
+    borderBottom: `${theme.custom.borderWidth.extraThick}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: '0 6px 25px rgba(0, 0, 0, 0.7)',
+    animation: '$pulseBorder 2s infinite',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.vibrant,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.extraThick,
+      left: theme.custom.borderWidth.extraThick,
+      right: theme.custom.borderWidth.extraThick,
+      bottom: theme.custom.borderWidth.extraThick,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.extraThick/2,
+      background: theme.palette.background.paper,
+      zIndex: -1,
+    },
     transition: 'opacity 0.3s ease',
   },
   messageArea: {
@@ -120,7 +224,32 @@ const useStyles = makeStyles((theme) => ({
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'stretch',
     minHeight: 0, // Added to ensure proper flex behavior
+    scrollbarWidth: 'thin',
+    scrollbarColor: `${theme.palette.grey[300]} transparent`,
+    '& > div[class*="userMessage"]': {
+      alignSelf: 'flex-end !important',
+      marginLeft: 'auto !important',
+      marginRight: '0 !important',
+    },
+    '& > div[class*="systemMessage"]': {
+      alignSelf: 'center !important',
+      margin: '0 auto !important',
+    },
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: theme.palette.grey[300],
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.grey[400],
+      },
+    },
   },
   message: {
     marginBottom: theme.spacing(1),
@@ -131,16 +260,16 @@ const useStyles = makeStyles((theme) => ({
     maxWidth: '80%',
     wordBreak: 'break-word',
     position: 'relative',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.3s ease',
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
     overflow: 'visible',
     width: 'auto',
     willChange: 'transform',
-    display: 'flex',
+    display: 'block', // Change to block to work with float
     flexDirection: 'column',
     alignItems: 'stretch', // Ensure children stretch to fill container width
     '&:hover': {
-      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+      boxShadow: theme.custom.boxShadowLarge,
       transform: 'translateY(-1px)',
     },
     [theme.breakpoints.down('sm')]: {
@@ -148,11 +277,11 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   userMessage: {
-    backgroundColor: theme.palette.primary.main,
+    backgroundColor: 'rgb(46, 46, 46)',
     color: '#ffffff',
     marginLeft: 'auto', // Push to the right side
     marginRight: '0', // Ensure it stays on the right
-    borderRadius: '20px 20px 0 20px',
+    borderRadius: '18px 18px 4px 18px',
     textAlign: 'right', // Set base text alignment for user messages
     alignSelf: 'flex-end', // Align to the end of the flex container
     '& $messageContent': {
@@ -193,9 +322,9 @@ const useStyles = makeStyles((theme) => ({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: 'rgba(5, 0, 44, 0.23)',
     color: theme.palette.text.primary,
-    borderBottomLeftRadius: '4px',
+    borderRadius: '18px 18px 18px 4px',
     minWidth: '300px',
     width: 'fit-content',
     display: 'flex',          // Add flex display to ensure proper content alignment
@@ -259,10 +388,13 @@ const useStyles = makeStyles((theme) => ({
   },
   inputArea: {
     display: 'flex',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.paper,
-    borderTop: `1px solid ${theme.palette.divider}`,
+    borderTop: `1px solid ${theme.palette.primary.main}`,
+    borderLeft: `3px solid ${theme.palette.primary.main}`, // Added left border
+    borderRight: `3px solid ${theme.palette.primary.main}`, // Added right border
+    borderBottom: `3px solid ${theme.palette.primary.main}`, // Added bottom border
     position: 'relative', // Added to ensure proper placement
     minHeight: '64px', // Set minimum height to ensure it's always visible
     zIndex: 5, // Added to keep above other elements
@@ -273,33 +405,200 @@ const useStyles = makeStyles((theme) => ({
     '& .MuiInputBase-root': {
       maxHeight: '150px',
       overflowY: 'auto',
+      padding: theme.spacing(1.5, 2),
+      border: `1px solid ${theme.palette.primary.main}`,
+    },
+    '& .MuiOutlinedInput-input': {
+      lineHeight: '1.5',
+      padding: theme.spacing(0.5, 1),
+      marginLeft: theme.spacing(0.5),
+    },
+    '& .MuiOutlinedInput-multiline': {
+      padding: theme.spacing(0.5),
+      overflow: 'hidden',
+    },
+    '& textarea': {
+      overflow: 'auto !important',
+      paddingTop: '8px !important',
+      paddingBottom: '8px !important',
     },
   },
   inputHelpIcon: {
     marginRight: theme.spacing(1),
     color: theme.palette.text.secondary,
+    '&:hover': {
+      color: theme.palette.primary.main,
+    },
   },
   typingIndicator: {
     position: 'absolute',
+    bottom: theme.spacing(2),
     left: '50%',
-    top: '50%',
-    transform: 'translate(-50%, -50%)',
-    padding: theme.spacing(1),
+    transform: 'translateX(-50%)',
     display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: theme.spacing(1),
-    zIndex: 10,
-    maxWidth: '180px',
-    maxHeight: '180px'
+    flexDirection: 'column',
+    gap: theme.spacing(1),
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: '30px',
+    maxWidth: '410px',
+    zIndex: 1000,
+    boxShadow: theme.shadows[3],
+    animation: '$fadeIn 0.3s ease-in-out',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: '30px',
+      background: `linear-gradient(90deg, 
+        transparent 0%,
+        ${theme.palette.primary.main} 50%,
+        transparent 100%)`,
+      backgroundSize: '200% 100%',
+      backgroundRepeat: 'no-repeat',
+      animation: '$borderZip 2s linear infinite',
+      opacity: 0.1,
+      clipPath: `
+        polygon(
+          30px 0,
+          calc(100% - 30px) 0,
+          100% 0,
+          100% 30px,
+          100% calc(100% - 30px),
+          100% 100%,
+          calc(100% - 30px) 100%,
+          30px 100%,
+          0 100%,
+          0 calc(100% - 30px),
+          0 30px,
+          0 0
+        )
+      `,
+      border: '2px solid',
+    },
+    '& .loading-text': {
+      color: theme.palette.text.secondary,
+      fontSize: '1rem',
+      lineHeight: 1.4,
+      textAlign: 'center',
+      fontWeight: 500,
+      marginBottom: theme.spacing(1),
+    },
+    '& .loading-header': {
+      color: theme.palette.text.primary,
+      fontSize: '1.2rem',
+      fontWeight: 600,
+      textAlign: 'center',
+      marginBottom: theme.spacing(1),
+    },
+    '& .dots': {
+      display: 'flex',
+      gap: '6px',
+      justifyContent: 'center',
+    },
+    '& .dot': {
+      width: '10px',
+      height: '10px',
+      backgroundColor: theme.palette.primary.main,
+      borderRadius: '50%',
+      opacity: 0.7,
+      animation: '$bounce 1.4s infinite ease-in-out both',
+      '&:nth-child(1)': {
+        animationDelay: '-0.32s',
+      },
+      '&:nth-child(2)': {
+        animationDelay: '-0.16s',
+      },
+    },
+  },
+  '@keyframes fadeIn': {
+    from: {
+      opacity: 0,
+      transform: 'translate(-50%, 20px)',
+    },
+    to: {
+      opacity: 1,
+      transform: 'translate(-50%, 0)',
+    },
   },
   '@keyframes bounce': {
     '0%, 80%, 100%': {
-      transform: 'scale(0)',
+      transform: 'scale(0.6)',
+      opacity: 0.5,
     },
     '40%': {
       transform: 'scale(1)',
+      opacity: 1,
+    },
+  },
+  '@keyframes dotFadeInOut': {
+    '0%, 80%, 100%': {
+      opacity: 0.3,
+    },
+    '40%': {
+      opacity: 1,
+    },
+  },
+  '@keyframes pulseBorder': {
+    '0%': {
+      borderColor: 'rgba(0, 0, 0, 0.05)',
+      boxShadow: '0 0 0 0 rgba(0, 0, 0, 0.05)',
+    },
+    '50%': {
+      borderColor: 'rgba(0, 0, 0, 0.15)',
+      boxShadow: '0 0 0 4px rgba(0, 0, 0, 0.05)',
+    },
+    '100%': {
+      borderColor: 'rgba(0, 0, 0, 0.05)',
+      boxShadow: '0 0 0 0 rgba(0, 0, 0, 0.05)',
+    },
+  },
+  '@keyframes borderZip': {
+    '0%': {
+      backgroundPosition: '200% 0',
+    },
+    '100%': {
+      backgroundPosition: '-200% 0',
+    },
+  },
+  '@keyframes borderGlow': {
+    '0%': {
+      opacity: 1,
+      background: 'linear-gradient(135deg, #4285f4, #34a853, #ea4335)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '0% 0%',
+      filter: 'brightness(1.2) contrast(1.3)',
+    },
+    '25%': {
+      opacity: 1,
+      background: 'linear-gradient(to right, #4285f4, #34a853, #fbbc05)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '50% 0%',
+      filter: 'brightness(1.3) contrast(1.4)',
+    },
+    '50%': {
+      opacity: 1,
+      background: 'linear-gradient(45deg, #ea4335, #4285f4, #34a853)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '100% 50%',
+      filter: 'brightness(1.4) contrast(1.5)',
+    },
+    '75%': {
+      opacity: 1,
+      background: 'linear-gradient(to bottom, #fbbc05, #ea4335, #4285f4)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '50% 100%',
+      filter: 'brightness(1.3) contrast(1.4)',
+    },
+    '100%': {
+      opacity: 1,
+      background: 'linear-gradient(to left, #34a853, #fbbc05, #ea4335)',
+      backgroundSize: '200% 200%',
+      backgroundPosition: '0% 100%',
+      filter: 'brightness(1.2) contrast(1.3)',
     },
   },
   improvementDialog: {
@@ -335,22 +634,59 @@ const useStyles = makeStyles((theme) => ({
     minWidth: '30%',
   },
   newChatButton: {
-    margin: theme.spacing(2),
+    margin: theme.spacing(1, 0, 2),
+    width: '100%',
+    alignSelf: 'center',
+    background: theme.custom.gradients.gradient1,
+    transition: theme.custom.transition,
+    position: 'relative',
+    zIndex: 2,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1),
+    fontWeight: 500,
+    '&:hover': {
+      background: theme.custom.gradients.vibrant,
+      transform: 'translateY(-2px)',
+      boxShadow: theme.custom.boxShadowLarge,
+    },
   },
   chatSessionItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing(1, 2),
+    padding: theme.spacing(1.5, 2),
+    transition: theme.custom.transition,
+    position: 'relative',
+    zIndex: 2,
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(1),
+    backgroundColor: 'rgba(30, 30, 30, 0.4)',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      transform: 'translateY(-1px)',
+      boxShadow: theme.custom.boxShadow,
+    },
+    '&.Mui-selected': {
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.common.white,
+      '& .MuiTypography-root': {
+        color: theme.palette.common.white,
+      },
+      '& .MuiSvgIcon-root': {
+        color: theme.palette.common.white,
+      },
+      '&:hover': {
+        backgroundColor: theme.palette.primary.dark,
+      },
+    },
+    '&:last-child': {
+      marginBottom: theme.spacing(4), // Add extra margin to the last chat session item
+    },
   },
   sessionActions: {
     display: 'flex',
-    gap: theme.spacing(0.25),
-    opacity: 0.7,
-    transition: 'opacity 0.2s',
-    '&:hover': {
-      opacity: 1,
-    },
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   sessionActionButton: {
     padding: 5,
@@ -368,19 +704,32 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: theme.spacing(2),
+    color: theme.palette.primary.main,
+    '& h6': {
+      fontWeight: 600,
+      fontSize: '1.2rem',
+    },
+  },
+  planDialogTitle: {
+    color: '#FFFFFF',
+    fontWeight: 700,
+    fontSize: '1.5rem',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
   },
   dialogContent: {
     padding: theme.spacing(2),
-  },
-  promptTip: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: theme.spacing(2),
-    marginBottom: theme.spacing(3),
-  },
-  tipIcon: {
-    color: theme.palette.primary.main,
-    marginTop: theme.spacing(0.5),
+    '& ul': {
+      paddingLeft: theme.spacing(2),
+      marginTop: theme.spacing(1),
+    },
+    '& li': {
+      marginBottom: theme.spacing(2),
+    },
+    '& .MuiTypography-root': {
+      color: theme.palette.text.primary,
+      lineHeight: 1.6,
+    },
   },
   planBox: {
     padding: theme.spacing(2),
@@ -388,18 +737,153 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.background.default,
     maxHeight: '400px',
     overflowY: 'auto',
+    position: 'relative',
+    border: `${theme.custom.borderWidth.hairline}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient1,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.hairline,
+      left: theme.custom.borderWidth.hairline,
+      right: theme.custom.borderWidth.hairline,
+      bottom: theme.custom.borderWidth.hairline,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.hairline/2,
+      background: theme.palette.background.default,
+      zIndex: -1,
+    },
+    '&:hover': {
+      boxShadow: theme.custom.boxShadowLarge,
+    }
   },
   modifiedQuestionBox: {
     padding: theme.spacing(2),
     marginTop: theme.spacing(1),
     backgroundColor: theme.palette.background.default,
+    borderRadius: theme.shape.borderRadius,
+    position: 'relative',
+    border: `${theme.custom.borderWidth.hairline}px solid transparent`,
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.vibrant,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.hairline,
+      left: theme.custom.borderWidth.hairline,
+      right: theme.custom.borderWidth.hairline,
+      bottom: theme.custom.borderWidth.hairline,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.hairline/2,
+      background: theme.palette.background.default,
+      zIndex: -1,
+    },
+    '&:hover': {
+      boxShadow: theme.custom.boxShadowLarge,
+    }
   },
   agentsBox: {
     padding: theme.spacing(2),
     backgroundColor: theme.palette.background.default,
+    position: 'relative',
+    border: `${theme.custom.borderWidth.hairline}px solid transparent`,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient1,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.hairline,
+      left: theme.custom.borderWidth.hairline,
+      right: theme.custom.borderWidth.hairline,
+      bottom: theme.custom.borderWidth.hairline,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.hairline/2,
+      background: theme.palette.background.default,
+      zIndex: -1,
+    },
+    '&:hover': {
+      boxShadow: theme.custom.boxShadowLarge,
+    }
+  },
+  sectionHeader: {
+    background: theme.custom.gradients.vibrant,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    textFillColor: 'transparent',
+    fontWeight: 600,
+    marginBottom: theme.spacing(1),
   },
   agentIcon: {
     marginRight: theme.spacing(2),
+  },
+  robotIcon: {
+    width: '40px',
+    height: '40px',
+    marginBottom: '8px',
+    transition: 'all 0.3s ease',
+    '&.selected': {
+      filter: 'brightness(1.2) drop-shadow(0 0 4px rgba(33, 150, 243, 0.7))',
+      transform: 'scale(1.05)',
+    },
+    '&.unselected': {
+      filter: 'grayscale(0.3)',
+      opacity: 0.85,
+    },
+    '&:hover': {
+      filter: 'brightness(1.1) drop-shadow(0 0 3px rgba(33, 150, 243, 0.4))',
+      transform: 'scale(1.03)',
+      opacity: 1,
+    }
+  },
+  agentCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '120px',
+    marginBottom: theme.spacing(2),
+    padding: theme.spacing(1),
+    borderRadius: theme.shape.borderRadius,
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      backgroundColor: 'rgba(33, 150, 243, 0.05)',
+    },
+    '&.selected': {
+      backgroundColor: 'rgba(33, 150, 243, 0.1)',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    }
   },
   markdown: {
     fontFamily: theme.typography.fontFamily,
@@ -467,6 +951,19 @@ const useStyles = makeStyles((theme) => ({
     padding: 0,
     borderRadius: theme.shape.borderRadius,
     transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    '& summary': {
+      fontWeight: 600,
+      cursor: 'pointer',
+      padding: '0.5em 0',
+      outline: 'none',
+      '&:hover': {
+        color: theme.palette.primary.main,
+      },
+    },
+    '& details[open] summary': {
+      color: theme.palette.primary.main,
+    },
   },
   // New container for our custom implementation
   customDetails: {
@@ -486,6 +983,24 @@ const useStyles = makeStyles((theme) => ({
     '&:not(:last-child)': {
       marginBottom: theme.spacing(2),
     },
+    '&.expert-section': {
+      borderLeft: '4px solid #4CAF50',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+      background: 'linear-gradient(to right, rgba(76, 175, 80, 0.05), rgba(30, 30, 30, 0))',
+      '&:hover': {
+        boxShadow: '0 3px 10px rgba(0, 0, 0, 0.2)',
+      }
+    },
+    '&.expert-report': {
+      borderLeft: '3px solid #2196F3',
+      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
+      background: 'linear-gradient(to right, rgba(33, 150, 243, 0.05), rgba(30, 30, 30, 0))',
+      marginLeft: theme.spacing(1),
+      marginTop: theme.spacing(1.5),
+      '&:hover': {
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.18)',
+      }
+    }
   },
   analysisDetailsHeader: {
     display: 'flex',
@@ -501,26 +1016,66 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   analysisTitle: {
-    fontWeight: 600,
-    fontSize: '0.95rem',
-    color: theme.palette.text.primary,
+    fontWeight: 800,
+    fontSize: '1.05rem',
+    color: '#4CAF50',
     flexGrow: 1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    textShadow: '0px 1px 1px rgba(0, 0, 0, 0.1)',
+    letterSpacing: '0.01em',
+    position: 'relative',
+    paddingLeft: '5px',
+    '&.expert-analysis': {
+      background: 'linear-gradient(90deg, #43A047, #66BB6A)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      textFillColor: 'transparent',
+    },
+    '&.expert-report': {
+      color: '#2196F3',
+      fontWeight: 700,
+      fontSize: '1rem',
+      background: 'linear-gradient(90deg, #1976D2, #42A5F5)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      textFillColor: 'transparent',
+    }
   },
   analysisExpandToggle: {
     transition: 'transform 0.3s ease',
     color: theme.palette.primary.main,
+    backgroundColor: 'rgba(30, 30, 30, 0.5)',
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.2)',
+    },
   },
   analysisExpanded: {
     transform: 'rotate(180deg)',
   },
   // Expert Analysis gets a slightly different color to visually distinguish it
   expertAnalysisHeader: {
-    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    fontWeight: 1000,
+    fontSize: '1.2rem',
+    borderLeft: '4px solid #4CAF50',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
     '&:hover': {
-      backgroundColor: 'rgba(76, 175, 80, 0.15)',
+      backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    },
+  },
+  // Individual expert report headers get a blue styling
+  expertReportHeader: {
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
+    fontWeight: 600,
+    fontSize: '1.1rem',
+    borderLeft: '3px solid #2196F3',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+    '&:hover': {
+      backgroundColor: 'rgba(33, 150, 243, 0.2)',
     },
   },
   // Inner details content container
@@ -579,6 +1134,16 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     width: '100%',
     textAlign: 'left', // Ensure expanded content is left-aligned by default
+    '.expert-section &': {
+      paddingLeft: theme.spacing(2.5),
+      borderLeft: '1px solid rgba(76, 175, 80, 0.2)',
+      background: 'linear-gradient(to right, rgba(76, 175, 80, 0.03), transparent)',
+    },
+    '.expert-report &': {
+      paddingLeft: theme.spacing(2),
+      borderLeft: '1px solid rgba(33, 150, 243, 0.15)',
+      background: 'linear-gradient(to right, rgba(33, 150, 243, 0.025), transparent)',
+    },
     '& img, & video': {
       maxWidth: '100%',
       height: 'auto',
@@ -644,13 +1209,14 @@ const useStyles = makeStyles((theme) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1300,
+    zIndex: 2000, // Increased zIndex substantially to ensure it's above other elements
     width: '100vw',
     height: '100vh',
     maxHeight: '100vh',
     maxWidth: '100vw',
     borderRadius: 0,
     padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper, // Use theme background color
   },
   fullscreenText: {
     color: theme.palette.text.secondary,
@@ -687,9 +1253,37 @@ const useStyles = makeStyles((theme) => ({
   systemMessage: {
     alignSelf: 'center',
     width: '95%',
-    backgroundColor: '#f5f5f5',
-    border: `1px solid ${theme.palette.primary.light}`,
-    borderRadius: '8px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    backgroundColor: 'rgba(30, 30, 30, 0.9)',
+    border: '1px solid transparent',
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.custom.boxShadow,
+    position: 'relative',
+    overflow: 'hidden',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient1,
+      opacity: 0.8,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: 1,
+      left: 1,
+      right: 1,
+      bottom: 1,
+      borderRadius: theme.shape.borderRadius - 1,
+      background: 'rgba(30, 30, 30, 0.95)',
+      zIndex: -1,
+    },
     '& p, & div, & h1, & h2, & h3, & h4, & h5, & h6, & span, & li': {
       margin: '4px 0',
       textAlign: 'left !important', // Force left-align text for system messages
@@ -701,7 +1295,7 @@ const useStyles = makeStyles((theme) => ({
       textAlign: 'left !important', // Force left-align for code and lists
     },
     '& strong': {
-      color: theme.palette.primary.dark,
+      color: theme.palette.primary.main,
     },
   },
   planCollapsedHeader: {
@@ -709,23 +1303,32 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    padding: theme.spacing(1, 1.5),
+    padding: theme.spacing(1.5, 2),
     cursor: 'pointer',
-    borderRadius: '8px 8px 0 0',
-    backgroundColor: 'rgba(92, 107, 192, 0.08)',
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor: 'rgba(66, 133, 244, 0.15)',
+    transition: theme.custom.transition,
     '&:hover': {
-      backgroundColor: 'rgba(92, 107, 192, 0.15)',
+      backgroundColor: 'rgba(66, 133, 244, 0.25)',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
     },
   },
   planExpandToggle: {
     transition: 'transform 0.3s ease',
     color: theme.palette.primary.main,
+    backgroundColor: 'rgba(30, 30, 30, 0.5)',
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.2)',
+    },
   },
   planContent: {
     padding: theme.spacing(2),
     transition: 'max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease, padding 0.3s ease',
     overflow: 'hidden',
-    textAlign: 'left', // Left-align plan content text
+    textAlign: 'left',
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    borderBottomLeftRadius: theme.shape.borderRadius,
+    borderBottomRightRadius: theme.shape.borderRadius,
   },
   planCollapsed: {
     maxHeight: 0,
@@ -737,6 +1340,7 @@ const useStyles = makeStyles((theme) => ({
     maxHeight: '5000px', // Large enough to fit content
     opacity: 1,
     transition: 'max-height 0.4s ease-in-out, opacity 0.5s ease',
+    boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   scrollToBottomButton: {
     position: 'absolute',
@@ -801,6 +1405,147 @@ const useStyles = makeStyles((theme) => ({
     width: '100%',
     display: 'block',
   },
+  userMessageText: {
+    fontSize: '0.95rem',
+    color: '#FFFFFF !important',
+    whiteSpace: 'pre-wrap',
+    textAlign: 'right', // Changed to right
+    wordBreak: 'break-word',
+    paddingRight: '40px',
+    width: '100%',
+    display: 'block',
+    '& *': {
+      color: '#FFFFFF !important',
+      textAlign: 'right !important'
+    }
+  },
+  promptTip: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(2),
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(2),
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: '8px',
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    },
+  },
+  tipIcon: {
+    color: theme.palette.primary.main,
+    marginTop: '2px',
+  },
+  selectedMessageContainer: {
+    padding: '12px',
+    borderRadius: '6px',
+    transition: 'all 0.3s ease',
+    position: 'relative',
+    border: '1px solid transparent',
+    marginBottom: theme.spacing(2),
+  },
+  selectedMessage: {
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    border: '1px solid rgba(33, 150, 243, 0.3)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+  },
+  messageRadioLabel: {
+    fontWeight: 600,
+    fontSize: '1rem',
+    color: theme.palette.text.primary,
+  },
+  dialogButton: {
+    borderRadius: '20px',
+    padding: theme.spacing(1, 3),
+    transition: 'all 0.3s ease',
+    fontWeight: 500,
+  },
+  submitButton: {
+    background: theme.custom.gradients.gradient1,
+    color: theme.palette.common.white,
+    '&:hover': {
+      background: theme.custom.gradients.vibrant,
+      boxShadow: '0 4px 10px rgba(0, 0, 0, 0.25)',
+      transform: 'translateY(-2px)',
+    },
+    '&.Mui-disabled': {
+      background: 'rgba(0, 0, 0, 0.12)',
+      color: 'rgba(255, 255, 255, 0.7)',
+    }
+  },
+  cancelButton: {
+    borderRadius: '20px',
+    color: theme.palette.text.secondary,
+    '&:hover': {
+      backgroundColor: 'rgba(0, 0, 0, 0.08)',
+      color: theme.palette.text.primary,
+    }
+  },
+  agentsContainer: {
+    padding: theme.spacing(2),
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    gap: theme.spacing(2),
+  },
+  agentName: {
+    marginBottom: theme.spacing(0.5),
+    fontWeight: 500,
+    fontSize: '0.85rem',
+    textAlign: 'center',
+    lineHeight: 1.2,
+    height: '40px', 
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  editDialogTitle: {
+    color: '#FFFFFF',
+    fontWeight: 700,
+    fontSize: '1.5rem',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+  },
+  teamDisplay: {
+    position: 'relative',
+    padding: theme.spacing(2),
+    marginTop: theme.spacing(1),
+    backgroundColor: theme.palette.background.default,
+    borderRadius: theme.shape.borderRadius,
+    border: `${theme.custom.borderWidth.hairline}px solid transparent`,
+    boxShadow: theme.custom.boxShadow,
+    transition: theme.custom.transition,
+    display: 'flex',
+    alignItems: 'center',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background: theme.custom.gradients.gradient1,
+      borderRadius: theme.shape.borderRadius,
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      top: theme.custom.borderWidth.hairline,
+      left: theme.custom.borderWidth.hairline,
+      right: theme.custom.borderWidth.hairline,
+      bottom: theme.custom.borderWidth.hairline,
+      borderRadius: theme.shape.borderRadius - theme.custom.borderWidth.hairline/2,
+      background: theme.palette.background.default,
+      zIndex: -1,
+    },
+  },
+  teamName: {
+    fontWeight: 600,
+    fontSize: '1rem',
+    color: theme.palette.primary.main,
+    marginLeft: theme.spacing(1),
+  },
 }));
 
 // Custom markdown renderer for code blocks
@@ -825,10 +1570,12 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
 // Memoized Message Component with collapsible system messages
 const Message = memo(({ message, onSectionExpanded }) => {
   const classes = useStyles();
+  const theme = useTheme();
   const [expandedSections, setExpandedSections] = useState({});
   const [isPlanExpanded, setIsPlanExpanded] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectingSectionId, setSelectingSectionId] = useState(null);
+  const [copied, setCopied] = useState(false);
   const contentRef = useRef(null);
   const selectionTimeoutRef = useRef(null);
   const detailsRefs = useRef({});
@@ -1043,6 +1790,13 @@ const Message = memo(({ message, onSectionExpanded }) => {
     return findScrollableParent(element.parentElement);
   };
 
+  // Handle copy for messages
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Render an AI reasoning section
   const renderReasoningSection = (reasoningText, reasoningId, position = 'beginning') => {
     if (!reasoningText || reasoningText.trim() === '') return null;
@@ -1170,11 +1924,42 @@ const Message = memo(({ message, onSectionExpanded }) => {
     const isExpertAnalysis = typeof title === 'string' && 
       (title === "Expert Analyses" || title.includes("Expert Analysis"));
     
+    // Detect individual expert reports using a more generic approach
+    const isExpertReport = typeof title === 'string' && (
+      // First check if it's the main "Expert Analyses" container - if so, it's not an individual report
+      title !== "Expert Analyses" && 
+      // Then check if it contains common expert report patterns
+      (title.includes("Expert") || 
+       title.includes("Report") ||
+       // Check for any agent/expert name pattern (Name followed by number)
+       /[A-Za-z]+\s*\d+/.test(title) || // Matches patterns like "Economics1" or "Global Influence1"
+       // Or check if it mentions "Analysis" but is not the main container
+       (title.includes("Analysis") && !title.includes("Expert Analyses")))
+    );
+
+    // Different styling for main Expert Analyses vs individual expert reports
+    const containerClass = isExpertAnalysis 
+      ? 'expert-section' 
+      : isExpertReport 
+        ? 'expert-report' 
+        : '';
+
+    const headerClass = isExpertAnalysis 
+      ? classes.expertAnalysisHeader 
+      : isExpertReport 
+        ? classes.expertReportHeader 
+        : '';
+    
+    const titleClass = isExpertAnalysis 
+      ? 'expert-analysis' 
+      : isExpertReport 
+        ? 'expert-report' 
+        : '';
+    
     // Get current expanded state
     const isExpanded = expandedSections[id] || false;
 
     // Use the ref callback function created at the component level
-    // No more useCallback here - fixes the React hooks rule violation
     const detailsContentRef = createRefCallback(id);
 
     // Check if any think tags should be associated with this details section
@@ -1219,13 +2004,39 @@ const Message = memo(({ message, onSectionExpanded }) => {
 
     // Return a completely custom div-based implementation that doesn't use native details/summary
     return (
-      <div className={classes.customDetails}>
+      <div className={`${classes.customDetails} ${containerClass}`}>
         {/* Custom header with toggle button - using exactly what was in the summary tag */}
         <div 
-          className={`${classes.analysisDetailsHeader} ${isExpertAnalysis ? classes.expertAnalysisHeader : ''}`}
+          className={`${classes.analysisDetailsHeader} ${headerClass}`}
           onClick={(e) => toggleSection(id, e)}
         >
-          <Typography className={classes.analysisTitle} title={title}>
+          <Typography className={`${classes.analysisTitle} ${titleClass}`} title={title}>
+            {isExpertAnalysis && (
+              <img 
+                src={agentTeamIcon} 
+                alt="Expert Analysis Team" 
+                style={{ 
+                  width: '22px', 
+                  height: '22px', 
+                  marginRight: '8px', 
+                  verticalAlign: 'middle',
+                  filter: 'invert(1) drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.3))'
+                }} 
+              />
+            )}
+            {isExpertReport && !isExpertAnalysis && (
+              <img 
+                src={robotIcon} 
+                alt="Robot Expert" 
+                style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  marginRight: '8px', 
+                  verticalAlign: 'middle',
+                  filter: 'drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.3))'
+                }} 
+              />
+            )}
             {title}
           </Typography>
           <IconButton 
@@ -1319,8 +2130,14 @@ const Message = memo(({ message, onSectionExpanded }) => {
     if (message.sender === 'system') {
       return (
         <Box display="flex" alignItems="center">
-          <FormatListBulletedIcon style={{ marginRight: 8, color: '#5c6bc0' }} />
-          <Typography variant="subtitle2" style={{ fontWeight: 'bold', color: '#5c6bc0' }}>
+          <FormatListBulletedIcon style={{ 
+            marginRight: 8, 
+            color: theme.palette.primary.main 
+          }} />
+          <Typography variant="subtitle2" style={{ 
+            fontWeight: 600, 
+            color: theme.palette.primary.main
+          }}>
             Plan Accepted
           </Typography>
         </Box>
@@ -1390,6 +2207,12 @@ const Message = memo(({ message, onSectionExpanded }) => {
       <div 
         className={`${classes.message} ${classes.systemMessage}`}
         ref={messageRef} // Add ref to message container
+        style={{ 
+          margin: '0 auto', 
+          float: 'none',
+          display: 'block',
+          alignSelf: 'center'
+        }}
       >
         {/* Clickable header */}
         <div 
@@ -1491,10 +2314,31 @@ const Message = memo(({ message, onSectionExpanded }) => {
     <div
       className={`${classes.message} ${getMessageClass()}`}
       ref={messageRef} // Add ref to message container
+      style={{
+        ...(message.role === 'user' || message.sender === 'user' ? {
+          alignSelf: 'flex-end !important',
+          marginLeft: 'auto !important', 
+          marginRight: '0 !important',
+          textAlign: 'right !important',
+          float: 'right',
+          clear: 'both'
+        } : {
+          alignSelf: 'flex-start',
+          marginRight: 'auto',
+          marginLeft: '0',
+          textAlign: 'left',
+          float: 'left',
+          clear: 'both'
+        })
+      }}
     >
       {renderModificationIndicator()}
       
-      {message.sender === 'ai' && thinkContents.length > 0 ? (
+      {message.role === 'user' ? (
+        <div className={classes.userMessageText}>
+          {message.text}
+        </div>
+      ) : message.sender === 'ai' && thinkContents.length > 0 ? (
         // For AI messages with think content, use our custom rendering
         <>
           {/* Use our renderMessageWithReasoningSections function */}
@@ -1527,6 +2371,8 @@ const Message = memo(({ message, onSectionExpanded }) => {
 function MultiAgentHILChat() {
   const classes = useStyles();
   const { user, token } = useContext(AuthContext);
+  const theme = useTheme(); // Add theme variable for the component
+
   const { state, dispatch } = useHILChat();
   const messageEndRef = useRef(null);
   const messageAreaRef = useRef(null);
@@ -1646,7 +2492,34 @@ function MultiAgentHILChat() {
   // Loading indicator component
   const TypingIndicator = () => (
     <div className={`${classes.typingIndicator} ${loadingIndicatorVisible ? '' : classes.hiddenIndicator}`}>
-      <LoadingScreen />
+      <Typography className="loading-header">
+        One moment...
+      </Typography>
+      <Typography className="loading-text">
+        Response is being generated...
+      </Typography>
+      <div className="dots" style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+        <span style={{ 
+          fontSize: '24px', 
+          lineHeight: '10px',
+          marginRight: '4px',
+          animation: 'dotFadeInOut 1.4s infinite',
+          animationDelay: '0s'
+        }}>.</span>
+        <span style={{ 
+          fontSize: '24px', 
+          lineHeight: '10px',
+          marginRight: '4px',
+          animation: 'dotFadeInOut 1.4s infinite',
+          animationDelay: '0.2s'
+        }}>.</span>
+        <span style={{ 
+          fontSize: '24px', 
+          lineHeight: '10px',
+          animation: 'dotFadeInOut 1.4s infinite',
+          animationDelay: '0.4s'
+        }}>.</span>
+      </div>
     </div>
   );
 
@@ -1911,7 +2784,26 @@ function MultiAgentHILChat() {
       if (currentSession) {
         setEditSessionId(sessionId);
         setEditSessionName(currentSession.name);
-        setEditSessionTeam(currentSession.team);
+        
+        // Check if we have the teamId and need to fetch the team name
+        if (currentSession.teamId) {
+          try {
+            // Try to get updated team information from the server
+            const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+            const teams = response.data.teams || [];
+            const teamInfo = teams.find(team => team.id === currentSession.teamId);
+            
+            // Use the team name if found, otherwise fallback to stored team value 
+            setEditSessionTeam(teamInfo ? teamInfo.name : currentSession.team);
+          } catch (error) {
+            console.error('Error fetching team details:', error);
+            // Fallback to the stored team name
+            setEditSessionTeam(currentSession.team);
+          }
+        } else {
+          // If no teamId, use the team name directly (might be the teamId in older sessions)
+          setEditSessionTeam(currentSession.team);
+        }
       }
       
       setEditDialogOpen(true);
@@ -2401,60 +3293,99 @@ function MultiAgentHILChat() {
       <Container 
         className={`${classes.root} ${state.isFullscreen ? classes.fullscreen : ''}`}
         maxWidth={false}
+        style={{ backgroundColor: 'transparent' }}
       >
         <div className={classes.chatContainer}>
           {!state.isFullscreen && (
-            <Paper className={classes.sessionsList} elevation={3}>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                className={classes.newChatButton}
-                onClick={handleNewChat}
-              >
-                Start New Chat Session
-              </Button>
-              <List>
-                {state.chatSessions.map((session) => (
-                  <React.Fragment key={session.id}>
-                    <ListItem 
-                      button 
-                      className={classes.chatSessionItem}
-                      selected={session.id === state.currentSessionId}
-                      onClick={() => handleSessionClick(session.id)}
-                    >
-                      <ListItemText primary={session.name} />
-                      <div className={classes.sessionActions}>
-                        <Tooltip title="Edit">
-                          <IconButton 
-                            edge="end" 
-                            aria-label="edit" 
-                            onClick={(e) => handleEditSession(e, session.id)}
-                            className={classes.sessionActionButton}
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton 
-                            edge="end" 
-                            aria-label="delete" 
-                            onClick={(e) => handleDeleteConfirmation(e, session.id)}
-                            className={classes.sessionActionButton}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Download">
-                          <IconButton edge="end" aria-label="download" onClick={() => handleDownloadSession(session.id)} className={classes.sessionActionButton}>
-                            <GetAppIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
+            <Paper className={classes.chatSessionsContainer} elevation={3}>
+              <div className={classes.chatLogContent}>
+                <Box mb={3}>
+                  <GradientText variant="h2" fontWeight="600" gutterBottom>
+                    Chat History
+                  </GradientText>
+                </Box>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  className={classes.newChatButton}
+                  onClick={handleNewChat}
+                >
+                  Start New Chat Session
+                </Button>
+                <div className={classes.innerSessionsContainer}>
+                  <List className={classes.sessionsList}>
+                    {state.chatSessions.map((session) => (
+                      <React.Fragment key={session.id}>
+                        <ListItem 
+                          button 
+                          className={classes.chatSessionItem}
+                          selected={session.id === state.currentSessionId}
+                          onClick={() => handleSessionClick(session.id)}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <ListItemText 
+                              primary={session.name} 
+                              secondary={
+                                <Typography 
+                                  variant="caption" 
+                                  color="textSecondary"
+                                  style={{ paddingTop: '0.25rem', display: 'block', fontSize: '0.75rem' }}
+                                >
+                                  {new Date(session.timestamp || Date.now()).toLocaleDateString('en-US', {
+                                    month: 'long',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })} {new Date(session.timestamp || Date.now()).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: false
+                                  })}    •••    ID: {(session.id || '').split('-')[0]}
+                                </Typography>
+                              }
+                            />
+                          </div>
+                          <div className={classes.sessionActions}>
+                            <Tooltip title="Edit">
+                              <IconButton 
+                                edge="end" 
+                                aria-label="edit" 
+                                onClick={(e) => handleEditSession(e, session.id)}
+                                className={classes.sessionActionButton}
+                                color="primary"
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton 
+                                edge="end" 
+                                aria-label="delete" 
+                                onClick={(e) => handleDeleteConfirmation(e, session.id)}
+                                className={classes.sessionActionButton}
+                                style={{ color: '#ea4335' }}
+                              >
+                                <DeleteIcon style={{ color: '#ea4335' }} />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Download">
+                              <IconButton 
+                                edge="end" 
+                                aria-label="download" 
+                                onClick={() => handleDownloadSession(session.id)} 
+                                className={classes.sessionActionButton}
+                                color="primary"
+                              >
+                                <GetAppIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </div>
+                        </ListItem>
+                        <Divider />
+                      </React.Fragment>
+                    ))}
+                  </List>
+                </div>
+              </div>
             </Paper>
           )}
           
@@ -2467,7 +3398,7 @@ function MultiAgentHILChat() {
               {/* Add Processing indicator button in the middle */}
               {state.isLoading && (
                 <div className={classes.processingButton} onClick={toggleLoadingIndicator}>
-                  <span className={classes.processingText}>Processing...</span>
+                  <span className={classes.processingText}>The agent team is retrieving information, reflecting, collaborating, revising, and drafting reports to address your query...</span>
                 </div>
               )}
               
@@ -2489,48 +3420,61 @@ function MultiAgentHILChat() {
               </div>
             </div>
             <div className={classes.messageArea} ref={messageAreaRef} onScroll={handleScroll}>
-              {state.messages.map(renderMessage)}
-              <div ref={messageEndRef} />
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                {state.messages.map(message => (
+                  <div key={message.id} style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: message.role === 'user' || message.sender === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: '16px'
+                  }}>
+                    <Message message={message} onSectionExpanded={handleSectionExpanded} />
+                  </div>
+                ))}
+                <div ref={messageEndRef} />
+              </div>
             </div>
 
             {state.isLoading && <TypingIndicator />}
 
             <form onSubmit={handleSubmit} className={classes.inputArea}>
-              <IconButton 
-                onClick={handlePromptHelpOpen}
-                size="small"
-                className={classes.inputHelpIcon}
-                title="Prompt Engineering Tips"
-              >
-                <HelpOutlineIcon />
-              </IconButton>
-              <TextField
-                  inputRef={inputRef}
-                  className={classes.input}
-                  variant="outlined"
-                  placeholder="Type your message here... (Ctrl+Enter to send)"
-                  value={state.input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyPress}
-                  multiline
-                  minRows={1}
-                  maxRows={15}
-                  fullWidth
-                  InputProps={{
-                    style: { 
-                      maxHeight: '300px',
-                      overflow: 'hidden' // Hide overflow on the Input component wrapper
-                    }
-                  }}
-              />
-              <Button 
-                type="submit" 
-                variant="contained" 
-                color="primary" 
-                endIcon={<SendIcon />}
-              >
-                Send
-              </Button>
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                <IconButton 
+                  onClick={handlePromptHelpOpen}
+                  size="small"
+                  className={classes.inputHelpIcon}
+                  title="Prompt Engineering Tips"
+                >
+                  <HelpOutlineIcon />
+                </IconButton>
+                <TextField
+                    inputRef={inputRef}
+                    className={classes.input}
+                    variant="outlined"
+                    placeholder="Type your message here... (Ctrl+Enter to send)"
+                    value={state.input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyPress}
+                    multiline
+                    minRows={1}
+                    maxRows={15}
+                    fullWidth
+                    InputProps={{
+                      style: { 
+                        maxHeight: '300px',
+                        overflow: 'hidden' // Hide overflow on the Input component wrapper
+                      }
+                    }}
+                />
+                <Button 
+                  type="submit" 
+                  variant="contained" 
+                  color="primary" 
+                  endIcon={<SendIcon />}
+                >
+                  Send
+                </Button>
+              </div>
             </form>
           </Paper>
         </div>
@@ -2613,46 +3557,45 @@ function MultiAgentHILChat() {
           fullWidth
           disableEscapeKeyDown
         >
-          <DialogTitle>Review Plan</DialogTitle>
+          <DialogTitle>
+            <Typography className={classes.planDialogTitle}>
+              Review Plan
+            </Typography>
+          </DialogTitle>
           <DialogContent>
             <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Agents</Typography>
+              <Typography variant="h6" gutterBottom className={classes.sectionHeader}>Agents</Typography>
               <Paper elevation={1} className={classes.agentsBox}>
-                <Box 
-                  display="flex" 
-                  flexWrap="wrap" 
-                  justifyContent="flex-start" 
-                  alignItems="flex-start"
-                  gap={2}
-                  p={2}
-                >
+                <Box className={classes.agentsContainer}>
                   {availableAgents.length > 0 ? (
                     availableAgents.map((agent) => (
                       <Box 
                         key={agent.id} 
-                        display="flex" 
-                        flexDirection="column" 
-                        alignItems="center"
-                        width="120px"
-                        mb={2}
+                        className={`${classes.agentCard} ${selectedAgents.includes(agent.name) ? 'selected' : ''}`}
+                        onClick={() => {
+                          if (selectedAgents.includes(agent.name)) {
+                            setSelectedAgents(prev => prev.filter(name => name !== agent.name));
+                          } else {
+                            setSelectedAgents(prev => [...prev, agent.name]);
+                          }
+                        }}
                       >
-                        <PersonIcon style={{ fontSize: 40, color: '#757575', marginBottom: '8px' }} />
-                        <Typography variant="body2" align="center" style={{ marginBottom: '4px' }}>
+                        <img 
+                          src={robotIcon} 
+                          alt="Agent"
+                          className={`${classes.robotIcon} ${selectedAgents.includes(agent.name) ? 'selected' : 'unselected'}`}
+                        />
+                        <Typography variant="body2" className={classes.agentName}>
                           {agent.name || agent.agent_name || "Unnamed Agent"}
                         </Typography>
                         <FormControlLabel
                           control={
                             <Checkbox
-                              checked={
-                                // Since selected agents is a string array of names, check if the current agent's name is in it
-                                selectedAgents.includes(agent.name)
-                              }
+                              checked={selectedAgents.includes(agent.name)}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  // Add agent name (not ID) to selected agents
                                   setSelectedAgents(prev => [...prev, agent.name]);
                                 } else {
-                                  // Remove agent name from selected agents
                                   setSelectedAgents(prev => prev.filter(name => name !== agent.name));
                                 }
                               }}
@@ -2676,7 +3619,7 @@ function MultiAgentHILChat() {
             </Box>
 
             <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Proposed Plan</Typography>
+              <Typography variant="h6" gutterBottom className={classes.sectionHeader}>Proposed Plan</Typography>
               <Paper elevation={1} className={classes.planBox}>
                 <ReactMarkdown
                   rehypePlugins={[rehypeRaw]}
@@ -2691,7 +3634,7 @@ function MultiAgentHILChat() {
             
             {planNotes && (
               <Box mb={3}>
-                <Typography variant="h6" gutterBottom>Plan Notes</Typography>
+                <Typography variant="h6" gutterBottom className={classes.sectionHeader}>Plan Notes</Typography>
                 <Paper elevation={1} className={classes.planBox}>
                   <ReactMarkdown
                     rehypePlugins={[rehypeRaw]}
@@ -2706,7 +3649,7 @@ function MultiAgentHILChat() {
             )}
             
             <Box mb={3}>
-              <Typography variant="h6" gutterBottom>Message Selection</Typography>
+              <Typography variant="h6" gutterBottom className={classes.sectionHeader}>Message Selection</Typography>
               <Paper elevation={1} className={classes.modifiedQuestionBox}>
                 <Box mb={2}>
                   <FormControlLabel
@@ -2717,18 +3660,17 @@ function MultiAgentHILChat() {
                         color="primary"
                       />
                     }
-                    label="Original Message"
+                    label={<span className={classes.messageRadioLabel}>Original Message</span>}
                   />
-                  <Typography 
-                    variant="body1" 
-                    style={{ 
-                      padding: '8px',
-                      backgroundColor: messageChoice === 'original' ? '#f0f7ff' : 'transparent',
-                      borderRadius: '4px'
-                    }}
+                  <div 
+                    className={`${classes.selectedMessageContainer} ${messageChoice === 'original' ? classes.selectedMessage : ''}`}
                   >
-                    {originalMessage}
-                  </Typography>
+                    <Typography 
+                      variant="body1" 
+                    >
+                      {originalMessage}
+                    </Typography>
+                  </div>
                 </Box>
                 
                 {modifiedQuestion && (
@@ -2741,18 +3683,17 @@ function MultiAgentHILChat() {
                           color="primary"
                         />
                       }
-                      label="Modified Message"
+                      label={<span className={classes.messageRadioLabel}>Modified Message</span>}
                     />
-                    <Typography 
-                      variant="body1" 
-                      style={{ 
-                        padding: '8px',
-                        backgroundColor: messageChoice === 'modified' ? '#f0f7ff' : 'transparent',
-                        borderRadius: '4px'
-                      }}
+                    <div 
+                      className={`${classes.selectedMessageContainer} ${messageChoice === 'modified' ? classes.selectedMessage : ''}`}
                     >
-                      {modifiedQuestion}
-                    </Typography>
+                      <Typography 
+                        variant="body1" 
+                      >
+                        {modifiedQuestion}
+                      </Typography>
+                    </div>
                   </Box>
                 )}
               </Paper>
@@ -2793,13 +3734,15 @@ function MultiAgentHILChat() {
             </Fade>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setPlanDialogOpen(false)}>
+            <Button 
+              onClick={() => setPlanDialogOpen(false)}
+              className={classes.cancelButton}
+            >
               Cancel
             </Button>
             <Button 
               onClick={handlePlanSubmit}
-              color="primary"
-              variant="contained"
+              className={`${classes.dialogButton} ${classes.submitButton}`}
               disabled={!planChoice || (planChoice === 'reject' && !rejectionText.trim())}
             >
               Submit
@@ -2884,7 +3827,11 @@ function MultiAgentHILChat() {
             setTeamError('');
           }}
         >
-          <DialogTitle>Edit Chat Session</DialogTitle>
+          <DialogTitle>
+            <Typography className={classes.editDialogTitle}>
+              Edit Chat Session
+            </Typography>
+          </DialogTitle>
           <DialogContent>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
               <TextField
@@ -2900,20 +3847,20 @@ function MultiAgentHILChat() {
               <Typography variant="body2" color="textSecondary">
                 Note: The team associated with this session cannot be changed.
               </Typography>
-              <Typography 
-                variant="body2" 
-                color="primary" 
-                style={{ 
-                  fontWeight: 600, 
-                  marginTop: '4px', 
-                  backgroundColor: '#f0f7ff', 
-                  padding: '8px 12px', 
-                  borderRadius: '4px',
-                  display: 'inline-block'
-                }}
-              >
-                Current team: {editSessionTeam}
-              </Typography>
+              <div className={classes.teamDisplay}>
+                <img 
+                  src={robotIcon} 
+                  alt="Team Icon" 
+                  style={{ 
+                    width: '24px', 
+                    height: '24px',
+                    filter: 'brightness(1.2) drop-shadow(0 0 3px rgba(33, 150, 243, 0.5))'
+                  }} 
+                />
+                <Typography className={classes.teamName}>
+                  {editSessionTeam}
+                </Typography>
+              </div>
               {teamError && (
                 <Typography color="error" variant="body2">
                   {teamError}
@@ -2922,18 +3869,20 @@ function MultiAgentHILChat() {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => {
-              setEditDialogOpen(false);
-              setEditSessionId(null);
-              setEditSessionName('');
-              setTeamError('');
-            }}>
+            <Button 
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditSessionId(null);
+                setEditSessionName('');
+                setTeamError('');
+              }}
+              className={classes.cancelButton}
+            >
               Cancel
             </Button>
             <Button 
               onClick={handleEditSubmit}
-              color="primary"
-              variant="contained"
+              className={`${classes.dialogButton} ${classes.submitButton}`}
             >
               Update
             </Button>

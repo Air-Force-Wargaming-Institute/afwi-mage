@@ -41,10 +41,10 @@ embedding-1  | 2025-03-03 04:24:34,639 - embedding_service - INFO - GPU 0: NVIDI
 embedding-1  | 2025-03-03 04:24:34,639 - embedding_service - INFO - PyTorch detected 1 CUDA device(s)
 embedding-1  | 2025-03-03 04:24:34,639 - embedding_service - INFO - CUDA device 0: NVIDIA GeForce RTX 4070, Compute capability: (8, 9)                                
 embedding-1  | 2025-03-03 04:24:34,640 - embedding_service - INFO - GPU available: True                                                                               
-embedding-1  | 2025-03-03 04:24:34,640 - embedding_service - INFO - Initializing LLM with: Model=llama3.2:latest, Base URL=http://host.docker.internal:11434          
+embedding-1  | 2025-03-03 04:24:34,640 - embedding_service - INFO - Initializing LLM with: Model=huihui_ai/llama3.2-abliterate:latest, Base URL=http://host.docker.internal:11434          
 embedding-1  | 2025-03-03 04:24:34,640 - embedding_service - INFO - LLM settings: Temperature=0.2, Context Window=16000                                               
 embedding-1  | 2025-03-03 04:24:34,645 - embedding_service - INFO - Successfully initialized LLM                                                                      
-embedding-1  | 2025-03-03 04:24:34,645 - embedding_service - INFO - Initialized LLM with model: llama3.2:latest, GPU enabled: True                                    
+embedding-1  | 2025-03-03 04:24:34,645 - embedding_service - INFO - Initialized LLM with model: huihui_ai/llama3.2-abliterate:latest, GPU enabled: True                                    
 embedding-1  | INFO:     Started server process [1]                                                                                                                   
 embedding-1  | INFO:     Waiting for application startup.
 embedding-1  | 2025-03-03 04:24:34,671 - embedding_service - INFO - Starting migration of vector store index files...                                                 

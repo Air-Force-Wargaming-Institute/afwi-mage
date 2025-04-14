@@ -1,1 +1,111 @@
-{}
+{
+  "f09c6f80-b245-4d7c-873c-87ed077b59a6": {
+    "filename": "SampleData.xlsx",
+    "size_bytes": 36046,
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "SalesOrders",
+      "MyLinks"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 26,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 26
+      },
+      "SalesOrders": {
+        "columns": [
+          "OrderDate",
+          "Region",
+          "Rep",
+          "Item",
+          "Units",
+          "Unit Cost",
+          "Total"
+        ],
+        "row_count": 43
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "f09c6f80-b245-4d7c-873c-87ed077b59a6",
+    "description": null,
+    "original_filename": "SampleData.xlsx",
+    "modified_filename": "SampleData.xlsx",
+    "upload_date": "2025-04-12T03:28:30.245720",
+    "modified_date": "2025-04-12T03:28:30.245720",
+    "storage_path": "/app/data/workbench/spreadsheets/f09c6f80-b245-4d7c-873c-87ed077b59a6.xlsx"
+  },
+  "5401e648-0403-4789-97f1-23e04a9eaceb": {
+    "filename": "sampledatainsurance.xlsx",
+    "size_bytes": 61520,
+    "sheet_count": 3,
+    "sheets": [
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 23,
+    "sheets_metadata": {
+      "Instructions": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
+      }
+    },
+    "id": "5401e648-0403-4789-97f1-23e04a9eaceb",
+    "description": null,
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance.xlsx",
+    "upload_date": "2025-04-12T03:35:59.372393",
+    "modified_date": "2025-04-12T03:35:59.372393",
+    "storage_path": "/app/data/workbench/spreadsheets/5401e648-0403-4789-97f1-23e04a9eaceb.xlsx"
+  }
+}
