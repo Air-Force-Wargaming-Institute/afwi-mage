@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -24,6 +24,8 @@ import {
 } from '@material-ui/icons';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -132,6 +134,7 @@ const useStyles = makeStyles((theme) => ({
 
 function ConversationTree() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [conversations, setConversations] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [expandedInteractions, setExpandedInteractions] = useState(new Set());
@@ -157,7 +160,13 @@ function ConversationTree() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get('http://localhost:8009/conversations/list');
+      const response = await axios.get(getGatewayUrl('/api/chat/conversations/list'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setConversations(response.data);
     } catch (error) {
       console.error('Error fetching conversations:', error);

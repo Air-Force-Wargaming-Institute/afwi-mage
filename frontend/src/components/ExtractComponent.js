@@ -1,7 +1,6 @@
-import React from 'react';
+import React, {useContext} from 'react';
 import axios from 'axios';
 import '../App.css';
-import { getApiUrl } from '../config';
 import { Box, Grid, Paper, Button, TextField, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, CircularProgress, Typography, List, ListItem, ListItemText } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,6 +12,8 @@ import { DataGrid } from '@mui/x-data-grid';
 import { keyframes } from '@emotion/react';
 import { styled } from '@mui/material/styles';
 import { useExtraction, ACTIONS } from '../contexts/ExtractionContext';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 // Add the pulsing animation keyframes
 const pulseAnimation = keyframes`
@@ -45,7 +46,8 @@ const PulsingButton = styled(Button)(({ theme, isextracting }) => ({
 
 function ExtractComponent() {
   const { state, dispatch } = useExtraction();
-  
+  const { user, token } = useContext(AuthContext);
+
   const {
     files,
     selectedFiles = [], // Add default empty array
@@ -86,7 +88,13 @@ function ExtractComponent() {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
     dispatch({ type: ACTIONS.SET_ERROR, payload: null });
     
-    axios.get(getApiUrl('EXTRACTION', `/api/extraction/files/?folder=${folder}`))
+    axios.get(getGatewayUrl(`/api/extraction/files/?folder=${folder}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
       .then(response => {
         if (Array.isArray(response.data)) {
           dispatch({ type: ACTIONS.SET_FILES, payload: response.data });
@@ -109,7 +117,13 @@ function ExtractComponent() {
 
   const fetchCsvFiles = React.useCallback(async () => {
     try {
-      const response = await axios.get(getApiUrl('EXTRACTION', '/api/extraction/csv-files/'));
+      const response = await axios.get(getGatewayUrl('/api/extraction/csv-files/'),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       dispatch({ type: ACTIONS.SET_CSV_FILES, payload: response.data });
     } catch (error) {
       console.error('Error fetching CSV files:', error);
@@ -166,9 +180,13 @@ function ExtractComponent() {
     setError(null);
 
     try {
-        const response = await axios.post(getApiUrl('EXTRACTION', '/api/extraction/extract/'), {
+        const response = await axios.post(getGatewayUrl('/api/extraction/extract/'), {
             filenames: selectedFiles,
             csv_filename: csvFilename.trim()
+        }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
         
         if (response.data.status === "Extraction process completed") {
@@ -232,9 +250,13 @@ function ExtractComponent() {
     try {
       // Ensure the new name has .csv extension
       const newNameWithExtension = newName.endsWith('.csv') ? newName : `${newName}.csv`;
-      await axios.post(getApiUrl('EXTRACTION', '/api/extraction/rename-csv/'), { 
+      await axios.post(getGatewayUrl('/api/extraction/rename-csv/'), { 
         old_name: oldName, 
         new_name: newNameWithExtension 
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       setMessage(`CSV file '${oldName}' renamed to '${newNameWithExtension}' successfully`);
       fetchCsvFiles();
@@ -256,7 +278,13 @@ function ExtractComponent() {
     setMetadataOpen(false);
     setMetadataContent(null);
     try {
-      await axios.delete(getApiUrl('EXTRACTION', `/api/extraction/delete-csv/${filename}`));
+      await axios.delete(getGatewayUrl(`/api/extraction/delete-csv/${filename}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setMessage(`CSV file '${filename}' deleted successfully`);
       fetchCsvFiles();
     } catch (error) {
@@ -268,7 +296,13 @@ function ExtractComponent() {
   const handlePreviewClick = async (filename) => {
     try {
       setSelectedCsvFile(filename);
-      const response = await axios.get(getApiUrl('EXTRACTION', `/api/extraction/csv-preview/${filename}`));
+      const response = await axios.get(getGatewayUrl(`/api/extraction/csv-preview/${filename}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setPreviewData(response.data);
       setPreviewOpen(true);
     } catch (error) {
@@ -278,7 +312,13 @@ function ExtractComponent() {
 
   const handleMetadataClick = async (filename) => {
     try {
-      const csvFiles = await axios.get(getApiUrl('EXTRACTION', '/api/extraction/csv-files/'));
+      const csvFiles = await axios.get(getGatewayUrl('/api/extraction/csv-files/'),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       const fileMetadata = csvFiles.data.find(file => file.name === filename);
       setMetadataContent(fileMetadata);
       setMetadataOpen(true);
@@ -842,14 +882,24 @@ function ExtractComponent() {
 
                   console.log('Formatted data:', formattedData);
 
-                  await axios.post(getApiUrl('EXTRACTION', `/api/extraction/update-csv/${selectedCsvFile}`), {
+                  await axios.post(getGatewayUrl(`/api/extraction/update-csv/${selectedCsvFile}`), {
                     data: formattedData
+                  }, {
+                    headers: {
+                      'Authorization': `Bearer ${token}`
+                    }
                   });
                   
                   setMessage('CSV file updated successfully');
                   
                   // Refresh the preview data
-                  const response = await axios.get(getApiUrl('EXTRACTION', `/api/extraction/csv-preview/${selectedCsvFile}`));
+                  const response = await axios.get(getGatewayUrl(`/api/extraction/csv-preview/${selectedCsvFile}`),
+                    {
+                      headers: {
+                        'Authorization': `Bearer ${token}`
+                      }
+                    }
+                  );
                   setPreviewData(response.data);
                 } catch (error) {
                   console.error('Error saving changes:', error);

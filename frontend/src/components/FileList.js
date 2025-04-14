@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Checkbox, IconButton, TextField, Typography, Select, MenuItem, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, List, ListItem, ListItemIcon, ListItemText, Tooltip, Divider } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import FolderIcon from '@material-ui/icons/Folder';
@@ -17,7 +17,8 @@ import SecurityIcon from '@material-ui/icons/Security';
 import DragIndicatorIcon from '@material-ui/icons/DragIndicator';
 import axios from 'axios';
 import '../App.css';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 const securityClassifications = [
   "Unclassified",
@@ -213,6 +214,7 @@ function FileList({
 }) {
   const [localFiles, setLocalFiles] = useState([]);
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [editingItem, setEditingItem] = useState(null);
   const [newItemName, setNewItemName] = useState('');
   const [sortedFiles, setSortedFiles] = useState([]);
@@ -422,7 +424,13 @@ function FileList({
     setItemToDelete(item);
     if (item.type === 'folder') {
       try {
-        const response = await axios.get(`${UPLOAD_SERVICE_URL}/api/upload/files/?folder=${currentFolder ? `${currentFolder}/` : ''}${item.name}`);
+        const response = await axios.get(getGatewayUrl(`/api/upload/files/?folder=${currentFolder ? `${currentFolder}/` : ''}${item.name}`),
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
         setFolderContents(response.data);
       } catch (error) {
         console.error('Error fetching folder contents:', error);
@@ -474,7 +482,13 @@ function FileList({
   ];
 
   const fetchFiles = (folder) => {
-    axios.get(getApiUrl('UPLOAD', `/api/upload/files/?folder=${folder}`))
+    axios.get(getGatewayUrl(`/api/upload/files/?folder=${folder}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
       .then(response => {
         setFiles(response.data);  // Use setFiles from props
       })
@@ -483,7 +497,13 @@ function FileList({
 
   const handleDeleteFile = async (filename) => {
     try {
-      await axios.delete(getApiUrl('UPLOAD', `/api/upload/files/${filename}`));
+      await axios.delete(getGatewayUrl(`/api/upload/files/${filename}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       // ... (rest of the function)
     } catch (error) {
       // ... (error handling)

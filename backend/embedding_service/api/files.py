@@ -31,7 +31,8 @@ except ImportError as e:
         print(f"Using environment UPLOAD_DIR: {UPLOAD_DIR}")
 
 # Set up router
-router = APIRouter(prefix="/files", tags=["files"])
+# router = APIRouter(prefix="/files", tags=["files"])
+router = APIRouter(tags=["files"])
 
 
 class FileInfo(BaseModel):
@@ -88,7 +89,7 @@ class FileDeleteResponse(BaseModel):
     }
 
 
-@router.get("", response_model=FileListResponse)
+@router.get("/api/embedding/files", response_model=FileListResponse)
 async def get_files():
     """Get a list of files available for embedding."""
     upload_dir = Path(UPLOAD_DIR)
@@ -153,7 +154,7 @@ async def get_files():
     return FileListResponse(files=files)
 
 
-@router.get("/{file_path:path}", response_model=FileDetailResponse)
+@router.get("/api/embedding/files/{file_path:path}", response_model=FileDetailResponse)
 async def get_file_detail(file_path: str):
     """Get detailed information about a file."""
     upload_dir = Path(UPLOAD_DIR)
@@ -207,7 +208,7 @@ async def get_file_detail(file_path: str):
     return FileDetailResponse(file_info=file_info, metadata=metadata)
 
 
-@router.delete("/{file_path:path}", response_model=FileDeleteResponse)
+@router.delete("/api/embedding/files/{file_path:path}", response_model=FileDeleteResponse)
 async def delete_file(file_path: str):
     """Delete a file and its associated metadata."""
     upload_dir = Path(UPLOAD_DIR)

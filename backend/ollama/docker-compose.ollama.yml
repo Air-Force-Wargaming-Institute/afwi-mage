@@ -1,0 +1,45 @@
+services:
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ollama-embedding
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # Basic Configuration
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODELS=/root/.ollama/models
+      - OLLAMA_GPU_LAYERS=all
+      # Minimal memory requirements
+      - OLLAMA_CUDA_MALLOC=2GB
+      # Offline mode
+      - OLLAMA_SKIP_UPDATE_CHECK=true
+      - HF_DATASETS_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+      # GPU Allocation - 10% split across both GPUs
+      - CUDA_VISIBLE_DEVICES=0
+      #- CUDA_VISIBLE_DEVICES=0,1
+      - OLLAMA_GPU_MEMORY_UTILIZATION=0.1
+      - OLLAMA_GPU_LAYERS_AUTO=1
+      - OLLAMA_NUM_GPU=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              #count: 2
+              capabilities: [gpu]
+    networks:
+      - app-network
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

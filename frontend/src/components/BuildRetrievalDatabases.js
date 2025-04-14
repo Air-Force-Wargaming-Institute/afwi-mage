@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   Typography,
   Grid,
@@ -46,11 +46,12 @@ import LinkIcon from '@material-ui/icons/Link';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import FileList from './FileList';
 import axios from 'axios';
-import { getApiUrl } from '../config';
 import '../App.css'; // Import the App.css styles
 import { Link as RouterLink } from 'react-router-dom';
 import BuildIcon from '@material-ui/icons/Build';
 import StarIcon from '@material-ui/icons/Star';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 import { 
   StyledContainer, 
   GradientBorderPaper, 
@@ -182,6 +183,7 @@ const useStyles = makeStyles((theme) => ({
 
 function BuildRetrievalDatabases() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   
   // State for file selection and management
   const [files, setFiles] = useState([]);
@@ -228,7 +230,13 @@ function BuildRetrievalDatabases() {
 
   const fetchEmbeddingModels = async () => {
     try {
-      const response = await axios.get(getApiUrl('EMBEDDING', '/api/embedding/models'));
+      const response = await axios.get(getGatewayUrl('/api/embedding/models'),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       if (Array.isArray(response.data)) {
         setEmbeddingModels(response.data);
       } else {
@@ -246,7 +254,13 @@ function BuildRetrievalDatabases() {
     
     try {
       // Use the EXTRACTION service to fetch files from the document library (consistent with ExtractComponent)
-      const response = await axios.get(getApiUrl('EXTRACTION', `/api/extraction/files/?folder=${folder || ''}`));
+      const response = await axios.get(getGatewayUrl(`/api/extraction/files/?folder=${folder || ''}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       if (Array.isArray(response.data)) {
         setFiles(response.data);
@@ -308,7 +322,7 @@ function BuildRetrievalDatabases() {
 
     try {
       // Make the API call to create the vector store using the new endpoint
-      const response = await axios.post(getApiUrl('EMBEDDING', '/api/embedding/vectorstores'), {
+      const response = await axios.post(getGatewayUrl('/api/embedding/vectorstores'), {
         name: vectorStoreName,
         description: vectorStoreDescription,
         files: selectedFiles,
@@ -318,6 +332,10 @@ function BuildRetrievalDatabases() {
         min_paragraph_length: parseInt(minParagraphLength),
         chunk_size: parseInt(chunkSize),
         chunk_overlap: parseInt(chunkOverlap),
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       // Keep isCreating true if we got a job ID (async processing)
@@ -350,7 +368,13 @@ function BuildRetrievalDatabases() {
   // These handlers are for the FileList component
   const handleDeleteFile = async (filename) => {
     try {
-      await axios.delete(getApiUrl('UPLOAD', `/api/upload/files/${filename}`));
+      await axios.delete(getGatewayUrl(`/api/upload/files/${filename}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       fetchFiles(currentFolder);
     } catch (error) {
       console.error('Error deleting file:', error);

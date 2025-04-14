@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Container, Typography, Grid, Paper, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@material-ui/core';
 import axios from 'axios';
 import '../App.css';
 import CSVPreview from './CSVPreview';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 import { useGeneration, ACTIONS } from '../contexts/GenerationContext';
 
 function GenerateDataset() {
   const { state, dispatch } = useGeneration();
+  const { user, token } = useContext(AuthContext);
   
   const {
     csvFiles,
@@ -26,7 +28,11 @@ function GenerateDataset() {
 
   const fetchCsvFiles = React.useCallback(async () => {
     try {
-      const response = await axios.get(getApiUrl('EXTRACTION', '/api/extraction/csv-files/'));
+      const response = await axios.get(getGatewayUrl('/api/extraction/csv-files/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       dispatch({ type: ACTIONS.SET_CSV_FILES, payload: response.data });
     } catch (error) {
       console.error('Error fetching CSV files:', error);
@@ -35,7 +41,11 @@ function GenerateDataset() {
 
   const fetchTrainingDatasets = React.useCallback(async () => {
     try {
-      const response = await axios.get(getApiUrl('GENERATION', '/api/generate/training-datasets/'));
+      const response = await axios.get(getGatewayUrl('/api/generate/training-datasets/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       console.log('Training datasets:', response.data); 
       dispatch({ type: ACTIONS.SET_TRAINING_DATASETS, payload: response.data });
     } catch (error) {
@@ -77,9 +87,13 @@ function GenerateDataset() {
 
   const handleCreateDataset = async () => {
     try {
-      const response = await axios.post(getApiUrl('GENERATION', '/api/generate/dataset/'), {
+      const response = await axios.post(getGatewayUrl('/api/generate/generate-dataset/'), {
         sourceFile: selectedCsv,
         datasetName: finalDatasetName
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       console.log(response.data);
       fetchTrainingDatasets();

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Typography, Button, Box } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import AddIcon from '@material-ui/icons/Add';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -20,6 +22,7 @@ const useStyles = makeStyles((theme) => ({
 
 function LLMLibrary() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
 
   const handleSetupNewLLM = () => {
     // TODO: Implement the logic to set up a new LLM

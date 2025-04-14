@@ -1,7 +1,6 @@
 FROM mage-base:latest
 
-# No need to install dependencies as they're in the base image
-
+WORKDIR /app
 # Copy service-specific files
 COPY . .
 

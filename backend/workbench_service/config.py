@@ -42,9 +42,11 @@ WORKBENCH_SPREADSHEETS_DIR = WORKBENCH_DIR / "spreadsheets" # Consolidated direc
 CORE_SERVICE_URL = os.environ.get("CORE_SERVICE_URL", "http://core:8000")
 EMBEDDING_SERVICE_URL = os.environ.get("EMBEDDING_SERVICE_URL", "http://embedding:8006")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://host.docker.internal:8007") # Default vLLM endpoint
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "llama3.2:3b")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower() # 'ollama' or 'vllm'
+DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "/models/DeepHermes-3-Llama-3-8B-Preview")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
 
 # Job configuration
@@ -67,6 +69,8 @@ def get_config() -> Dict[str, Any]:
         "OLLAMA_BASE_URL": OLLAMA_BASE_URL,
         "DEFAULT_LLM_MODEL": DEFAULT_LLM_MODEL,
         "DEFAULT_EMBEDDING_MODEL": DEFAULT_EMBEDDING_MODEL,
+        "LLM_PROVIDER": LLM_PROVIDER,
+        "VLLM_BASE_URL": VLLM_BASE_URL,
         "MAX_CONCURRENT_JOBS": MAX_CONCURRENT_JOBS,
         "JOB_TIMEOUT_SECONDS": JOB_TIMEOUT_SECONDS,
         "IN_DOCKER": IN_DOCKER,
@@ -100,5 +104,12 @@ def validate_config() -> None:
     # Validate external service URLs
     logger.info(f"External services: CORE_SERVICE_URL={CORE_SERVICE_URL}")
     logger.info(f"LLM configuration: DEFAULT_LLM_MODEL={DEFAULT_LLM_MODEL}")
+    logger.info(f"LLM Provider: {LLM_PROVIDER}")
+    if LLM_PROVIDER == "ollama":
+        logger.info(f"Ollama Base URL: {OLLAMA_BASE_URL}")
+    elif LLM_PROVIDER == "vllm":
+        logger.info(f"vLLM Base URL: {VLLM_BASE_URL}")
+    else:
+        logger.warning(f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}. Defaulting behavior might be unexpected.")
 
     logger.info("Configuration validation complete") 

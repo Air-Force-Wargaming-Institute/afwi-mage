@@ -258,7 +258,7 @@ async def convert_docx_to_pdf(docx_path: Path) -> Optional[Path]:
         logger.error(f"Error during conversion: {str(e)}")
         return None
 
-@router.get("/documents")
+@router.get("/api/core/documents")
 async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
     """List all documents and folders in the specified path"""
     try:
@@ -349,7 +349,7 @@ async def list_documents(path: Optional[str] = "") -> List[DocumentResponse]:
         logger.error(f"Error listing documents: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/folders")
+@router.post("/api/core/documents/folders")
 async def create_folder(folder: FolderRequest) -> JSONResponse:
     """Create a new folder"""
     try:
@@ -377,7 +377,7 @@ async def create_folder(folder: FolderRequest) -> JSONResponse:
         logger.error(f"Error creating folder: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/move")
+@router.post("/api/core/documents/move")
 async def move_items(
     source_paths: List[str] = Body(...),
     target_folder: str = Body(...),
@@ -431,7 +431,7 @@ async def move_items(
         logger.error(f"Error moving items: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/upload")
+@router.post("/api/core/documents/upload")
 async def upload_documents(files: List[UploadFile] = File(...), folder_path: str = Form("")):
     """Upload one or more documents"""
     try:
@@ -514,7 +514,7 @@ async def upload_documents(files: List[UploadFile] = File(...), folder_path: str
         logger.error(f"Error during file upload: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/documents/{document_id}/download")
+@router.get("/api/core/documents/{document_id}/download")
 async def download_document(document_id: str):
     """Download a specific document"""
     try:
@@ -535,7 +535,7 @@ async def download_document(document_id: str):
         logger.error(f"Error downloading document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/documents/{document_id}")
+@router.delete("/api/core/documents/{document_id}")
 async def delete_document(document_id: str) -> JSONResponse:
     """Delete a specific document"""
     try:
@@ -553,7 +553,7 @@ async def delete_document(document_id: str) -> JSONResponse:
         logger.error(f"Error deleting document: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/documents/{document_id}/preview")
+@router.get("/api/core/documents/{document_id}/preview")
 async def preview_document(document_id: str) -> JSONResponse:
     """Get a preview of a document's content"""
     try:
@@ -582,7 +582,7 @@ async def preview_document(document_id: str) -> JSONResponse:
         logger.error(f"Error generating preview: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/bulk-delete")
+@router.post("/api/core/documents/bulk-delete")
 async def bulk_delete_documents(
     request: BulkDeleteRequest,
     background_tasks: BackgroundTasks
@@ -608,7 +608,7 @@ async def bulk_delete_documents(
         "status_endpoint": f"/documents/bulk-operations/{operation_id}/status"
     }
 
-@router.post("/documents/bulk-download")
+@router.post("/api/core/documents/bulk-download")
 async def bulk_download_documents(request: BulkDownloadRequest) -> StreamingResponse:
     """Download multiple documents as a ZIP file with progress tracking."""
     operation_id = generate_operation_id()
@@ -645,7 +645,7 @@ async def bulk_download_documents(request: BulkDownloadRequest) -> StreamingResp
             detail=f"Error creating ZIP file: {str(e)}"
         )
 
-@router.get("/documents/bulk-operations/{operation_id}/status")
+@router.get("/api/core/documents/bulk-operations/{operation_id}/status")
 async def get_operation_status(operation_id: str) -> BulkOperationStatus:
     """Get the status of a bulk operation."""
     if operation_id not in operation_progress:
@@ -659,7 +659,7 @@ async def get_operation_status(operation_id: str) -> BulkOperationStatus:
     
     return status
 
-@router.get("/documents/{document_id:path}/download")
+@router.get("/api/core/documents/{document_id:path}/download")
 async def download_document(document_id: str):
     """Download a single document."""
     try:
@@ -705,7 +705,7 @@ class RenameRequest(BaseModel):
             raise ValueError("Name contains invalid characters")
         return v
 
-@router.post("/documents/rename")
+@router.post("/api/core/documents/rename")
 async def rename_item(old_path: str = Body(...), new_name: str = Body(...)) -> JSONResponse:
     """Rename a document or folder"""
     try:

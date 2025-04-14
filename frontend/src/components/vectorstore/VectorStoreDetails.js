@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   Typography,
   makeStyles,
@@ -38,6 +38,8 @@ import DocumentSelector from './DocumentSelector';
 import SearchIcon from '@material-ui/icons/Search';
 import CheckIcon from '@material-ui/icons/Check';
 import Description from '@material-ui/icons/Description';
+import { AuthContext } from '../../contexts/AuthContext';
+import { getApiUrl, getGatewayUrl } from '../../config';
 
 import { 
   getJobStatus,
@@ -211,6 +213,7 @@ const useStyles = makeStyles((theme) => ({
 const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh }) => {
   const classes = useStyles();
   const theme = useTheme();
+  const { user, token } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -295,7 +298,7 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
       console.log("Batch update operations:", operations);
       
       // Call the batch update API
-      const result = await batchUpdateVectorStore(vectorStore.id, operations);
+      const result = await batchUpdateVectorStore(vectorStore.id, operations, token);
       
       console.log("Batch update result:", result);
       
@@ -352,7 +355,7 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
 
       const checkStatus = async () => {
         try {
-          const status = await getJobStatus(jobId);
+          const status = await getJobStatus(jobId, token);
           
           // Update progress
           if (status) {

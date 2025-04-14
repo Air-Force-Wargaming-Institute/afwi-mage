@@ -37,7 +37,7 @@ import InfoIcon from '@material-ui/icons/Info';
 import Visibility from '@material-ui/icons/Visibility';
 import VisibilityOff from '@material-ui/icons/VisibilityOff';
 import { AuthContext } from '../contexts/AuthContext';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -159,7 +159,7 @@ function AdminDashboard() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(getApiUrl('AUTH', '/api/users'), {
+      const response = await fetch(getGatewayUrl('/api/auth/users'), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -269,8 +269,8 @@ function AdminDashboard() {
 
     try {
       const endpoint = editingUser 
-        ? `/api/users/${editingUser.id}` 
-        : '/api/users';
+        ? `/api/auth/users/${editingUser.id}` 
+        : '/api/auth/users';
       
       const method = editingUser ? 'PUT' : 'POST';
       
@@ -284,7 +284,7 @@ function AdminDashboard() {
         userData.password = newUser.password;
       }
 
-      const response = await fetch(getApiUrl('AUTH', endpoint), {
+      const response = await fetch(getGatewayUrl(endpoint), {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -323,7 +323,7 @@ function AdminDashboard() {
 
   const handleDeleteUser = async (userId) => {
     try {
-      const response = await fetch(getApiUrl('AUTH', `/api/users/${userId}`), {
+      const response = await fetch(getGatewayUrl(`/api/auth/users/${userId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

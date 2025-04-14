@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useContext, useRef, useState } from 'react';
 import {
   Container,
   Paper,
@@ -47,7 +47,8 @@ import {
 } from '@material-ui/icons';
 import FilePreview from './FilePreview';
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 import { useDocumentLibrary, ACTIONS } from '../contexts/DocumentLibraryContext';
 import { StyledContainer, GradientBorderPaper, useContainerStyles, GradientText } from '../styles/StyledComponents';
 import { DeleteButton, DownloadButton, EditButton, ViewButton } from '../styles/ActionButtons';
@@ -308,6 +309,7 @@ class ErrorBoundary extends React.Component {
 
 function DocumentLibrary() {
   const { state, dispatch } = useDocumentLibrary();
+  const { user, token } = useContext(AuthContext);
   const classes = useStyles();
   const theme = useTheme();
   const containerClasses = useContainerStyles();
@@ -348,7 +350,14 @@ function DocumentLibrary() {
 
     try {
       dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: true });
-      const response = await fetch(getApiUrl('UPLOAD', `/api/upload/files/?folder=${encodeURIComponent(path || '')}`));
+      const response = await fetch(
+        getGatewayUrl(`/api/upload/files/?folder=${encodeURIComponent(path || '')}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          } 
+        }
+      );
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -454,8 +463,9 @@ function DocumentLibrary() {
         total_items: files.length
       });
 
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/upload/'), {
+      const response = await fetch(getGatewayUrl('/api/upload/upload'), {
         method: 'POST',
+        headers: {'Authorization': `Bearer ${token}`},
         body: formData,
       });
       
@@ -534,10 +544,14 @@ function DocumentLibrary() {
       }
 
       const endpoint = isFolder 
-        ? getApiUrl('UPLOAD', `/api/upload/delete_folder/${encodeURIComponent(item.path)}`)
-        : getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(item.path)}`);
+        ? getGatewayUrl(`/api/upload/delete_folder/${encodeURIComponent(item.path)}`)
+        : getGatewayUrl(`/api/upload/files/${encodeURIComponent(item.path)}`);
 
-      await axios.delete(endpoint);
+      await axios.delete(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       fetchDocuments(currentPath);
       
@@ -558,7 +572,12 @@ function DocumentLibrary() {
         .map(segment => encodeURIComponent(segment))
         .join('/');
       
-      const response = await fetch(getApiUrl('UPLOAD', `/api/upload/files/${encodedPath}`));
+      const response = await fetch(
+        getGatewayUrl(`/api/upload/files/${encodedPath}`), 
+        {
+          headers: {'Authorization': `Bearer ${token}`}
+        }
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -613,8 +632,14 @@ function DocumentLibrary() {
       
       const filePaths = [...new Set(selectedItems.map(item => item.path))];
       
-      await axios.post(getApiUrl('UPLOAD', '/api/upload/bulk-delete/'), {
+      // Perform the bulk delete
+      await axios.post(getGatewayUrl('/api/upload/bulk-delete/'), {
         filenames: filePaths
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       setSelectedDocs([]);
@@ -632,9 +657,10 @@ function DocumentLibrary() {
     
     try {
         setIsLoading(true);
-        const response = await fetch(getApiUrl('UPLOAD', '/api/upload/bulk-download/'), {
+        const response = await fetch(getGatewayUrl('/api/upload/bulk-download/'), {
             method: 'POST',
             headers: {
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -667,9 +693,10 @@ function DocumentLibrary() {
 
   const handleCreateFolder = async () => {
     try {
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/create_folder/'), {
+      const response = await fetch(getGatewayUrl('/api/upload/create_folder/'), {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -733,9 +760,10 @@ function DocumentLibrary() {
       const fullNewName = itemToRename.isFolder ? newName : `${newName}${extension}`;
 
       const endpoint = itemToRename.isFolder ? '/api/upload/rename_folder/' : '/api/upload/rename_file/';
-      const response = await fetch(getApiUrl('UPLOAD', endpoint), {
+      const response = await fetch(getGatewayUrl(endpoint), {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -858,9 +886,10 @@ function DocumentLibrary() {
         currentDraggedItem.map(item => item.path) :
         [currentDraggedItem.path];
 
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
+      const response = await fetch(getGatewayUrl('/api/upload/move-file/'), {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -916,9 +945,10 @@ function DocumentLibrary() {
         currentDraggedItem.map(item => item.path) :
         [currentDraggedItem.path];
 
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
+      const response = await fetch(getGatewayUrl('/api/upload/move-file/'), {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -968,9 +998,10 @@ function DocumentLibrary() {
       setIsLoading(true);
       const parentPath = currentPath.split('/').slice(0, -1).join('/');
       
-      const response = await fetch(getApiUrl('UPLOAD', '/api/upload/move-file/'), {
+      const response = await fetch(getGatewayUrl('/api/upload/move-file/'), {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -1018,9 +1049,14 @@ function DocumentLibrary() {
 
   const handleClassificationChange = async (item, newClassification) => {
     try {
-      const response = await axios.post(getApiUrl('UPLOAD', '/api/upload/update-security/'), {
+      const response = await axios.post(getGatewayUrl('/api/upload/update-security/'), {
         filename: item.path,
         security_classification: newClassification
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.status === 200) {

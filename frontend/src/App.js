@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Switch, Redirect, useLocation } from 'r
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import HeaderStyled from './components/HeaderStyled';
 import Home from './components/Home';
+import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import FineTuneGuide from './components/FineTuneGuide';
 import ExtractComponent from './components/ExtractComponent';
@@ -59,13 +60,7 @@ const AuthenticatedRoutes = () => {
         }}
       >
         <Switch>
-          <Route exact path="/login">
-            <Redirect to="/home" />
-          </Route>
-          {/* Define the standalone route outside the main layout structure */}
-          {/* We'll handle it separately in the main App component structure */}
-          
-          {/* Routes inside the main layout */}
+          <Route exact path="/login" component={Login} />
           <Route exact path="/home" component={Home} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/document-library" component={DocumentLibrary} />
@@ -101,9 +96,9 @@ const AuthenticatedRoutes = () => {
           <Route path="/retrieval/manage-databases" component={ManageVectorStores} />
           <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
           <Route exact path="/">
-            <Redirect to="/home" />
+            <Redirect to="/login" />
           </Route>
-          <Redirect to="/home" />
+          <Redirect to="/login" />
         </Switch>
       </Box>
       {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber */}

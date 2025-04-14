@@ -1,0 +1,25 @@
+# Authentication Service Environment Configuration
+
+# Database Connection
+DATABASE_URL=postgresql://postgres:password@db:5432/authdb
+
+# JWT Configuration
+SECRET_KEY=your-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# CORS Configuration
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+# Authentication Controls
+DISABLE_AUTH=false                     # Set to true to globally disable authentication
+PUBLIC_PATHS=/api/health,/docs,/       # Comma-separated list of paths that don't require authentication
+DEV_MODE=false                         # Set to true in development environments for more lenient auth
+
+# Default Admin Credentials - DO NOT use these in production!
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=12345
+
+# Service Configuration
+PORT=8010
+HOST=0.0.0.0 

@@ -16,6 +16,7 @@ import pandas as pd
 import re
 
 from .client import get_llm_client
+from config import LLM_PROVIDER
 
 logger = logging.getLogger("workbench_service")
 
@@ -55,6 +56,7 @@ class RowTransformer:
         self.output_columns = output_columns
         self.include_headers = include_headers
         self.error_handling = error_handling
+        self.llm_provider = LLM_PROVIDER
         self.llm_client = get_llm_client()
         
         # Output column names for reference
@@ -71,6 +73,11 @@ class RowTransformer:
         
         # Validate output column configurations
         self._validate_output_columns()
+        
+        logger.info(f"RowTransformer initialized for provider: {self.llm_provider}")
+        logger.info(f"Input columns: {self.input_columns}")
+        logger.info(f"Output columns: {self.output_column_names}")
+        logger.info(f"Error handling: {self.error_handling}")
     
     def _validate_output_columns(self) -> None:
         """
@@ -305,12 +312,38 @@ class RowTransformer:
         Raises:
             Exception: If parsing fails
         """
+        content = None
         try:
-            # Extract the content from the response
-            content = response.get('message', {}).get('content', '')
+            # --- START: Modify content extraction based on provider ---
+            if self.llm_provider == 'ollama':
+                if message_data := response.get('message'):
+                    content = message_data.get('content')
+                else:
+                    logger.warning(f"Ollama response missing 'message' key. Raw response: {response}")
+            elif self.llm_provider == 'vllm':
+                if choices := response.get('choices'):
+                    if isinstance(choices, list) and len(choices) > 0:
+                        first_choice = choices[0]
+                        if message_data := first_choice.get('message'):
+                            content = message_data.get('content')
+                            if content is None:
+                                logger.warning(f"vLLM response 'message' object missing 'content'. Message: {message_data}")
+                        else:
+                            logger.warning(f"vLLM response first choice missing 'message' key. Choice: {first_choice}")
+                    else:
+                        logger.warning(f"vLLM response 'choices' key is empty or not a list. Choices: {choices}")
+                else:
+                    logger.warning(f"vLLM response missing 'choices' key. Raw response: {response}")
+            else:
+                 logger.error(f"Unsupported LLM provider '{self.llm_provider}' encountered during parsing.")
+                 raise Exception(f"Unsupported LLM provider: {self.llm_provider}")
+            # --- END: Modify content extraction based on provider ---
+
             if not content:
-                raise Exception("Empty response from LLM")
-                
+                # Log the raw response that led to empty content
+                logger.error(f"Extracted content is empty. Raw response: {response}")
+                raise Exception("Empty content extracted from LLM response")
+
             # Try to extract JSON from the content (in case there's other text)
             json_start = content.find('{')
             json_end = content.rfind('}')

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useContext,useMemo, memo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import {
   Container,
@@ -47,7 +47,8 @@ import rehypeRaw from 'rehype-raw';
 import Snackbar from '@material-ui/core/Snackbar';
 import Alert from '@material-ui/lab/Alert';
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import GetAppIcon from '@mui/icons-material/GetApp';
@@ -2369,6 +2370,7 @@ const Message = memo(({ message, onSectionExpanded }) => {
 
 function MultiAgentHILChat() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const theme = useTheme(); // Add theme variable for the component
 
   const { state, dispatch } = useHILChat();
@@ -2554,7 +2556,11 @@ function MultiAgentHILChat() {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const response = await axios.get(getApiUrl('CHAT', '/sessions'));
+        const response = await axios.get(getGatewayUrl('/api/chat/sessions'), {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (response.data && Array.isArray(response.data)) {
           // Transform the sessions data to include only necessary fields
           const formattedSessions = response.data.map(session => ({
@@ -2585,7 +2591,11 @@ function MultiAgentHILChat() {
   const handleSessionClick = async (sessionId) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
-      const response = await axios.get(`${getApiUrl('CHAT', `/sessions/${sessionId}`)}`);
+      const response = await axios.get(`${getGatewayUrl(`/api/chat/sessions/${sessionId}`)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (response.data && response.data.conversation_history) {
         const formattedMessages = response.data.conversation_history.flatMap(entry => {
@@ -2705,7 +2715,11 @@ function MultiAgentHILChat() {
     // Reset selectedAgents when starting a new chat
     setSelectedAgents([]);
     try {
-      const response = await axios.get(getApiUrl('AGENT', '/api/agents/available_teams/'));
+      const response = await axios.get(getGatewayUrl('/api/agent/available_teams/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setAvailableTeams(response.data.teams);
       setDialogOpen(true);
       
@@ -2809,10 +2823,14 @@ function MultiAgentHILChat() {
     try {
       const currentSession = state.chatSessions.find(s => s.id === editSessionId);
       
-      await axios.put(getApiUrl('CHAT', `/sessions/${editSessionId}`), {
+      await axios.put(getGatewayUrl(`/api/chat/sessions/${editSessionId}`), {
         session_name: editSessionName.trim(),
         team_id: currentSession.teamId,
         team_name: currentSession.team
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       // Update local state
@@ -2856,7 +2874,11 @@ function MultiAgentHILChat() {
       console.log(`Attempting to delete session: ${deleteSessionId}`);
       
       // Send delete request to backend
-      await axios.delete(getApiUrl('CHAT', `/sessions/${deleteSessionId}`));
+      await axios.delete(getGatewayUrl(`/api/chat/sessions/${deleteSessionId}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       console.log(`Successfully deleted session: ${deleteSessionId}`);
       
@@ -2919,7 +2941,7 @@ function MultiAgentHILChat() {
       currentSession = {
         id: uuidv4(),
         name: 'New Chat',
-        team: defaultTeam?.name || 'PRC_Team',
+        team: defaultTeam?.name || 'Default_Team',
         teamId: defaultTeam?.id
       };
       dispatch({ type: ACTIONS.ADD_CHAT_SESSION, payload: currentSession });
@@ -2961,7 +2983,11 @@ function MultiAgentHILChat() {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
       
       // First, send to init endpoint
-      let response = await axios.post(getApiUrl('CHAT', '/chat/refine'), messageData);
+      let response = await axios.post(getGatewayUrl('/api/chat/refine'), messageData, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
       // Handle any errors
       if (response.data.error) {
@@ -3014,7 +3040,11 @@ function MultiAgentHILChat() {
   const fetchTeamAgents = async (teamId) => {
     try {
       // First, get the complete team details with agent names using list_teams
-      const teamsListResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_teams/'));
+      const teamsListResponse = await axios.get(getGatewayUrl('/api/agent/list_teams/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (!teamsListResponse.data || !teamsListResponse.data.teams) {
         throw new Error('Failed to retrieve teams data');
       }
@@ -3031,7 +3061,11 @@ function MultiAgentHILChat() {
       console.log(`Team ${teamDetails.name} has ${teamAgentNames.length} agents:`, teamAgentNames);
       
       // Fetch all available agents
-      const agentsResponse = await axios.get(getApiUrl('AGENT', '/api/agents/list_agents/'));
+      const agentsResponse = await axios.get(getGatewayUrl('/api/agent/list_agents/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (!agentsResponse.data || !agentsResponse.data.agents) {
         throw new Error('Failed to retrieve agents data');
       }
@@ -3151,8 +3185,15 @@ function MultiAgentHILChat() {
     }
 
     try {
-      const endpoint = planChoice === 'accept' ? '/chat/process' : '/chat/refine';
-      const response = await axios.post(getApiUrl('CHAT', endpoint), messageData);
+      const endpoint = planChoice === 'accept' ? '/api/chat/process' : '/api/chat/refine';
+      const response = await axios.post(getGatewayUrl(endpoint), 
+      messageData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
 
       if (response.data.error) {
         throw new Error(response.data.error);
@@ -3228,9 +3269,13 @@ function MultiAgentHILChat() {
 
   const generateSessionId = async (teamId, sessionName) => {
     try {
-      const response = await axios.post(getApiUrl('CHAT', '/chat/generate_session_id'), {
+      const response = await axios.post(getGatewayUrl('/api/chat/generate_session_id'), {
         team_id: teamId,
         session_name: sessionName
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       return response.data.session_id;
     } catch (error) {

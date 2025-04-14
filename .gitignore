@@ -39,6 +39,7 @@ Thumbs.db
 /backend/extraction_service/nltk_data/*
 /backend/chat_service/chat_teams/*
 /data/vectorstores/*
+/models/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
 
@@ -76,7 +77,6 @@ Thumbs.db
 !data/
 !models/
 !data/**/
-!models/**/
 
 # Critical files that must be included
 !entrypoint.sh
@@ -133,6 +133,10 @@ __langchain+graph_documentation/
 # Conversation logs
 backend/chat_service/conversation_logs/*.json
 backend/chat_service/conversation_logs/**/*
+data/conversation_logs/*
 
 # But keep the directory itself
 !backend/chat_service/conversation_logs/.gitkeep
+
+#reference files
+backend/VLLM_Docs/*

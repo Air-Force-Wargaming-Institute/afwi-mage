@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   Paper,
   Typography,
@@ -25,7 +25,8 @@ import { Alert } from '@material-ui/lab';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@material-ui/icons';
 import { makeStyles } from '@material-ui/core/styles';
 import axios from 'axios';
-import { getApiUrl } from '../../config';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -70,6 +71,7 @@ const useStyles = makeStyles((theme) => ({
 
 function SystemPrompts() {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [prompts, setPrompts] = useState({});
   const [editingPrompt, setEditingPrompt] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -101,7 +103,13 @@ function SystemPrompts() {
 
   const fetchPrompts = async () => {
     try {
-      const response = await axios.get(getApiUrl('CHAT', '/api/prompts/list'));
+      const response = await axios.get(getGatewayUrl('/api/chat/prompts/list'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setPrompts(response.data);
     } catch (error) {
       console.error('Error fetching prompts:', error);
@@ -116,7 +124,13 @@ function SystemPrompts() {
   const fetchAvailableVariables = async (promptId) => {
     if (!promptId) return;
     try {
-      const response = await axios.get(getApiUrl('CHAT', `/api/prompts/${promptId}/variables`));
+      const response = await axios.get(getGatewayUrl(`/api/chat/prompts/${promptId}/variables`),
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }
+    );
       setAvailableVariables(response.data);
     } catch (error) {
       console.error('Error fetching variables:', error);
@@ -125,7 +139,13 @@ function SystemPrompts() {
 
   const fetchAvailableLLMs = async () => {
     try {
-      const response = await axios.get(getApiUrl('CHAT', '/models/ollama'));
+      const response = await axios.get(getGatewayUrl('/api/chat/models/ollama'),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       const llms = response.data.models.map(model => ({
         id: model.name,  // Use model name as ID
         name: model.name,
@@ -196,13 +216,23 @@ function SystemPrompts() {
       let response;
       if (editingPrompt.id && editingPrompt.id.trim()) {
         response = await axios.put(
-          getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}`),
-          promptData
+          getGatewayUrl(`/api/chat/prompts/${editingPrompt.id}`),
+          promptData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
         );
       } else {
         response = await axios.post(
-          getApiUrl('CHAT', '/api/prompts'),
-          promptData
+          getGatewayUrl('/api/chat/prompts'),
+          promptData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
         );
       }
 
@@ -225,7 +255,13 @@ function SystemPrompts() {
 
   const handleDeletePrompt = async (promptId) => {
     try {
-      await axios.delete(getApiUrl('CHAT', `/api/prompts/${promptId}`));
+      await axios.delete(getGatewayUrl(`/api/chat/prompts/${promptId}`),
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+      );
       setSnackbar({
         open: true,
         message: 'Prompt deleted successfully',
@@ -262,9 +298,11 @@ function SystemPrompts() {
     
     try {
       await axios.post(
-        getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}/variables`),
-        {},
+        getGatewayUrl(`/api/chat/prompts/${editingPrompt.id}/variables`),
         { 
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
           params: { 
             variable_name: newVariable.trim() 
           } 
@@ -294,7 +332,12 @@ function SystemPrompts() {
     
     try {
       await axios.delete(
-        getApiUrl('CHAT', `/api/prompts/${editingPrompt.id}/variables/${variable}`)
+        getGatewayUrl(`/api/chat/prompts/${editingPrompt.id}/variables/${variable}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
       
       setSnackbar({

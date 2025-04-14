@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { 
   Button, 
@@ -23,7 +23,8 @@ import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import FullscreenExitIcon from '@material-ui/icons/FullscreenExit';
 import CloseIcon from '@material-ui/icons/Close';
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   previewContainer: {
@@ -200,6 +201,7 @@ const useStyles = makeStyles((theme) => ({
 
 function FilePreview({ file, onFileUpdate }) {
   const classes = useStyles();
+  const { user, token } = useContext(AuthContext);
   const [numPages, setNumPages] = useState(null);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(1);
@@ -215,7 +217,13 @@ function FilePreview({ file, onFileUpdate }) {
         try {
           setLoading(true);
           setError(null);
-          const response = await axios.get(`${getApiUrl('UPLOAD', `/api/upload/pdf-info/${encodeURIComponent(file.path)}`)}`);
+          const response = await axios.get(getGatewayUrl(`/api/upload/pdf-info/${encodeURIComponent(file.path)}`),
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
           if (response.data.num_pages) {
             setNumPages(response.data.num_pages);
             setEndPage(response.data.num_pages); // Set end page to total pages by default
@@ -261,8 +269,15 @@ function FilePreview({ file, onFileUpdate }) {
         try {
           setLoading('deleting');
           // Delete the entire document
-          await axios.delete(`${getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(file.path)}`)}`, {
-            data: { delete_metadata: true }
+          //await axios.delete(`${getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(file.path)}`)}`, {
+          //  data: { delete_metadata: true }
+          //});
+          await axios.delete(getGatewayUrl(`/api/upload/files/${encodeURIComponent(file.path)}`), {
+            data: { delete_metadata: true },
+          }, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
           });
           
           // Clear the preview and trigger parent update
@@ -298,9 +313,13 @@ function FilePreview({ file, onFileUpdate }) {
       // Delete pages from highest to lowest to avoid page number shifting
       for (let i = 0; i <= endPage - startPage; i++) {
         const pageToDelete = endPage - i;
-        const response = await axios.post(`${getApiUrl('UPLOAD', '/api/upload/delete-pdf-page')}`, {
+        const response = await axios.post(getGatewayUrl('/api/upload/delete-pdf-page'), {
           file_path: file.path,
           page_number: pageToDelete
+        }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
         if (!response.data.success) {
           throw new Error(`Failed to delete page ${pageToDelete}`);
@@ -379,7 +398,7 @@ function FilePreview({ file, onFileUpdate }) {
     if (file.type === 'PDF' || file.type === 'DOCX' || file.path.toLowerCase().endsWith('.docx')) {
       const previewUrl = file.type === 'PDF' 
         ? `${getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(file.path)}`)}?t=${timestamp}`
-        : `${getApiUrl('UPLOAD', `/api/upload/preview-docx/${encodeURIComponent(file.path)}`)}?t=${timestamp}`;
+        : `${getApiUrl('UPLOAD', `/api/upload/preview-docx/${encodeURIComponent(file.path)}`)}?t=${timestamp}`; //Should this be authenticated?
 
       return (
         <>
@@ -429,7 +448,7 @@ function FilePreview({ file, onFileUpdate }) {
               <Button
                 variant="outlined"
                 color="primary"
-                href={`${getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(file.path)}`)}`}
+                href={`${getApiUrl('UPLOAD', `/api/upload/files/${encodeURIComponent(file.path)}`)}`} //Should this be authenticated?
                 download
               >
                 Download Original DOCX
@@ -442,7 +461,7 @@ function FilePreview({ file, onFileUpdate }) {
       return (
         <>
           <iframe
-            src={`${getApiUrl('UPLOAD', `/api/upload/preview-txt/${file.path}`)}`}
+            src={`${getApiUrl('UPLOAD', `/api/upload/preview-txt/${file.path}`)}`} //Should this be authenticated?
             {...iframeProps}
             title="TXT Preview"
           />

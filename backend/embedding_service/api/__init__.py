@@ -8,6 +8,21 @@ separating the API layer from the business logic in the core package.
 import os
 import sys
 from fastapi import APIRouter
+from pathlib import Path
+import logging
+
+
+# Ensure log directory exists
+log_dir = Path('/app/data/logs')
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename=log_dir / 'embedding_service.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Set up the path to ensure modules can be found
 module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -70,7 +85,8 @@ except Exception as e:
     raise
 
 # Create a main router that includes all sub-routers
-main_router = APIRouter(prefix="/api/embedding")
+# main_router = APIRouter(prefix="/api/embedding")
+main_router = APIRouter()
 
 # Include all sub-routers
 for name, router in routers.items():

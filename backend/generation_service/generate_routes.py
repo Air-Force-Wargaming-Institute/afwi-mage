@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/training-datasets/")
+@router.get("/api/generate/training-datasets/")
 async def get_training_datasets():
     try:
         datasets = []
@@ -33,7 +33,7 @@ async def get_training_datasets():
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error fetching training datasets: {str(e)}")
 
-@router.get("/csv-preview/{filename}")
+@router.get("/api/generate/csv-preview/{filename}")
 async def get_csv_preview(filename: str, rows: int = 100):
     logger.info(f"Received request for CSV preview: {filename}")
     try:
@@ -85,7 +85,7 @@ async def get_csv_preview(filename: str, rows: int = 100):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error fetching CSV preview: {str(e)}")
 
-@router.post("/generate-dataset/")
+@router.post("/api/generate/generate-dataset/")
 async def generate_dataset(request: dict):
     try:
         source_file = request.get("sourceFile")
@@ -109,7 +109,7 @@ async def generate_dataset(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating dataset: {str(e)}")
 
-@router.post("/initialize-model/{model_name}")
+@router.post("/api/generate/initialize-model/{model_name}")
 async def init_model(model_name: str):
     try:
         initialize_model(model_name)
@@ -117,7 +117,7 @@ async def init_model(model_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error initializing model: {str(e)}")
 
-@router.post("/chat-with-model/{model_name}")
+@router.post("/api/generate/chat-with-model/{model_name}")
 async def chat(model_name: str, messages: list = Body(...), stream: bool = Query(False)):
     try:
         response = chat_with_model(model_name, messages, stream)
@@ -128,7 +128,7 @@ async def chat(model_name: str, messages: list = Body(...), stream: bool = Query
         logger.error(f"Error chatting with model: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error chatting with model: {str(e)}")
 
-@router.post("/generate-text/{model_name}")
+@router.post("/api/generate/generate-text/{model_name}")
 async def generate(model_name: str, prompt: str = Body(...), stream: bool = Query(False)):
     try:
         response = generate_text(model_name, prompt, stream)
@@ -140,7 +140,7 @@ async def generate(model_name: str, prompt: str = Body(...), stream: bool = Quer
         raise HTTPException(status_code=500, detail=f"Error generating text: {str(e)}")
 
 # Add this new route
-@router.get("/available-models/")
+@router.get("/api/generate/available-models/")
 async def get_available_models():
     try:
         logger.info(f"Searching for models in: {BASE_MODELS_DIR}")

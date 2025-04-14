@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
   Box,
   Button,
@@ -31,6 +31,7 @@ import AccordionSummary from '@material-ui/core/AccordionSummary';
 import AccordionDetails from '@material-ui/core/AccordionDetails';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
+import { AuthContext } from '../../contexts/AuthContext';
 import { useTheme } from '@material-ui/core/styles';
 
 // Import styled components
@@ -375,6 +376,7 @@ const QueryTester = ({ vectorStore }) => {
   Object.keys(useStyles).forEach(key => {
     classes[key] = useStyles[key](theme);
   });
+  const { user, token } = useContext(AuthContext);
   
   const [queryText, setQueryText] = useState('');
   const [queryResults, setQueryResults] = useState(null);
@@ -499,7 +501,8 @@ const QueryTester = ({ vectorStore }) => {
             score_threshold: scoreThreshold,
             truncate_text: false, // Ensure we get full text
             max_text_length: 10000 // Set a high value to avoid truncation
-          }
+          },
+          token
         );
         
         // Update state with results
@@ -523,7 +526,8 @@ const QueryTester = ({ vectorStore }) => {
             include_sources: true,
             truncate_text: false,
             max_text_length: 10000
-          }
+          },
+          token
         );
         
         setLlmResponse(response);
@@ -553,7 +557,8 @@ const QueryTester = ({ vectorStore }) => {
           sample_size: sampleSize,
           summary_length: 'long',
           sampling_strategy: samplingStrategy
-        }
+        },
+        token
       );
       
       // Log the raw response for debugging

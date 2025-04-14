@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import '../App.css';
 import { 
   Typography, 
@@ -14,9 +14,11 @@ import {
   Box
 } from '@material-ui/core';
 import axios from 'axios';
-import { getApiUrl } from '../config';
+import { getApiUrl, getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
 function FineTune() {
+  const { user, token } = useContext(AuthContext);
   const [selectedDataset, setSelectedDataset] = useState('');
   const [datasets, setDatasets] = useState([]);
   const [selectedBaseModel, setSelectedBaseModel] = useState('');
@@ -31,7 +33,11 @@ function FineTune() {
 
   const fetchDatasets = async () => {
     try {
-      const response = await axios.get(getApiUrl('GENERATION', '/api/generate/training-datasets/'));
+      const response = await axios.get(getGatewayUrl('/api/generate/training-datasets/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setDatasets(response.data);
     } catch (error) {
       console.error('Error fetching datasets:', error);
@@ -41,7 +47,11 @@ function FineTune() {
 
   const fetchBaseModels = async () => {
     try {
-      const response = await axios.get(getApiUrl('GENERATION', '/api/generate/available-models/'));
+      const response = await axios.get(getGatewayUrl('/api/generate/available-models/'), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setBaseModels(response.data);
     } catch (error) {
       console.error('Error fetching base models:', error);
@@ -61,9 +71,13 @@ function FineTune() {
     if (selectedDataset && selectedBaseModel) {
       setIsLoading(true);
       try {
-        const response = await axios.post(getApiUrl('GENERATION', '/api/generate/fine-tune/'), {
+        const response = await axios.post(getGatewayUrl('/api/generate/fine-tune/'), {
           dataset: selectedDataset,
           base_model: selectedBaseModel
+        }, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
         setMessage(response.data.message);
       } catch (error) {
