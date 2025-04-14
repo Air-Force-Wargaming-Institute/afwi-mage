@@ -29,7 +29,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Container,
   Badge,
   LinearProgress,
   FormControlLabel,
@@ -65,6 +64,15 @@ import CloudOffIcon from '@material-ui/icons/CloudOff';
 import CloseIcon from '@material-ui/icons/Close';
 import { AuthContext } from '../../contexts/AuthContext';
 import { getApiUrl, getGatewayUrl } from '../../config';
+import { 
+  StyledContainer, 
+  GradientBorderPaper, 
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  GradientText,
+  GradientBorderCard,
+  HighContrastGradientPaper 
+} from '../../styles/StyledComponents';
 
 // Import the vector store service for API integration
 import { 
@@ -91,7 +99,10 @@ const useStyles = makeStyles((theme) => ({
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '100vh',
+    minHeight: 'auto',
+    paddingTop: theme.spacing(10),
+    paddingBottom: theme.spacing(4),
+    overflow: 'visible',
   },
   header: {
     display: 'flex',
@@ -112,7 +123,7 @@ const useStyles = makeStyles((theme) => ({
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    transition: '0.3s',
+    transition: 'all 0.3s ease',
     '&:hover': {
       transform: 'translateY(-5px)',
       boxShadow: theme.shadows[4],
@@ -133,6 +144,12 @@ const useStyles = makeStyles((theme) => ({
   statsCard: {
     textAlign: 'center',
     padding: theme.spacing(2),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      boxShadow: theme.shadows[3],
+    },
   },
   statsValue: {
     fontSize: '2rem',
@@ -209,17 +226,30 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(3),
     alignItems: 'flex-start',
     height: 'auto',
+    flexWrap: 'wrap',
+    overflow: 'visible',
   },
   mainContentSection: {
     flex: '0 0 66%',
-    maxHeight: '100%',
-    overflowY: 'auto',
+    height: 'auto',
+    overflowY: 'visible',
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    boxShadow: theme.shadows[3],
+    '@media (max-width: 960px)': {
+      flex: '0 0 100%',
+    },
   },
   sidebarSection: {
     flex: '0 0 32%',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: '100%',
+    height: 'auto',
+    overflowY: 'visible',
+    '@media (max-width: 960px)': {
+      flex: '0 0 100%',
+      marginTop: theme.spacing(3),
+    },
   },
   connectionCard: {
     marginBottom: theme.spacing(2),
@@ -253,26 +283,38 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: 'wrap',
   },
   dbTypeButton: {
-    border: `1px solid ${theme.palette.divider}`,
-    padding: theme.spacing(1),
+    padding: theme.spacing(2),
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: theme.shape.borderRadius,
-    width: '80px',
+    width: '100px',
+    height: '100px',
     cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    backgroundColor: theme.palette.background.lighter,
     '&.selected': {
-      backgroundColor: theme.palette.primary.light,
+      backgroundColor: theme.palette.primary.dark,
       color: theme.palette.primary.contrastText,
+      transform: 'translateY(-4px)',
+      boxShadow: theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
     },
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+      backgroundColor: theme.palette.action.hover,
+    }
   },
   dbTypeIcon: {
-    fontSize: '2rem',
-    marginBottom: theme.spacing(0.5),
+    fontSize: '2.5rem',
+    marginBottom: theme.spacing(1),
+    color: theme.palette.primary.main,
   },
   dbTypeLabel: {
-    fontSize: '0.75rem',
+    fontSize: '0.85rem',
     textAlign: 'center',
+    fontWeight: 500,
   },
   connectionActions: {
     display: 'flex',
@@ -304,8 +346,8 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
-    height: '100%',
-    overflow: 'hidden',
+    height: 'auto',
+    overflow: 'visible',
   },
 }));
 
@@ -732,15 +774,15 @@ function ManageVectorStores() {
             
             return (
               <Grid item xs={12} sm={6} md={4} key={store.id}>
-                <Card 
+                <GradientBorderCard 
                   className={classes.card} 
                   onClick={() => handleOpenDetails(store)}
                   style={{ 
                     cursor: 'pointer',
                     // Add a subtle background tint for backup stores
                     backgroundColor: backupInfo.isBackup ? 'rgba(220, 220, 255, 0.2)' : undefined,
-                    // Add a border for backup stores
-                    border: backupInfo.isBackup ? '1px solid #9c27b0' : undefined
+                    // Add a border for backup stores - removing as GradientBorderCard provides its own border
+                    // border: backupInfo.isBackup ? '1px solid #9c27b0' : undefined
                   }}
                 >
                   <span className={classes.creationDate}>
@@ -803,16 +845,15 @@ function ManageVectorStores() {
                     </Button>
                     <IconButton 
                       size="small" 
-                      color="secondary" 
                       onClick={(e) => {
                         e.stopPropagation(); // Prevent card click from triggering
                         handleOpenDelete(store);
                       }}
                     >
-                      <DeleteIcon />
+                      <DeleteIcon style={{ color: '#f44336' }} />
                     </IconButton>
                   </CardActions>
-                </Card>
+                </GradientBorderCard>
               </Grid>
             );
           })
@@ -945,13 +986,12 @@ function ManageVectorStores() {
                       </IconButton>
                       <IconButton 
                         size="small" 
-                        color="secondary" 
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent row click
                           handleOpenDelete(store);
                         }}
                       >
-                        <DeleteIcon />
+                        <DeleteIcon style={{ color: '#f44336' }} />
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -1332,7 +1372,7 @@ function ManageVectorStores() {
       <Dialog
         open={filePreviewOpen}
         onClose={handleCloseFilePreview}
-        maxWidth="md"
+        maxWidth='lg'
         fullWidth
       >
         <DialogTitle style={{ paddingBottom: 8 }}>
@@ -1801,14 +1841,14 @@ function ManageVectorStores() {
     return (
       <Box className={classes.dbTypeSelector}>
         {connectionTypes.map((type) => (
-          <Box 
+          <GradientBorderCard 
             key={type.id}
             className={`${classes.dbTypeButton} ${selectedConnectionType === type.id ? 'selected' : ''}`}
             onClick={() => handleSelectConnectionType(type.id)}
           >
             {type.icon}
             <Typography className={classes.dbTypeLabel}>{type.name}</Typography>
-          </Box>
+          </GradientBorderCard>
         ))}
       </Box>
     );
@@ -1817,7 +1857,7 @@ function ManageVectorStores() {
   // Render the database connections section
   const renderDatabaseConnections = () => {
     return (
-      <Paper 
+      <HighContrastGradientPaper 
         className={classes.sidebarSection} 
         elevation={3}
       >
@@ -1842,7 +1882,7 @@ function ManageVectorStores() {
           </Button>
           
           {newConnectionOpen && (
-            <Paper className={classes.connectionCard} elevation={0}>
+            <HighContrastGradientPaper className={classes.connectionCard} elevation={3}>
               <div className={classes.connectionHeader}>
                 <ComputerIcon className={classes.connectionIcon} />
                 <Typography variant="subtitle1">New Database Connection</Typography>
@@ -1884,15 +1924,16 @@ function ManageVectorStores() {
                 </Button>
                 <Button
                   variant="contained"
-                  color="primary"
+                  color="secondary" 
                   startIcon={<SaveIcon />}
                   onClick={handleSaveConnection}
                   disabled={!selectedConnectionType || !connectionForm.name}
+                  style={{ backgroundColor: '#34a853', color: '#ffffff' }}
                 >
                   Save Connection
                 </Button>
               </div>
-            </Paper>
+            </HighContrastGradientPaper>
           )}
           
           <div className={classes.connectionList}>
@@ -1908,7 +1949,7 @@ function ManageVectorStores() {
               </div>
             ) : (
               connections.map((connection) => (
-                <Paper key={connection.id} className={classes.connectionCard} elevation={0}>
+                <GradientBorderCard key={connection.id} className={classes.connectionCard} elevation={2}>
                   <div className={classes.connectionHeader}>
                     {connection.type === 'excel' || connection.type === 'csv' ? (
                       <TableChartIcon className={classes.connectionIcon} />
@@ -1994,284 +2035,293 @@ function ManageVectorStores() {
                     </Button>
                     <Button
                       size="small"
-                      color="secondary"
-                      startIcon={<DeleteIcon />}
+                      startIcon={<DeleteIcon style={{ color: '#f44336' }} />}
                       onClick={() => handleDeleteConnection(connection.id)}
+                      style={{ color: '#f44336' }}
                     >
                       Delete
                     </Button>
                   </div>
-                </Paper>
+                </GradientBorderCard>
               ))
             )}
           </div>
         </Box>
-      </Paper>
+      </HighContrastGradientPaper>
     );
   };
 
   return (
-    <Container maxWidth="xl" className={`main-content ${classes.mainContent}`} style={{ overflow: 'hidden' }}>
-      <div className={classes.header}>
-        <Typography variant="h4" className="section-title" gutterBottom>
-          Manage Retrieval Databases
-        </Typography>
-        <div>
-          <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            className={classes.actionButton}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            className={classes.actionButton}
-            onClick={() => window.location.href = '/retrieval/build-databases'}
-          >
-            Create New
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <Grid container spacing={3} className={classes.statsCards}>
-        <Grid item xs={12} md={4}>
-          <Paper className={classes.statsCard} elevation={3}>
-            <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-              Total Retrieval Databases
-            </Typography>
-            <Typography className={classes.statsValue}>
-              {loading ? <Skeleton width={80} /> : stats.totalStores}
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className={classes.statsCard} elevation={3}>
-            <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-              Total Embedded Documents
-            </Typography>
-            <Typography className={classes.statsValue}>
-              {loading ? <Skeleton width={80} /> : stats.totalDocuments}
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper className={classes.statsCard} elevation={3}>
-            <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-              Recently Updated <Tooltip title="Updated in the last 7 days"><InfoIcon fontSize="small" /></Tooltip>
-            </Typography>
-            <Typography className={classes.statsValue}>
-              {loading ? <Skeleton width={80} /> : (
-                <Badge 
-                  color="primary" 
-                  badgeContent={stats.recentlyUpdated > 0 ? 'New' : 0}
-                  invisible={stats.recentlyUpdated === 0}
-                >
-                  {stats.recentlyUpdated}
-                </Badge>
-              )}
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Backup information alert */}
-      {backupCount > 0 && (
-        <Alert 
-          severity="info" 
-          style={{ marginBottom: 16 }}
-          action={
-            <Button 
-              color="inherit" 
-              size="small" 
-              onClick={handleCleanupBackups}
-              disabled={isCleaningBackups}
-              startIcon={isCleaningBackups ? <CircularProgress size={16} /> : <DeleteSweepIcon />}
-            >
-              CLEAN UP
-            </Button>
-          }
-        >
-          <AlertTitle>Vector Store Backups</AlertTitle>
-          {backupCount} backup{backupCount !== 1 ? 's' : ''} detected. Backups are automatically created when you add or remove documents from a vector store.
-          They serve as a safety measure in case anything goes wrong during the update process.
-          Once you've verified your vector store is working correctly, you can safely clean up old backups.
-        </Alert>
-      )}
-
-      {/* Split layout: Vector stores on left (2/3) and Database connections on right (1/3) */}
-      <Box 
-        className={classes.splitContainer}
-      >
-        {/* Main Vector Store Content - Left 2/3 */}
-        <Paper 
-          className={classes.mainContentSection} 
-          elevation={3}
-        >
-          <Box p={2}>
-      {/* Search and Filters */}
-      <div className={classes.filterControls}>
-        <div className={classes.searchBar}>
-          <TextField
-            className={classes.searchInput}
-            variant="outlined"
-            size="small"
-            placeholder="Search for a database..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon color="action" style={{ marginRight: 8 }} />,
-            }}
-          />
-          {searchTerm && (
+    <StyledContainer maxWidth="xl" className={classes.mainContent}>
+      <AnimatedGradientPaper elevation={3} className={classes.root}>
+        <div className={classes.header}>
+        <GradientText variant="h1" fontWeight="600" fontSize={'4rem'} gutterBottom>
+        Manage Retrieval Databases
+          </GradientText>
+          <div>
             <Button
               variant="outlined"
-              size="small"
-              onClick={() => setSearchTerm('')}
+              color="primary"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              className={classes.actionButton}
             >
-              Clear
+              Refresh
             </Button>
-          )}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              className={classes.actionButton}
+              onClick={() => window.location.href = '/retrieval/build-databases'}
+            >
+              Create New
+            </Button>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showBackups}
-                onChange={(e) => setShowBackups(e.target.checked)}
-                name="showBackups"
-                color="secondary"
-              />
-            }
-            label={
-              <Box display="flex" alignItems="center">
-                <Typography variant="body2" style={{ marginRight: 8 }}>
-                  Show Backups
-                </Typography>
-                {backupCount > 0 && (
+
+        {/* Stats Cards */}
+        <Grid container spacing={3} className={classes.statsCards}>
+          <Grid item xs={12} md={4}>
+            <SubtleGlowPaper elevation={2} className={classes.statsCard}>
+              <Typography variant="subtitle1" color="textSecondary" gutterBottom>
+                Total Retrieval Databases
+              </Typography>
+              <Typography className={classes.statsValue}>
+                {loading ? <Skeleton width={80} /> : stats.totalStores}
+              </Typography>
+            </SubtleGlowPaper>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <SubtleGlowPaper elevation={2} className={classes.statsCard}>
+              <Typography variant="subtitle1" color="textSecondary" gutterBottom>
+                Total Embedded Documents
+              </Typography>
+              <Typography className={classes.statsValue}>
+                {loading ? <Skeleton width={80} /> : stats.totalDocuments}
+              </Typography>
+            </SubtleGlowPaper>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <SubtleGlowPaper elevation={2} className={classes.statsCard}>
+              <Typography variant="subtitle1" color="textSecondary" gutterBottom>
+                Recently Updated <Tooltip title="Updated in the last 7 days"><InfoIcon fontSize="small" /></Tooltip>
+              </Typography>
+              <Typography className={classes.statsValue}>
+                {loading ? <Skeleton width={80} /> : (
                   <Badge 
-                    color="secondary" 
-                    badgeContent={backupCount} 
-                    overlap="circular"
-                  />
+                    color="primary" 
+                    badgeContent={stats.recentlyUpdated > 0 ? 'New' : 0}
+                    invisible={stats.recentlyUpdated === 0}
+                  >
+                    {stats.recentlyUpdated}
+                  </Badge>
                 )}
-              </Box>
-            }
-          />
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={handleViewModeChange}
-            className={classes.viewToggle}
-            size="small"
-          >
-            <ToggleButton value="grid" aria-label="grid view">
-              <ViewModuleIcon />
-            </ToggleButton>
-            <ToggleButton value="list" aria-label="list view">
-              <ViewListIcon />
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </div>
-      </div>
-
-      {/* Vector Store List */}
-      {loading && filteredStores.length === 0 ? (
-        <div className={classes.progressContainer}>
-          <CircularProgress />
-        </div>
-      ) : error ? (
-        <Alert severity="error" style={{ marginTop: 16 }}>
-          {error}
-        </Alert>
-      ) : (
-        <Grid container spacing={3}>
-          {viewMode === 'grid' ? renderGridView() : renderTableView()}
+              </Typography>
+            </SubtleGlowPaper>
+          </Grid>
         </Grid>
-      )}
 
-            {/* Clean Up Backups Button */}
-            {renderCleanupButton()}
-          </Box>
-        </Paper>
-
-        {/* Database Connections Section - Right 1/3 */}
-        {renderDatabaseConnections()}
-      </Box>
-
-      {/* Details Dialog */}
-      <Dialog
-        open={detailsDialogOpen}
-        onClose={handleCloseDetails}
-        maxWidth="xl"
-        fullWidth
-      >
-        {selectedStore && <VectorStoreDetails 
-          vectorStore={selectedStore} 
-          onClose={handleCloseDetails} 
-          onSave={handleSaveEdit}
-          onDelete={handleOpenDelete}
-          onRefresh={handleRefreshVectorStore}
-        />}
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleCloseDelete}
-      >
-        <DialogTitle style={{ display: 'flex', alignItems: 'center', color: '#f44336' }}>
-          <WarningIcon style={{ marginRight: 8 }} /> Warning: Permanent Deletion
-        </DialogTitle>
-        <DialogContent>
-          <Box mb={2} p={2} bgcolor="#fff4f4" border="1px solid #f44336" borderRadius={4}>
-            <DialogContentText color="error">
-              <strong>This action cannot be undone.</strong> Are you sure you want to delete the vector store "{storeToDelete?.name}"?
-            </DialogContentText>
-          </Box>
-          <DialogContentText style={{ marginTop: 16 }}>
-            This will permanently remove all <strong>{storeToDelete?.documentCount || storeToDelete?.file_count || 0}</strong> embedded documents from this vector store.
-          </DialogContentText>
-          <DialogContentText style={{ marginTop: 16 }}>
-            <strong>Important:</strong> Recreating this vector store will require significant time and compute resources, especially for large document collections. All embeddings will need to be regenerated from scratch.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDelete} color="primary" variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="secondary"
-            variant="contained"
-            disabled={isDeleting}
-            startIcon={isDeleting ? <CircularProgress size={20} /> : <DeleteForeverIcon />}
+        {/* Backup information alert */}
+        {backupCount > 0 && (
+          <Alert 
+            severity="info" 
+            style={{ marginBottom: 16 }}
+            action={
+              <Button 
+                color="inherit" 
+                size="small" 
+                onClick={handleCleanupBackups}
+                disabled={isCleaningBackups}
+                startIcon={isCleaningBackups ? <CircularProgress size={16} /> : <DeleteSweepIcon />}
+              >
+                CLEAN UP
+              </Button>
+            }
           >
-            {isDeleting ? 'Deleting...' : 'Delete Permanently'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <AlertTitle>Vector Store Backups</AlertTitle>
+            {backupCount} backup{backupCount !== 1 ? 's' : ''} detected. Backups are automatically created when you add or remove documents from a vector store.
+            They serve as a safety measure in case anything goes wrong during the update process.
+            Once you've verified your vector store is working correctly, you can safely clean up old backups.
+          </Alert>
+        )}
 
-      {/* File Preview Dialog */}
-      {renderFilePreviewDialog()}
+        {/* Split layout: Vector stores on left (2/3) and Database connections on right (1/3) */}
+        <Box 
+          className={classes.splitContainer}
+        >
+          {/* Main Vector Store Content - Left 2/3 */}
+          <Paper 
+            className={classes.mainContentSection} 
+            elevation={3}
+          >
+            <Box p={2}>
+          {/* Search and Filters */}
+          <div className={classes.filterControls}>
+            <div className={classes.searchBar}>
+              <TextField
+                className={classes.searchInput}
+                variant="outlined"
+                size="small"
+                placeholder="Search for a database..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon color="action" style={{ marginRight: 8 }} />,
+                }}
+              />
+              {searchTerm && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setSearchTerm('')}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showBackups}
+                    onChange={(e) => setShowBackups(e.target.checked)}
+                    name="showBackups"
+                    color="secondary"
+                  />
+                }
+                label={
+                  <Box display="flex" alignItems="center">
+                    <Typography variant="body2" style={{ marginRight: 8 }}>
+                      Show Backups
+                    </Typography>
+                    {backupCount > 0 && (
+                      <Badge 
+                        color="secondary" 
+                        badgeContent={backupCount} 
+                        overlap="circular"
+                      />
+                    )}
+                  </Box>
+                }
+              />
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                className={classes.viewToggle}
+                size="small"
+              >
+                <ToggleButton value="grid" aria-label="grid view">
+                  <ViewModuleIcon />
+                </ToggleButton>
+                <ToggleButton value="list" aria-label="list view">
+                  <ViewListIcon />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </div>
+          </div>
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-      >
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
-  );
-}
+          {/* Vector Store List */}
+          {loading && filteredStores.length === 0 ? (
+            <div className={classes.progressContainer}>
+              <CircularProgress />
+            </div>
+          ) : error ? (
+            <Alert severity="error" style={{ marginTop: 16 }}>
+              {error}
+            </Alert>
+          ) : (
+            <Grid container spacing={3}>
+              {viewMode === 'grid' ? renderGridView() : renderTableView()}
+            </Grid>
+          )}
 
-export default ManageVectorStores; 
+                {/* Clean Up Backups Button */}
+                {renderCleanupButton()}
+              </Box>
+            </Paper>
+
+            {/* Database Connections Section - Right 1/3 */}
+            {renderDatabaseConnections()}
+          </Box>
+
+          {/* Details Dialog */}
+          <Dialog
+            open={detailsDialogOpen}
+            onClose={handleCloseDetails}
+            maxWidth={false}
+            fullWidth
+            PaperProps={{
+              style: { 
+                width: '95%', 
+                maxWidth: '2500px', 
+                height: '90vh'
+              }
+            }}
+          >
+            {selectedStore && <VectorStoreDetails 
+              vectorStore={selectedStore} 
+              onClose={handleCloseDetails} 
+              onSave={handleSaveEdit}
+              onDelete={handleOpenDelete}
+              onRefresh={handleRefreshVectorStore}
+            />}
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog
+            open={deleteDialogOpen}
+            onClose={handleCloseDelete}
+          >
+            <DialogTitle style={{ display: 'flex', alignItems: 'center', color: '#f44336' }}>
+              <WarningIcon style={{ marginRight: 8 }} /> Warning: Permanent Deletion
+            </DialogTitle>
+            <DialogContent>
+              <Box mb={2} p={2} bgcolor="#fff4f4" border="1px solid #f44336" borderRadius={4}>
+                <DialogContentText color="error">
+                  <strong>This action cannot be undone.</strong> Are you sure you want to delete the vector store "{storeToDelete?.name}"?
+                </DialogContentText>
+              </Box>
+              <DialogContentText style={{ marginTop: 16 }}>
+                This will permanently remove all <strong>{storeToDelete?.documentCount || storeToDelete?.file_count || 0}</strong> embedded documents from this vector store.
+              </DialogContentText>
+              <DialogContentText style={{ marginTop: 16 }}>
+                <strong>Important:</strong> Recreating this vector store will require significant time and compute resources, especially for large document collections. All embeddings will need to be regenerated from scratch.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDelete} color="primary" variant="outlined">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmDelete}
+                color="secondary"
+                variant="contained"
+                disabled={isDeleting}
+                startIcon={isDeleting ? <CircularProgress size={20} /> : <DeleteForeverIcon />}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* File Preview Dialog */}
+          {renderFilePreviewDialog()}
+
+          {/* Snackbar for notifications */}
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={6000}
+            onClose={handleSnackbarClose}
+          >
+            <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+        </AnimatedGradientPaper>
+      </StyledContainer>
+    );
+  }
+
+  export default ManageVectorStores; 

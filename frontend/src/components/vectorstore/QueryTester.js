@@ -4,7 +4,6 @@ import {
   Button,
   CircularProgress,
   Divider,
-  Paper,
   TextField,
   Typography,
   Slider,
@@ -12,7 +11,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  makeStyles,
   Chip,
   TablePagination,
   Tooltip,
@@ -34,6 +32,29 @@ import AccordionDetails from '@material-ui/core/AccordionDetails';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import { AuthContext } from '../../contexts/AuthContext';
+import { useTheme } from '@material-ui/core/styles';
+
+// Import styled components
+import {
+  GradientBorderPaper,
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  HighContrastGradientPaper,
+  GradientCornersPaper,
+  GradientText,
+  StyledContainer,
+  useContainerStyles
+} from '../../styles/StyledComponents';
+
+// Import action buttons
+import {
+  DeleteButton,
+  EditButton,
+  DownloadButton,
+  ViewButton,
+  AddButton,
+  CopyButton
+} from '../../styles/ActionButtons';
 
 import { testVectorStoreQuery, analyzeVectorStore, llmQueryVectorStore } from '../../services/vectorStoreService';
 import { MetadataDisplay, SecurityClassification } from './MetadataDisplay';
@@ -46,25 +67,26 @@ const getScoreColor = (score) => {
   return '#ff9800'; // Low relevance - orange
 };
 
-const useStyles = makeStyles((theme) => ({
-  root: {
+// Component-specific styles
+const useStyles = {
+  root: theme => ({
     padding: theme.spacing(3),
-  },
-  queryInput: {
+  }),
+  queryInput: theme => ({
     marginBottom: theme.spacing(2),
-  },
-  resultContainer: {
+  }),
+  resultContainer: theme => ({
     marginTop: theme.spacing(3),
-  },
-  resultItem: {
+  }),
+  resultItem: theme => ({
     padding: theme.spacing(2),
     marginBottom: theme.spacing(2),
     borderLeft: `4px solid ${theme.palette.primary.main}`,
     '& .metadata-section': {
       marginBottom: theme.spacing(2),
     },
-  },
-  relevanceScore: {
+  }),
+  relevanceScore: theme => ({
     fontWeight: 'bold',
     display: 'flex',
     flexDirection: 'column',
@@ -75,55 +97,55 @@ const useStyles = makeStyles((theme) => ({
       borderRadius: '2px',
       marginTop: '2px',
     },
-  },
-  source: {
+  }),
+  source: theme => ({
     display: 'flex',
     alignItems: 'center',
     marginBottom: theme.spacing(1),
-  },
-  divider: {
+  }),
+  divider: theme => ({
     margin: theme.spacing(1, 0),
-  },
-  querySettings: {
+  }),
+  querySettings: theme => ({
     marginTop: theme.spacing(2),
     marginBottom: theme.spacing(2),
-  },
-  slider: {
+  }),
+  slider: theme => ({
     width: '100%',
     marginTop: theme.spacing(3),
-  },
-  queryButton: {
+  }),
+  queryButton: theme => ({
     marginTop: theme.spacing(2),
-  },
-  expandedSettings: {
+  }),
+  expandedSettings: theme => ({
     backgroundColor: 'rgba(0, 0, 0, 0.03)',
     borderRadius: theme.shape.borderRadius,
     boxShadow: 'none',
     '&:before': {
       display: 'none',
     },
-  },
-  settingsDetails: {
+  }),
+  settingsDetails: theme => ({
     flexDirection: 'column',
     padding: theme.spacing(1, 2, 2),
-  },
-  compactAlert: {
+  }),
+  compactAlert: theme => ({
     padding: theme.spacing(1, 2),
     marginBottom: theme.spacing(1),
-  },
-  compactSliderContainer: {
+  }),
+  compactSliderContainer: theme => ({
     marginBottom: theme.spacing(1.5),
-  },
-  sliderLabel: {
+  }),
+  sliderLabel: theme => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing(0.5),
-  },
-  sliderCaption: {
+  }),
+  sliderCaption: theme => ({
     marginTop: theme.spacing(0.5),
-  },
-  noResults: {
+  }),
+  noResults: theme => ({
     textAlign: 'center',
     padding: theme.spacing(4),
     color: theme.palette.text.secondary,
@@ -135,54 +157,54 @@ const useStyles = makeStyles((theme) => ({
       opacity: 0.5,
       marginBottom: theme.spacing(2),
     },
-  },
-  exampleContainer: {
+  }),
+  exampleContainer: theme => ({
     marginTop: theme.spacing(2),
-  },
-  exampleChip: {
+  }),
+  exampleChip: theme => ({
     margin: theme.spacing(0.5),
     cursor: 'pointer',
-  },
-  highlightedText: {
+  }),
+  highlightedText: theme => ({
     backgroundColor: 'rgba(255, 235, 59, 0.3)',
     padding: '0 1px',
     borderRadius: '2px',
-  },
-  settingsFormControl: {
+  }),
+  settingsFormControl: theme => ({
     marginBottom: theme.spacing(2),
     minWidth: 120,
-  },
-  matchMetadata: {
+  }),
+  matchMetadata: theme => ({
     display: 'flex',
     flexWrap: 'wrap',
     gap: theme.spacing(1),
     marginBottom: theme.spacing(1),
-  },
-  metadataChip: {
+  }),
+  metadataChip: theme => ({
     backgroundColor: theme.palette.background.default,
-  },
-  analyzeButton: {
+  }),
+  analyzeButton: theme => ({
     marginBottom: theme.spacing(3),
-  },
-  analysisPaper: {
+  }),
+  analysisPaper: theme => ({
     padding: theme.spacing(3),
     marginBottom: theme.spacing(3),
     backgroundColor: 'rgba(232, 244, 253, 0.3)',
     border: '1px solid rgba(25, 118, 210, 0.12)',
-  },
-  analysisHeader: {
+  }),
+  analysisHeader: theme => ({
     display: 'flex',
     alignItems: 'center',
     marginBottom: theme.spacing(2),
-  },
-  analysisIcon: {
+  }),
+  analysisIcon: theme => ({
     marginRight: theme.spacing(1),
     color: theme.palette.primary.main,
-  },
-  analysisSection: {
+  }),
+  analysisSection: theme => ({
     marginBottom: theme.spacing(2),
-  },
-  llmAnswerContainer: {
+  }),
+  llmAnswerContainer: theme => ({
     marginTop: theme.spacing(3),
     padding: theme.spacing(3),
     backgroundColor: 'rgba(250, 250, 250, 0.8)',
@@ -197,8 +219,8 @@ const useStyles = makeStyles((theme) => ({
         color: theme.palette.primary.main,
       },
     },
-  },
-  llmAnswer: {
+  }),
+  llmAnswer: theme => ({
     whiteSpace: 'pre-wrap',
     '& p': {
       marginBottom: theme.spacing(1.5),
@@ -209,8 +231,8 @@ const useStyles = makeStyles((theme) => ({
       borderRadius: '3px',
       fontSize: '0.9em',
     },
-  },
-  sourcesList: {
+  }),
+  sourcesList: theme => ({
     marginTop: theme.spacing(3),
     '& .source-header': {
       marginBottom: theme.spacing(1),
@@ -218,49 +240,49 @@ const useStyles = makeStyles((theme) => ({
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-  },
-  sourcesHeading: {
+  }),
+  sourcesHeading: theme => ({
     marginBottom: theme.spacing(1),
     fontWeight: 500,
-  },
-  queryModeSelector: {
+  }),
+  queryModeSelector: theme => ({
     display: 'flex',
     alignItems: 'center',
     marginBottom: theme.spacing(2),
-  },
-  queryModeButton: {
+  }),
+  queryModeButton: theme => ({
     margin: theme.spacing(0, 1),
-  },
-  activeModeButton: {
+  }),
+  activeModeButton: theme => ({
     backgroundColor: theme.palette.primary.main,
     color: theme.palette.primary.contrastText,
     '&:hover': {
       backgroundColor: theme.palette.primary.dark,
     },
-  },
-  infoCard: {
+  }),
+  infoCard: theme => ({
     marginBottom: theme.spacing(3),
     padding: theme.spacing(2),
     backgroundColor: 'rgba(232, 244, 253, 0.5)',
     borderLeft: `4px solid ${theme.palette.info.main}`,
-  },
-  modeInfoCard: {
+  }),
+  modeInfoCard: theme => ({
     marginBottom: theme.spacing(2),
     padding: theme.spacing(2),
     borderRadius: theme.shape.borderRadius,
     backgroundColor: 'rgba(232, 244, 253, 0.3)',
-  },
-  helpIcon: {
+  }),
+  helpIcon: theme => ({
     fontSize: '1rem',
     marginLeft: theme.spacing(0.5),
     color: theme.palette.info.main,
     cursor: 'pointer',
-  },
-  modeDescription: {
+  }),
+  modeDescription: theme => ({
     marginTop: theme.spacing(1),
     marginBottom: theme.spacing(1),
-  },
-  compactRelevanceBox: {
+  }),
+  compactRelevanceBox: theme => ({
     padding: theme.spacing(0.75),
     fontSize: '0.75rem',
     borderRadius: 4,
@@ -268,8 +290,8 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sliderDivider: {
+  }),
+  sliderDivider: theme => ({
     position: 'relative',
     paddingRight: theme.spacing(3),
     '&::after': {
@@ -284,11 +306,11 @@ const useStyles = makeStyles((theme) => ({
         display: 'none'
       }
     }
-  },
-  sliderRightContainer: {
+  }),
+  sliderRightContainer: theme => ({
     paddingLeft: theme.spacing(3),
-  },
-  expandedDocContainer: {
+  }),
+  expandedDocContainer: theme => ({
     marginTop: theme.spacing(1),
     marginBottom: theme.spacing(2),
     padding: theme.spacing(2),
@@ -301,51 +323,61 @@ const useStyles = makeStyles((theme) => ({
     '& .metadata-section': {
       marginBottom: theme.spacing(1.5),
     },
-  },
-  expandedDocText: {
+  }),
+  expandedDocText: theme => ({
     whiteSpace: 'pre-wrap',
     fontSize: '0.875rem',
-    maxHeight: '300px',
+    maxHeight: '500px',
     overflow: 'auto',
     backgroundColor: 'white',
     padding: theme.spacing(1.5),
     border: '1px solid rgba(0, 0, 0, 0.1)',
     borderRadius: theme.shape.borderRadius,
     marginTop: theme.spacing(1.5),
-  },
-  expandedDocTextLimited: {
-    maxHeight: '150px',
-  },
-  showMoreButton: {
+    wordBreak: 'break-word',
+    textOverflow: 'clip',
+  }),
+  expandedDocTextLimited: theme => ({
+    maxHeight: '200px',
+  }),
+  showMoreButton: theme => ({
     marginTop: theme.spacing(1),
     textTransform: 'none',
     fontSize: '0.75rem',
-  },
-  expandedDocHeader: {
+  }),
+  expandedDocHeader: theme => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing(1.5),
-  },
-  expandedDocMetadata: {
+  }),
+  expandedDocMetadata: theme => ({
     display: 'flex',
     flexWrap: 'wrap',
     gap: theme.spacing(1),
     marginBottom: theme.spacing(1),
-  },
-  documentChip: {
+  }),
+  documentChip: theme => ({
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     '&:hover': {
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
       transform: 'translateY(-1px)',
     },
-  },
-}));
+  }),
+};
 
 const QueryTester = ({ vectorStore }) => {
-  const classes = useStyles();
+  const theme = useTheme();
+  const containerClasses = useContainerStyles();
+  
+  // Convert style functions to actual styles with theme
+  const classes = {};
+  Object.keys(useStyles).forEach(key => {
+    classes[key] = useStyles[key](theme);
+  });
   const { user, token } = useContext(AuthContext);
+  
   const [queryText, setQueryText] = useState('');
   const [queryResults, setQueryResults] = useState(null);
   const [displayedResults, setDisplayedResults] = useState([]);
@@ -362,7 +394,7 @@ const QueryTester = ({ vectorStore }) => {
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
-  const [sampleSize, setSampleSize] = useState(1000);
+  const [sampleSize, setSampleSize] = useState(50);
   const [samplingStrategy, setSamplingStrategy] = useState('random');
   
   // LLM response state
@@ -466,7 +498,9 @@ const QueryTester = ({ vectorStore }) => {
           queryText.trim(),
           { 
             top_k: topK,
-            score_threshold: scoreThreshold
+            score_threshold: scoreThreshold,
+            truncate_text: false, // Ensure we get full text
+            max_text_length: 10000 // Set a high value to avoid truncation
           },
           token
         );
@@ -489,7 +523,9 @@ const QueryTester = ({ vectorStore }) => {
             top_k: topK,
             score_threshold: scoreThreshold,
             use_llm: true,
-            include_sources: true
+            include_sources: true,
+            truncate_text: false,
+            max_text_length: 10000
           },
           token
         );
@@ -575,7 +611,7 @@ const QueryTester = ({ vectorStore }) => {
     const originalScore = result.original_score !== undefined ? result.original_score : null;
     
     return (
-      <Paper key={index} className={classes.resultItem} elevation={2}>
+      <GradientBorderPaper key={index} style={classes.resultItem} elevation={2}>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
           <Box>
             <Typography variant="subtitle1">
@@ -606,8 +642,7 @@ const QueryTester = ({ vectorStore }) => {
             >
               <div>
                 <Typography 
-                  className={classes.relevanceScore}
-                  style={{ color: getScoreColor(normalizedScore) }}
+                  style={{...classes.relevanceScore, color: getScoreColor(normalizedScore)}}
                 >
                   {normalizedScore.toFixed(2)}
                   <div 
@@ -628,7 +663,7 @@ const QueryTester = ({ vectorStore }) => {
         {/* Enhanced Metadata Display */}
         <MetadataDisplay metadata={result.metadata} />
         
-        <Divider className={classes.divider} />
+        <Divider style={classes.divider} />
         
         <Typography variant="body2" 
           dangerouslySetInnerHTML={{ 
@@ -642,7 +677,7 @@ const QueryTester = ({ vectorStore }) => {
         {/* Add expand/collapse button if text is long */}
         {result.text.length > 500 && (
           <Button
-            className={classes.showMoreButton}
+            style={classes.showMoreButton}
             onClick={() => toggleShowFullText(result.metadata?.document_id || index)}
             size="small"
             color="primary"
@@ -651,7 +686,7 @@ const QueryTester = ({ vectorStore }) => {
             {showFullText[result.metadata?.document_id || index] ? "Show less" : "Show more"}
           </Button>
         )}
-      </Paper>
+      </GradientBorderPaper>
     );
   };
 
@@ -665,8 +700,11 @@ const QueryTester = ({ vectorStore }) => {
     }
     
     try {
+      // Make sure we're working with the complete text
+      const fullText = markdown.toString();
+      
       // Enhanced markdown to HTML conversion
-      let html = markdown
+      let html = fullText
         // Headers
         .replace(/^### (.*$)/gim, '<h3 style="margin-top: 16px; margin-bottom: 8px; font-size: 1.1rem;">$1</h3>')
         .replace(/^## (.*$)/gim, '<h2 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.25rem;">$1</h2>')
@@ -714,13 +752,30 @@ const QueryTester = ({ vectorStore }) => {
         return `<p style="margin-bottom: 12px; line-height: 1.5;">${paragraph}</p>`;
       }).join('');
       
-      return <div dangerouslySetInnerHTML={{ __html: html }} style={{ overflow: 'auto' }} />;
+      return (
+        <div 
+          dangerouslySetInnerHTML={{ __html: html }} 
+          style={{ 
+            overflow: 'auto', 
+            wordBreak: 'break-word',
+            whiteSpace: 'pre-wrap'
+          }} 
+        />
+      );
     } catch (error) {
       console.error("Error rendering markdown:", error);
       return (
         <div>
           <Typography color="error">Error rendering content. Raw content:</Typography>
-          <pre style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+          <pre style={{ 
+            whiteSpace: 'pre-wrap', 
+            backgroundColor: '#f5f5f5', 
+            padding: '8px', 
+            borderRadius: '4px',
+            wordBreak: 'break-word', 
+            overflow: 'auto',
+            maxWidth: '100%'
+          }}>
             {markdown}
           </pre>
         </div>
@@ -757,12 +812,12 @@ const QueryTester = ({ vectorStore }) => {
   };
 
   return (
-    <div className={classes.root}>
-      <Typography variant="h6" gutterBottom>
+    <StyledContainer maxWidth="lg" style={classes.root}>
+      <Typography variant="h6" gutterBottom style={{ color: '#e0e0e0' }}>
         Test Vector Store Query
       </Typography>
       
-      <Typography variant="body2" color="textSecondary" paragraph>
+      <Typography variant="body2" color="textSecondary" paragraph style={{ color: '#b0b0b0' }}>
         Test your vector store's retrieval capabilities by analyzing its content or querying for specific information.
       </Typography>
       
@@ -770,16 +825,23 @@ const QueryTester = ({ vectorStore }) => {
       <Grid container spacing={3}>
         {/* Left Column - Quick Test & Analysis */}
         <Grid item xs={12} md={6}>
-          <Paper style={{ padding: 16, marginBottom: 8, backgroundColor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center' }}>
-            <AnalyticsIcon style={{ marginRight: 8, color: '#1976d2' }} />
-            <Typography variant="subtitle1" style={{ fontWeight: 500 }}>
+          <SubtleGlowPaper style={{ 
+            padding: 16, 
+            marginBottom: 8, 
+            backgroundColor: '#212b36', 
+            display: 'flex', 
+            alignItems: 'center',
+            border: '1px solid rgba(65, 90, 115, 0.3)'
+          }}>
+            <AnalyticsIcon style={{ marginRight: 8, color: '#4285f4' }} />
+            <Typography variant="subtitle1" style={{ fontWeight: 500, color: '#e0e0e0' }}>
               Quick Test & Analysis
             </Typography>
-          </Paper>
+          </SubtleGlowPaper>
           
           {/* Analysis section */}
           {!analysis && !isAnalyzing && (
-            <Paper style={{ padding: 16, marginBottom: 24, border: '1px dashed rgba(0, 0, 0, 0.12)' }}>
+            <GradientBorderPaper style={{ padding: 16, marginBottom: 24, border: '1px dashed rgba(0, 0, 0, 0.12)' }}>
               <Box display="flex" alignItems="center" mb={1}>
                 <InfoIcon color="primary" style={{ marginRight: 8 }} />
                 <Typography variant="subtitle1">
@@ -802,11 +864,11 @@ const QueryTester = ({ vectorStore }) => {
                         onChange={(e) => setSampleSize(e.target.value)}
                         label="Sample Size"
                       >
-                        <MenuItem value={50}>50 chunks</MenuItem>
+                        <MenuItem value={50}>50 chunks (recommended)</MenuItem>
                         <MenuItem value={100}>100 chunks</MenuItem>
                         <MenuItem value={200}>200 chunks</MenuItem>
                         <MenuItem value={500}>500 chunks</MenuItem>
-                        <MenuItem value={1000}>1000 chunks (recommended)</MenuItem>
+                        <MenuItem value={1000}>1000 chunks</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -842,11 +904,11 @@ const QueryTester = ({ vectorStore }) => {
               >
                 {isAnalyzing ? 'Analyzing...' : 'Analyze Vector Store Content'}
               </Button>
-            </Paper>
+            </GradientBorderPaper>
           )}
           
           {isAnalyzing && !analysis && (
-            <Paper style={{ padding: 16, marginBottom: 24, textAlign: 'center' }}>
+            <GradientBorderPaper style={{ padding: 16, marginBottom: 24, textAlign: 'center' }}>
               <CircularProgress size={40} />
               <Typography variant="subtitle1" style={{ marginTop: 16 }}>
                 Analyzing your vector store...
@@ -854,14 +916,19 @@ const QueryTester = ({ vectorStore }) => {
               <Typography variant="body2" color="textSecondary">
                 This may take a moment as we analyze the content and structure of your data.
               </Typography>
-            </Paper>
+            </GradientBorderPaper>
           )}
           
           {analysis && (
-            <Paper className={classes.analysisPaper} elevation={1}>
-              <div className={classes.analysisHeader}>
-                <AnalyticsIcon className={classes.analysisIcon} />
-                <Typography variant="h6">
+            <AnimatedGradientPaper style={{
+              ...classes.analysisPaper, 
+              backgroundColor: '#1a2027',
+              border: '1px solid rgba(65, 90, 115, 0.5)',
+              color: '#e0e0e0'
+            }} elevation={1}>
+              <div style={classes.analysisHeader}>
+                <AnalyticsIcon style={{...classes.analysisIcon, color: '#4285f4'}} />
+                <Typography variant="h6" style={{ color: '#e0e0e0' }}>
                   Vectorstore Analysis
                 </Typography>
                 <Button 
@@ -877,18 +944,33 @@ const QueryTester = ({ vectorStore }) => {
                 </Button>
               </div>
               
-              <Alert severity="success" variant="outlined" style={{ marginBottom: 16 }}>
-                <Typography variant="body2">
+              <Alert 
+                severity="success" 
+                variant="outlined" 
+                style={{ 
+                  marginBottom: 16, 
+                  backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                  color: '#e0e0e0',
+                  border: '1px solid rgba(76, 175, 80, 0.5)'
+                }}
+              >
+                <Typography variant="body2" style={{ color: '#e0e0e0' }}>
                   Analysis completed! This helps you understand what's in your vector store and suggests useful queries to try.
                 </Typography>
               </Alert>
               
               {/* Analysis options section - only visible when analysis is complete */}
               {analysis && (
-                <Paper style={{ padding: 16, marginBottom: 16, backgroundColor: 'rgba(250, 250, 250, 0.7)' }}>
+                <GradientCornersPaper style={{ 
+                  padding: 16, 
+                  marginBottom: 16, 
+                  backgroundColor: '#212b36',
+                  border: '1px solid rgba(65, 90, 115, 0.3)',
+                  color: '#e0e0e0'
+                }}>
                   <Box display="flex" alignItems="center" mb={1}>
-                    <InfoIcon color="primary" style={{ marginRight: 8 }} />
-                    <Typography variant="subtitle1">
+                    <InfoIcon style={{ color: '#4285f4', marginRight: 8 }} />
+                    <Typography variant="subtitle1" style={{ color: '#e0e0e0' }}>
                       Analysis Parameters
                     </Typography>
                     {isAnalyzing && (
@@ -904,40 +986,48 @@ const QueryTester = ({ vectorStore }) => {
                   <Grid container spacing={2}>
                     {/* Display sample size and strategy for analysis */}
                     <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" gutterBottom>
+                      <Typography variant="body2" gutterBottom style={{ color: '#e0e0e0' }}>
                         <strong>Sample Size:</strong> {analysis?.sample_size || sampleSize}
                       </Typography>
                     </Grid>
                     
                     <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" gutterBottom>
+                      <Typography variant="body2" gutterBottom style={{ color: '#e0e0e0' }}>
                         <strong>Sampling Method:</strong> {formatSamplingStrategy(analysis?.sampling_strategy || samplingStrategy)}
                       </Typography>
                     </Grid>
                   </Grid>
                   
                   {/* Include basic explanation of the analysis process */}
-                  <Alert severity="info" className={classes.compactAlert} style={{ marginTop: 8 }}>
-                    <Typography variant="body2">
+                  <Alert severity="info" style={{
+                    ...classes.compactAlert, 
+                    marginTop: 8,
+                    backgroundColor: 'rgba(25, 118, 210, 0.15)',
+                    color: '#e0e0e0',
+                    border: '1px solid rgba(25, 118, 210, 0.3)'
+                  }}>
+                    <Typography variant="body2" style={{ color: '#e0e0e0' }}>
                       The analysis examines your vector store content and suggests relevant queries. 
                       Use the suggested queries below to explore your data effectively.
                     </Typography>
                   </Alert>
-                </Paper>
+                </GradientCornersPaper>
               )}
               
-              <div className={classes.analysisSection}>
-                <Typography variant="subtitle1" gutterBottom>
+              <div style={classes.analysisSection}>
+                <Typography variant="subtitle1" gutterBottom style={{ color: '#e0e0e0' }}>
                   LLM Analysis (Raw Response)
                   <Tooltip title="This is the unprocessed output directly from the LLM">
-                    <HelpOutlineIcon className={classes.helpIcon} />
+                    <HelpOutlineIcon style={{...classes.helpIcon, color: '#4285f4'}} />
                   </Tooltip>
                 </Typography>
-                <Paper variant="outlined" style={{ 
+                <GradientBorderPaper variant="outlined" style={{ 
                   padding: 16, 
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: 'rgba(30, 30, 30, 0.9)',
                   maxHeight: '800px',
-                  overflow: 'auto'
+                  overflow: 'auto',
+                  color: '#e0e0e0',
+                  border: '1px solid rgba(65, 90, 115, 0.5)'
                 }}>
                   {analysis?.raw_response ? (
                     renderMarkdown(analysis.raw_response)
@@ -946,7 +1036,7 @@ const QueryTester = ({ vectorStore }) => {
                       No analysis available. The LLM did not return any content.
                     </Typography>
                   )}
-                </Paper>
+                </GradientBorderPaper>
                 
                 <Box mt={1} display="flex" justifyContent="flex-end">
                   <Button
@@ -965,48 +1055,76 @@ const QueryTester = ({ vectorStore }) => {
                 </Box>
               </div>
               
-              <div className={classes.analysisSection}>
-                <Typography variant="subtitle1" gutterBottom>
+              <div style={classes.analysisSection}>
+                <Typography variant="subtitle1" gutterBottom style={{ color: '#e0e0e0' }}>
                   Document Information
                 </Typography>
                 <Box display="flex" flexWrap="wrap">
-                  <Paper variant="outlined" style={{ padding: 12, margin: '0 8px 8px 0', backgroundColor: 'rgba(255, 255, 255, 0.7)', flexGrow: 1 }}>
-                    <Typography variant="body2" align="center">
+                  <SubtleGlowPaper variant="outlined" style={{ 
+                    padding: 12, 
+                    margin: '0 8px 8px 0', 
+                    backgroundColor: '#212b36', 
+                    color: '#e0e0e0',
+                    flexGrow: 1,
+                    border: '1px solid rgba(65, 90, 115, 0.5)'
+                  }}>
+                    <Typography variant="body2" align="center" style={{ color: '#e0e0e0' }}>
                       <strong>{analysis.document_count}</strong><br/>
                       Documents
                     </Typography>
-                  </Paper>
-                  <Paper variant="outlined" style={{ padding: 12, margin: '0 0 8px 0', backgroundColor: 'rgba(255, 255, 255, 0.7)', flexGrow: 1 }}>
-                    <Typography variant="body2" align="center">
+                  </SubtleGlowPaper>
+                  <SubtleGlowPaper variant="outlined" style={{ 
+                    padding: 12, 
+                    margin: '0 0 8px 0', 
+                    backgroundColor: '#212b36', 
+                    color: '#e0e0e0',
+                    flexGrow: 1,
+                    border: '1px solid rgba(65, 90, 115, 0.5)'
+                  }}>
+                    <Typography variant="body2" align="center" style={{ color: '#e0e0e0' }}>
                       <strong>{analysis.chunk_count}</strong><br/>
                       Chunks
                     </Typography>
-                  </Paper>
+                  </SubtleGlowPaper>
                 </Box>
                 <Box display="flex" flexWrap="wrap" mt={1}>
-                  <Paper variant="outlined" style={{ padding: 12, margin: '0 8px 8px 0', backgroundColor: 'rgba(255, 255, 255, 0.7)', flexGrow: 1 }}>
-                    <Typography variant="body2" align="center">
+                  <SubtleGlowPaper variant="outlined" style={{ 
+                    padding: 12, 
+                    margin: '0 8px 8px 0', 
+                    backgroundColor: '#212b36', 
+                    color: '#e0e0e0',
+                    flexGrow: 1,
+                    border: '1px solid rgba(65, 90, 115, 0.5)'
+                  }}>
+                    <Typography variant="body2" align="center" style={{ color: '#e0e0e0' }}>
                       <strong>{analysis.sample_size}</strong><br/>
                       Samples Analyzed
                     </Typography>
-                  </Paper>
-                  <Paper variant="outlined" style={{ padding: 12, margin: '0 0 8px 0', backgroundColor: 'rgba(255, 255, 255, 0.7)', flexGrow: 1 }}>
-                    <Typography variant="body2" align="center">
+                  </SubtleGlowPaper>
+                  <SubtleGlowPaper variant="outlined" style={{ 
+                    padding: 12, 
+                    margin: '0 0 8px 0', 
+                    backgroundColor: '#212b36', 
+                    color: '#e0e0e0',
+                    flexGrow: 1,
+                    border: '1px solid rgba(65, 90, 115, 0.5)'
+                  }}>
+                    <Typography variant="body2" align="center" style={{ color: '#e0e0e0' }}>
                       <strong>{formatSamplingStrategy(analysis.sampling_strategy)}</strong><br/>
                       Sampling Method
                     </Typography>
-                  </Paper>
+                  </SubtleGlowPaper>
                 </Box>
               </div>
               
-              <div className={classes.analysisSection}>
-                <Typography variant="subtitle1" gutterBottom>
+              <div style={classes.analysisSection}>
+                <Typography variant="subtitle1" gutterBottom style={{ color: '#e0e0e0' }}>
                   Suggested Queries
                   <Tooltip title="Try these queries to test your vectorstore's retrieval capabilities">
-                    <HelpOutlineIcon className={classes.helpIcon} />
+                    <HelpOutlineIcon style={{...classes.helpIcon, color: '#4285f4'}} />
                   </Tooltip>
                 </Typography>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
+                <Typography variant="body2" color="textSecondary" gutterBottom style={{ color: '#b0b0b0' }}>
                   Click on any suggestion to try it:
                 </Typography>
                 <Box display="flex" flexWrap="wrap" mt={1}>
@@ -1021,22 +1139,25 @@ const QueryTester = ({ vectorStore }) => {
                           key={index}
                           label={displayQuery}
                           onClick={() => handleExampleClick(query)}
-                          className={classes.exampleChip}
+                          style={{
+                            ...classes.exampleChip, 
+                            margin: '0 8px 8px 0', 
+                            maxWidth: '100%', 
+                            height: 'auto', 
+                            whiteSpace: 'normal', 
+                            padding: '4px 0',
+                            backgroundColor: 'rgba(65, 90, 115, 0.2)',
+                            border: '1px solid rgba(66, 133, 244, 0.5)',
+                            color: '#e0e0e0'
+                          }}
                           color="primary"
                           variant="outlined"
                           size="small"
-                          style={{ 
-                            margin: '0 8px 8px 0',
-                            maxWidth: '100%',
-                            height: 'auto',
-                            whiteSpace: 'normal',
-                            padding: '4px 0'
-                          }}
                         />
                       )
                     })
                   ) : (
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="body2" style={{ color: '#b0b0b0' }}>
                       No suggested queries available from the LLM. Try one of the default queries below.
                     </Typography>
                   )}
@@ -1048,11 +1169,16 @@ const QueryTester = ({ vectorStore }) => {
                           key={index}
                           label={query}
                           onClick={() => handleExampleClick(query)}
-                          className={classes.exampleChip}
+                          style={{
+                            ...classes.exampleChip, 
+                            margin: '0 8px 8px 0',
+                            backgroundColor: 'rgba(65, 90, 115, 0.2)',
+                            border: '1px solid rgba(66, 133, 244, 0.5)',
+                            color: '#e0e0e0'
+                          }}
                           color="secondary"
                           variant="outlined"
                           size="small"
-                          style={{ margin: '0 8px 8px 0' }}
                         />
                       ))}
                     </Box>
@@ -1061,26 +1187,39 @@ const QueryTester = ({ vectorStore }) => {
               </div>
               
               <Box mt={2}>
-                <Typography variant="body2" color="textSecondary">
-                  <InfoIcon fontSize="small" style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                <Typography variant="body2" style={{ color: '#b0b0b0' }}>
+                  <InfoIcon fontSize="small" style={{ verticalAlign: 'middle', marginRight: 4, color: '#4285f4' }} />
                   Try both the Raw Results and AI-Enhanced modes with the same query to see how they differ.
                 </Typography>
               </Box>
-            </Paper>
+            </AnimatedGradientPaper>
           )}
         </Grid>
 
         {/* Right Column - Query Input and Settings */}
         <Grid item xs={12} md={6}>
-          <Paper style={{ padding: 16, marginBottom: 8, backgroundColor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center' }}>
-            <SearchIcon style={{ marginRight: 8, color: '#1976d2' }} />
-            <Typography variant="subtitle1" style={{ fontWeight: 500 }}>
+          <SubtleGlowPaper style={{ 
+            padding: 16, 
+            marginBottom: 8, 
+            backgroundColor: '#212b36', 
+            display: 'flex', 
+            alignItems: 'center',
+            border: '1px solid rgba(65, 90, 115, 0.3)' 
+          }}>
+            <SearchIcon style={{ marginRight: 8, color: '#4285f4' }} />
+            <Typography variant="subtitle1" style={{ fontWeight: 500, color: '#e0e0e0' }}>
               Query & Test
             </Typography>
-          </Paper>
+          </SubtleGlowPaper>
           
-          <Paper style={{ padding: 16, marginBottom: 16 }}>
-            <Typography variant="subtitle1" gutterBottom>
+          <GradientBorderPaper style={{ 
+            padding: 16, 
+            marginBottom: 16,
+            backgroundColor: '#1a2027',
+            color: '#e0e0e0',
+            border: '1px solid rgba(65, 90, 115, 0.5)'
+          }}>
+            <Typography variant="subtitle1" gutterBottom style={{ color: '#e0e0e0' }}>
               Enter a Query
             </Typography>
             
@@ -1090,13 +1229,13 @@ const QueryTester = ({ vectorStore }) => {
               fullWidth
               value={queryText}
               onChange={handleQueryChange}
-              className={classes.queryInput}
+              style={classes.queryInput}
               placeholder="What would you like to know about this data?"
               disabled={isQuerying}
             />
             
             {analysis && (
-              <Box className={classes.exampleContainer}>
+              <Box style={classes.exampleContainer}>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   <strong>Quick Start:</strong> Try one of these example queries:
                 </Typography>
@@ -1107,11 +1246,10 @@ const QueryTester = ({ vectorStore }) => {
                         key={index}
                         label={example}
                         onClick={() => handleExampleClick(example)}
-                        className={classes.exampleChip}
+                        style={{...classes.exampleChip, margin: '0 8px 8px 0'}}
                         color="primary"
                         variant="outlined"
                         size="small"
-                        style={{ margin: '0 8px 8px 0' }}
                       />
                     ))
                   ) : (
@@ -1120,11 +1258,10 @@ const QueryTester = ({ vectorStore }) => {
                         key={index}
                         label={example}
                         onClick={() => handleExampleClick(example)}
-                        className={classes.exampleChip}
+                        style={{...classes.exampleChip, margin: '0 8px 8px 0'}}
                         color="secondary"
                         variant="outlined"
                         size="small"
-                        style={{ margin: '0 8px 8px 0' }}
                       />
                     ))
                   )}
@@ -1133,16 +1270,19 @@ const QueryTester = ({ vectorStore }) => {
             )}
             
             {/* Query Mode Selector moved below query input */}
-            <Paper style={{ padding: '12px', marginTop: '16px', marginBottom: '16px' }}>
+            <GradientCornersPaper style={{ padding: '12px', marginTop: '16px', marginBottom: '16px' }}>
               <Box display="flex" alignItems="center">
                 <Typography variant="body2" color="textSecondary" style={{ marginRight: '12px' }}>
-                  <strong>Query Mode:</strong>
+                  <strong>Query Modes:</strong>
                 </Typography>
                 
                 <Box display="flex" alignItems="center">
                   <Tooltip title="Returns direct vector matches based on semantic similarity">
                     <Button
-                      className={`${classes.queryModeButton} ${queryMode === 'raw' ? classes.activeModeButton : ''}`}
+                      style={{
+                        ...classes.queryModeButton,
+                        ...(queryMode === 'raw' ? classes.activeModeButton : {})
+                      }}
                       variant={queryMode === 'raw' ? 'contained' : 'outlined'}
                       size="small"
                       onClick={() => handleQueryModeChange('raw')}
@@ -1159,7 +1299,10 @@ const QueryTester = ({ vectorStore }) => {
                 <Box display="flex" alignItems="center">
                   <Tooltip title="Uses an LLM to generate a coherent answer based on the documents">
                     <Button
-                      className={`${classes.queryModeButton} ${queryMode === 'llm' ? classes.activeModeButton : ''}`}
+                      style={{
+                        ...classes.queryModeButton,
+                        ...(queryMode === 'llm' ? classes.activeModeButton : {})
+                      }}
                       variant={queryMode === 'llm' ? 'contained' : 'outlined'}
                       size="small"
                       onClick={() => handleQueryModeChange('llm')}
@@ -1173,13 +1316,13 @@ const QueryTester = ({ vectorStore }) => {
                   </Typography>
                 </Box>
               </Box>
-            </Paper>
+            </GradientCornersPaper>
             
             {/* Run Query button moved below query mode selector */}
             <Button
               variant="contained"
               color="primary"
-              className={classes.queryButton}
+              style={classes.queryButton}
               onClick={executeQuery}
               disabled={!queryText.trim() || isQuerying}
               startIcon={isQuerying ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
@@ -1191,8 +1334,7 @@ const QueryTester = ({ vectorStore }) => {
             <Accordion 
               expanded={settingsExpanded} 
               onChange={() => setSettingsExpanded(!settingsExpanded)}
-              className={classes.expandedSettings}
-              style={{ marginTop: 16 }}
+              style={{...classes.expandedSettings, marginTop: 16}}
             >
               <AccordionSummary
                 expandIcon={<ExpandMoreIcon />}
@@ -1202,7 +1344,7 @@ const QueryTester = ({ vectorStore }) => {
                 <TuneIcon style={{ marginRight: 8 }} />
                 <Typography>Query Settings</Typography>
               </AccordionSummary>
-              <AccordionDetails className={classes.settingsDetails}>
+              <AccordionDetails style={classes.settingsDetails}>
                 <Typography variant="body2" color="textSecondary" gutterBottom style={{ marginBottom: 8 }}>
                   Adjust how many results to return and the minimum relevance score.
                 </Typography>
@@ -1214,10 +1356,10 @@ const QueryTester = ({ vectorStore }) => {
                     item 
                     xs={12} 
                     sm={6}
-                    className={classes.sliderDivider}
+                    style={classes.sliderDivider}
                   >
-                    <Box className={classes.compactSliderContainer} style={{ paddingRight: 16 }}>
-                      <Box className={classes.sliderLabel}>
+                    <Box style={{...classes.compactSliderContainer, paddingRight: 16}}>
+                      <Box style={classes.sliderLabel}>
                         <Typography variant="body2" id="max-results-slider">
                           Maximum Results: <strong>{topK}</strong>
                         </Typography>
@@ -1235,9 +1377,9 @@ const QueryTester = ({ vectorStore }) => {
                         ]}
                         min={3}
                         max={20}
-                        className={classes.slider}
+                        style={classes.slider}
                       />
-                      <Typography variant="caption" color="textSecondary" className={classes.sliderCaption}>
+                      <Typography variant="caption" color="textSecondary" style={classes.sliderCaption}>
                         Max document chunks to retrieve
                       </Typography>
                     </Box>
@@ -1245,8 +1387,8 @@ const QueryTester = ({ vectorStore }) => {
                   
                   {/* Relevance Threshold Slider */}
                   <Grid item xs={12} sm={6}>
-                    <Box className={classes.compactSliderContainer} style={{ paddingLeft: 16 }}>
-                      <Box className={classes.sliderLabel}>
+                    <Box style={{...classes.compactSliderContainer, paddingLeft: 16}}>
+                      <Box style={classes.sliderLabel}>
                         <Typography variant="body2" id="score-threshold-slider">
                           Relevance Threshold: <strong>{scoreThreshold.toFixed(2)}</strong>
                         </Typography>
@@ -1264,9 +1406,9 @@ const QueryTester = ({ vectorStore }) => {
                         ]}
                         min={0}
                         max={1}
-                        className={classes.slider}
+                        style={classes.slider}
                       />
-                      <Typography variant="caption" color="textSecondary" className={classes.sliderCaption}>
+                      <Typography variant="caption" color="textSecondary" style={classes.sliderCaption}>
                         Higher = more relevant results. Only results with a score above this threshold will be shown.
                       </Typography>
                     </Box>
@@ -1274,7 +1416,7 @@ const QueryTester = ({ vectorStore }) => {
                 </Grid>
                 
                 {/* Keep relevance score explanation below both sliders */}
-                <Alert severity="info" className={classes.compactAlert} style={{ marginTop: 8 }}>
+                <Alert severity="info" style={{...classes.compactAlert, marginTop: 8}}>
                   <Typography variant="body2">
                     <strong>What is relevance score?</strong> It measures how semantically similar a document chunk is to your query. 
                     Scores are normalized to a 0-1 scale, where:
@@ -1282,8 +1424,8 @@ const QueryTester = ({ vectorStore }) => {
                       {/* Reorder from low (left) to high (right) */}
                       <Grid item xs={6} sm={3}>
                         <Box 
-                          className={classes.compactRelevanceBox}
                           style={{ 
+                            ...classes.compactRelevanceBox,
                             backgroundColor: 'rgba(255, 152, 0, 0.1)', 
                             borderLeft: '4px solid #ff9800' 
                           }}
@@ -1293,8 +1435,8 @@ const QueryTester = ({ vectorStore }) => {
                       </Grid>
                       <Grid item xs={6} sm={3}>
                         <Box 
-                          className={classes.compactRelevanceBox}
                           style={{ 
+                            ...classes.compactRelevanceBox,
                             backgroundColor: 'rgba(255, 193, 7, 0.1)', 
                             borderLeft: '4px solid #ffc107' 
                           }}
@@ -1304,8 +1446,8 @@ const QueryTester = ({ vectorStore }) => {
                       </Grid>
                       <Grid item xs={6} sm={3}>
                         <Box 
-                          className={classes.compactRelevanceBox}
                           style={{ 
+                            ...classes.compactRelevanceBox,
                             backgroundColor: 'rgba(139, 195, 74, 0.1)', 
                             borderLeft: '4px solid #8bc34a' 
                           }}
@@ -1315,8 +1457,8 @@ const QueryTester = ({ vectorStore }) => {
                       </Grid>
                       <Grid item xs={6} sm={3}>
                         <Box 
-                          className={classes.compactRelevanceBox}
                           style={{ 
+                            ...classes.compactRelevanceBox,
                             backgroundColor: 'rgba(76, 175, 80, 0.1)', 
                             borderLeft: '4px solid #4caf50' 
                           }}
@@ -1329,7 +1471,7 @@ const QueryTester = ({ vectorStore }) => {
                 </Alert>
               </AccordionDetails>
             </Accordion>
-          </Paper>
+          </GradientBorderPaper>
           
           {error && (
             <Alert severity="warning" style={{ marginBottom: 16 }}>
@@ -1339,49 +1481,77 @@ const QueryTester = ({ vectorStore }) => {
           
           {/* LLM Response Section */}
           {queryMode === 'llm' && llmResponse && (
-            <div className={classes.llmAnswerContainer}>
+            <div style={{
+              ...classes.llmAnswerContainer,
+              backgroundColor: '#1a2027',
+              border: '1px solid rgba(65, 90, 115, 0.5)',
+              color: '#e0e0e0'
+            }}>
               <Box mb={2}>
-                <Alert severity="info">
-                  <Typography variant="body2">
+                <Alert severity="info" style={{
+                  backgroundColor: '#2c3a47',
+                  color: '#e0e0e0',
+                  border: '1px solid rgba(25, 118, 210, 0.3)'
+                }}>
+                  <Typography variant="body2" style={{ color: '#e0e0e0' }}>
                     This response was generated by AI based on the most relevant document chunks found in your vector store.
                     The sources used are listed below the answer.
                   </Typography>
                 </Alert>
               </Box>
               
-              <Typography variant="h6" gutterBottom>
+              <Typography variant="h6" gutterBottom style={{ color: '#e0e0e0' }}>
                 AI Response
               </Typography>
               
-              <Paper elevation={1} style={{ padding: '16px', backgroundColor: 'white' }}>
-                <div className={classes.llmAnswer}>
+              <HighContrastGradientPaper elevation={1} style={{ 
+                padding: '16px', 
+                backgroundColor: '#1e272e', 
+                color: '#e0e0e0',
+                border: '1px solid rgba(65, 90, 115, 0.5)'
+              }}>
+                <div style={{
+                  ...classes.llmAnswer,
+                  color: '#e0e0e0'
+                }}>
                   {renderMarkdown(llmResponse.answer)}
                 </div>
-              </Paper>
+              </HighContrastGradientPaper>
 
               {/* Add a button to copy the response to clipboard */}
               <Box mt={1} display="flex" justifyContent="flex-end">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<span role="img" aria-label="copy">📋</span>}
+                <CopyButton
                   onClick={() => {
                     navigator.clipboard.writeText(llmResponse.answer);
                     // You could add a snackbar notification here
                   }}
-                >
-                  Copy Response
-                </Button>
+                  tooltip="Copy response"
+                />
               </Box>
               
               {llmResponse.sources && llmResponse.sources.length > 0 && (
-                <div className={classes.sourcesList}>
-                  <Typography variant="subtitle2" className={classes.sourcesHeading}>
+                <div style={{
+                  ...classes.sourcesList,
+                  backgroundColor: '#2c3a47',
+                  padding: '16px',
+                  marginTop: '24px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(65, 90, 115, 0.5)'
+                }}>
+                  <Typography variant="subtitle2" style={{
+                    ...classes.sourcesHeading,
+                    color: '#e0e0e0'
+                  }}>
                     Sources Used:
                   </Typography>
                   
-                  <Paper variant="outlined" style={{ padding: '12px', backgroundColor: 'rgba(245, 245, 245, 0.7)' }}>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                  <GradientBorderPaper variant="outlined" style={{ 
+                    padding: '12px', 
+                    backgroundColor: '#212b36',
+                    color: '#e0e0e0',
+                    border: '1px solid rgba(65, 90, 115, 0.5)'
+                  }}>
+                    <Typography variant="body2" style={{ color: '#b0b0b0' }} gutterBottom>
                       The AI response is based on these {llmResponse.sources.length} document chunks:
                     </Typography>
                     
@@ -1405,27 +1575,35 @@ const QueryTester = ({ vectorStore }) => {
                                     }
                                   </Box>
                                 }
-                                className={`${classes.metadataChip} ${classes.documentChip}`}
-                                onClick={() => handleDocExpand(sourceId)}
                                 style={{ 
+                                  ...classes.metadataChip,
+                                  ...classes.documentChip,
                                   margin: '0 4px 4px 0',
                                   backgroundColor: `${getScoreColor(source.score)}20`,
                                   border: `1px solid ${getScoreColor(source.score)}`,
-                                  fontWeight: source.score >= 0.7 ? 'bold' : 'normal'
+                                  fontWeight: source.score >= 0.7 ? 'bold' : 'normal',
+                                  color: '#e0e0e0'
                                 }}
+                                onClick={() => handleDocExpand(sourceId)}
                               />
                             </Tooltip>
                             
                             <Collapse in={isExpanded} timeout="auto" unmountOnExit style={{ width: '100%' }}>
-                              <div className={classes.expandedDocContainer}>
-                                <div className={classes.expandedDocHeader}>
-                                  <Typography variant="subtitle2">
+                              <div style={{
+                                ...classes.expandedDocContainer,
+                                backgroundColor: '#212b36',
+                                border: '1px solid rgba(65, 90, 115, 0.5)',
+                                color: '#e0e0e0'
+                              }}>
+                                <div style={classes.expandedDocHeader}>
+                                  <Typography variant="subtitle2" style={{ color: '#e0e0e0' }}>
                                     Source Document {index + 1}
                                   </Typography>
                                   <IconButton 
                                     size="small" 
                                     onClick={() => setExpandedDocId(null)}
                                     aria-label="close"
+                                    style={{ color: '#e0e0e0' }}
                                   >
                                     <ExpandLessIcon fontSize="small" />
                                   </IconButton>
@@ -1434,13 +1612,25 @@ const QueryTester = ({ vectorStore }) => {
                                 {/* Enhanced metadata display for source */}
                                 <MetadataDisplay metadata={source.metadata} />
                                 
-                                <div className={`${classes.expandedDocText} ${!showFullText[sourceId] ? classes.expandedDocTextLimited : ''}`}>
+                                <div style={{
+                                  ...classes.expandedDocText,
+                                  ...((!showFullText[sourceId]) ? classes.expandedDocTextLimited : {}),
+                                  backgroundColor: '#1a2027',
+                                  border: '1px solid rgba(65, 90, 115, 0.3)',
+                                  color: '#e0e0e0',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                  overflow: 'auto'
+                                }}>
                                   {source.text || source.text_preview || "Full document text not available."}
                                 </div>
                                 
                                 {(source.text && source.text.length > 500) && (
                                   <Button 
-                                    className={classes.showMoreButton} 
+                                    style={{
+                                      ...classes.showMoreButton,
+                                      color: '#4285f4'
+                                    }}
                                     onClick={() => toggleShowFullText(sourceId)}
                                     size="small"
                                     color="primary"
@@ -1456,11 +1646,11 @@ const QueryTester = ({ vectorStore }) => {
                       })}
                     </Box>
                     
-                    <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+                    <Typography variant="body2" style={{ color: '#b0b0b0', marginTop: 8 }}>
                       Sources are ordered by relevance. Darker colors indicate higher relevance to your query.
                       Click on any source to view its full text and metadata.
                     </Typography>
-                  </Paper>
+                  </GradientBorderPaper>
                 </div>
               )}
             </div>
@@ -1468,7 +1658,7 @@ const QueryTester = ({ vectorStore }) => {
           
           {/* Raw Query Results Section with Pagination */}
           {queryMode === 'raw' && queryResults && queryResults.length > 0 && (
-            <div className={classes.resultContainer}>
+            <div style={classes.resultContainer}>
               <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6" gutterBottom>
                   Query Results ({queryResults.length})
@@ -1519,7 +1709,7 @@ const QueryTester = ({ vectorStore }) => {
           )}
           
           {queryMode === 'raw' && queryResults && queryResults.length === 0 && (
-            <Paper className={classes.noResults}>
+            <GradientBorderPaper style={classes.noResults}>
               <InfoIcon color="disabled" style={{ fontSize: 48, opacity: 0.5 }} />
               <Typography variant="h6" gutterBottom>
                 No Matching Results
@@ -1527,11 +1717,11 @@ const QueryTester = ({ vectorStore }) => {
               <Typography variant="body2">
                 Try adjusting your query or lowering the relevance threshold to see more results.
               </Typography>
-            </Paper>
+            </GradientBorderPaper>
           )}
           
           {!hasSearched && !queryResults && !llmResponse && !isQuerying && (
-            <Paper style={{ 
+            <GradientBorderPaper style={{ 
               padding: 24, 
               marginTop: 16, 
               textAlign: 'center', 
@@ -1560,11 +1750,10 @@ const QueryTester = ({ vectorStore }) => {
                       key={index}
                       label={example}
                       onClick={() => handleExampleClick(example)}
-                      className={classes.exampleChip}
+                      style={{...classes.exampleChip, margin: '4px'}}
                       color="primary"
                       variant="outlined"
                       size="small"
-                      style={{ margin: '4px' }}
                     />
                   ))}
                 </Box>
@@ -1582,11 +1771,11 @@ const QueryTester = ({ vectorStore }) => {
                   Run Query
                 </Button>
               )}
-            </Paper>
+            </GradientBorderPaper>
           )}
           
           {isQuerying && (
-            <Paper style={{ 
+            <GradientBorderPaper style={{ 
               padding: 24, 
               marginTop: 16, 
               textAlign: 'center',
@@ -1610,11 +1799,11 @@ const QueryTester = ({ vectorStore }) => {
               <Typography variant="caption" color="textSecondary" style={{ marginTop: 24 }}>
                 This may take a few seconds depending on the complexity of your query.
               </Typography>
-            </Paper>
+            </GradientBorderPaper>
           )}
         </Grid>
       </Grid>
-    </div>
+    </StyledContainer>
   );
 };
 

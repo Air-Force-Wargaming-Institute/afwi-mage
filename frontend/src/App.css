@@ -1,35 +1,48 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;700&display=swap');
 
 :root {
-  --primary-color: #00308f;
-  --secondary-color: #001f5c;
-  --background-color: #1a1a1a;
-  --text-color-light: #e0e0e0;
-  --text-color-dark: #333333;
-  --container-bg-color: rgba(245, 245, 245, 0.9);
-  --header-footer-bg-color: rgba(0, 0, 0, 0.8);
-  --border-radius: 8px;
-  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --primary-color: #4285f4;
+  --secondary-color: #2c5cc5;
+  --primary-hover: #5794ff;
+  --background-color: #121212;
+  --text-color-light: #f0f0f0;
+  --text-color-dark: #bbbbbb;
+  --container-bg-color: rgba(30, 30, 30, 0.9);
+  --container-bg-color-lighter: rgba(40, 40, 40, 0.9);
+  --header-footer-bg-color: rgba(10, 10, 10, 0.95);
+  --border-radius: 10px;
+  --box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   --transition: all 0.3s ease;
   --user-account-right-offset: 20px;
   
-  /* New component-specific variables */
-  --info-box-bg: rgba(255, 255, 255, 0.9);
+  /* Gradient border variables */
+  --border-gradient-1: linear-gradient(to right, #4285f4, #34a853, #fbbc05);
+  --border-gradient-2: linear-gradient(135deg, #4285f4, #34a853, #ea4335);
+  --border-gradient-horizontal: linear-gradient(to right, #4285f4, #34a853, #fbbc05);
+  --border-gradient-vertical: linear-gradient(to bottom, #4285f4, #34a853, #ea4335);
+  
+  /* Component-specific variables */
+  --info-box-bg: rgba(30, 30, 30, 0.7);
   --table-header-bg: var(--primary-color);
-  --table-row-hover: #f0f0f0;
-  --table-row-even: #f8f8f8;
-  --table-border: #e0e0e0;
-  --dropzone-border: #ccc;
+  --table-row-hover: rgba(60, 60, 60, 0.7);
+  --table-row-even: rgba(75, 74, 74, 0.7);
+  --table-row-odd: rgba(35, 35, 35, 0.7);
+  --table-border: #333333;
+  --dropzone-border: #555555;
+  --divider-color: #333333;
+  --card-bg-color: rgba(40, 40, 40, 0.8);
+  --hover-overlay: rgba(66, 134, 244, 0.39);
 }
 
 /* Global Styles */
 body, html {
-  font-family: 'Roboto', Helvetica, Arial, sans-serif;
+  font-family: 'Nunito Sans', Helvetica, Arial, sans-serif;
   font-size: 14px;
   margin: 0;
   padding: 0;
   background-color: var(--background-color);
-  color: var(--text-color);
+  color: var(--text-color-light);
   height: 100%;
   overflow: hidden;
 }
@@ -47,6 +60,7 @@ body {
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
+  background-color: var(--background-color);
 }
 
 /* AFWI MAGE Coin Logo - Positioned in the lower left corner */
@@ -67,177 +81,23 @@ body {
   min-height: 100vh;
   text-align: center;
 }
-
-/* Header Styles */
-.app-header {
-  position: relative;
-  top: 0;
-  z-index: 1000;
-  min-height: 80px;
-  background-color: var(--header-footer-bg-color);
-  box-shadow: var(--box-shadow);
-  padding: 10px 20px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.header-left-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logo-title-container {
-  display: flex;
-  align-items: center;
-}
-
-.logo {
-  height: 40px;
-  width: auto;
-  margin-right: 15px;
-}
-
-.title-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.title-container h1 {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-  text-align: left;
-  color: white !important;
-}
-
-.title-container h1::before {
-  content: 'Multi-Agent Generative Engine';
-}
-
+  
 .title-container h2 {
-  margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: normal;
   line-height: 1.2;
   text-align: left;
-  color: white !important;
+  color: var(--text-color-light) ;
 }
 
+.title-container h1::before {
+  content: '';
+}
+  
 .title-container h2::before {
-  content: 'Air Force Wargaming Institute';
-}
-
-@media (max-width: 1024px) {
-  .title-container h1 {
-    font-size: 16px;
-    line-height: 1.2;
-    text-align: left;
-    color: white !important;
-  }
-  
-  .title-container h2 {
-    font-size: 12px;
-    font-weight: normal;
-    line-height: 1.2;
-    text-align: left;
-    color: white !important;
-  }
-
-  .title-container h1::before {
-    content: 'MAGE';
-  }
-  
-  .title-container h2::before {
-    content: 'AFWI';
-  }
-}
-
-/* Navigation Styles */
-.workflow-nav {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 10px;
-}
-
-.workflow-nav ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.workflow-nav li {
-  margin: 0 10px;
-  display: flex;
-  align-items: center;
-}
-
-.workflow-nav a {
-  color: var(--text-color);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  padding: 5px 10px;
-  font-size: 14px;
-  position: relative;
-  transition: var(--transition);
-}
-
-.workflow-nav a::after {
   content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: white;
-  transition: var(--transition);
 }
 
-.workflow-nav a:hover::after,
-.workflow-nav a.active::after {
-  width: 100%;
-}
-
-.workflow-nav a:hover,
-.workflow-nav a.active {
-  color: var(--primary-color);
-}
-
-.workflow-nav a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -12px;
-  left: 0;
-  width: 100%;
-  height: 18px;
-  background: linear-gradient(to bottom, var(--primary-color) 0%, transparent 100%);
-  border-radius: 0px 0px 4px 4px;
-}
-
-.workflow-step {
-  display: flex;
-  align-items: center;
-}
-
-.arrow {
-  color: white;
-  margin-left: 5px;
-  font-size: 14px;
-  opacity: 0.8;
-}
 
 /* Main Content Styles */
 main {
@@ -248,14 +108,15 @@ main {
   width: 100%;
   margin: 0 auto;
   overflow: auto;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(0, 0, 0, 0.4);
   position: relative;
   z-index: 2;
 }
 
-/* Container Styles */
+/* Container Styles with gradient borders */
 .container {
   background-color: var(--container-bg-color);
+  color: var(--text-color-light);
   border-radius: var(--border-radius);
   padding: 30px;
   width: 100%;
@@ -266,39 +127,69 @@ main {
   flex-direction: column;
   position: relative;
   z-index: 5;
+  
+  /* Use pseudo-element approach that works with border-radius */
+  position: relative;
+}
+
+.container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 1px;
+  background: var(--border-gradient-1);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Typography Styles */
 h1, h2, h3, h4, h5, h6 {
-  color: var(--primary-color);
+  font-family: 'League+Spartan', sans-serif;
+  color: var(--text-color-light);
   margin-bottom: 20px;
 }
 
-h1 { font-size: 32px; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
-h4 { font-size: 20px; }
-h5 { font-size: 18px; }
-h6 { font-size: 16px; }
+h1 { font-size: 38px; }
+h2 { font-size: 28px; }
+h3 { font-size: 22px; }
+h4 { font-size: 18px; }
+h5 { font-size: 16px; }
+h6 { font-size: 14px; }
 
 p {
+  font-family: 'Nunito Sans', sans-serif;
   line-height: 1.6;
   font-size: 14px;
   margin-bottom: 15px;
-  color: var(--text-color-dark);
+  color: var(--text-color-light);
 }
 
 /* Form Element Styles */
 input, select, textarea, button {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 14px;
   padding: 10px 15px;
   margin: 10px 0;
   border-radius: var(--border-radius);
-  border: 1px solid #cccccc;
-  background-color: #ffffff;
-  color: var(--text-color-dark);
+  border: 1px solid #444444;
+  background-color: var(--container-bg-color-lighter);
+  color: var(--text-color-light);
   transition: var(--transition);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
 }
 
 .app-button {
@@ -315,23 +206,26 @@ input, select, textarea, button {
 
 .app-button:hover {
   transform: translateY(-2px);
+  background-color: var(--primary-hover);
 }
 
-app-button:disabled {
-  background-color: #cccccc;
+.app-button:disabled {
+  background-color: #555555;
   cursor: not-allowed;
   transform: none;
 }
 
 /* Dropzone Styles */
 .dropzone {
-  border: 2px dashed #cccccc;
+  border: 2px dashed var(--dropzone-border);
   border-radius: var(--border-radius);
   padding: 20px;
   text-align: center;
   cursor: pointer;
   margin-bottom: 20px;
   transition: var(--transition);
+  background-color: var(--info-box-bg);
+  color: var(--text-color-light);
 }
 
 .dropzone.active {
@@ -348,11 +242,11 @@ app-button:disabled {
 /* Footer Styles */
 .app-footer {
   background-color: var(--header-footer-bg-color);
-  color: var(--text-color);
+  color: var(--text-color-light);
   padding: 10px 20px;
   text-align: center;
   font-size: 12px;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Material-UI Overrides */
@@ -360,15 +254,15 @@ app-button:disabled {
 .MuiTypography-root,
 .MuiListItemText-primary,
 .MuiSelect-root {
-  color: var(--text-color-dark) !important;
+  color: var(--text-color-light);
 }
 
 .MuiTableBody-root .MuiTableRow-root:nth-of-type(odd) {
-  background-color: #f5f5f5;
+  background-color: var(--table-row-odd);
 }
 
 .MuiTableBody-root .MuiTableRow-root:nth-of-type(even) {
-  background-color: #ffffff;
+  background-color: var(--table-row-even);
 }
 
 /* Feature Grid Styles */
@@ -382,7 +276,7 @@ app-button:disabled {
 }
 
 .feature-card {
-  background-color: #ffffff;
+  background-color: var(--card-bg-color);
   border-radius: var(--border-radius);
   padding: 20px;
   text-align: center;
@@ -392,11 +286,36 @@ app-button:disabled {
   align-items: center;
   width: 200px;
   box-shadow: var(--box-shadow);
+  position: relative;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 1px;
+  background: var(--border-gradient-1);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.5;
 }
 
 .feature-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.feature-card:hover::before {
+  opacity: 1;
 }
 
 .feature-icon {
@@ -408,26 +327,18 @@ app-button:disabled {
 .feature-title {
   font-size: 1.25rem;
   margin-bottom: 10px;
-  color: var(--text-color-dark);
+  color: var(--text-color-light);
 }
 
 .feature-description {
   font-size: 0.9rem;
-  color: #666666;
+  color: var(--text-color-dark);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
   .container {
     padding: 20px;
-  }
-
-  .workflow-nav ul {
-    flex-direction: column;
-  }
-
-  .workflow-nav li {
-    margin: 5px 0;
   }
 
   .feature-grid {
@@ -443,6 +354,9 @@ app-button:disabled {
 .table-container {
   overflow-x: auto;
   margin-top: 20px;
+  border-radius: var(--border-radius);
+  background-color: var(--container-bg-color);
+  box-shadow: var(--box-shadow);
 }
 
 table {
@@ -454,40 +368,208 @@ table {
 th, td {
   padding: 12px 15px;
   text-align: left;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--table-border);
+  color: var(--text-color-light);
 }
 
 th {
-  background-color: var(--primary-color);
+  background-color: var(--table-header-bg);
   color: white;
   font-weight: bold;
 }
 
 tr:nth-child(even) {
-  background-color: #f8f8f8;
+  background-color: var(--table-row-even);
+}
+
+tr:nth-child(odd) {
+  background-color: var(--table-row-odd);
 }
 
 tr:hover {
-  background-color: #f0f0f0;
+  background-color: var(--table-row-hover);
 }
 
-/* Add these new styles to your existing App.css */
+/* Main content styles */
+.main-content {
+  background-color: var(--container-bg-color);
+  border: 1px solid var(--border-gradient-1);
+  color: var(--text-color-light);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.main-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 2px; /* Slightly thicker border */
+  background: var(--border-gradient-2);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+  animation: borderGlow 8s infinite alternate;
+}
+
+/* Glowing border animation */
+@keyframes borderGlow {
+  0% {
+    opacity: 0.6;
+    background: var(--border-gradient-2);
+  }
+  50% {
+    opacity: 1;
+    background: var(--border-gradient-horizontal);
+  }
+  100% {
+    opacity: 0.8;
+    background: var(--border-gradient-1);
+  }
+}
+
+/* Main content with enhanced gradient corners */
+.main-content-gradient {
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.main-content-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--border-radius);
+  padding: 3px;
+  background: 
+    linear-gradient(
+      to right, 
+      var(--primary-color), 
+      var(--secondary-color), 
+      var(--primary-color)
+    );
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
+}
+
+/* Accent corners for main content */
+.main-content-corners {
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.main-content-corners::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 30%;
+  background: linear-gradient(135deg, var(--primary-color) 0%, transparent 60%);
+  border-top-left-radius: var(--border-radius);
+  opacity: 0.5;
+  z-index: -1;
+}
+
+.main-content-corners::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30%;
+  height: 30%;
+  background: linear-gradient(315deg, var(--primary-color) 0%, transparent 60%);
+  border-bottom-right-radius: var(--border-radius);
+  opacity: 0.5;
+  z-index: -1;
+}
+
+.info-box {
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  margin: 1rem 0;
+  position: relative;
+}
+
+.info-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 1px;
+  background: var(--border-gradient-horizontal);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
 
 .paper {
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
   padding: 20px;
-  background-color: #f5f5f5;
   margin-bottom: 20px;
+  border-radius: var(--border-radius);
+  position: relative;
 }
 
-.title-container {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
+.paper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 1px;
+  background: var(--border-gradient-vertical);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .info-icon {
   margin-left: 8px;
   cursor: pointer;
+  color: var(--primary-color);
 }
 
 .mt-2 {
@@ -506,6 +588,7 @@ tr:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-color-light);
 }
 
 .button-container {
@@ -514,12 +597,13 @@ tr:hover {
 
 .preview-container {
   padding: 20px;
-  background-color: #f5f5f5;
+  background-color: var(--container-bg-color);
   height: calc(100vh - 200px);
+  border-radius: var(--border-radius);
 }
 
 .warning-text {
-  color: red;
+  color: #ff5252;
 }
 
 .bold {
@@ -527,20 +611,20 @@ tr:hover {
 }
 
 .folder-item {
-  background-color: #ffebee;
+  background-color: rgba(244, 67, 54, 0.1);
 }
 
 .folder-icon {
-  color: #f44336;
+  color: #ff7961;
 }
 
 .folder-text {
   font-weight: bold;
-  color: #f44336;
+  color: #ff7961;
 }
 
 .folder-caption {
-  color: #f44336;
+  color: #ff7961;
 }
 
 .dialog-title {
@@ -548,198 +632,69 @@ tr:hover {
 }
 
 .dialog-title-text {
-  color: #ffffff;
+  color: var(--text-color-light);
 }
 
 .dialog-content {
   padding: 24px;
+  background-color: var(--container-bg-color);
 }
 
 .list-item-icon {
   min-width: 36px;
+  color: var(--primary-color);
 }
 
 .list-item-text {
   margin: 0;
-  color: var(--text-color-dark);
+  color: var(--text-color-light);
   text-align: left;
 }
 
 .divider {
   margin: 16px 0;
+  background-color: var(--divider-color);
 }
 
-/* Add any additional specific styles here */
-
-/* Add or update these styles in your App.css */
-
-.main-nav ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  /* gap: 1rem; */
-}
-
-.main-nav ul li a {
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: relative;
-  transition: color 0.2s ease;
-}
-
-.main-nav ul li a:hover {
-  color: white;
-}
-
-.main-nav ul li a.active {
-  color: white;
-  position: relative;
-}
-
-.main-nav ul li a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -16px;
-  left: 0;
-  width: 100%;
-  height: 25px;
-  background: linear-gradient(to bottom, #00308f 0%, transparent 100%);
-  border-radius: 0px 0px 4px 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-}
-
-.main-nav ul li a svg {
-  font-size: 1.5rem;
-  margin-right: 0.5rem;
-  position: relative;
-  top: -1px;
-}
-
-/* Add this to your existing App.css */
-
-.app-header {
-  position: relative;
-}
-
-.user-account {
-  display: flex;
-  position: fixed;
-  align-items: center;
-  padding: 10px;
-  right: var(--user-account-right-offset);
-}
-@media (max-width: 1520px) {
-  .user-account {
-    display: none !important;
-  }
-}
-
-.user-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  color: var(--text-color-dark);
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 5px 4px 15px rgba(0,0,0,1);
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height 0.2s ease-out;
-}
-
-.user-menu.open {
-  max-height: 300px; /* Adjust this value based on your menu's content */
-  transition: max-height 0.2s ease-in;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.menu-item:hover {
-  background-color: #f5f5f5;
-}
-
-.menu-item svg {
-  margin-right: 10px;
-}
-
-.MuiAvatar-root {
-  background: linear-gradient(135deg, #00008B, #800080, #8B0000) !important; /* Rich gradient */
-  border: 2px solid white !important; /* White border */
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-}
-
-.MuiAvatar-root .MuiSvgIcon-root {
-  font-size: 1.5rem !important; /* Adjust size as needed */
-  margin: 0 !important; /* Remove any default margin */
-}
-
-.MuiSvgIcon-root {
-  margin-right: 8px;
-}
-
-/* Add this section to ensure login styles are not overridden */
+/* Login styles */
 .MuiTypography-root.loginTitle,
 .MuiTypography-root.loginSubtitle {
-  color: #ffffff !important;
+  color: var(--text-color-light);
 }
 
 /* Component Layout Styles */
-.main-content {
-  background-color: var(--container-bg-color);
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-}
-
 .section {
   margin-bottom: 2rem;
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
+  border-radius: var(--border-radius);
+  padding: 1rem;
 }
 
 .section-title {
-  color: var(--primary-color);
+  color: var(--text-color-light);
+  margin-top: 0;
   margin-bottom: 1rem;
   font-size: 1.5rem;
   font-weight: 500;
   padding: 0.75rem;
-  background-color: white;
+  background-color: var(--container-bg-color-lighter);
   border-radius: var(--border-radius);
 }
 
 .section-subtitle {
-  color: var(--secondary-color);
+  color: var(--text-color-light);
   margin-top: 1.5rem;
   margin-bottom: 1rem;
   font-size: 1.25rem;
   font-weight: 500;
 }
 
-/* Info Box Styles */
-.info-box {
-  background-color: var(--info-box-bg);
-  padding: 1rem;
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
-  margin: 1rem 0;
-}
-
 /* List Styles */
 .list-item {
   padding-left: 0;
   margin-bottom: 0.5rem;
+  color: var(--text-color-light);
 }
 
 .list-item-icon {
@@ -747,18 +702,19 @@ tr:hover {
   margin-right: 0.5rem;
 }
 
-/* Table Styles */
+/* Table Styles - Updated for dark mode */
 .table-container {
   border-radius: var(--border-radius);
   box-shadow: var(--box-shadow);
   overflow: hidden;
-  background-color: var(--info-box-bg);
+  background-color: var(--container-bg-color);
 }
 
 .table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  background-color: var(--container-bg-color);
 }
 
 .table th {
@@ -772,10 +728,15 @@ tr:hover {
 .table td {
   padding: 1rem;
   border-bottom: 1px solid var(--table-border);
+  color: var(--text-color-light);
 }
 
 .table tr:nth-child(even) {
   background-color: var(--table-row-even);
+}
+
+.table tr:nth-child(odd) {
+  background-color: var(--table-row-odd);
 }
 
 .table tr:hover {
@@ -795,32 +756,65 @@ tr:hover {
   background-color: var(--info-box-bg);
   cursor: pointer;
   transition: var(--transition);
+  color: var(--text-color-light);
 }
 
 .dropzone:hover, .dropzone.active {
   border-color: var(--primary-color);
-  background-color: var(--table-row-hover);
+  background-color: var(--container-bg-color-lighter);
 }
 
-.upload-button {
-  background-color: var(--primary-color) !important;
-  color: white !important;
-  padding: 0.5rem 1.5rem !important;
-  transition: var(--transition) !important;
+/* Upload button should use the app-button class instead of having its own styles */
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  transition: var(--transition);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
 }
 
-.upload-button:hover {
-  background-color: var(--secondary-color) !important;
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  transition: var(--transition);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-outlined {
+  background-color: transparent;
+  color: var(--primary-color);
+  padding: 0.5rem 1.5rem;
+  transition: var(--transition);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.btn-outlined:hover {
+  background-color: var(--hover-overlay);
 }
 
 /* Action Buttons */
 .action-button {
-  color: var(--primary-color) !important;
-  margin-right: 0.5rem !important;
+  color: var(--primary-color);
+  margin-right: 0.5rem;
 }
 
 .action-button:hover {
-  color: var(--secondary-color) !important;
+  color: var(--primary-hover);
 }
 
 /* Dialog Styles */
@@ -832,6 +826,7 @@ tr:hover {
 
 .dialog-content {
   padding: 1.5rem;
+  background-color: var(--container-bg-color);
 }
 
 /* Icon Styles */
@@ -840,84 +835,18 @@ tr:hover {
   margin-right: 0.5rem;
 }
 
-/* Divider Styles */
-.divider {
-  margin: 1.5rem 0;
-  background-color: var(--table-border);
-}
-
 /* Text Styles */
 .text-secondary {
   color: var(--text-color-dark);
-  opacity: 0.7;
 }
 
 .final-text {
   margin-top: 1rem;
   line-height: 1.6;
+  color: var(--text-color-light);
 }
 
-/* Document Library Styles */
-.dropzone {
-  border: 2px dashed #ccc;
-  border-radius: var(--border-radius);
-  padding: 24px;
-  text-align: center;
-  background-color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.dropzone:hover,
-.dropzone.active {
-  border-color: var(--primary-color);
-  background-color: #f0f0f0;
-}
-
-.upload-button {
-  background-color: var(--primary-color) !important;
-  color: #fff !important;
-}
-
-.upload-button:hover {
-  background-color: var(--secondary-color) !important;
-}
-
-.table-container {
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
-  margin-top: 24px;
-}
-
-.table {
-  min-width: 650px;
-  background-color: rgba(255, 255, 255, 0.9);
-}
-
-.action-button {
-  margin-right: 8px !important;
-  color: var(--primary-color) !important;
-}
-
-.icon {
-  margin-right: 8px;
-  color: var(--primary-color);
-}
-
-.dialog-title {
-  background-color: var(--primary-color);
-  color: #fff;
-}
-
-.dialog-content {
-  padding: 24px;
-}
-
-.upload-section {
-  margin-bottom: 32px;
-}
-
-/* Add these styles for BuildRetrievalDatabases component */
+/* Root container styles */
 .root-container {
   display: flex;
   flex-direction: row;
@@ -938,25 +867,26 @@ tr:hover {
   height: fit-content;
   position: sticky;
   top: 24px;
+  box-shadow: var(--box-shadow);
 }
 
 .nav-item {
   border-radius: var(--border-radius);
   margin-bottom: 8px;
   transition: var(--transition);
+  padding: 8px 12px;
 }
 
 .nav-item:hover {
-  background-color: rgba(0, 48, 143, 0.1);
+  background-color: var(--hover-overlay);
 }
 
 .nav-item.active {
-  background-color: var(--primary-color) !important;
-  color: white !important;
+  background-color: var(--primary-color) ;
 }
 
 .nav-item.active .nav-icon {
-  color: white !important;
+  color: white ;
 }
 
 .nav-icon {
@@ -965,11 +895,24 @@ tr:hover {
 }
 
 .nav-text {
-  color: var(--text-color-dark);
+  color: var(--text-color-light);
 }
 
-.nav-item.active .nav-text {
-  color: white !important;
+.nav-item.active .nav-text,
+.nav-item.active .nav-icon,
+.nav-item.active .MuiListItemText-primary,
+.nav-item.active .MuiListItemIcon-root,
+.nav-item.active:hover .nav-text,
+.nav-item.active:hover .nav-icon,
+.nav-item.active:hover .MuiListItemText-primary,
+.nav-item.active:hover .MuiListItemIcon-root {
+  color: white ;
+}
+
+/* Make sure secondary text (description) is white on active items */
+.nav-item.active .MuiListItemText-secondary,
+.nav-item.active:hover .MuiListItemText-secondary {
+  color: rgba(255, 255, 255, 0.7) ;
 }
 
 /* Update main-content for the BuildRetrievalDatabases layout */
@@ -983,201 +926,30 @@ tr:hover {
   margin: 0;
 }
 
-/* Update selected menu items */
-.workflow-nav a.active {
-  color: white !important;
-  background-color: var(--primary-color);
-  border-radius: var(--border-radius);
-}
-
-.main-nav a.active {
-  color: white !important;
-  background-color: var(--primary-color);
-  border-radius: var(--border-radius);
-}
-
-/* Ensure text remains white when nav items are active */
-.nav-item.active .nav-text {
-  color: white !important;
-}
-
-/* Navigation hover states */
-.workflow-nav a:hover,
-.main-nav a:hover {
-  color: white !important;
-  background-color: var(--primary-color);
-  border-radius: var(--border-radius);
-  transition: var(--transition);
-}
-
-/* Update the existing hover styles */
-.nav-item:hover {
-  background-color: rgba(0, 48, 143, 0.1);
-  color: var(--text-color-dark) !important;
-}
-
-.nav-item:hover .nav-text,
-.nav-item:hover .MuiListItemText-primary {
-  color: var(--text-color-dark) !important;
-}
-
-.nav-item:hover .nav-icon,
-.nav-item:hover .MuiListItemIcon-root {
-  color: var(--primary-color) !important;
-}
-
-/* Keep active state with white text */
-.nav-item.active,
-.nav-item.active:hover {
-  background-color: var(--primary-color) !important;
-}
-
-.nav-item.active .nav-text,
-.nav-item.active .MuiListItemText-primary,
-.nav-item.active .nav-icon,
-.nav-item.active .MuiListItemIcon-root,
-.nav-item.active:hover .nav-text,
-.nav-item.active:hover .MuiListItemText-primary,
-.nav-item.active:hover .nav-icon,
-.nav-item.active:hover .MuiListItemIcon-root {
-  color: white !important;
-}
-
-/* Make sure secondary text (description) is white on active items */
-.nav-item.active .MuiListItemText-secondary,
-.nav-item.active:hover .MuiListItemText-secondary {
-  color: rgba(255, 255, 255, 0.7) !important;
-}
-
-/* Add the same underline effect for main navigation */
-.main-nav a::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: white;
-  transition: var(--transition);
-}
-
-.main-nav a:hover::after,
-.main-nav a.active::after {
-  width: 100%;
-}
-
-/* Main navigation menu items */
-.main-nav a {
-  font-size: 20px;
-  color: var(--text-color);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  padding: 5px 10px;
-  position: relative;
-  transition: var(--transition);
-}
-
-/* Add specific styles for the main nav list items */
-.main-nav li {
-  font-size: 20x;
-  margin: 0 8px;
-  display: flex;
-  align-items: center;
-}
-
-/* Ensure icon sizes match the text */
-.main-nav svg {
-  font-size: 24px;
-  margin-right: 5px;
-}
-
-/* Update header layout */
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-
-/* Update main nav styles */
-.main-nav {
-  display: flex;
-  align-items: center;
-}
-
-.main-nav ul {
-  display: flex;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  align-items: center;
-}
-
-/* Adjust workflow nav position */
-.workflow-nav {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  margin-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 10px;
-}
-
-/* Update the nav-item active state */
-.nav-item.active {
-  background-color: var(--primary-color) !important;
-}
-
-/* Update text and icon colors for active state */
-.nav-item.active .nav-text,
-.nav-item.active .MuiListItemText-primary {
-  color: white !important;
-}
-
-.nav-item.active .nav-icon,
-.nav-item.active .MuiListItemIcon-root {
-  color: white !important;
-}
-
-/* Update hover states */
-.nav-item:hover {
-  background-color: rgba(0, 48, 143, 0.1);
-  color: var(--text-color-dark) !important;
-}
-
-.nav-item:hover .nav-text,
-.nav-item:hover .MuiListItemText-primary,
-.nav-item:hover .nav-icon,
-.nav-item:hover .MuiListItemIcon-root {
-  color: var(--text-color-dark) !important;
-}
-
-/* Table header styles */
+/* Table header styles with removed  */
 .MuiTableHead-root .MuiTableCell-head {
   background-color: var(--primary-color);
-  color: white !important;
+  color: white;
   font-weight: bold;
 }
 
-/* Override any other styles that might affect table headers */
+/* Override any other styles that might affect table headers - removed  */
 .MuiTableCell-head .MuiTypography-root {
-  color: white !important;
+  color: white;
 }
 
-/* Ensure icons in table headers are also white */
+/* Ensure icons in table headers are also white - removed  */
 .MuiTableCell-head .MuiSvgIcon-root {
-  color: white !important;
+  color: white;
 }
 
-/* Make sure the sort icons in table headers are white */
+/* Make sure the sort icons in table headers are white - removed  */
 .MuiTableCell-head .MuiTableSortLabel-root {
-  color: white !important;
+  color: white;
 }
 
 .MuiTableCell-head .MuiTableSortLabel-icon {
-  color: white !important;
+  color: white;
 }
 
 /* File Preview Container Styles */
@@ -1187,6 +959,7 @@ tr:hover {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background-color: var(--container-bg-color);
 }
 
 .previewFrame {
@@ -1195,15 +968,16 @@ tr:hover {
   width: 100%;
   min-height: 0;
   border-radius: var(--border-radius);
-  background-color: white;
+  background-color: var(--container-bg-color-lighter);
 }
 
 /* Adjust the container padding to maximize space */
 .preview-dialog-content {
-  padding: 16px !important;
+  padding: 16px ;
   height: 95vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--container-bg-color);
 }
 
 /* Ensure the preview fills available space */
@@ -1214,10 +988,468 @@ tr:hover {
   overflow: hidden;
   margin: 0;
   padding: 0;
+  background-color: var(--container-bg-color);
 }
 
-/* Add style for flipped extract icon */
-.extract-icon {
-  transform: rotate(180deg);
-  display: inline-block;
+/* Material-UI component overrides for dark mode */
+.MuiPaper-root {
+  background-color: var(--container-bg-color);
+  color: var(--text-color-light);
+}
+
+.MuiDialog-paper {
+  background-color: var(--container-bg-color);
+}
+
+.MuiFormLabel-root {
+  color: var(--text-color-dark);
+}
+
+.MuiFormLabel-root.Mui-focused {
+  color: var(--primary-color);
+}
+
+.MuiInputBase-input {
+  color: var(--text-color-light);
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: var(--divider-color);
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary-color);
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary-color);
+}
+
+.MuiMenuItem-root {
+  color: var(--text-color-light);
+}
+
+.MuiMenu-paper {
+  background-color: var(--container-bg-color-lighter);
+}
+
+.MuiListItemText-secondary {
+  color: var(--text-color-dark);
+}
+
+.MuiCard-root {
+  background-color: var(--card-bg-color);
+}
+
+.MuiButton-contained {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.MuiButton-contained:hover {
+  background-color: var(--primary-hover);
+}
+
+.MuiButton-outlined {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.MuiButton-outlined:hover {
+  background-color: var(--hover-overlay);
+}
+
+.MuiCheckbox-colorPrimary.Mui-checked {
+  color: var(--primary-color);
+}
+
+.MuiRadio-colorPrimary.Mui-checked {
+  color: var(--primary-color);
+}
+
+.MuiSwitch-colorPrimary.Mui-checked {
+  color: var(--primary-color);
+}
+
+.MuiSwitch-colorPrimary.Mui-checked + .MuiSwitch-track {
+  background-color: var(--primary-color);
+}
+
+.MuiChip-root {
+  background-color: var(--container-bg-color-lighter);
+  color: var(--text-color-light);
+}
+
+.MuiChip-root.MuiChip-colorPrimary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.MuiDivider-root {
+  background-color: var(--divider-color);
+}
+
+/* Utility Classes - Expanded for Dark Mode */
+/* Spacing Utilities */
+.m-0 { margin: 0; }
+.m-1 { margin: 4px; }
+.m-2 { margin: 8px; }
+.m-3 { margin: 16px; }
+.m-4 { margin: 24px; }
+.m-5 { margin: 32px; }
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+.mt-4 { margin-top: 32px; }
+.mt-5 { margin-top: 48px; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 24px; }
+.mb-4 { margin-bottom: 32px; }
+.mb-5 { margin-bottom: 48px; }
+
+.ml-0 { margin-left: 0; }
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.ml-3 { margin-left: 16px; }
+.ml-4 { margin-left: 24px; }
+.ml-5 { margin-left: 32px; }
+
+.mr-0 { margin-right: 0; }
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+.mr-3 { margin-right: 16px; }
+.mr-4 { margin-right: 24px; }
+.mr-5 { margin-right: 32px; }
+
+.mx-0 { margin-left: 0; margin-right: 0; }
+.mx-1 { margin-left: 4px; margin-right: 4px; }
+.mx-2 { margin-left: 8px; margin-right: 8px; }
+.mx-3 { margin-left: 16px; margin-right: 16px; }
+.mx-4 { margin-left: 24px; margin-right: 24px; }
+.mx-5 { margin-left: 32px; margin-right: 32px; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+.my-0 { margin-top: 0; margin-bottom: 0; }
+.my-1 { margin-top: 4px; margin-bottom: 4px; }
+.my-2 { margin-top: 8px; margin-bottom: 8px; }
+.my-3 { margin-top: 16px; margin-bottom: 16px; }
+.my-4 { margin-top: 24px; margin-bottom: 24px; }
+.my-5 { margin-top: 32px; margin-bottom: 32px; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 16px; }
+.p-4 { padding: 24px; }
+.p-5 { padding: 32px; }
+
+.pt-0 { padding-top: 0; }
+.pt-1 { padding-top: 4px; }
+.pt-2 { padding-top: 8px; }
+.pt-3 { padding-top: 16px; }
+.pt-4 { padding-top: 24px; }
+.pt-5 { padding-top: 32px; }
+
+.pb-0 { padding-bottom: 0; }
+.pb-1 { padding-bottom: 4px; }
+.pb-2 { padding-bottom: 8px; }
+.pb-3 { padding-bottom: 16px; }
+.pb-4 { padding-bottom: 24px; }
+.pb-5 { padding-bottom: 32px; }
+
+.pl-0 { padding-left: 0; }
+.pl-1 { padding-left: 4px; }
+.pl-2 { padding-left: 8px; }
+.pl-3 { padding-left: 16px; }
+.pl-4 { padding-left: 24px; }
+.pl-5 { padding-left: 32px; }
+
+.pr-0 { padding-right: 0; }
+.pr-1 { padding-right: 4px; }
+.pr-2 { padding-right: 8px; }
+.pr-3 { padding-right: 16px; }
+.pr-4 { padding-right: 24px; }
+.pr-5 { padding-right: 32px; }
+
+.px-0 { padding-left: 0; padding-right: 0; }
+.px-1 { padding-left: 4px; padding-right: 4px; }
+.px-2 { padding-left: 8px; padding-right: 8px; }
+.px-3 { padding-left: 16px; padding-right: 16px; }
+.px-4 { padding-left: 24px; padding-right: 24px; }
+.px-5 { padding-left: 32px; padding-right: 32px; }
+
+.py-0 { padding-top: 0; padding-bottom: 0; }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.py-3 { padding-top: 16px; padding-bottom: 16px; }
+.py-4 { padding-top: 24px; padding-bottom: 24px; }
+.py-5 { padding-top: 32px; padding-bottom: 32px; }
+
+/* Typography Utilities */
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.text-md { font-size: 1rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-3xl { font-size: 1.875rem; }
+.text-4xl { font-size: 2.25rem; }
+
+.font-light { font-weight: 300; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold, .bold { font-weight: 700; }
+
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-justify { text-align: justify; }
+
+.text-light { color: var(--text-color-light); }
+.text-dark { color: var(--text-color-dark); }
+.text-primary { color: var(--primary-color); }
+.text-secondary { color: var(--text-color-dark); }
+.text-white { color: #ffffff; }
+
+.line-height-sm { line-height: 1.25; }
+.line-height-md { line-height: 1.5; }
+.line-height-lg { line-height: 1.75; }
+
+.italic { font-style: italic; }
+.uppercase { text-transform: uppercase; }
+.lowercase { text-transform: lowercase; }
+.capitalize { text-transform: capitalize; }
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Display and Flex Utilities */
+.d-none { display: none ; }
+.d-inline { display: inline ; }
+.d-inline-block { display: inline-block ; }
+.d-block { display: block ; }
+.d-flex { display: flex ; }
+.d-inline-flex { display: inline-flex ; }
+.d-grid { display: grid ; }
+
+.flex-row { flex-direction: row ; }
+.flex-column { flex-direction: column ; }
+.flex-row-reverse { flex-direction: row-reverse ; }
+.flex-column-reverse { flex-direction: column-reverse ; }
+
+.flex-grow-0 { flex-grow: 0 ; }
+.flex-grow-1 { flex-grow: 1 ; }
+.flex-shrink-0 { flex-shrink: 0 ; }
+.flex-shrink-1 { flex-shrink: 1 ; }
+.flex-wrap { flex-wrap: wrap ; }
+.flex-nowrap { flex-wrap: nowrap ; }
+
+.justify-content-start { justify-content: flex-start ; }
+.justify-content-end { justify-content: flex-end ; }
+.justify-content-center { justify-content: center ; }
+.justify-content-between { justify-content: space-between ; }
+.justify-content-around { justify-content: space-around ; }
+.justify-content-evenly { justify-content: space-evenly ; }
+
+.align-items-start { align-items: flex-start ; }
+.align-items-end { align-items: flex-end ; }
+.align-items-center { align-items: center ; }
+.align-items-baseline { align-items: baseline ; }
+.align-items-stretch { align-items: stretch ; }
+
+.align-self-start { align-self: flex-start ; }
+.align-self-end { align-self: flex-end ; }
+.align-self-center { align-self: center ; }
+.align-self-baseline { align-self: baseline ; }
+.align-self-stretch { align-self: stretch ; }
+
+.flex-center {
+  display: flex ;
+  justify-content: center ;
+  align-items: center ;
+}
+
+/* Border and Shadow Utilities */
+.border { border: 1px solid var(--divider-color) ; }
+.border-0 { border: 0 ; }
+.border-top { border-top: 1px solid var(--divider-color) ; }
+.border-end { border-right: 1px solid var(--divider-color) ; }
+.border-bottom { border-bottom: 1px solid var(--divider-color) ; }
+.border-start { border-left: 1px solid var(--divider-color) ; }
+
+.border-primary { border-color: var(--primary-color) ; }
+.border-secondary { border-color: var(--secondary-color) ; }
+.border-dark { border-color: var(--divider-color) ; }
+.border-light { border-color: var(--text-color-light) ; }
+
+.rounded { border-radius: var(--border-radius) ; }
+.rounded-sm { border-radius: calc(var(--border-radius) * 0.5) ; }
+.rounded-lg { border-radius: calc(var(--border-radius) * 1.5) ; }
+.rounded-circle { border-radius: 50% ; }
+.rounded-pill { border-radius: 50rem ; }
+.rounded-0 { border-radius: 0 ; }
+
+.shadow-none { box-shadow: none ; }
+.shadow-sm { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) ; }
+.shadow { box-shadow: var(--box-shadow) ; }
+.shadow-lg { box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) ; }
+
+/* Background Utilities */
+.bg-primary { background-color: var(--primary-color) ; }
+.bg-secondary { background-color: var(--secondary-color) ; }
+.bg-container { background-color: var(--container-bg-color) ; }
+.bg-lighter { background-color: var(--container-bg-color-lighter) ; }
+.bg-dark { background-color: var(--background-color) ; }
+.bg-transparent { background-color: transparent ; }
+.bg-gradient {
+  background: var(--border-gradient-horizontal) ;
+}
+
+/* Position Utilities */
+.position-static { position: static ; }
+.position-relative { position: relative ; }
+.position-absolute { position: absolute ; }
+.position-fixed { position: fixed ; }
+.position-sticky { position: sticky ; }
+
+.top-0 { top: 0 ; }
+.bottom-0 { bottom: 0 ; }
+.start-0 { left: 0 ; }
+.end-0 { right: 0 ; }
+.top-50 { top: 50% ; }
+.bottom-50 { bottom: 50% ; }
+.start-50 { left: 50% ; }
+.end-50 { right: 50% ; }
+
+.translate-middle {
+  transform: translate(-50%, -50%) ;
+}
+.translate-middle-x {
+  transform: translateX(-50%) ;
+}
+.translate-middle-y {
+  transform: translateY(-50%) ;
+}
+
+/* Width and Height Utilities */
+.w-25 { width: 25% ; }
+.w-50 { width: 50% ; }
+.w-75 { width: 75% ; }
+.w-100 { width: 100% ; }
+.w-auto { width: auto ; }
+.mw-100 { max-width: 100% ; }
+.vw-100 { width: 100vw ; }
+.min-vw-100 { min-width: 100vw ; }
+
+.h-25 { height: 25% ; }
+.h-50 { height: 50% ; }
+.h-75 { height: 75% ; }
+.h-100 { height: 100% ; }
+.h-auto { height: auto ; }
+.mh-100 { max-height: 100% ; }
+.vh-100 { height: 100vh ; }
+.min-vh-100 { min-height: 100vh ; }
+
+/* Visibility Utilities */
+.visible { visibility: visible ; }
+.invisible { visibility: hidden ; }
+
+/* Misc Utilities */
+.overflow-auto { overflow: auto ; }
+.overflow-hidden { overflow: hidden ; }
+.overflow-visible { overflow: visible ; }
+.overflow-scroll { overflow: scroll ; }
+.overflow-x-auto { overflow-x: auto ; }
+.overflow-x-hidden { overflow-x: hidden ; }
+.overflow-y-auto { overflow-y: auto ; }
+.overflow-y-hidden { overflow-y: hidden ; }
+
+.cursor-pointer { cursor: pointer ; }
+.cursor-default { cursor: default ; }
+.cursor-not-allowed { cursor: not-allowed ; }
+
+.user-select-none { user-select: none ; }
+.user-select-all { user-select: all ; }
+.user-select-auto { user-select: auto ; }
+
+/* Gradient Text Utility */
+.text-gradient {
+  background: var(--border-gradient-horizontal);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Animation Utilities */
+.transition { transition: var(--transition) ; }
+.transition-slow { transition: all 0.5s ease ; }
+.transition-fast { transition: all 0.2s ease ; }
+
+.hover-lift {
+  transition: var(--transition) ;
+}
+.hover-lift:hover {
+  transform: translateY(-4px) ;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) ;
+}
+
+.hover-opacity {
+  transition: var(--transition) ;
+  opacity: 0.85;
+}
+.hover-opacity:hover {
+  opacity: 1;
+}
+
+.hover-primary:hover {
+  color: var(--primary-color) ;
+}
+
+/* Dark Mode Card Utilities */
+.card-dark {
+  background-color: var(--card-bg-color) ;
+  border-radius: var(--border-radius) ;
+  padding: 1rem ;
+  position: relative ;
+}
+
+.card-dark-gradient {
+  background-color: var(--card-bg-color) ;
+  border-radius: var(--border-radius) ;
+  padding: 1rem ;
+  position: relative ;
+}
+
+.card-dark-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--border-radius);
+  padding: 1px;
+  background: var(--border-gradient-1);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.5;
+}
+
+.card-dark-gradient:hover::before {
+  opacity: 1;
 }

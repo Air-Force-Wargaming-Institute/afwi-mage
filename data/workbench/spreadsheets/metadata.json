@@ -1,135 +1,111 @@
 {
-  "ae51ee7d-cc0c-428f-b53f-93d80d1ff62f": {
-    "filename": "Fruit-Prices-2022.csv",
-    "size_bytes": 4203,
-    "sheet_count": 1,
+  "f09c6f80-b245-4d7c-873c-87ed077b59a6": {
+    "filename": "SampleData.xlsx",
+    "size_bytes": 36046,
+    "sheet_count": 3,
     "sheets": [
-      "Sheet1"
+      "Instructions",
+      "SalesOrders",
+      "MyLinks"
     ],
     "columns": [
-      "Fruit",
-      "Form",
-      "RetailPrice",
-      "RetailPriceUnit",
-      "Yield",
-      "CupEquivalentSize",
-      "CupEquivalentUnit",
-      "CupEquivalentPrice"
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
     ],
-    "row_count": 62,
+    "row_count": 26,
     "sheets_metadata": {
-      "Sheet1": {
+      "Instructions": {
         "columns": [
-          "Fruit",
-          "Form",
-          "RetailPrice",
-          "RetailPriceUnit",
-          "Yield",
-          "CupEquivalentSize",
-          "CupEquivalentUnit",
-          "CupEquivalentPrice",
-          "Fresh?",
-          "Justification"
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
         ],
-        "row_count": 62
+        "row_count": 26
+      },
+      "SalesOrders": {
+        "columns": [
+          "OrderDate",
+          "Region",
+          "Rep",
+          "Item",
+          "Units",
+          "Unit Cost",
+          "Total"
+        ],
+        "row_count": 43
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
       }
     },
-    "id": "ae51ee7d-cc0c-428f-b53f-93d80d1ff62f",
+    "id": "f09c6f80-b245-4d7c-873c-87ed077b59a6",
     "description": null,
-    "original_filename": "Fruit-Prices-2022.csv",
-    "modified_filename": "Fruit-Prices-2022.csv",
-    "upload_date": "2025-04-01T16:05:10.148048",
-    "modified_date": "2025-04-01T16:05:10.148048",
-    "storage_path": "/app/data/workbench/spreadsheets/ae51ee7d-cc0c-428f-b53f-93d80d1ff62f.csv"
+    "original_filename": "SampleData.xlsx",
+    "modified_filename": "SampleData.xlsx",
+    "upload_date": "2025-04-12T03:28:30.245720",
+    "modified_date": "2025-04-12T03:28:30.245720",
+    "storage_path": "/app/data/workbench/spreadsheets/f09c6f80-b245-4d7c-873c-87ed077b59a6.xlsx"
   },
-  "8a191c66-32f2-41c4-aeb3-c8257acc4d2d": {
-    "id": "8a191c66-32f2-41c4-aeb3-c8257acc4d2d",
-    "filename": "Fruit-Prices-2022.csv",
-    "original_filename": "Fruit-Prices-2022.csv",
-    "modified_filename": "Fruit-Prices-2022_Transformed_20250401_161126.csv",
-    "upload_date": "2025-04-01T16:11:11.323448",
-    "modified_date": "2025-04-01T16:11:26.075890",
-    "storage_path": "/app/data/workbench/spreadsheets/8a191c66-32f2-41c4-aeb3-c8257acc4d2d.csv",
-    "original_id": "ae51ee7d-cc0c-428f-b53f-93d80d1ff62f",
-    "description": "Duplicate of Fruit-Prices-2022.csv created for column transformation",
-    "sheet_count": 1,
+  "5401e648-0403-4789-97f1-23e04a9eaceb": {
+    "filename": "sampledatainsurance.xlsx",
+    "size_bytes": 61520,
+    "sheet_count": 3,
     "sheets": [
-      "Sheet1"
+      "Instructions",
+      "PolicyData",
+      "MyLinks"
     ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2"
+    ],
+    "row_count": 23,
     "sheets_metadata": {
-      "Sheet1": {
+      "Instructions": {
         "columns": [
-          "Fruit",
-          "Form",
-          "RetailPrice",
-          "RetailPriceUnit",
-          "Yield",
-          "CupEquivalentSize",
-          "CupEquivalentUnit",
-          "CupEquivalentPrice",
-          "Story"
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
         ],
-        "row_count": 62
+        "row_count": 23
+      },
+      "PolicyData": {
+        "columns": [
+          "Policy",
+          "Expiry",
+          "Location",
+          "State",
+          "Region",
+          "InsuredValue",
+          "Construction",
+          "BusinessType",
+          "Earthquake",
+          "Flood"
+        ],
+        "row_count": 500
+      },
+      "MyLinks": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2"
+        ],
+        "row_count": 8
       }
     },
-    "columns": [
-      "Fruit",
-      "Form",
-      "RetailPrice",
-      "RetailPriceUnit",
-      "Yield",
-      "CupEquivalentSize",
-      "CupEquivalentUnit",
-      "CupEquivalentPrice",
-      "Story"
-    ],
-    "size_bytes": 13474,
-    "row_count": 62
-  },
-  "e32ec2e7-3978-4a3d-bc87-b662452eb7d6": {
-    "id": "e32ec2e7-3978-4a3d-bc87-b662452eb7d6",
-    "filename": "Fruit-Prices-2022.csv",
-    "original_filename": "Fruit-Prices-2022.csv",
-    "modified_filename": "Fruit-Prices-2022_Transformed_20250401_165628.csv",
-    "upload_date": "2025-04-01T16:56:16.098833",
-    "modified_date": "2025-04-01T16:56:28.336613",
-    "storage_path": "/app/data/workbench/spreadsheets/e32ec2e7-3978-4a3d-bc87-b662452eb7d6.csv",
-    "original_id": "ae51ee7d-cc0c-428f-b53f-93d80d1ff62f",
-    "description": "Duplicate of Fruit-Prices-2022.csv created for column transformation",
-    "sheet_count": 1,
-    "sheets": [
-      "Sheet1"
-    ],
-    "sheets_metadata": {
-      "Sheet1": {
-        "columns": [
-          "Fruit",
-          "Form",
-          "RetailPrice",
-          "RetailPriceUnit",
-          "Yield",
-          "CupEquivalentSize",
-          "CupEquivalentUnit",
-          "CupEquivalentPrice",
-          "Fresh?",
-          "Justification"
-        ],
-        "row_count": 62
-      }
-    },
-    "columns": [
-      "Fruit",
-      "Form",
-      "RetailPrice",
-      "RetailPriceUnit",
-      "Yield",
-      "CupEquivalentSize",
-      "CupEquivalentUnit",
-      "CupEquivalentPrice",
-      "Fresh?",
-      "Justification"
-    ],
-    "size_bytes": 7261,
-    "row_count": 62
+    "id": "5401e648-0403-4789-97f1-23e04a9eaceb",
+    "description": null,
+    "original_filename": "sampledatainsurance.xlsx",
+    "modified_filename": "sampledatainsurance.xlsx",
+    "upload_date": "2025-04-12T03:35:59.372393",
+    "modified_date": "2025-04-12T03:35:59.372393",
+    "storage_path": "/app/data/workbench/spreadsheets/5401e648-0403-4789-97f1-23e04a9eaceb.xlsx"
   }
 }

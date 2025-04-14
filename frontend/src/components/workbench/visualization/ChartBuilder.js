@@ -3,7 +3,6 @@ import { WorkbenchContext } from '../../../contexts/WorkbenchContext';
 import { 
   Box, 
   Typography, 
-  Paper,
   Grid,
   FormControl,
   InputLabel,
@@ -33,6 +32,26 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import FakePlotImage from '../../../assets/FakePlot.png'; // Import the fake plot image
 import '../../../App.css'; // Import App.css for styling
+
+// Import styled components
+import {
+  GradientBorderPaper,
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  GradientBorderCard,
+  GradientText,
+  HighContrastGradientPaper,
+  useContainerStyles
+} from '../../../styles/StyledComponents';
+
+// Import action buttons
+import {
+  ViewButton,
+  AddButton,
+  EditButton,
+  DownloadButton,
+  CopyButton
+} from '../../../styles/ActionButtons';
 
 // Sample mock visualization for development mode
 const SAMPLE_VISUALIZATION_CODE = `import matplotlib.pyplot as plt
@@ -76,10 +95,30 @@ const CodeEditor = ({ code, setCode, readOnly }) => {
         style: { 
           fontFamily: 'monospace', 
           fontSize: '0.9rem',
-          backgroundColor: '#f5f5f5'
+          backgroundColor: '#1A1A1A',
+          color: '#f0f0f0',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
         }
       }}
       variant="outlined"
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          borderRadius: theme => theme.shape?.borderRadius || 10,
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'primary.main',
+            borderWidth: '1px',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'primary.main',
+            borderWidth: '2px',
+          },
+          '& fieldset': {
+            borderColor: 'transparent',
+          }
+        }
+      }}
     />
   );
 };
@@ -98,6 +137,7 @@ const ChartBuilder = () => {
     executeVisualizationCode
   } = useContext(WorkbenchContext);
   
+  const containerClasses = useContainerStyles();
   const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState('');
   const [selectedChartType, setSelectedChartType] = useState('line');
@@ -210,17 +250,17 @@ const ChartBuilder = () => {
     if (dataContext.error) return <Alert severity="error">{dataContext.error}</Alert>;
     
     return (
-      <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-        <Typography variant="subtitle2" gutterBottom>
+      <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+        <Typography variant="subtitle2" fontWeight="600" gutterBottom>
           File Analysis Summary
         </Typography>
-        <Typography variant="body2" className="text-secondary">
+        <Typography variant="body2" color="text.secondary">
           {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.schema.length} columns
         </Typography>
-        <Typography variant="body2" className="text-secondary">
+        <Typography variant="body2" color="text.secondary">
           Columns: {dataContext.schema.map(col => col.name).join(', ')}
         </Typography>
-      </div>
+      </SubtleGlowPaper>
     );
   };
 
@@ -229,30 +269,31 @@ const ChartBuilder = () => {
     if (!connectionError) return null;
     
     return (
-      <Alert 
-        severity="warning" 
-        variant="outlined"
-        icon={<ErrorOutlineIcon />}
-        style={{ marginBottom: '24px' }}
-      >
-        <AlertTitle>Backend Connection Error</AlertTitle>
-        <Typography variant="body2" paragraph>
-          Unable to connect to backend services. The visualization features require the backend to be running.
-        </Typography>
-        <Typography variant="body2">
-          You can still explore the interface, but visualization generation will not work until the backend is available.
-        </Typography>
-      </Alert>
+      <HighContrastGradientPaper sx={{ mb: 3 }}>
+        <Alert 
+          severity="warning" 
+          variant="outlined"
+          icon={<ErrorOutlineIcon />}
+        >
+          <AlertTitle>Backend Connection Error</AlertTitle>
+          <Typography variant="body2" paragraph>
+            Unable to connect to backend services. The visualization features require the backend to be running.
+          </Typography>
+          <Typography variant="body2">
+            You can still explore the interface, but visualization generation will not work until the backend is available.
+          </Typography>
+        </Alert>
+      </HighContrastGradientPaper>
     );
   };
 
   return (
-    <div>
-      <Typography variant="h5" component="h1" gutterBottom className="section-title">
+    <div style={{ marginTop: '-10px' }}>
+      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
         Data Visualization
-      </Typography>
+      </GradientText>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
         Create visualizations from Excel data using natural language requests.
       </Typography>
       
@@ -261,20 +302,68 @@ const ChartBuilder = () => {
       <Grid container spacing={3}>
         {/* Left panel - Input */}
         <Grid item xs={12} md={5}>
-          <Paper elevation={1} style={{ padding: '24px', height: '100%' }}>
-            <Typography variant="h6" gutterBottom className="section-subtitle">
+          <GradientBorderPaper elevation={3} sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom className="section-subtitle" fontWeight="600" color="primary.main">
               Visualization Request
             </Typography>
             
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Data Source</InputLabel>
                   <Select
                     value={selectedFile}
                     label="Data Source"
                     onChange={(e) => handleFileSelected(e.target.value)}
                     disabled={connectionError}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="">
                       <em>Select a file</em>
@@ -299,17 +388,91 @@ const ChartBuilder = () => {
                   value={vizRequest}
                   onChange={(e) => setVizRequest(e.target.value)}
                   disabled={connectionError}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: theme => theme.shape?.borderRadius || 10,
+                      backgroundColor: '#121212',
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '1px',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '2px',
+                      },
+                      '& fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      }
+                    },
+                    '& .MuiInputBase-input': {
+                      color: 'white',
+                    },
+                  }}
                 />
               </Grid>
               
               <Grid item xs={12}>
-                <FormControl fullWidth style={{ marginBottom: '16px' }}>
+                <FormControl fullWidth style={{ marginBottom: '16px' }} sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Chart Type</InputLabel>
                   <Select
                     value={selectedChartType}
                     label="Chart Type"
                     onChange={(e) => setSelectedChartType(e.target.value)}
                     disabled={connectionError}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)'
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="line">Line Chart</MenuItem>
                     <MenuItem value="bar">Bar Chart</MenuItem>
@@ -327,6 +490,7 @@ const ChartBuilder = () => {
                       checked={useSeaborn}
                       onChange={(e) => setUseSeaborn(e.target.checked)}
                       disabled={connectionError}
+                      color="primary"
                     />
                   }
                   label="Use Seaborn (enhanced styling)"
@@ -336,13 +500,61 @@ const ChartBuilder = () => {
               {useSeaborn && (
                 <>
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Style</InputLabel>
                       <Select
                         value={selectedStyle}
                         label="Style"
                         onChange={(e) => setSelectedStyle(e.target.value)}
                         disabled={connectionError}
+                        sx={{
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)'
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
                         <MenuItem value="default">Default</MenuItem>
                         <MenuItem value="whitegrid">White Grid</MenuItem>
@@ -353,13 +565,61 @@ const ChartBuilder = () => {
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Color Palette</InputLabel>
                       <Select
                         value={selectedPalette}
                         label="Color Palette"
                         onChange={(e) => setSelectedPalette(e.target.value)}
                         disabled={connectionError}
+                        sx={{
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)'
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
                         <MenuItem value="Set1">Set1</MenuItem>
                         <MenuItem value="Set2">Set2</MenuItem>
@@ -376,63 +636,122 @@ const ChartBuilder = () => {
                 <Button
                   variant="contained"
                   fullWidth
-                  className="upload-button"
+                  color="primary"
                   disabled={!selectedFile || !vizRequest || isLoading || codeResult.status === 'loading'}
                   onClick={handleGenerateVisualization}
+                  sx={{ 
+                    mt: 1, 
+                    mb: 1,
+                    py: 1.5,
+                    boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                    transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                    '&:hover': {
+                      boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
                 >
                   {isLoading || codeResult.status === 'loading' ? (
-                    <CircularProgress size={24} />
+                    <CircularProgress size={24} color="inherit" />
                   ) : (
                     'Generate Visualization'
                   )}
                 </Button>
               </Grid>
             </Grid>
-          </Paper>
+          </GradientBorderPaper>
         </Grid>
         
         {/* Right panel - Output */}
         <Grid item xs={12} md={7}>
-          <Paper elevation={1} style={{ padding: '24px', height: '100%' }}>
+          <GradientBorderPaper elevation={3} sx={{ 
+            p: 3, 
+            height: '100%',
+            borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
+            borderRadius: 2,
+            background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+            '&::before': {
+              background: '#121212',
+              borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+            }
+          }}>
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
               aria-label="visualization tabs"
-              style={{ marginBottom: '16px' }}
+              sx={{ 
+                mb: 2,
+                '& .MuiTab-root': {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                  },
+                  fontWeight: 500
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'primary.main',
+                  height: '3px'
+                }
+              }}
             >
               <Tab icon={<CodeIcon />} label="Code" />
               <Tab icon={<VisibilityIcon />} label="Visualization" />
             </Tabs>
             
             {localError && (
-              <Alert severity="error" style={{ marginBottom: '16px' }} onClose={() => setLocalError(null)}>
+              <Alert 
+                severity="error" 
+                style={{ marginBottom: '16px' }} 
+                onClose={() => setLocalError(null)}
+                variant="filled"
+                sx={{
+                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                }}
+              >
                 {localError}
               </Alert>
             )}
             
             {codeResult && codeResult.error && (
-              <Alert severity="error" style={{ marginBottom: '16px' }}>
+              <Alert 
+                severity="error" 
+                style={{ marginBottom: '16px' }}
+                variant="filled"
+                sx={{
+                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                }}
+              >
                 {codeResult.error}
               </Alert>
             )}
             
             {tabValue === 0 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <Typography variant="subtitle1">
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
                     Python Visualization Code
                   </Typography>
                   <Button 
-                    variant="outlined" 
-                    size="small" 
+                    variant="contained" 
+                    size="small"
                     startIcon={<RefreshIcon />}
-                    className="action-button"
                     onClick={handleRunCode}
                     disabled={!visualizationCode || codeResult.status === 'loading'}
+                    sx={{ 
+                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
                   >
                     Run Code
                   </Button>
-                </div>
+                </Box>
                 <CodeEditor 
                   code={visualizationCode || (connectionError ? 
                     "# Backend connection required to generate visualization code\n# Please start the backend services and reload this page" : 
@@ -440,65 +759,55 @@ const ChartBuilder = () => {
                   setCode={setVisualizationCode}
                   readOnly={connectionError}
                 />
-              </div>
+              </Box>
             )}
             
             {tabValue === 1 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <Typography variant="subtitle1">
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
                     Visualization Preview
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<SaveAltIcon />}
-                    size="small"
-                    className="action-button"
+                  <DownloadButton
+                    onClick={() => alert('Export functionality would be implemented here')}
+                    tooltip="Export Visualization"
                     disabled={(!dataContext || connectionError)}
-                  >
-                    Export
-                  </Button>
-                </div>
+                  />
+                </Box>
                 
                 {/* Visualization Output */}
-                <div style={{ marginTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <Typography variant="subtitle1">
-                      Visualization Output
-                    </Typography>
-                    <Button 
-                      variant="outlined" 
-                      size="small" 
-                      startIcon={<SaveAltIcon />}
-                      className="action-button"
-                      disabled={(!dataContext || connectionError)}
-                    >
-                      Export
-                    </Button>
-                  </div>
-                  
+                <SubtleGlowPaper sx={{ 
+                  mt: 3, 
+                  p: 0, 
+                  overflow: 'hidden',
+                  backgroundColor: '#1A1A1A',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px'
+                }}>
                   {dataContext && dataContext.loading ? (
-                    <CircularProgress size={20} />
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+                      <CircularProgress size={40} />
+                    </Box>
                   ) : dataContext && dataContext.error ? (
                     <Alert severity="error">{dataContext.error}</Alert>
                   ) : (
-                    <Card>
+                    <Box>
                       <img
                         src={FakePlotImage}
                         alt="Generated visualization"
                         style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain' }}
                       />
-                      <CardContent>
-                        <Typography variant="body2" className="text-secondary">
+                      <Box sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
                           {vizRequest || "Sales data across different products showing monthly trends"}
                         </Typography>
-                      </CardContent>
-                    </Card>
+                      </Box>
+                    </Box>
                   )}
-                </div>
-              </div>
+                </SubtleGlowPaper>
+              </Box>
             )}
-          </Paper>
+          </GradientBorderPaper>
         </Grid>
       </Grid>
     </div>
