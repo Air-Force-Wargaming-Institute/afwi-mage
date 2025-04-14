@@ -37,13 +37,22 @@ services:
       - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
       - WORKBENCH_SERVICE_URL=http://workbench:8020
+      - VLLM_INSTANCES=http://vllm:8000/v1=generate
+      - OLLAMA_BASE_URLS=http://ollama:11434
+      - DIRECT_CHAT_SERVICE_URL=http://direct_chat_service:8011
       - DEBUG=1
       - PYTHONUNBUFFERED=1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ../data:/app/data:rw
     depends_on:
       init-data:
         condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
     networks:
       - app-network
@@ -302,13 +311,13 @@ services:
   #   networks:
   #     - app-network
 
-  # redis:
-  #   image: redis/redis-stack:7.4.0-v3-x86_64
-  #   ports:
-  #     - "6379:6379"
-  #     - "6380:8001"
-  #   networks:
-  #     - app-network
+  redis:
+    image: redis/redis-stack:7.4.0-v3-x86_64
+    ports:
+      - "6379:6379"
+      - "6380:8001"
+    networks:
+      - app-network
 
   # chat_db:
   #   image: postgres:17.4
