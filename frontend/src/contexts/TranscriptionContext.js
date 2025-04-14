@@ -17,7 +17,12 @@ export const ACTIONS = {
   ADD_MARKER: 'ADD_MARKER',
   REMOVE_MARKER: 'REMOVE_MARKER',
   ADD_CUSTOM_MARKER_TYPE: 'ADD_CUSTOM_MARKER_TYPE',
-  RESET_STATE: 'RESET_STATE'
+  RESET_STATE: 'RESET_STATE',
+  // New actions for session browsing
+  SET_PREVIOUS_SESSIONS: 'SET_PREVIOUS_SESSIONS',
+  SET_LOADED_SESSION_ID: 'SET_LOADED_SESSION_ID',
+  LOAD_SESSION_DATA: 'LOAD_SESSION_DATA', // Action to load all data for a selected session
+  START_NEW_SESSION: 'START_NEW_SESSION' // Action to clear loaded session and reset relevant fields
 };
 
 // Define recorder states
@@ -63,7 +68,11 @@ const initialState = {
     organization: ''
   },
   markers: [],
-  availableMarkerTypes: [...defaultMarkerTypes]
+  availableMarkerTypes: [...defaultMarkerTypes],
+  // New state for session browsing
+  previousSessions: [], // Will hold list like [{ id: '...', name: '...', date: '...' }, ...]
+  loadedSessionId: null, // ID of the session currently loaded in the right panel
+  audioUrl: null // URL for playback when a session is loaded
 };
 
 // Reducer function to handle state updates
@@ -84,17 +93,18 @@ const transcriptionReducer = (state, action) => {
     case ACTIONS.SET_PARTICIPANTS:
       return { ...state, participants: action.payload };
     case ACTIONS.SET_CLASSIFICATION:
-      return { 
-        ...state, 
-        classification: action.payload, 
-        caveatType: null,
-        customCaveat: ''
+      return {
+        ...state,
+        classification: action.payload,
+        // Reset caveats only if classification changes to the default placeholder
+        caveatType: action.payload === 'SELECT A SECURITY CLASSIFICATION' ? null : state.caveatType,
+        customCaveat: action.payload === 'SELECT A SECURITY CLASSIFICATION' ? '' : state.customCaveat
       };
     case ACTIONS.SET_CAVEAT_TYPE:
-      return { 
-        ...state, 
-        caveatType: action.payload, 
-        customCaveat: action.payload === 'none' ? '' : state.customCaveat 
+      return {
+        ...state,
+        caveatType: action.payload,
+        customCaveat: action.payload === 'none' ? '' : state.customCaveat
       };
     case ACTIONS.SET_CUSTOM_CAVEAT:
       return { ...state, customCaveat: action.payload };
@@ -128,16 +138,68 @@ const transcriptionReducer = (state, action) => {
           type: generateTypeFromLabel(newLabel),
           color: 'default'
       };
-      return { 
-        ...state, 
-        availableMarkerTypes: [...state.availableMarkerTypes, newCustomMarkerType] 
+      return {
+        ...state,
+        availableMarkerTypes: [...state.availableMarkerTypes, newCustomMarkerType]
       };
     case ACTIONS.RESET_STATE:
+      // Preserve custom marker types but reset everything else
       const preservedMarkerTypes = state.availableMarkerTypes;
       return {
           ...initialState,
           availableMarkerTypes: preservedMarkerTypes
       };
+
+    // --- New Reducers for Session Browsing ---
+    case ACTIONS.SET_PREVIOUS_SESSIONS:
+      return { ...state, previousSessions: action.payload };
+
+    case ACTIONS.SET_LOADED_SESSION_ID:
+        // When just setting the ID, don't change other state yet.
+        // The caller should dispatch LOAD_SESSION_DATA after fetching.
+      return { ...state, loadedSessionId: action.payload };
+
+    case ACTIONS.LOAD_SESSION_DATA:
+      // Payload should be the full session object fetched from the API
+      // (matching structure in Get Session Details plan)
+      const loadedData = action.payload;
+      return {
+        ...state,
+        loadedSessionId: loadedData.session_id,
+        sessionId: loadedData.session_id, // Set the active sessionId as well
+        audioFilename: loadedData.session_name || '', // Use session_name or fallback
+        transcriptionText: loadedData.transcription_text || '',
+        participants: loadedData.participants || [],
+        eventMetadata: loadedData.event_metadata ? {
+            wargame_name: loadedData.event_metadata.wargame_name || '',
+            scenario: loadedData.event_metadata.scenario || '',
+            phase: loadedData.event_metadata.phase || '',
+            location: loadedData.event_metadata.location || '',
+            organization: loadedData.event_metadata.organization || '',
+            // Keep existing classification structure separate
+        } : initialState.eventMetadata,
+        classification: loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION',
+        caveatType: loadedData.event_metadata?.caveat_type || null,
+        customCaveat: loadedData.event_metadata?.custom_caveat || '',
+        markers: loadedData.markers || [],
+        audioUrl: loadedData.audio_url || null, // Store audio URL for playback
+        recordingState: RECORDING_STATES.STOPPED, // Assume loaded session is stopped
+        recordingTime: 0, // Reset timer
+        error: null,
+      };
+
+    case ACTIONS.START_NEW_SESSION:
+      // Reset relevant fields to initial state, keeping custom markers and previous session list
+      const preservedMarkerTypesNew = state.availableMarkerTypes;
+      const preservedPreviousSessions = state.previousSessions;
+      return {
+        ...initialState,
+        availableMarkerTypes: preservedMarkerTypesNew,
+        previousSessions: preservedPreviousSessions,
+        // Ensure loadedSessionId is cleared
+        loadedSessionId: null
+      };
+
     default:
       return state;
   }
