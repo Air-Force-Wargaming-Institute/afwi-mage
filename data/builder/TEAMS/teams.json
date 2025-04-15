@@ -1,85 +1,19 @@
 [
     {
-        "name": "china 4 team",
-        "unique_id": "4201d5c7-b002-4123-8d86-64142eaacd75",
-        "description": "china 4 team",
+        "name": "PRC Example Team",
+        "unique_id": "2e6d95bf-f6b8-4b31-aa05-7f7bc8ad33db",
+        "description": "Exemplar team designed to provide out-of-the-box functionality.",
         "agents": [
-            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
-            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593"
+            "2e3b8990-f86a-42c4-9c70-9e595437d80d",
+            "e6c042a1-d9e3-4856-b7ec-6806c33b783c",
+            "b4d90b5e-2b07-4cb5-9e33-38bff6de405c",
+            "39399023-fa6c-4e15-87fb-02d098b071a0"
         ],
         "color": "#FF0000",
-        "created_at": "2025-03-13T16:04:27.991879Z",
-        "last_modified": "2025-04-12T06:09:34.342037Z",
+        "created_at": "2025-04-15T13:05:20.824005Z",
+        "last_modified": "2025-04-15T13:26:21.811293Z",
         "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
-        ]
-    },
-    {
-        "name": "US Team",
-        "unique_id": "4208b6be-7b64-47bd-8b60-5f3be42e1c91",
-        "description": "china 4 team Synthesis Agent - Consolidates agent collaborations, reports, and research results for final output to the use",
-        "agents": [
-            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
-            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593",
-            "7094e92e-e1e6-420f-be8e-1c59929662bc"
-        ],
-        "color": "#0000FF",
-        "created_at": "2025-04-12T05:43:43.647995Z",
-        "last_modified": "2025-04-12T06:07:29.008049Z",
-        "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
-        ]
-    },
-    {
-        "name": "NATO Team",
-        "unique_id": "499ee3b7-0fe6-40e0-a2f7-2d9b477de467",
-        "description": "NATO 4 team",
-        "agents": [
-            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
-            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593",
-            "7094e92e-e1e6-420f-be8e-1c59929662bc"
-        ],
-        "color": "#32CD32",
-        "created_at": "2025-04-12T05:43:56.294583Z",
-        "last_modified": "2025-04-12T06:41:18.017275Z",
-        "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
-        ]
-    },
-    {
-        "name": "Analysis Team",
-        "unique_id": "d7ab9fce-6a2c-40e9-a2c4-078e6cbabbbe",
-        "description": "Analysis team",
-        "agents": [
-            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
-            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593",
-            "7094e92e-e1e6-420f-be8e-1c59929662bc"
-        ],
-        "color": "#808080",
-        "created_at": "2025-04-12T05:44:40.972402Z",
-        "last_modified": "2025-04-12T06:44:43.323425Z",
-        "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
-        ]
-    },
-    {
-        "name": "sdfsdfsdfs",
-        "unique_id": "f90601c9-75c2-4a8f-b6c2-903508b08956",
-        "description": "asdfasdfasdfasdfa",
-        "agents": [
-            "ebddca47-1dba-4f84-a8f6-2b3a4584353c",
-            "62257ba9-5c8a-45b3-95c9-e89c0e924509",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593"
-        ],
-        "color": "#FF0000",
-        "created_at": "2025-03-18T18:30:32.038105Z",
-        "last_modified": "2025-03-18T18:30:32.038117Z",
-        "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+            "0c3c5a8b-c303-47a2-96a8-f79ec989c967"
         ]
     }
 ]
