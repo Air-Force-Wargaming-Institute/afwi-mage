@@ -16,7 +16,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import { GradientText } from '../../../styles/StyledComponents';
@@ -25,7 +29,12 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
 import CheckIcon from '@material-ui/icons/Check';
 import CloseIcon from '@material-ui/icons/Close';
+import FullscreenIcon from '@material-ui/icons/Fullscreen';
+import DoneIcon from '@material-ui/icons/Done';
 import ExecutionChecklist from './ExecutionChecklist';
+import TextEditorModal from './TextEditorModal';
+import { KeyboardDatePicker, MuiPickersUtilsProvider } from '@material-ui/pickers';
+import DateFnsUtils from '@date-io/date-fns';
 
 const useStyles = makeStyles((theme) => ({
   section: {
@@ -147,6 +156,62 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'flex-start',
     marginBottom: theme.spacing(2),
   },
+  expandButton: {
+    position: 'absolute',
+    right: theme.spacing(2),
+    top: theme.spacing(1.5),
+    zIndex: 1,
+  },
+  textFieldContainer: {
+    position: 'relative',
+  },
+  dialogTitle: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dialogContent: {
+    padding: theme.spacing(2),
+  },
+  closeButton: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    top: theme.spacing(1),
+    color: theme.palette.grey[500],
+  },
+  fullscreenTextField: {
+    '& .MuiInputBase-root': {
+      fontFamily: "'Roboto Mono', monospace",
+    },
+  },
+  approveButton: {
+    marginTop: theme.spacing(1),
+  },
+  approveButtonApproved: {
+    backgroundColor: theme.palette.success.main,
+    color: theme.palette.common.white,
+    '&:hover': {
+      backgroundColor: theme.palette.success.dark,
+    },
+  },
+  approveButtonNotApproved: {
+    borderColor: theme.palette.success.main,
+    color: theme.palette.success.main,
+  },
+  fieldHeaderContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing(1),
+  },
+  approvalStatus: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  approvalStatusText: {
+    marginRight: theme.spacing(1),
+    fontSize: '0.75rem',
+    color: theme.palette.text.secondary,
+  },
 }));
 
 function ScenarioTab({ wargameData, onChange }) {
@@ -156,6 +221,18 @@ function ScenarioTab({ wargameData, onChange }) {
   const [editedTitle, setEditedTitle] = useState('');
   const [timeHorizonNumber, setTimeHorizonNumber] = useState(1);
   const [timeHorizonUnit, setTimeHorizonUnit] = useState('months');
+  const [wargameStartDate, setWargameStartDate] = useState(
+    wargameData?.wargameStartDate ? new Date(wargameData.wargameStartDate) : null
+  );
+  
+  // State for text editor modal
+  const [textEditorOpen, setTextEditorOpen] = useState(false);
+  const [textEditorConfig, setTextEditorConfig] = useState({
+    title: '',
+    value: '',
+    fieldName: '', // to identify which field is being edited
+    placeholder: ''
+  });
 
   // Initialize research objectives as array if it doesn't exist
   if (!wargameData.researchObjectives || !Array.isArray(wargameData.researchObjectives)) {
@@ -186,6 +263,19 @@ function ScenarioTab({ wargameData, onChange }) {
       }
     }
   }, [wargameData?.timeHorizon]);
+
+  // Initialize approval status with default values if they don't exist
+  useEffect(() => {
+    if (!wargameData.approvedFields) {
+      onChange({
+        ...wargameData,
+        approvedFields: wargameData.approvedFields || {
+          roadToWar: false,
+          // Add other fields that need approval status here
+        }
+      });
+    }
+  }, []);
 
   // Event handlers for form fields
   const handleNameChange = (e) => {
@@ -225,10 +315,45 @@ function ScenarioTab({ wargameData, onChange }) {
     });
   };
 
-  const handleRoadToWarChange = (e) => {
+  // Add handler for description changes
+  const handleDescriptionChange = (e) => {
     onChange({
       ...wargameData,
-      roadToWar: e.target.value
+      description: e.target.value
+    });
+  };
+
+  // Handler for toggling approval status
+  const handleToggleApproval = (fieldName) => {
+    const currentApproval = wargameData.approvedFields?.[fieldName] || false;
+    
+    onChange({
+      ...wargameData,
+      approvedFields: {
+        ...(wargameData.approvedFields || {}),
+        [fieldName]: !currentApproval
+      }
+    });
+    
+    // This would eventually trigger an API call to update the approved status
+    console.log(`Field ${fieldName} approval status changed to: ${!currentApproval}`);
+  };
+  
+  // Modified handler for road to war that also updates approval status
+  const handleRoadToWarChange = (value) => {
+    // If the content changes, set approval to false
+    const isValueChanged = value !== wargameData.roadToWar;
+    const newApprovalStatus = isValueChanged 
+      ? false 
+      : (wargameData.approvedFields?.roadToWar || false);
+    
+    onChange({
+      ...wargameData,
+      roadToWar: value,
+      approvedFields: {
+        ...(wargameData.approvedFields || {}),
+        roadToWar: newApprovalStatus
+      }
     });
   };
 
@@ -323,6 +448,72 @@ function ScenarioTab({ wargameData, onChange }) {
     }
   };
 
+  // Add a handler for the date change
+  const handleStartDateChange = (date) => {
+    setWargameStartDate(date);
+    onChange({
+      ...wargameData,
+      wargameStartDate: date ? date.toISOString() : null
+    });
+  };
+  
+  // Open text editor modal for a specific field
+  const openTextEditor = (title, value, fieldName, placeholder, extraData = null) => {
+    setTextEditorConfig({
+      title,
+      value,
+      fieldName,
+      placeholder,
+      extraData
+    });
+    setTextEditorOpen(true);
+  };
+
+  // Handle save from text editor modal
+  const handleTextEditorSave = (newValue) => {
+    // Update the appropriate field based on fieldName
+    switch (textEditorConfig.fieldName) {
+      case 'roadToWar':
+        handleRoadToWarChange(newValue);
+        break;
+      case 'description':
+        onChange({
+          ...wargameData,
+          description: newValue
+        });
+        break;
+      case 'researchObjective':
+        setNewObjective(newValue);
+        break;
+      case 'editObjective':
+        const objIndex = textEditorConfig.extraData?.index;
+        if (objIndex !== undefined) {
+          const updatedObjectives = [...wargameData.researchObjectives];
+          updatedObjectives[objIndex] = newValue;
+          onChange({
+            ...wargameData,
+            researchObjectives: updatedObjectives
+          });
+        }
+        break;
+      default:
+        console.warn(`No handler for field: ${textEditorConfig.fieldName}`);
+    }
+    setTextEditorOpen(false);
+  };
+
+  // Add function to edit an existing objective
+  const handleEditObjective = (index) => {
+    const objective = wargameData.researchObjectives[index];
+    openTextEditor(
+      'Edit Research Objective',
+      objective,
+      'editObjective',
+      'Define a specific research question or insight this wargame aims to address',
+      { index }
+    );
+  };
+
   return (
     <div>
       <Box className={classes.titleEditContainer}>
@@ -375,32 +566,203 @@ function ScenarioTab({ wargameData, onChange }) {
             onChange={handleDesignerChange}
           />
           
-          {/* Date metadata moved underneath designer */}
-          <Box className={classes.metadataItem}>
-            <Typography variant="subtitle2" className={classes.metadataLabel}>
-              Created on:
+          {/* Description field with TextEditorModal */}
+          <Box mt={2}>
+            <Typography variant="subtitle2" className={classes.formLabel}>
+              Description
             </Typography>
-            <Typography variant="body2" className={classes.dateValue}>
-              {formatDate(wargameData?.createdAt)}
-            </Typography>
+            <Box className={classes.textFieldContainer}>
+              <TextField
+                id="wargame-description"
+                variant="outlined"
+                size="small"
+                fullWidth
+                multiline
+                rows={2}
+                placeholder="Enter a short description of the wargame scenario"
+                value={wargameData?.description || ''}
+                onChange={(e) => handleDescriptionChange(e)}
+                className={classes.inputField}
+              />
+              <Tooltip title="Open fullscreen editor">
+                <IconButton 
+                  className={classes.expandButton}
+                  onClick={() => openTextEditor(
+                    'Wargame Description', 
+                    wargameData?.description || '', 
+                    'description',
+                    'Enter a short description of the wargame scenario'
+                  )}
+                  size="small"
+                >
+                  <FullscreenIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
           
-          <Box className={classes.metadataItem}>
-            <Typography variant="subtitle2" className={classes.metadataLabel}>
-              Modified on:
+          {/* Timeline Information - moved here and made horizontal */}
+          <Box mt={2}>
+            <Typography variant="subtitle2" className={classes.formLabel}>
+              Timeline Information
             </Typography>
-            <Typography variant="body2" className={classes.dateValue}>
-              {formatDate(wargameData?.modifiedAt)}
-            </Typography>
+            <Box display="flex" flexDirection="row" justifyContent="space-between" mt={1}>
+              <Box display="flex" alignItems="center">
+                <Typography variant="body2" color="textSecondary" style={{ fontWeight: 'bold', marginRight: '4px' }}>
+                  Created:
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {formatDate(wargameData?.createdAt)}
+                </Typography>
+              </Box>
+              
+              <Box display="flex" alignItems="center">
+                <Typography variant="body2" color="textSecondary" style={{ fontWeight: 'bold', marginRight: '4px' }}>
+                  Modified:
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {formatDate(wargameData?.modifiedAt)}
+                </Typography>
+              </Box>
+              
+              <Box display="flex" alignItems="center">
+                <Typography variant="body2" color="textSecondary" style={{ fontWeight: 'bold', marginRight: '4px' }}>
+                  Executed:
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {formatDate(wargameData?.lastExecuted)}
+                </Typography>
+              </Box>
+            </Box>
           </Box>
-          
-          <Box className={classes.metadataItem}>
-            <Typography variant="subtitle2" className={classes.metadataLabel}>
-              Last Executed:
+
+          {/* Wargame Parameters moved here */}
+          <Box mt={3}>
+            <Typography variant="subtitle2" className={classes.formLabel}>
+              Wargame Parameters
             </Typography>
-            <Typography variant="body2" className={classes.dateValue}>
-              {formatDate(wargameData?.lastExecuted)}
-            </Typography>
+            
+            <Grid container spacing={2} style={{ marginTop: '8px' }}>
+              {/* Security Classification */}
+              <Grid item xs={12}>
+                <Typography variant="body2" gutterBottom>
+                  Security Classification
+                </Typography>
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <Select
+                    id="security-classification"
+                    value={wargameData?.securityClassification || ''}
+                    onChange={handleSecurityClassificationChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>Select Classification</em>
+                    </MenuItem>
+                    <MenuItem value="UNCLASSIFIED">UNCLASSIFIED</MenuItem>
+                    <MenuItem value="CONFIDENTIAL">CONFIDENTIAL</MenuItem>
+                    <MenuItem value="SECRET">SECRET</MenuItem>
+                    <MenuItem value="TOP SECRET">TOP SECRET</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              {/* Number of Game Permutations */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Number of Game Permutations (1-100)
+                </Typography>
+                <TextField
+                  id="number-of-iterations"
+                  variant="outlined"
+                  type="number"
+                  size="small"
+                  inputProps={{ min: 1, max: 100 }}
+                  placeholder="10"
+                  fullWidth
+                  value={wargameData?.numberOfIterations || ''}
+                  onChange={handleNumberOfIterationsChange}
+                />
+              </Grid>
+              
+              {/* Number of Moves/Turns */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Number of Moves/Turns (1-24)
+                </Typography>
+                <TextField
+                  id="number-of-moves"
+                  variant="outlined"
+                  type="number"
+                  size="small"
+                  inputProps={{ min: 1, max: 24 }}
+                  placeholder="10"
+                  fullWidth
+                  value={wargameData?.numberOfMoves || ''}
+                  onChange={handleNumberOfMovesChange}
+                />
+              </Grid>
+              
+              {/* Time Horizon */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Time Horizon
+                </Typography>
+                <Box display="flex" alignItems="center">
+                  <TextField
+                    id="time-horizon-number"
+                    variant="outlined"
+                    type="number"
+                    size="small"
+                    inputProps={{ min: 1, max: 365 }}
+                    style={{ width: '40%', marginRight: '8px' }}
+                    value={timeHorizonNumber}
+                    onChange={handleTimeHorizonNumberChange}
+                  />
+                  <FormControl variant="outlined" size="small" style={{ width: '60%' }}>
+                    <Select
+                      id="time-horizon-unit"
+                      value={timeHorizonUnit}
+                      onChange={handleTimeHorizonUnitChange}
+                    >
+                      <MenuItem value="days">Days</MenuItem>
+                      <MenuItem value="weeks">Weeks</MenuItem>
+                      <MenuItem value="months">Months</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Grid>
+              
+              {/* Wargame Start Date - NEW */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Wargame Start Date
+                </Typography>
+                <MuiPickersUtilsProvider utils={DateFnsUtils}>
+                  <KeyboardDatePicker
+                    inputVariant="outlined"
+                    format="dd MMMM, yyyy"
+                    size="small"
+                    fullWidth
+                    id="wargame-start-date"
+                    value={wargameStartDate}
+                    onChange={handleStartDateChange}
+                    KeyboardButtonProps={{
+                      'aria-label': 'change date',
+                    }}
+                    placeholder="Select a start date"
+                  />
+                </MuiPickersUtilsProvider>
+              </Grid>
+            </Grid>
+            
+            {/* Simulation Parameters Preview */}
+            <Box mt={2} p={2} bgcolor="rgba(66, 133, 244, 0.05)" borderRadius={4} border="1px solid rgba(66, 133, 244, 0.2)">
+              <Typography variant="body2" style={{ fontStyle: 'italic', fontSize: '18px', textAlign: 'center' }}>
+                MAGE will run {wargameData?.numberOfIterations || 0} permutation{wargameData?.numberOfIterations !== 1 ? 's' : ''} of the wargame, 
+                splitting {wargameData?.numberOfMoves || 0} {wargameData?.numberOfMoves !== 1 ? 'moves' : 'move'} across {wargameData?.timeHorizon || '0 days'} 
+                , with a notional start date of {wargameStartDate ? formatDate(wargameStartDate) : 'not specified'}.
+              </Typography>
+            </Box>
           </Box>
         </Grid>
         
@@ -424,23 +786,78 @@ function ScenarioTab({ wargameData, onChange }) {
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
           <Box className={classes.section}>
-            <Typography variant="h6" className={classes.formLabel}>
-              Road to War
-            </Typography>
+            <Box className={classes.fieldHeaderContainer}>
+              <Typography variant="h6" className={classes.formLabel}>
+                Road to War
+              </Typography>
+            </Box>
             <Typography variant="body2" color="textSecondary" paragraph>
               Describe the narrative context and geopolitical situation leading up to the scenario.
             </Typography>
-            <TextField
-              id="road-to-war"
-              variant="outlined"
-              multiline
-              rows={6}
-              fullWidth
-              placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation..."
-              value={wargameData?.roadToWar || ''}
-              onChange={handleRoadToWarChange}
-              className={classes.inputField}
-            />
+            <Box className={classes.textFieldContainer}>
+              <TextField
+                id="road-to-war"
+                variant="outlined"
+                multiline
+                rows={6}
+                fullWidth
+                placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation..."
+                value={wargameData?.roadToWar || ''}
+                onChange={(e) => handleRoadToWarChange(e.target.value)}
+                className={classes.inputField}
+              />
+              <Tooltip title="Open fullscreen editor">
+                <IconButton 
+                  className={classes.expandButton}
+                  onClick={() => openTextEditor(
+                    'Road to War', 
+                    wargameData?.roadToWar || '', 
+                    'roadToWar',
+                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                  )}
+                  size="small"
+                >
+                  <FullscreenIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Box display="flex" flexDirection="column">
+              <Box display="flex" alignItems="center">
+                <Button
+                  variant={wargameData.approvedFields?.roadToWar ? "contained" : "outlined"}
+                  size="small"
+                  className={`${classes.approveButton} ${
+                    wargameData.approvedFields?.roadToWar 
+                      ? classes.approveButtonApproved 
+                      : classes.approveButtonNotApproved
+                  }`}
+                  onClick={() => handleToggleApproval('roadToWar')}
+                  startIcon={wargameData.approvedFields?.roadToWar ? <DoneIcon /> : null}
+                >
+                  {wargameData.approvedFields?.roadToWar ? "Approved" : "Approve & Commit"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  style={{ marginLeft: 8 }}
+                  startIcon={<FullscreenIcon />}
+                  onClick={() => openTextEditor(
+                    'Road to War', 
+                    wargameData?.roadToWar || '', 
+                    'roadToWar',
+                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                  )}
+                >
+                  Open Editor
+                </Button>
+              </Box>
+              {wargameData.approvedFields?.roadToWar && (
+                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                  Content approved for execution
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Grid>
 
@@ -460,8 +877,13 @@ function ScenarioTab({ wargameData, onChange }) {
                     primary={`${index + 1}. ${objective}`} 
                   />
                   <ListItemSecondaryAction>
+                    <Tooltip title="Edit objective">
+                      <IconButton edge="end" aria-label="edit" onClick={() => handleEditObjective(index)} style={{ marginRight: 8 }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteObjective(index)}>
-                      <DeleteIcon />
+                      <DeleteIcon fontSize="small" />
                     </IconButton>
                   </ListItemSecondaryAction>
                 </ListItem>
@@ -470,19 +892,35 @@ function ScenarioTab({ wargameData, onChange }) {
             
             <Grid container spacing={1} alignItems="center">
               <Grid item xs>
-                <TextField
-                  placeholder="Enter a research objective or question..."
-                  variant="outlined"
-                  fullWidth
-                  value={newObjective}
-                  onChange={(e) => setNewObjective(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddObjective();
-                      e.preventDefault();
-                    }
-                  }}
-                />
+                <Box className={classes.textFieldContainer}>
+                  <TextField
+                    placeholder="Enter a research objective or question..."
+                    variant="outlined"
+                    fullWidth
+                    value={newObjective}
+                    onChange={(e) => setNewObjective(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddObjective();
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                  <Tooltip title="Open fullscreen editor">
+                    <IconButton 
+                      className={classes.expandButton}
+                      onClick={() => openTextEditor(
+                        'New Research Objective', 
+                        newObjective, 
+                        'researchObjective',
+                        'Define a specific research question or insight this wargame aims to address'
+                      )}
+                      size="small"
+                    >
+                      <FullscreenIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </Grid>
               <Grid item>
                 <Button
@@ -500,111 +938,6 @@ function ScenarioTab({ wargameData, onChange }) {
           </Box>
         </Grid>
       </Grid>
-      
-      <Divider />
-      
-      <Box className={classes.section} mt={4}>
-        <Typography variant="h6" className={classes.formLabel}>
-          Wargame Parameters
-        </Typography>
-        <Typography variant="body2" color="textSecondary" paragraph>
-          Configure simulation parameters to define the scope and complexity of your wargame.
-        </Typography>
-        
-        <Grid container spacing={4}>
-          {/* Security Classification moved to parameters section */}
-          <Grid item>
-            <Typography variant="subtitle2" gutterBottom>
-              Security Classification
-            </Typography>
-            <FormControl variant="outlined" size="small" style={{ width: '200px' }}>
-              <Select
-                id="security-classification"
-                value={wargameData?.securityClassification || ''}
-                onChange={handleSecurityClassificationChange}
-                displayEmpty
-              >
-                <MenuItem value="">
-                  <em>Select Classification</em>
-                </MenuItem>
-                <MenuItem value="UNCLASSIFIED">UNCLASSIFIED</MenuItem>
-                <MenuItem value="CONFIDENTIAL">CONFIDENTIAL</MenuItem>
-                <MenuItem value="SECRET">SECRET</MenuItem>
-                <MenuItem value="TOP SECRET">TOP SECRET</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item>
-            <Typography variant="subtitle2" gutterBottom>
-              Number of Permutations
-            </Typography>
-            <TextField
-              id="number-of-iterations"
-              variant="outlined"
-              type="number"
-              inputProps={{ min: 1, max: 100 }}
-              placeholder="5"
-              className={classes.parameterField}
-              value={wargameData?.numberOfIterations || ''}
-              onChange={handleNumberOfIterationsChange}
-            />
-            <Typography variant="caption" color="textSecondary" display="block">
-              How many simulation runs to perform
-            </Typography>
-          </Grid>
-          
-          <Grid item>
-            <Typography variant="subtitle2" gutterBottom>
-              Number of Moves/Turns
-            </Typography>
-            <TextField
-              id="number-of-moves"
-              variant="outlined"
-              type="number"
-              inputProps={{ min: 1, max: 50 }}
-              placeholder="10"
-              className={classes.parameterField}
-              value={wargameData?.numberOfMoves || ''}
-              onChange={handleNumberOfMovesChange}
-            />
-            <Typography variant="caption" color="textSecondary" display="block">
-              Maximum moves per simulation
-            </Typography>
-          </Grid>
-          
-          <Grid item>
-            <Typography variant="subtitle2" gutterBottom>
-              Time Horizon
-            </Typography>
-            <Box display="flex" alignItems="center">
-              <TextField
-                id="time-horizon-number"
-                variant="outlined"
-                type="number"
-                inputProps={{ min: 1, max: 100 }}
-                style={{ width: '80px', marginRight: '8px' }}
-                value={timeHorizonNumber}
-                onChange={handleTimeHorizonNumberChange}
-              />
-              <FormControl variant="outlined" style={{ width: '120px' }}>
-                <Select
-                  id="time-horizon-unit"
-                  value={timeHorizonUnit}
-                  onChange={handleTimeHorizonUnitChange}
-                >
-                  <MenuItem value="days">Days</MenuItem>
-                  <MenuItem value="weeks">Weeks</MenuItem>
-                  <MenuItem value="months">Months</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <Typography variant="caption" color="textSecondary" display="block">
-              Timespan represented by simulation
-            </Typography>
-          </Grid>
-        </Grid>
-      </Box>
       
       <Divider />
       
@@ -654,6 +987,19 @@ function ScenarioTab({ wargameData, onChange }) {
           </Grid>
         </Grid>
       </Box>
+      
+      {/* Text Editor Modal */}
+      <TextEditorModal
+        open={textEditorOpen}
+        onClose={() => setTextEditorOpen(false)}
+        title={textEditorConfig.title}
+        value={textEditorConfig.value}
+        onChange={handleTextEditorSave}
+        placeholder={textEditorConfig.placeholder}
+        isApproved={textEditorConfig.fieldName ? wargameData.approvedFields?.[textEditorConfig.fieldName] || false : false}
+        onApprove={handleToggleApproval}
+        fieldName={textEditorConfig.fieldName}
+      />
     </div>
   );
 }

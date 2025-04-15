@@ -24,6 +24,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import CloseIcon from '@material-ui/icons/Close';
 import Flag from 'react-world-flags';
 import { GradientText } from '../../../styles/StyledComponents';
+import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 
 const useStyles = makeStyles((theme) => ({
   dialogRoot: {
@@ -223,6 +224,20 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '1.5rem',
     fontWeight: 500,
   },
+  relationshipStatus: {
+    padding: theme.spacing(1),
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: theme.shape.borderRadius,
+  },
+  relationshipLabel: {
+    fontWeight: 600,
+  },
+  allyLabel: {
+    color: theme.palette.success.main,
+  },
+  partnerLabel: {
+    color: theme.palette.primary.main,
+  },
 }));
 
 // TabPanel component for displaying tab content
@@ -244,9 +259,10 @@ function TabPanel({ children, value, index, ...other }) {
   );
 }
 
-function NationPostureModal({ open, onClose, nation, otherNations, onSave }) {
+function NationPostureModal({ open, onClose, nation, otherNations, onSave, nationRelationships = {} }) {
   const classes = useStyles();
   const [tabValue, setTabValue] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
   const [nationData, setNationData] = useState({
     // Relationships
     relationships: {},
@@ -431,24 +447,30 @@ function NationPostureModal({ open, onClose, nation, otherNations, onSave }) {
       </Tabs>
       
       <DialogContent className={classes.dialogContent} dividers>
-        {/* Relationships Tab */}
+        {/* Relationships Tab - READ ONLY VIEW */}
         <TabPanel value={tabValue} index={0} className={classes.tabPanel}>
           <Typography variant="h5" className={classes.sectionTitle}>
-            Clarify Relationships with Other Nations
+            Relationships with Other Nations
+          </Typography>
+          
+          <Typography variant="body2" color="textSecondary" paragraph>
+            This is a summary of relationships defined in the Relationships & Theaters configuration. 
+            To modify these relationships, select the "Configure Relationships & Theaters of Conflict" button on Wargame Crafter tab.
           </Typography>
           
           {otherNations && otherNations.length > 0 ? (
             otherNations.map(otherNation => {
-              // Get current relationship data if it exists
-              const relationshipData = nationData.relationships[otherNation.entityId] || {};
-              const relationType = relationshipData.relationType || '';
-              const details = relationshipData.details || '';
+              // Get relationship key - ensure consistent order regardless of which nation comes first
+              const relationshipKey = [nation.entityId, otherNation.entityId].sort().join('_');
+              const relationshipData = nationRelationships[relationshipKey] || {};
+              const relationType = relationshipData.type || '';
+              const notes = relationshipData.notes || '';
               
               return (
                 <Box key={otherNation.entityId} className={classes.relationshipItem}>
                   <Box className={classes.relationshipItemContent}>
                     <Grid container spacing={2}>
-                      <Grid item xs={12} md={3}>
+                      <Grid item xs={12}>
                         <Box display="flex" alignItems="center">
                           <Box width={30} height={20} marginRight={1} overflow="hidden" border="1px solid rgba(255,255,255,0.12)">
                             <Flag code={otherNation.entityId} style={{ width: '100%', height: 'auto' }} />
@@ -459,66 +481,95 @@ function NationPostureModal({ open, onClose, nation, otherNations, onSave }) {
                         </Box>
                       </Grid>
                       
-                      <Grid item xs={12} md={6}>
-                        <Box className={classes.relationshipButtonGroup}>
+                      <Grid item xs={12}>
+                        {/* Relationship buttons similar to RelationshipMatrix but read-only */}
+                        <Box className={classes.relationshipButtonGroup} mt={1}>
                           <Button
-                            className={`${classes.relationshipButton} ${classes.allianceButton} ${relationType === 'alliance' ? 'selected' : ''}`}
-                            onClick={() => handleRelationshipTypeChange(otherNation.entityId, 'alliance')}
-                            variant={relationType === 'alliance' ? 'contained' : 'outlined'}
+                            className={`${classes.relationshipButton} ${classes.allianceButton} ${relationType === 'ally' ? 'selected' : ''}`}
+                            variant={relationType === 'ally' ? 'contained' : 'outlined'}
                             size="small"
+                            disabled
+                            style={{
+                              opacity: 1,
+                              backgroundColor: relationType === 'ally' ? 'rgba(66, 133, 244, 0.2)' : 'transparent',
+                              fontWeight: relationType === 'ally' ? 700 : 400
+                            }}
                           >
-                            Alliance
+                            Ally
                           </Button>
                           <Button
-                            className={`${classes.relationshipButton} ${classes.partnershipButton} ${relationType === 'partnership' ? 'selected' : ''}`}
-                            onClick={() => handleRelationshipTypeChange(otherNation.entityId, 'partnership')}
-                            variant={relationType === 'partnership' ? 'contained' : 'outlined'}
+                            className={`${classes.relationshipButton} ${classes.partnershipButton} ${relationType === 'partner' ? 'selected' : ''}`}
+                            variant={relationType === 'partner' ? 'contained' : 'outlined'}
                             size="small"
+                            disabled
+                            style={{
+                              opacity: 1,
+                              backgroundColor: relationType === 'partner' ? 'rgba(52, 168, 83, 0.2)' : 'transparent',
+                              fontWeight: relationType === 'partner' ? 700 : 400
+                            }}
                           >
-                            Partnership
-                          </Button>
-                          <Button
-                            className={`${classes.relationshipButton} ${classes.rivalryButton} ${relationType === 'rivalry' ? 'selected' : ''}`}
-                            onClick={() => handleRelationshipTypeChange(otherNation.entityId, 'rivalry')}
-                            variant={relationType === 'rivalry' ? 'contained' : 'outlined'}
-                            size="small"
-                          >
-                            Rivalry
+                            Partner
                           </Button>
                           <Button
                             className={`${classes.relationshipButton} ${classes.neutralButton} ${relationType === 'neutral' ? 'selected' : ''}`}
-                            onClick={() => handleRelationshipTypeChange(otherNation.entityId, 'neutral')}
                             variant={relationType === 'neutral' ? 'contained' : 'outlined'}
                             size="small"
+                            disabled
+                            style={{
+                              opacity: 1,
+                              backgroundColor: relationType === 'neutral' ? 'rgba(157, 157, 157, 0.2)' : 'transparent',
+                              fontWeight: relationType === 'neutral' ? 700 : 400
+                            }}
                           >
                             Neutral
                           </Button>
+                          <Button
+                            className={`${classes.relationshipButton} ${classes.rivalryButton} ${relationType === 'adversary' ? 'selected' : ''}`}
+                            variant={relationType === 'adversary' ? 'contained' : 'outlined'}
+                            size="small"
+                            disabled
+                            style={{
+                              opacity: 1,
+                              backgroundColor: relationType === 'adversary' ? 'rgba(234, 67, 53, 0.2)' : 'transparent',
+                              fontWeight: relationType === 'adversary' ? 700 : 400
+                            }}
+                          >
+                            Adversary
+                          </Button>
+                          <Button
+                            className={`${classes.relationshipButton} ${classes.rivalryButton} ${relationType === 'enemy' ? 'selected' : ''}`}
+                            variant={relationType === 'enemy' ? 'contained' : 'outlined'}
+                            size="small"
+                            disabled
+                            style={{
+                              opacity: 1,
+                              backgroundColor: relationType === 'enemy' ? 'rgba(234, 67, 53, 0.2)' : 'transparent',
+                              fontWeight: relationType === 'enemy' ? 700 : 400
+                            }}
+                          >
+                            Enemy
+                          </Button>
                         </Box>
+                        
+                        {!relationType && (
+                          <Typography color="textSecondary" variant="body2" style={{ marginTop: 10, fontStyle: 'italic' }}>
+                            No relationship has been defined with {otherNation.entityName}
+                          </Typography>
+                        )}
                       </Grid>
                       
-                      <Grid item xs={12} md={3} container justifyContent="flex-end">
-                        <Button 
-                          variant={relationType ? "outlined" : "text"} 
-                          color="secondary" 
-                          size="small"
-                          onClick={() => handleRemoveRelationship(otherNation.entityId)}
-                          disabled={!relationType}
-                        >
-                          Clear
-                        </Button>
-                      </Grid>
-                      
-                      <Grid item xs={12}>
-                        <TextField
-                          placeholder="Describe relationship details and policy considerations... (Press Enter for line breaks)"
-                          variant="outlined"
-                          multiline
-                          rows={4}
-                          fullWidth
-                          value={details}
-                          onChange={(e) => handleRelationshipDetailsChange(otherNation.entityId, e.target.value)}
-                        />
-                      </Grid>
+                      {notes && (
+                        <Grid item xs={12}>
+                          <Box mt={2} p={2} bgcolor="rgba(0,0,0,0.1)" borderRadius={1}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Relationship Notes:
+                            </Typography>
+                            <Typography variant="body2">
+                              {notes}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      )}
                     </Grid>
                   </Box>
                 </Box>

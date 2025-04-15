@@ -25,7 +25,7 @@ import {
 import { makeStyles } from '@material-ui/core/styles';
 import Alert from '@material-ui/lab/Alert';
 import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
-import TheaterIcon from '@material-ui/icons/Theaters';
+import SecurityIcon from '@material-ui/icons/Security';
 import CloseIcon from '@material-ui/icons/Close';
 import LockIcon from '@material-ui/icons/Lock';
 import { GradientText } from '../../../styles/StyledComponents';
@@ -573,10 +573,10 @@ function CrafterTab({ wargameData, onChange }) {
             variant="contained"
             color="primary"
             className={classes.theatersButton}
-            startIcon={<TheaterIcon />}
+            startIcon={<SecurityIcon />}
             onClick={handleOpenTheatersModal}
           >
-            Configure Theaters of Conflict
+            Configure Relationships & Theaters of Conflict
           </Button>
           
           <NationConfigPane
@@ -630,6 +630,7 @@ function CrafterTab({ wargameData, onChange }) {
         nation={selectedNation}
         otherNations={selectedNations.filter(n => n.entityId !== selectedNation?.entityId)}
         onSave={handleSaveNationConfig}
+        nationRelationships={nationRelationships}
       />
       
       {/* Theaters of Conflict Modal */}
