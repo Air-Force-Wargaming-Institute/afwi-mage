@@ -225,7 +225,7 @@ function WargamesListPage() {
     <StyledContainer>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <GradientText variant="h4" component="h1">
-          Wargame Builder
+          Wargame Builder (Pre-Alpha)
         </GradientText>
         <Button
           variant="contained"

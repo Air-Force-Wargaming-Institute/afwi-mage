@@ -42,6 +42,7 @@ const AuthenticatedRoutes = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
   const isStandaloneTranscriber = location.pathname === '/record-transcribe-standalone'; // Check for standalone route
+  const isHomePage = location.pathname === '/home' || location.pathname === '/'; // Check if on home page
   const { user } = useContext(AuthContext) || { user: null };
   
   return (
@@ -101,8 +102,8 @@ const AuthenticatedRoutes = () => {
           <Route path="/wargame-builder" component={WargameBuilder} />
         </Switch>
       </Box>
-      {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber */}
-      {!isStandaloneTranscriber && (
+      {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber or home page */}
+      {!isStandaloneTranscriber && !isHomePage && (
         <Box
           component="img"
           src={AFWIMageCoin}

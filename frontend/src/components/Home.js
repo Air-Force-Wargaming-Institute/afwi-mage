@@ -15,6 +15,7 @@ import GroupWorkIcon from '@material-ui/icons/GroupWork';
 import TuneIcon from '@material-ui/icons/Tune';
 import LibraryBooksIcon from '@material-ui/icons/LibraryBooks';
 import FolderIcon from '@material-ui/icons/Folder';
+import PublicIcon from '@material-ui/icons/Public';
 import { 
   GradientBorderPaper, 
   GradientBorderCard, 
@@ -22,8 +23,32 @@ import {
   StyledContainer,
   GradientText
 } from '../styles/StyledComponents';
+import mageCoiImage from '../assets/AFWI_MAGE_COIN.png';
 
 const useStyles = makeStyles((theme) => ({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    paddingTop: theme.spacing(70),
+  },
+  coinImage: {
+    width: 300,
+    height: 300,
+    marginBottom: theme.spacing(2),
+    filter: 'drop-shadow(0px 10px 20px rgba(0, 0, 0, 0.4))',
+  },
+  welcomeText: {
+    textAlign: 'center',
+    marginBottom: theme.spacing(0),
+    fontSize: '3.5rem',
+  },
+  transparentPaper: {
+    backgroundColor: 'transparent',
+    boxShadow: 'none',
+    marginTop: theme.spacing(0),
+  },
   iconContainer: {
     display: 'flex', 
     justifyContent: 'center',
@@ -53,6 +78,32 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
     padding: theme.spacing(3),
   },
+  featuresContainer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    margin: theme.spacing(0, -1.5),
+  },
+  featureItem: {
+    width: 'calc(20% - 24px)',
+    margin: theme.spacing(0, 1.5, 3, 1.5),
+    [theme.breakpoints.down('md')]: {
+      width: 'calc(33.333% - 24px)',
+    },
+    [theme.breakpoints.down('sm')]: {
+      width: 'calc(50% - 24px)',
+    },
+    [theme.breakpoints.down('xs')]: {
+      width: '100%',
+    },
+  },
+  cardTitle: {
+    fontSize: '1.4rem',
+    fontWeight: 600,
+    marginBottom: theme.spacing(1.5),
+    lineHeight: 1.3,
+    letterSpacing: '0.02em',
+  }
 }));
 
 function Home() {
@@ -63,7 +114,14 @@ function Home() {
 
   const features = [
     {
-      title: 'Multi-Agent Portal',
+      title: 'Build a Wargame (Pre-Alpha)',
+      description: 'Execute and analyze geopolitical wargame simulations using multi-agent systems, the DIME framework, and integrated cross-domain warfare.',
+      path: '/wargame-builder',
+      buttonText: 'Build a Wargame',
+      icon: <PublicIcon className={classes.cardIcon} />
+    },
+    {
+      title: 'Agent Portal',
       description: 'Build, manage, and chat with multi-agent systems for complex problem-solving and decision-making.',
       path: '/multi-agent',
       buttonText: 'Access Portal',
@@ -93,75 +151,69 @@ function Home() {
   ];
 
   return (
-    <StyledContainer maxWidth="lg">
-      <AnimatedGradientPaper elevation={3}>
-        <Box mb={3}>
-          <GradientText variant="h1" fontWeight="600" fontSize={'4rem'} gutterBottom>
-            Welcome to MAGE
-          </GradientText>
-        </Box>
-
-        <Box mb={4}>
-          <Typography variant="body1" color="textSecondary" paragraph>
-            MAGE is a versatile platform that empowers wargame designers, participants, and analysts to build multi-agent systems that use fine-tuned Large Language Models (LLMs) in local secure environments and air-gapped systems. 
-            It offers a suite of tools for building AI multi-agent teams, fine-tune LLMs, build retrieval systems for AI agents, and manage a critical knowledge bases. 
-            Select a portal below to explore MAGE's capabilities.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          {features.map((feature) => (
-            <Grid item xs={12} sm={6} md={3} key={feature.title}>
-              <GradientBorderCard elevation={2} className={classes.card}>
-                <Box className={classes.cardContent}>
-                  <Box className={classes.iconContainer}>
-                    {feature.icon}
+    <Box className={classes.root}>
+      <img src={mageCoiImage} alt="AFWI MAGE Coin" className={classes.coinImage} />
+      
+      <GradientText variant="h1" fontWeight="600" fontSize={'4rem'} className={classes.welcomeText}>
+        Welcome to MAGE
+      </GradientText>
+      
+      <StyledContainer maxWidth="xl">
+        <AnimatedGradientPaper elevation={3} className={classes.transparentPaper}>
+          <Box className={classes.featuresContainer}>
+            {features.map((feature) => (
+              <Box key={feature.title} className={classes.featureItem}>
+                <GradientBorderCard elevation={2} className={classes.card}>
+                  <Box className={classes.cardContent}>
+                    <Box className={classes.iconContainer}>
+                      {feature.icon}
+                    </Box>
+                    <Typography variant="h6" color="primary" gutterBottom fontWeight={500} className={classes.cardTitle}>
+                      {feature.title}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" paragraph>
+                      {feature.description}
+                    </Typography>
                   </Box>
-                  <Typography variant="h6" color="primary" gutterBottom fontWeight={500}>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" paragraph>
-                    {feature.description}
-                  </Typography>
-                </Box>
-                <CardActions>
-                  <Button
-                    color="primary"
-                    variant="contained"
-                    onClick={() => history.push(feature.path)}
-                    className={classes.actionButton}
-                    fullWidth
-                  >
-                    {feature.buttonText}
-                  </Button>
-                </CardActions>
-              </GradientBorderCard>
-            </Grid>
-          ))}
-        </Grid>
+                  <CardActions>
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      onClick={() => history.push(feature.path)}
+                      className={classes.actionButton}
+                      fullWidth
+                    >
+                      {feature.buttonText}
+                    </Button>
+                  </CardActions>
+                </GradientBorderCard>
+              </Box>
+            ))}
+          </Box>
 
-        {user?.permission === 'admin' && (
-          <GradientBorderPaper elevation={2} className={classes.adminSection}>
-            <Box p={3}>
-              <Typography variant="h6" color="primary" gutterBottom>
-                Administrator Tools
-              </Typography>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Access administrative functions to manage users and monitor system status.
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => history.push('/admin')}
-                className={classes.actionButton}
-              >
-                Access Admin Dashboard
-              </Button>
-            </Box>
-          </GradientBorderPaper>
-        )}
-      </AnimatedGradientPaper>
-    </StyledContainer>
+          {user?.permission === 'admin' && (
+            <GradientBorderPaper elevation={2} className={classes.adminSection}>
+              <Box p={3}>
+                <Typography variant="h6" color="primary" gutterBottom>
+                  Administrator Tools
+                </Typography>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Access administrative functions to manage users and monitor system status.
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => history.push('/admin')}
+                  className={classes.actionButton}
+                >
+                  Access Admin Dashboard
+                </Button>
+              </Box>
+            </GradientBorderPaper>
+          )}
+        </AnimatedGradientPaper>
+      </StyledContainer>
+    </Box>
   );
 }
 
