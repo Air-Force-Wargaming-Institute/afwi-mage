@@ -490,7 +490,7 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
             variant="subtitle1" 
             className={`${classes.subtabLabel} ${bottomTabValue === 0 ? classes.activeSubtabLabel : ''}`}
           >
-            Configure and Setup
+            Configure & Setup
           </Typography>
         </Box>
         
@@ -504,7 +504,7 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
             variant="subtitle1" 
             className={`${classes.subtabLabel} ${bottomTabValue === 1 ? classes.activeSubtabLabel : ''}`}
           >
-            Manage Actors and Theaters
+            Manage Actors & Theaters
           </Typography>
         </Box>
         

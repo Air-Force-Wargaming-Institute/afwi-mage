@@ -62,44 +62,82 @@ const AuthenticatedRoutes = () => {
       >
         <Switch>
           <Route exact path="/login" component={Login} />
-          <Route exact path="/home" component={Home} />
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/document-library" component={DocumentLibrary} />
+          
+          {/* Protected routes that require authentication */}
+          <Route path="/home">
+            {user ? <Home /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/admin">
+            {user ? <AdminDashboard /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/document-library">
+            {user ? <DocumentLibrary /> : <Redirect to="/login" />}
+          </Route>
           
           {/* StyleTest route - accessible to all users */}
           <Route path="/style-test" component={StyleTest} />
           
           <Route exact path="/multi-agent">
-            <Redirect to="/multi-agent/team-chat" />
+            {user ? <Redirect to="/multi-agent/team-chat" /> : <Redirect to="/login" />}
           </Route>
-          <Route path="/multi-agent/guide" component={UserGuide} />
+          <Route path="/multi-agent/guide">
+            {user ? <UserGuide /> : <Redirect to="/login" />}
+          </Route>
           
           {/* Team Chat Container */}
-          <Route path="/multi-agent/team-chat" component={TeamChatContainer} />
+          <Route path="/multi-agent/team-chat">
+            {user ? <TeamChatContainer /> : <Redirect to="/login" />}
+          </Route>
           
           {/* Redirect old routes to new structure */}
           <Route path="/multi-agent/builder">
-            <Redirect to="/multi-agent/team-chat/builder" />
+            {user ? <Redirect to="/multi-agent/team-chat/builder" /> : <Redirect to="/login" />}
           </Route>
           <Route path="/multi-agent/chat">
-            <Redirect to="/multi-agent/team-chat/chat" />
+            {user ? <Redirect to="/multi-agent/team-chat/chat" /> : <Redirect to="/login" />}
           </Route>
           
-          <Route path="/multi-agent/direct-chat" component={DirectChat} />
-          <Route path="/multi-agent/workbench" component={WorkbenchDashboard} />
-          <Route exact path="/fine-tuning" component={FineTuneGuide} />
-          <Route path="/fine-tuning/extract" component={ExtractComponent} />
-          <Route path="/fine-tuning/generate" component={GenerateDataset} />
-          <Route path="/fine-tuning/fine-tune" component={FineTune} />
-          <Route path="/fine-tuning/test" component={Test} />
-          <Route exact path="/retrieval" component={RetrievalGuide} />
-          <Route path="/retrieval/build-databases" component={BuildRetrievalDatabases} />
-          <Route path="/retrieval/manage-databases" component={ManageVectorStores} />
-          <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
-          <Route exact path="/">
-            <Home />
+          <Route path="/multi-agent/direct-chat">
+            {user ? <DirectChat /> : <Redirect to="/login" />}
           </Route>
-          <Route path="/wargame-builder" component={WargameBuilder} />
+          <Route path="/multi-agent/workbench">
+            {user ? <WorkbenchDashboard /> : <Redirect to="/login" />}
+          </Route>
+          <Route exact path="/fine-tuning">
+            {user ? <FineTuneGuide /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/fine-tuning/extract">
+            {user ? <ExtractComponent /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/fine-tuning/generate">
+            {user ? <GenerateDataset /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/fine-tuning/fine-tune">
+            {user ? <FineTune /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/fine-tuning/test">
+            {user ? <Test /> : <Redirect to="/login" />}
+          </Route>
+          <Route exact path="/retrieval">
+            {user ? <RetrievalGuide /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/retrieval/build-databases">
+            {user ? <BuildRetrievalDatabases /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/retrieval/manage-databases">
+            {user ? <ManageVectorStores /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/retrieval/librarian-agents">
+            {user ? <LibrarianAgents /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/wargame-builder">
+            {user ? <WargameBuilder /> : <Redirect to="/login" />}
+          </Route>
+          
+          {/* Root path redirects to login if not authenticated, home if authenticated */}
+          <Route exact path="/">
+            {user ? <Home /> : <Redirect to="/login" />}
+          </Route>
         </Switch>
       </Box>
       {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber or home page */}

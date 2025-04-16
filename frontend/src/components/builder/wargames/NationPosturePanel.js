@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -13,12 +13,32 @@ import {
   Button,
   Paper,
   Divider,
-  ButtonGroup
+  ButtonGroup,
+  Tooltip,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  ListItemSecondaryAction,
+  IconButton
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import Flag from 'react-world-flags';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
+import DoneIcon from '@material-ui/icons/Done';
 import FlagIcon from './FlagIcon';
+import CloudUploadIcon from '@material-ui/icons/CloudUpload';
+import AttachFileIcon from '@material-ui/icons/AttachFile';
+import DeleteIcon from '@material-ui/icons/Delete';
+import DescriptionIcon from '@material-ui/icons/Description';
+import PictureAsPdfIcon from '@material-ui/icons/PictureAsPdf';
+import ImageIcon from '@material-ui/icons/Image';
+import AddIcon from '@material-ui/icons/Add';
+import EditIcon from '@material-ui/icons/Edit';
+import FullscreenIcon from '@material-ui/icons/Fullscreen';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
+import TextEditorModal from './TextEditorModal';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -211,6 +231,129 @@ const useStyles = makeStyles((theme) => ({
     borderTop: `1px solid ${theme.palette.divider}`,
     marginTop: 'auto',
   },
+  approveButton: {
+    marginLeft: theme.spacing(1),
+    minWidth: 'auto',
+    padding: theme.spacing(0.5, 1),
+  },
+  approveButtonApproved: {
+    backgroundColor: theme.palette.success.main,
+    color: theme.palette.common.white,
+    '&:hover': {
+      backgroundColor: theme.palette.success.dark,
+    },
+  },
+  fieldContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  approvedIndicator: {
+    position: 'absolute',
+    top: -10,
+    right: 0,
+    backgroundColor: theme.palette.success.main,
+    color: theme.palette.common.white,
+    fontSize: '0.7rem',
+    padding: theme.spacing(0.25, 1),
+    borderRadius: theme.shape.borderRadius,
+    display: 'flex',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  approvedIcon: {
+    fontSize: '0.85rem',
+    marginRight: theme.spacing(0.5),
+  },
+  approveButtonRow: {
+    display: 'flex',
+    justifyContent: 'flex-start',
+    width: '100%',
+    marginTop: theme.spacing(0.5),
+  },
+  doctrineUploadArea: {
+    border: `2px dashed ${theme.palette.primary.main}`,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(3),
+    textAlign: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s ease',
+    marginBottom: theme.spacing(2),
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.1)',
+      borderColor: theme.palette.secondary.main,
+    },
+  },
+  dragActive: {
+    backgroundColor: 'rgba(66, 133, 244, 0.2)',
+    borderColor: theme.palette.secondary.main,
+  },
+  uploadIcon: {
+    fontSize: '3rem',
+    color: theme.palette.primary.main,
+    marginBottom: theme.spacing(1),
+  },
+  fileList: {
+    maxHeight: '200px',
+    overflowY: 'auto',
+    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: theme.shape.borderRadius,
+  },
+  fileItem: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  fileIcon: {
+    color: theme.palette.primary.main,
+  },
+  fileSize: {
+    color: theme.palette.text.secondary,
+    fontSize: '0.75rem',
+  },
+  hiddenInput: {
+    display: 'none',
+  },
+  objectivesList: {
+    width: '100%',
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(2),
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: theme.shape.borderRadius,
+  },
+  objectiveItem: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  addObjectiveButton: {
+    marginTop: theme.spacing(1),
+  },
+  objectiveInput: {
+    marginRight: theme.spacing(1),
+    flexGrow: 1,
+  },
+  fieldHeaderContainer: {
+    display: 'flex',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: theme.spacing(1),
+  },
+  expandButton: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 1,
+  },
+  textFieldContainer: {
+    position: 'relative',
+  },
+  actionButtonsContainer: {
+    display: 'flex',
+    marginTop: theme.spacing(1),
+    justifyContent: 'flex-start',
+    '& > *': {
+      marginRight: theme.spacing(1),
+    }
+  },
 }));
 
 // TabPanel component for displaying tab content
@@ -235,13 +378,35 @@ function TabPanel({ children, value, index, ...other }) {
 function NationPosturePanel({ nation, otherNations, onSave, nationRelationships = {} }) {
   const classes = useStyles();
   const [tabValue, setTabValue] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // New state for objective inputs
+  const [newDiplomacyObjective, setNewDiplomacyObjective] = useState('');
+  const [newInformationObjective, setNewInformationObjective] = useState('');
+  const [newMilitaryObjective, setNewMilitaryObjective] = useState('');
+  const [newEconomicObjective, setNewEconomicObjective] = useState('');
+  
+  // State for tracking which objective is being edited
+  const [editingObjective, setEditingObjective] = useState(null);
+  
+  // State for text editor modal
+  const [textEditorOpen, setTextEditorOpen] = useState(false);
+  const [textEditorConfig, setTextEditorConfig] = useState({
+    title: '',
+    value: '',
+    fieldName: '',
+    section: '',
+    field: '',
+    placeholder: ''
+  });
+  
   const [nationData, setNationData] = useState({
     // Relationships
     relationships: {},
     
     // Diplomacy
     diplomacy: {
-      objectives: '',
+      objectives: [], // Changed from string to array
       posture: '',
       keyInitiatives: '',
       specialConsiderations: '',
@@ -249,7 +414,7 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
     
     // Information
     information: {
-      objectives: '',
+      objectives: [], // Changed from string to array
       propagandaThemes: '',
       cyberTargets: '',
       specialConsiderations: '',
@@ -257,9 +422,10 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
     
     // Military
     military: {
-      objectives: '',
+      objectives: [], // Changed from string to array
       alertLevel: '',
       doctrine: '',
+      doctrineFiles: [],
       domainPosture: {
         land: '',
         sea: '',
@@ -272,19 +438,66 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
     
     // Economic
     economic: {
-      objectives: '',
+      objectives: [], // Changed from string to array
       tradeFocus: '',
       resourceDeps: '',
       sanctionsPolicy: '',
       specialConsiderations: '',
-    }
+    },
+    
+    // Add approvedFields to track which fields have been approved
+    approvedFields: {}
   });
+  
+  // Alert level options
+  const alertLevelOptions = [
+    { value: 'Normal Peacetime Operations', label: 'Normal Peacetime Operations' },
+    { value: 'Elevated Readiness', label: 'Elevated Readiness' },
+    { value: 'Heightened Alert', label: 'Heightened Alert' },
+    { value: 'High Alert', label: 'High Alert' },
+    { value: 'Full Mobilization', label: 'Full Mobilization' },
+    { value: 'War Footing', label: 'War Footing' }
+  ];
   
   // Initialize nation data when nation changes
   useEffect(() => {
     if (nation) {
       // If nation already has configuration data, load it
-      setNationData(nation.configData || nationData);
+      const configData = nation.configData || {
+        ...nationData,
+        approvedFields: nation.configData?.approvedFields || {}
+      };
+      
+      // Convert string objectives to arrays if needed (for backward compatibility)
+      const updatedConfigData = {
+        ...configData,
+        diplomacy: {
+          ...configData.diplomacy,
+          objectives: Array.isArray(configData.diplomacy.objectives) 
+            ? configData.diplomacy.objectives 
+            : configData.diplomacy.objectives ? [configData.diplomacy.objectives] : []
+        },
+        information: {
+          ...configData.information,
+          objectives: Array.isArray(configData.information.objectives) 
+            ? configData.information.objectives 
+            : configData.information.objectives ? [configData.information.objectives] : []
+        },
+        military: {
+          ...configData.military,
+          objectives: Array.isArray(configData.military.objectives) 
+            ? configData.military.objectives 
+            : configData.military.objectives ? [configData.military.objectives] : []
+        },
+        economic: {
+          ...configData.economic,
+          objectives: Array.isArray(configData.economic.objectives) 
+            ? configData.economic.objectives 
+            : configData.economic.objectives ? [configData.economic.objectives] : []
+        }
+      };
+      
+      setNationData(updatedConfigData);
     }
   }, [nation]);
   
@@ -293,16 +506,27 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   };
   
   const handleInputChange = (section, field, value) => {
+    // Mark field as unapproved when changed
+    const fieldKey = `${section}.${field}`;
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
     setNationData(prev => ({
       ...prev,
       [section]: {
         ...prev[section],
         [field]: value
-      }
+      },
+      approvedFields: updatedApprovedFields
     }));
   };
   
   const handleMilitaryDomainChange = (domain, value) => {
+    // Mark field as unapproved when changed
+    const fieldKey = `military.domainPosture.${domain}`;
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
     setNationData(prev => ({
       ...prev,
       military: {
@@ -311,7 +535,8 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
           ...prev.military.domainPosture,
           [domain]: value
         }
-      }
+      },
+      approvedFields: updatedApprovedFields
     }));
   };
   
@@ -341,8 +566,614 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
     }));
   };
   
+  // New handler to toggle field approval status
+  const handleToggleApproval = (fieldKey) => {
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    
+    if (updatedApprovedFields[fieldKey]) {
+      delete updatedApprovedFields[fieldKey];
+    } else {
+      updatedApprovedFields[fieldKey] = true;
+    }
+    
+    setNationData(prev => ({
+      ...prev,
+      approvedFields: updatedApprovedFields
+    }));
+  };
+  
   const handleSave = () => {
     onSave({ ...nation, configData: nationData, isConfigured: true });
+  };
+  
+  // Check if a field is approved
+  const isFieldApproved = (fieldKey) => {
+    return !!nationData.approvedFields[fieldKey];
+  };
+  
+  // Format file size for display
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+  
+  // Get appropriate icon for file type
+  const getFileIcon = (fileName) => {
+    const extension = fileName.split('.').pop().toLowerCase();
+    
+    if (['pdf'].includes(extension)) {
+      return <PictureAsPdfIcon className={classes.fileIcon} />;
+    } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(extension)) {
+      return <ImageIcon className={classes.fileIcon} />;
+    } else {
+      return <DescriptionIcon className={classes.fileIcon} />;
+    }
+  };
+  
+  // Handle drag events
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+  
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+  
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileUpload(files);
+    }
+  }, []);
+  
+  // Handle file selection via input
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      handleFileUpload(files);
+    }
+  };
+  
+  // Process uploaded files
+  const handleFileUpload = (files) => {
+    // Create file objects with metadata
+    const newFiles = files.map(file => ({
+      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+      // In a real app, you might want to:
+      // 1. Upload the file to a server and store the URL
+      // 2. Read the file content and store it
+      // For this example, we'll just store metadata
+    }));
+    
+    // Update state with new files
+    setNationData(prev => ({
+      ...prev,
+      military: {
+        ...prev.military,
+        doctrineFiles: [...prev.military.doctrineFiles, ...newFiles]
+      }
+    }));
+    
+    // Mark as unapproved when files are added
+    const fieldKey = 'military.doctrine';
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
+    setNationData(prev => ({
+      ...prev,
+      approvedFields: updatedApprovedFields
+    }));
+  };
+  
+  // Remove a file
+  const handleRemoveFile = (fileId) => {
+    setNationData(prev => ({
+      ...prev,
+      military: {
+        ...prev.military,
+        doctrineFiles: prev.military.doctrineFiles.filter(file => file.id !== fileId)
+      }
+    }));
+    
+    // Mark as unapproved when files are removed
+    const fieldKey = 'military.doctrine';
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
+    setNationData(prev => ({
+      ...prev,
+      approvedFields: updatedApprovedFields
+    }));
+  };
+  
+  // Generic handler for adding objectives to any DIME section
+  const handleAddObjective = (section, objective) => {
+    if (!objective.trim()) return;
+    
+    // Mark field as unapproved when changed
+    const fieldKey = `${section}.objectives`;
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
+    setNationData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        objectives: [...prev[section].objectives, objective.trim()]
+      },
+      approvedFields: updatedApprovedFields
+    }));
+    
+    // Clear the input field
+    switch(section) {
+      case 'diplomacy':
+        setNewDiplomacyObjective('');
+        break;
+      case 'information':
+        setNewInformationObjective('');
+        break;
+      case 'military':
+        setNewMilitaryObjective('');
+        break;
+      case 'economic':
+        setNewEconomicObjective('');
+        break;
+    }
+  };
+  
+  // Generic handler for editing objectives in any DIME section
+  const handleEditObjective = (section, index, newValue) => {
+    if (!newValue.trim()) return;
+    
+    // Mark field as unapproved when changed
+    const fieldKey = `${section}.objectives`;
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
+    setNationData(prev => {
+      const updatedObjectives = [...prev[section].objectives];
+      updatedObjectives[index] = newValue.trim();
+      
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          objectives: updatedObjectives
+        },
+        approvedFields: updatedApprovedFields
+      };
+    });
+    
+    setEditingObjective(null);
+  };
+  
+  // Generic handler for deleting objectives in any DIME section
+  const handleDeleteObjective = (section, index) => {
+    // Mark field as unapproved when changed
+    const fieldKey = `${section}.objectives`;
+    const updatedApprovedFields = { ...nationData.approvedFields };
+    delete updatedApprovedFields[fieldKey];
+    
+    setNationData(prev => {
+      const updatedObjectives = [...prev[section].objectives];
+      updatedObjectives.splice(index, 1);
+      
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          objectives: updatedObjectives
+        },
+        approvedFields: updatedApprovedFields
+      };
+    });
+  };
+  
+  // Helper function to render objectives list for any DIME section
+  const renderObjectivesList = (section, newObjective, setNewObjective) => {
+    const fieldKey = `${section}.objectives`;
+    const isApproved = isFieldApproved(fieldKey);
+    const objectives = nationData[section].objectives || [];
+    
+    return (
+      <Box mb={3}>
+        <Box className={classes.fieldHeaderContainer}>
+          <Typography variant="subtitle1" style={{ marginRight: '16px' }}>Strategic Objectives</Typography>
+          <Button
+            variant={isApproved ? "contained" : "outlined"}
+            size="small"
+            onClick={() => handleToggleApproval(fieldKey)}
+            className={`${classes.approveButton} ${isApproved ? classes.approveButtonApproved : ''}`}
+            startIcon={isApproved ? <DoneIcon /> : null}
+          >
+            {isApproved ? "Approved" : "Approve & Commit"}
+          </Button>
+        </Box>
+        
+        <Typography variant="body2" color="textSecondary" paragraph>
+          Define the key {section === 'diplomacy' ? 'diplomatic' : 
+                         section === 'information' ? 'information' : 
+                         section === 'military' ? 'military' : 'economic'} 
+          goals and priorities for this entity.
+        </Typography>
+        
+        {objectives.length > 0 && (
+          <List className={classes.objectivesList}>
+            {objectives.map((objective, index) => (
+              <ListItem key={index} className={classes.objectiveItem}>
+                <ListItemText
+                  primary={
+                    editingObjective && editingObjective.section === section && editingObjective.index === index ? (
+                      <TextField
+                        fullWidth
+                        value={editingObjective.value}
+                        onChange={(e) => setEditingObjective({...editingObjective, value: e.target.value})}
+                        autoFocus
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleEditObjective(section, index, editingObjective.value);
+                            e.preventDefault();
+                          }
+                        }}
+                        onBlur={() => handleEditObjective(section, index, editingObjective.value)}
+                      />
+                    ) : (
+                      `${index + 1}. ${objective}`
+                    )
+                  }
+                />
+                {(!editingObjective || editingObjective.section !== section || editingObjective.index !== index) && (
+                  <ListItemSecondaryAction>
+                    <IconButton edge="end" aria-label="edit" 
+                      onClick={() => setEditingObjective({section, index, value: objective})}
+                      style={{ marginRight: 8 }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton edge="end" aria-label="delete" 
+                      onClick={() => handleDeleteObjective(section, index)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                )}
+              </ListItem>
+            ))}
+          </List>
+        )}
+        
+        <Grid container spacing={1} alignItems="center" style={{ marginTop: 8 }}>
+          <Grid item xs>
+            <TextField
+              placeholder={`Enter a ${section} objective...`}
+              variant="outlined"
+              fullWidth
+              size="small"
+              value={newObjective}
+              onChange={(e) => setNewObjective(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddObjective(section, newObjective);
+                  e.preventDefault();
+                }
+              }}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => handleAddObjective(section, newObjective)}
+              disabled={!newObjective.trim()}
+              size="small"
+            >
+              Add
+            </Button>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  };
+  
+  // Render the document upload area
+  const renderDoctrineUploadArea = (gridProps = { xs: 12, md: 6 }) => {
+    const fieldKey = 'military.doctrine';
+    const isApproved = isFieldApproved(fieldKey);
+    const doctrineFiles = nationData.military.doctrineFiles || [];
+    
+    return (
+      <Grid item {...gridProps}>
+        <Box className={classes.fieldContainer}>
+          {isApproved && (
+            <Box className={classes.approvedIndicator}>
+              <DoneIcon className={classes.approvedIcon} />
+              <Typography variant="caption">Approved</Typography>
+            </Box>
+          )}
+          
+          <Typography variant="subtitle1" gutterBottom>Military Doctrine Documents</Typography>
+          
+          {/* Drag and drop area */}
+          <Box
+            className={`${classes.doctrineUploadArea} ${isDragging ? classes.dragActive : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => document.getElementById('doctrine-file-input').click()}
+          >
+            <input
+              id="doctrine-file-input"
+              type="file"
+              multiple
+              className={classes.hiddenInput}
+              onChange={handleFileSelect}
+            />
+            <CloudUploadIcon className={classes.uploadIcon} />
+            <Typography variant="body1" gutterBottom>
+              Drag & drop doctrine documents here
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              or click to select files
+            </Typography>
+          </Box>
+          
+          {/* File list */}
+          {doctrineFiles.length > 0 && (
+            <List className={classes.fileList}>
+              {doctrineFiles.map((file) => (
+                <ListItem key={file.id} className={classes.fileItem}>
+                  <ListItemIcon>
+                    {getFileIcon(file.name)}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={file.name} 
+                    secondary={<span className={classes.fileSize}>{formatFileSize(file.size)}</span>} 
+                  />
+                  <ListItemSecondaryAction>
+                    <IconButton edge="end" onClick={() => handleRemoveFile(file.id)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          )}
+          
+          {/* Add supporting text field for doctrine summary */}
+          <TextField
+            label="Doctrine Summary (Optional)"
+            variant="outlined"
+            fullWidth
+            multiline
+            rows={2}
+            value={nationData.military.doctrine}
+            onChange={(e) => handleInputChange('military', 'doctrine', e.target.value)}
+            placeholder="Briefly summarize the doctrine outlined in the uploaded documents..."
+            style={{ marginTop: 16 }}
+          />
+          
+          <Box className={classes.approveButtonRow}>
+            <Button
+              variant={isApproved ? "contained" : "outlined"}
+              size="small"
+              onClick={() => handleToggleApproval(fieldKey)}
+              className={`${classes.approveButton} ${isApproved ? classes.approveButtonApproved : ''}`}
+              startIcon={isApproved ? <DoneIcon /> : null}
+            >
+              {isApproved ? "Approved" : "Approve & Commit"}
+            </Button>
+          </Box>
+        </Box>
+      </Grid>
+    );
+  };
+  
+  // Handler for opening text editor modal
+  const handleOpenTextEditor = (title, value, section, field, placeholder) => {
+    setTextEditorConfig({
+      title,
+      value,
+      fieldName: `${section}.${field}`,
+      section,
+      field,
+      placeholder
+    });
+    setTextEditorOpen(true);
+  };
+  
+  // Handler for saving text from editor modal
+  const handleTextEditorSave = (newValue) => {
+    const { section, field } = textEditorConfig;
+    
+    if (section && field) {
+      // Handle special case for military domain posture fields
+      if (section === 'military' && field.includes('domainPosture.')) {
+        const domain = field.split('.')[1];
+        handleMilitaryDomainChange(domain, newValue);
+      } else {
+        // Standard field update
+        handleInputChange(section, field, newValue);
+      }
+    }
+    
+    setTextEditorOpen(false);
+  };
+  
+  // Handler for MAGE Assist button
+  const handleMageAssist = (section, field) => {
+    // Placeholder for future LLM functionality
+    console.log(`MAGE Assist requested for ${section}.${field}`);
+    // This would eventually trigger the MAGE LLM to help with content generation
+  };
+  
+  // Modified renderFieldWithApproval to include Open Editor and MAGE Assist buttons
+  const renderFieldWithApproval = (section, field, label, rows = 3, placeholder = '', gridProps = { xs: 12 }) => {
+    const fieldKey = `${section}.${field}`;
+    const isApproved = isFieldApproved(fieldKey);
+    const fieldValue = section === 'military' && field.includes('.') 
+      ? field.split('.').reduce((obj, key) => obj[key], nationData[section])
+      : nationData[section][field];
+    
+    return (
+      <Grid item {...gridProps}>
+        <Box className={classes.fieldContainer}>
+          {isApproved && (
+            <Box className={classes.approvedIndicator}>
+              <DoneIcon className={classes.approvedIcon} />
+              <Typography variant="caption">Approved</Typography>
+            </Box>
+          )}
+          <Box className={classes.textFieldContainer}>
+            <TextField
+              label={label}
+              variant="outlined"
+              fullWidth
+              multiline={rows > 1}
+              rows={rows}
+              value={fieldValue}
+              onChange={(e) => {
+                if (section === 'military' && field.includes('.')) {
+                  const [parent, child] = field.split('.');
+                  handleMilitaryDomainChange(child, e.target.value);
+                } else {
+                  handleInputChange(section, field, e.target.value);
+                }
+              }}
+              placeholder={placeholder}
+            />
+            {rows > 1 && (
+              <Tooltip title="Open fullscreen editor">
+                <IconButton 
+                  className={classes.expandButton}
+                  onClick={() => handleOpenTextEditor(
+                    label, 
+                    fieldValue, 
+                    section, 
+                    field,
+                    placeholder
+                  )}
+                  size="small"
+                >
+                  <FullscreenIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+          <Box className={classes.actionButtonsContainer}>
+            <Button
+              variant={isApproved ? "contained" : "outlined"}
+              size="small"
+              onClick={() => handleToggleApproval(fieldKey)}
+              className={`${classes.approveButton} ${isApproved ? classes.approveButtonApproved : ''}`}
+              startIcon={isApproved ? <DoneIcon /> : null}
+            >
+              {isApproved ? "Approved" : "Approve & Commit"}
+            </Button>
+            
+            {rows > 1 && (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  startIcon={<FullscreenIcon />}
+                  onClick={() => handleOpenTextEditor(
+                    label, 
+                    fieldValue, 
+                    section, 
+                    field,
+                    placeholder
+                  )}
+                >
+                  Open Editor
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="primary"
+                  startIcon={<AutorenewIcon />}
+                  onClick={() => handleMageAssist(section, field)}
+                >
+                  MAGE Assist
+                </Button>
+              </>
+            )}
+            
+            {isApproved && (
+              <Typography variant="caption" color="textSecondary" style={{ marginLeft: 8, display: 'flex', alignItems: 'center' }}>
+                <DoneIcon fontSize="small" style={{ color: '#4caf50', marginRight: 4 }} />
+                Content approved
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </Grid>
+    );
+  };
+  
+  // Helper to render alert level dropdown
+  const renderAlertLevelDropdown = (gridProps = { xs: 12, md: 6 }) => {
+    const fieldKey = 'military.alertLevel';
+    const isApproved = isFieldApproved(fieldKey);
+    
+    return (
+      <Grid item {...gridProps}>
+        <Box className={classes.fieldContainer}>
+          {isApproved && (
+            <Box className={classes.approvedIndicator}>
+              <DoneIcon className={classes.approvedIcon} />
+              <Typography variant="caption">Approved</Typography>
+            </Box>
+          )}
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel id="military-alert-level-label">Military Alert Level</InputLabel>
+            <Select
+              labelId="military-alert-level-label"
+              id="military-alert-level"
+              value={nationData.military.alertLevel}
+              onChange={(e) => handleInputChange('military', 'alertLevel', e.target.value)}
+              label="Military Alert Level"
+            >
+              <MenuItem value="">
+                <em>Select an alert level...</em>
+              </MenuItem>
+              {alertLevelOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box className={classes.approveButtonRow}>
+            <Button
+              variant={isApproved ? "contained" : "outlined"}
+              size="small"
+              onClick={() => handleToggleApproval(fieldKey)}
+              className={`${classes.approveButton} ${isApproved ? classes.approveButtonApproved : ''}`}
+              startIcon={isApproved ? <DoneIcon /> : null}
+            >
+              {isApproved ? "Approved" : "Approve & Commit"}
+            </Button>
+          </Box>
+        </Box>
+      </Grid>
+    );
   };
   
   // If no nation is provided, don't render anything
@@ -371,7 +1202,7 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
         className={classes.tabs}
       >
         <Tab 
-          label={<Typography variant="subtitle1">Relationships</Typography>} 
+          label={<Typography variant="subtitle1">Review Relationships</Typography>} 
           id="dime-tab-0"
           aria-controls="dime-tabpanel-0"
         />
@@ -401,12 +1232,12 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
         {/* Relationships Tab - READ ONLY VIEW */}
         <TabPanel value={tabValue} index={0} className={classes.tabPanel}>
           <Typography variant="h5" className={classes.sectionTitle}>
-            Relationships with Other Nations
+            Relationships with Other Nations/Organizations
           </Typography>
           
           <Typography variant="body2" color="textSecondary" paragraph>
             This is a summary of relationships defined in the Relationships & Theaters configuration. 
-            To modify these relationships, select the "Configure Relationships & Theaters of Conflict" button on Wargame Crafter tab.
+            To modify these relationships, select the "Configure Relationships & Theaters of Conflict" button on Manage Actors & Theaters tab.
           </Typography>
           
           {otherNations && otherNations.length > 0 ? (
@@ -545,59 +1376,35 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
               Diplomatic Posture
             </Typography>
             
+            {/* Render objectives list for Diplomacy */}
+            {renderObjectivesList('diplomacy', newDiplomacyObjective, setNewDiplomacyObjective)}
+            
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Strategic Objectives"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.diplomacy.objectives}
-                  onChange={(e) => handleInputChange('diplomacy', 'objectives', e.target.value)}
-                  placeholder="Describe the key diplomatic goals and priorities..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'diplomacy', 
+                'posture', 
+                "General Diplomatic Posture", 
+                3, 
+                "Describe the general diplomatic stance (e.g., cooperative, assertive, isolationist)...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="General Diplomatic Posture"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.diplomacy.posture}
-                  onChange={(e) => handleInputChange('diplomacy', 'posture', e.target.value)}
-                  placeholder="Describe the general diplomatic stance (e.g., cooperative, assertive, isolationist)..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'diplomacy', 
+                'keyInitiatives', 
+                "Key Diplomatic Initiatives", 
+                3, 
+                "Outline current or planned diplomatic initiatives...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Key Diplomatic Initiatives"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.diplomacy.keyInitiatives}
-                  onChange={(e) => handleInputChange('diplomacy', 'keyInitiatives', e.target.value)}
-                  placeholder="Outline current or planned diplomatic initiatives..."
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Special Considerations"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.diplomacy.specialConsiderations}
-                  onChange={(e) => handleInputChange('diplomacy', 'specialConsiderations', e.target.value)}
-                  placeholder="Any unique factors, sensitivities, or constraints that influence diplomatic behavior..."
-                  className={classes.specialConsiderationsField}
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'diplomacy', 
+                'specialConsiderations', 
+                "Special Considerations", 
+                3, 
+                "Any unique factors, sensitivities, or constraints that influence diplomatic behavior..."
+              )}
             </Grid>
           </Box>
         </TabPanel>
@@ -609,59 +1416,35 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
               Information Operations
             </Typography>
             
+            {/* Render objectives list for Information */}
+            {renderObjectivesList('information', newInformationObjective, setNewInformationObjective)}
+            
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Information Objectives"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.information.objectives}
-                  onChange={(e) => handleInputChange('information', 'objectives', e.target.value)}
-                  placeholder="Describe the key information and influence goals..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'information', 
+                'propagandaThemes', 
+                "Propaganda Themes", 
+                3, 
+                "Key narratives and messaging themes for domestic and international audiences...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Propaganda Themes"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.information.propagandaThemes}
-                  onChange={(e) => handleInputChange('information', 'propagandaThemes', e.target.value)}
-                  placeholder="Key narratives and messaging themes for domestic and international audiences..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'information', 
+                'cyberTargets', 
+                "Cyber Capabilities & Targets", 
+                3, 
+                "Describe cyber capabilities and potential targets for information operations...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Cyber Capabilities & Targets"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.information.cyberTargets}
-                  onChange={(e) => handleInputChange('information', 'cyberTargets', e.target.value)}
-                  placeholder="Describe cyber capabilities and potential targets for information operations..."
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Special Considerations"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.information.specialConsiderations}
-                  onChange={(e) => handleInputChange('information', 'specialConsiderations', e.target.value)}
-                  placeholder="Any unique factors, sensitivities, or constraints that influence information operations..."
-                  className={classes.specialConsiderationsField}
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'information', 
+                'specialConsiderations', 
+                "Special Considerations", 
+                3, 
+                "Any unique factors, sensitivities, or constraints that influence information operations..."
+              )}
             </Grid>
           </Box>
         </TabPanel>
@@ -673,43 +1456,13 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
               Military Posture
             </Typography>
             
+            {/* Render objectives list for Military */}
+            {renderObjectivesList('military', newMilitaryObjective, setNewMilitaryObjective)}
+            
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Military Objectives"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.military.objectives}
-                  onChange={(e) => handleInputChange('military', 'objectives', e.target.value)}
-                  placeholder="Describe the key military goals and priorities..."
-                />
-              </Grid>
+              {renderAlertLevelDropdown({ xs: 12, md: 6 })}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Military Alert Level"
-                  variant="outlined"
-                  fullWidth
-                  value={nationData.military.alertLevel}
-                  onChange={(e) => handleInputChange('military', 'alertLevel', e.target.value)}
-                  placeholder="Current readiness status (e.g., normal, heightened, full mobilization)..."
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Military Doctrine"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.doctrine}
-                  onChange={(e) => handleInputChange('military', 'doctrine', e.target.value)}
-                  placeholder="General approach to warfare (e.g., offensive, defensive, asymmetric)..."
-                />
-              </Grid>
+              {renderDoctrineUploadArea({ xs: 12, md: 6 })}
             </Grid>
             
             <Typography variant="subtitle1" gutterBottom style={{ marginTop: 24 }}>
@@ -717,84 +1470,58 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
             </Typography>
             
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Land Forces"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.domainPosture.land}
-                  onChange={(e) => handleMilitaryDomainChange('land', e.target.value)}
-                  placeholder="Disposition and employment of land forces..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'domainPosture.land', 
+                "Land Forces", 
+                2, 
+                "Disposition and employment of land forces...",
+                { xs: 12, md: 4 }
+              )}
               
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Naval Forces"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.domainPosture.sea}
-                  onChange={(e) => handleMilitaryDomainChange('sea', e.target.value)}
-                  placeholder="Disposition and employment of naval forces..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'domainPosture.sea', 
+                "Naval Forces", 
+                2, 
+                "Disposition and employment of naval forces...",
+                { xs: 12, md: 4 }
+              )}
               
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Air Forces"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.domainPosture.air}
-                  onChange={(e) => handleMilitaryDomainChange('air', e.target.value)}
-                  placeholder="Disposition and employment of air forces..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'domainPosture.air', 
+                "Air Forces", 
+                2, 
+                "Disposition and employment of air forces...",
+                { xs: 12, md: 4 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Cyber Capabilities"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.domainPosture.cyber}
-                  onChange={(e) => handleMilitaryDomainChange('cyber', e.target.value)}
-                  placeholder="Military cyber operations and capabilities..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'domainPosture.cyber', 
+                "Cyber Capabilities", 
+                2, 
+                "Military cyber operations and capabilities...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Space Capabilities"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.military.domainPosture.space}
-                  onChange={(e) => handleMilitaryDomainChange('space', e.target.value)}
-                  placeholder="Military space operations and capabilities..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'domainPosture.space', 
+                "Space Capabilities", 
+                2, 
+                "Military space operations and capabilities...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12}>
-                <TextField
-                  label="Special Considerations"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.military.specialConsiderations}
-                  onChange={(e) => handleInputChange('military', 'specialConsiderations', e.target.value)}
-                  placeholder="Any unique factors, sensitivities, or constraints that influence military operations..."
-                  className={classes.specialConsiderationsField}
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'military', 
+                'specialConsiderations', 
+                "Special Considerations", 
+                3, 
+                "Any unique factors, sensitivities, or constraints that influence military operations..."
+              )}
             </Grid>
           </Box>
         </TabPanel>
@@ -806,72 +1533,43 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
               Economic Posture
             </Typography>
             
+            {/* Render objectives list for Economic */}
+            {renderObjectivesList('economic', newEconomicObjective, setNewEconomicObjective)}
+            
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Economic Objectives"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.economic.objectives}
-                  onChange={(e) => handleInputChange('economic', 'objectives', e.target.value)}
-                  placeholder="Describe the key economic goals and priorities..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'economic', 
+                'tradeFocus', 
+                "Trade Focus", 
+                3, 
+                "Key trade priorities, partners, and goals...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Trade Focus"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.economic.tradeFocus}
-                  onChange={(e) => handleInputChange('economic', 'tradeFocus', e.target.value)}
-                  placeholder="Key trade priorities, partners, and goals..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'economic', 
+                'resourceDeps', 
+                "Resource Dependencies", 
+                3, 
+                "Critical resources, supply chains, and dependencies...",
+                { xs: 12, md: 6 }
+              )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Resource Dependencies"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.economic.resourceDeps}
-                  onChange={(e) => handleInputChange('economic', 'resourceDeps', e.target.value)}
-                  placeholder="Critical resources, supply chains, and dependencies..."
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'economic', 
+                'sanctionsPolicy', 
+                "Sanctions Policy", 
+                2, 
+                "Approach to economic sanctions (both imposing and responding to)..."
+              )}
               
-              <Grid item xs={12}>
-                <TextField
-                  label="Sanctions Policy"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={nationData.economic.sanctionsPolicy}
-                  onChange={(e) => handleInputChange('economic', 'sanctionsPolicy', e.target.value)}
-                  placeholder="Approach to economic sanctions (both imposing and responding to)..."
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Special Considerations"
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  rows={3}
-                  value={nationData.economic.specialConsiderations}
-                  onChange={(e) => handleInputChange('economic', 'specialConsiderations', e.target.value)}
-                  placeholder="Any unique factors, sensitivities, or constraints that influence economic policy..."
-                  className={classes.specialConsiderationsField}
-                />
-              </Grid>
+              {renderFieldWithApproval(
+                'economic', 
+                'specialConsiderations', 
+                "Special Considerations", 
+                3, 
+                "Any unique factors, sensitivities, or constraints that influence economic policy..."
+              )}
             </Grid>
           </Box>
         </TabPanel>
@@ -886,6 +1584,19 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
           Save Configuration
         </Button>
       </Box>
+      
+      {/* Add TextEditorModal */}
+      <TextEditorModal
+        open={textEditorOpen}
+        onClose={() => setTextEditorOpen(false)}
+        title={textEditorConfig.title}
+        value={textEditorConfig.value}
+        onChange={handleTextEditorSave}
+        placeholder={textEditorConfig.placeholder}
+        isApproved={textEditorConfig.fieldName ? isFieldApproved(textEditorConfig.fieldName) : false}
+        onApprove={handleToggleApproval}
+        fieldName={textEditorConfig.fieldName}
+      />
     </Paper>
   );
 }

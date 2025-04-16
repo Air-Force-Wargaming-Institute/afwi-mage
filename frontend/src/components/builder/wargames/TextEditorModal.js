@@ -14,6 +14,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import CloseIcon from '@material-ui/icons/Close';
 import EditIcon from '@material-ui/icons/Edit';
 import DoneIcon from '@material-ui/icons/Done';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
 
 const useStyles = makeStyles((theme) => ({
   dialogTitle: {
@@ -67,7 +68,19 @@ const useStyles = makeStyles((theme) => ({
     '&:hover': {
       backgroundColor: theme.palette.success.dark,
     },
-  }
+  },
+  mageAssistButton: {
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(1),
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    borderColor: theme.palette.primary.main,
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.2)',
+    },
+  },
+  mageAssistIcon: {
+    marginRight: theme.spacing(1),
+  },
 }));
 
 /**
@@ -135,6 +148,12 @@ function TextEditorModal({
     }
   };
 
+  const handleMageAssist = () => {
+    // This is a placeholder - will be connected to LLM functionality
+    console.log('MAGE Assist requested for text editor content');
+    // Future implementation could pre-populate or enhance the current text
+  };
+
   // Calculate character count and limit information
   const charCount = text.length;
   const charLimitText = maxLength ? `${charCount}/${maxLength}` : `${charCount} characters`;
@@ -172,6 +191,17 @@ function TextEditorModal({
           placeholder={placeholder}
           className={classes.fullscreenTextField}
         />
+        
+        <Button
+          variant="outlined"
+          fullWidth
+          color="primary"
+          className={classes.mageAssistButton}
+          onClick={handleMageAssist}
+          startIcon={<AutorenewIcon />}
+        >
+          MAGE Assist - Help Improve This Content
+        </Button>
         
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" mt={2} mb={1}>
           {showApprovalButton && (

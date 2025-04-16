@@ -33,8 +33,7 @@ import FullscreenIcon from '@material-ui/icons/Fullscreen';
 import DoneIcon from '@material-ui/icons/Done';
 import ExecutionChecklist from './ExecutionChecklist';
 import TextEditorModal from './TextEditorModal';
-import { KeyboardDatePicker, MuiPickersUtilsProvider } from '@material-ui/pickers';
-import DateFnsUtils from '@date-io/date-fns';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
 
 const useStyles = makeStyles((theme) => ({
   section: {
@@ -75,6 +74,7 @@ const useStyles = makeStyles((theme) => ({
     borderBottom: `2px solid ${theme.palette.primary.main}`,
     paddingBottom: theme.spacing(0.3),
     display: 'inline-block',
+    marginRight: theme.spacing(2),
   },
   inputField: {
     marginBottom: theme.spacing(2),
@@ -205,7 +205,8 @@ const useStyles = makeStyles((theme) => ({
   },
   fieldHeaderContainer: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
     marginBottom: theme.spacing(1),
   },
   approvalStatus: {
@@ -226,9 +227,16 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
   const [editedTitle, setEditedTitle] = useState('');
   const [timeHorizonNumber, setTimeHorizonNumber] = useState(1);
   const [timeHorizonUnit, setTimeHorizonUnit] = useState('months');
-  const [wargameStartDate, setWargameStartDate] = useState(
-    wargameData?.wargameStartDate ? new Date(wargameData.wargameStartDate) : null
-  );
+  const [wargameStartDate, setWargameStartDate] = useState(() => {
+    if (!wargameData?.wargameStartDate) return '';
+    try {
+      const date = new Date(wargameData.wargameStartDate);
+      return isNaN(date.getTime()) ? '' : formatDateForInput(date);
+    } catch (error) {
+      console.error("Invalid date format:", error);
+      return '';
+    }
+  });
   
   // State for text editor modal
   const [textEditorOpen, setTextEditorOpen] = useState(false);
@@ -238,6 +246,10 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
     fieldName: '', // to identify which field is being edited
     placeholder: ''
   });
+
+  // Add new state variables for the knowledge source selections
+  const [selectedVectorstore, setSelectedVectorstore] = useState(wargameData?.selectedVectorstore || '');
+  const [selectedDatabase, setSelectedDatabase] = useState(wargameData?.selectedDatabase || '');
 
   // Initialize research objectives as array if it doesn't exist
   if (!wargameData.researchObjectives || !Array.isArray(wargameData.researchObjectives)) {
@@ -269,14 +281,16 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
     }
   }, [wargameData?.timeHorizon]);
 
-  // Initialize approval status with default values if they don't exist
+  // Update the useEffect that initializes approval fields to include wargameParameters
   useEffect(() => {
     if (!wargameData.approvedFields) {
       onChange({
         ...wargameData,
         approvedFields: wargameData.approvedFields || {
           roadToWar: false,
-          // Add other fields that need approval status here
+          description: false,
+          researchObjectives: false,
+          wargameParameters: false
         }
       });
     }
@@ -437,29 +451,59 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
     });
   };
 
-  // Format date for display
+  // Update the formatDate function to display dates in the requested format
   const formatDate = (dateString) => {
     if (!dateString) return 'Not available';
     
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric'
-      });
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      // Format as "dd MMMM yyyy" (e.g., "15 January 2023")
+      return new Intl.DateTimeFormat('en-US', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric'
+      }).format(date);
     } catch (error) {
       return 'Invalid date';
     }
   };
 
-  // Add a handler for the date change
-  const handleStartDateChange = (date) => {
-    setWargameStartDate(date);
-    onChange({
-      ...wargameData,
-      wargameStartDate: date ? date.toISOString() : null
-    });
+  // Add helper function to format a date for the input
+  const formatDateForInput = (date) => {
+    if (!date) return '';
+    try {
+      // Format as YYYY-MM-DD for the date input
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return '';
+    }
+  };
+
+  // Modify the handleStartDateChange to work with a string input
+  const handleStartDateChange = (e) => {
+    const dateString = e.target.value;
+    setWargameStartDate(dateString);
+    
+    try {
+      // Convert the input string to a Date object and then to ISO string
+      const date = dateString ? new Date(dateString) : null;
+      onChange({
+        ...wargameData,
+        wargameStartDate: date && !isNaN(date.getTime()) ? date.toISOString() : null
+      });
+    } catch (error) {
+      console.error("Error handling date change:", error);
+      onChange({
+        ...wargameData,
+        wargameStartDate: null
+      });
+    }
   };
   
   // Open text editor modal for a specific field
@@ -517,6 +561,39 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
       'Define a specific research question or insight this wargame aims to address',
       { index }
     );
+  };
+
+  // Add handlers for the knowledge source selections
+  const handleVectorstoreChange = (e) => {
+    const value = e.target.value;
+    setSelectedVectorstore(value);
+    onChange({
+      ...wargameData,
+      selectedVectorstore: value
+    });
+  };
+
+  const handleDatabaseChange = (e) => {
+    const value = e.target.value;
+    setSelectedDatabase(value);
+    onChange({
+      ...wargameData,
+      selectedDatabase: value
+    });
+  };
+
+  // Add a function to handle the MAGE Assist button click
+  const handleMageAssist = () => {
+    // Placeholder for future LLM assistance functionality
+    console.log('MAGE Assist requested for Road to War content');
+    // Future implementation will connect to the system LLM
+  };
+
+  // Add a handler function for the Generate Wargame button
+  const handleGenerateWargame = () => {
+    // Placeholder for future LLM generation functionality
+    console.log('Generate Wargame requested - will use connected knowledge sources and approved content');
+    // This will eventually trigger the MAGE LLM to generate the wargame build
   };
 
   return (
@@ -614,11 +691,80 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
             </Box>
           </Box>
 
-          {/* Wargame Parameters */}
+          {/* Knowledge Sources Section */}
           <Box mt={3}>
             <Typography variant="subtitle2" className={classes.formLabel}>
-              Wargame Parameters
+              Connect to Knowledge Sources
             </Typography>
+            <Typography variant="body2" color="textSecondary" paragraph>
+              Link this wargame to knowledge sources for agent context and data retrieval.
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Select Vectorstore
+                </Typography>
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <Select
+                    value={selectedVectorstore}
+                    onChange={handleVectorstoreChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>None Selected</em>
+                    </MenuItem>
+                    <MenuItem value="vectorstore_1">World Politics Collection</MenuItem>
+                    <MenuItem value="vectorstore_2">Military Strategy Database</MenuItem>
+                    <MenuItem value="vectorstore_3">Historical Conflicts Archive</MenuItem>
+                    <MenuItem value="vectorstore_4">Global Economics Analysis</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" gutterBottom>
+                  Select Database
+                </Typography>
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <Select
+                    value={selectedDatabase}
+                    onChange={handleDatabaseChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>None Selected</em>
+                    </MenuItem>
+                    <MenuItem value="database_1">Intelligence Reports DB</MenuItem>
+                    <MenuItem value="database_2">Strategic Assets Catalog</MenuItem>
+                    <MenuItem value="database_3">Regional Capabilities Index</MenuItem>
+                    <MenuItem value="database_4">Diplomatic Relations History</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Wargame Parameters */}
+          <Box mt={3}>
+            <Box className={classes.fieldHeaderContainer}>
+              <Typography variant="subtitle2" className={classes.formLabel}>
+                Wargame Parameters
+              </Typography>
+              <Button
+                variant={wargameData.approvedFields?.wargameParameters ? "contained" : "outlined"}
+                size="small"
+                className={`${classes.approveButton} ${
+                  wargameData.approvedFields?.wargameParameters
+                    ? classes.approveButtonApproved
+                    : classes.approveButtonNotApproved
+                }`}
+                onClick={() => handleToggleApproval('wargameParameters')}
+                startIcon={wargameData.approvedFields?.wargameParameters ? <DoneIcon /> : null}
+              >
+                {wargameData.approvedFields?.wargameParameters ? "Approved" : "Approve & Commit"}
+              </Button>
+            </Box>
             
             <Grid container spacing={2} style={{ marginTop: '8px' }}>
               {/* Security Classification */}
@@ -715,21 +861,26 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
                 <Typography variant="body2" gutterBottom>
                   Wargame Start Date
                 </Typography>
-                <MuiPickersUtilsProvider utils={DateFnsUtils}>
-                  <KeyboardDatePicker
-                    inputVariant="outlined"
-                    format="dd MMMM, yyyy"
+                <Box mb={1}>
+                  <TextField
+                    id="wargame-start-date"
+                    type="date"
+                    variant="outlined"
                     size="small"
                     fullWidth
-                    id="wargame-start-date"
                     value={wargameStartDate}
                     onChange={handleStartDateChange}
-                    KeyboardButtonProps={{
-                      'aria-label': 'change date',
+                    InputLabelProps={{
+                      shrink: true,
                     }}
-                    placeholder="Select a start date"
                   />
-                </MuiPickersUtilsProvider>
+                </Box>
+                {/* Show the formatted date */}
+                {wargameData?.wargameStartDate && (
+                  <Typography variant="body2" color="textSecondary">
+                    Selected: <b>{formatDate(wargameData.wargameStartDate)}</b>
+                  </Typography>
+                )}
               </Grid>
             </Grid>
             
@@ -738,7 +889,7 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
               <Typography variant="body2" style={{ fontStyle: 'italic', fontSize: '18px', textAlign: 'center' }}>
                 MAGE will run {wargameData?.numberOfIterations || 0} permutation{wargameData?.numberOfIterations !== 1 ? 's' : ''} of the wargame, 
                 splitting {wargameData?.numberOfMoves || 0} {wargameData?.numberOfMoves !== 1 ? 'moves' : 'move'} across {wargameData?.timeHorizon || '0 days'} 
-                , with a notional start date of {wargameStartDate ? formatDate(wargameStartDate) : 'not specified'}.
+                , with a notional start date of {wargameData?.wargameStartDate ? formatDate(wargameData.wargameStartDate) : 'not specified'}.
               </Typography>
             </Box>
           </Box>
@@ -758,10 +909,74 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
         
         {/* Right Column - Research Objectives and Road to War */}
         <Grid item xs={12} md={6}>
+          {/* Generate Wargame Button */}
+          <Box 
+            mb={4} 
+            p={3} 
+            border={1} 
+            borderColor="primary.main" 
+            borderRadius={1}
+            bgcolor="rgba(66, 133, 244, 0.05)"
+            textAlign="center"
+          >
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              fullWidth
+              startIcon={<AutorenewIcon />}
+              onClick={handleGenerateWargame}
+              style={{ 
+                padding: '12px 24px',
+                fontWeight: 'bold',
+                fontSize: '1.1rem'
+              }}
+            >
+              Generate Wargame
+            </Button>
+            <Typography variant="body2" style={{ marginTop: 12, color: 'rgba(255, 255, 255, 0.7)' }}>
+              When ready, MAGE will pre-generate your wargame build utilizing the knowledge sources you've connected 
+              and the information you've approved for the description, research objectives, and the road to war. 
+              You can then review and approve the entire configuration that MAGE has built in the workflow tabs.
+            </Typography>
+            <Typography variant="body2" style={{ marginTop: 12, color: 'rgba(255, 255, 255, 0.7)' }}>
+              This includes: 
+            </Typography>
+            <ul style={{ 
+              marginTop: 8, 
+              marginLeft: 24, 
+              color: 'rgba(255, 255, 255, 0.7)',
+              textAlign: 'left',
+              paddingLeft: 16
+            }}>
+              <li>Selecting the nations and organizations that will be modeled and their relationships</li>
+              <li>Configuring the theater(s) of war</li>
+              <li>Detailed modeling of key national and/or organizational DIME postures and capabilities</li>
+            </ul>
+          </Box>
+          
           {/* Description field with TextEditorModal */}
           <Box className={classes.section}>
-            <Typography variant="subtitle2" className={classes.formLabel}>
-              Description
+            <Box className={classes.fieldHeaderContainer}>
+              <Typography variant="subtitle2" className={classes.formLabel}>
+                Description
+              </Typography>
+              <Button
+                variant={wargameData.approvedFields?.description ? "contained" : "outlined"}
+                size="small"
+                className={`${classes.approveButton} ${
+                  wargameData.approvedFields?.description
+                    ? classes.approveButtonApproved
+                    : classes.approveButtonNotApproved
+                }`}
+                onClick={() => handleToggleApproval('description')}
+                startIcon={wargameData.approvedFields?.description ? <DoneIcon /> : null}
+              >
+                {wargameData.approvedFields?.description ? "Approved" : "Approve & Commit"}
+              </Button>
+            </Box>
+            <Typography variant="body2" color="textSecondary" paragraph>
+              Enter a short description of the wargame scenario.
             </Typography>
             <Box className={classes.textFieldContainer}>
               <TextField
@@ -795,9 +1010,24 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
 
           {/* Research Objectives */}
           <Box className={classes.section}>
-            <Typography variant="h6" className={classes.formLabel}>
-              Research Objectives
-            </Typography>
+            <Box className={classes.fieldHeaderContainer}>
+              <Typography variant="h6" className={classes.formLabel}>
+                Research Objectives
+              </Typography>
+              <Button
+                variant={wargameData.approvedFields?.researchObjectives ? "contained" : "outlined"}
+                size="small"
+                className={`${classes.approveButton} ${
+                  wargameData.approvedFields?.researchObjectives
+                    ? classes.approveButtonApproved
+                    : classes.approveButtonNotApproved
+                }`}
+                onClick={() => handleToggleApproval('researchObjectives')}
+                startIcon={wargameData.approvedFields?.researchObjectives ? <DoneIcon /> : null}
+              >
+                {wargameData.approvedFields?.researchObjectives ? "Approved" : "Approve & Commit"}
+              </Button>
+            </Box>
             <Typography variant="body2" color="textSecondary" paragraph>
               Define the primary questions and insights this wargame simulation aims to address.
             </Typography>
@@ -875,6 +1105,19 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
               <Typography variant="h6" className={classes.formLabel}>
                 Road to War
               </Typography>
+              <Button
+                variant={wargameData.approvedFields?.roadToWar ? "contained" : "outlined"}
+                size="small"
+                className={`${classes.approveButton} ${
+                  wargameData.approvedFields?.roadToWar 
+                    ? classes.approveButtonApproved 
+                    : classes.approveButtonNotApproved
+                }`}
+                onClick={() => handleToggleApproval('roadToWar')}
+                startIcon={wargameData.approvedFields?.roadToWar ? <DoneIcon /> : null}
+              >
+                {wargameData.approvedFields?.roadToWar ? "Approved" : "Approve & Commit"}
+              </Button>
             </Box>
             <Typography variant="body2" color="textSecondary" paragraph>
               Describe the narrative context and geopolitical situation leading up to the scenario.
@@ -886,7 +1129,7 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
                 multiline
                 rows={10}
                 fullWidth
-                placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation..."
+                placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation... Use the MAGE Assist to get help in crafting a detailed and comprehensive road to war narrative. This section will be crucial to the build of a valuable wargame research effort."
                 value={wargameData?.roadToWar || ''}
                 onChange={(e) => handleRoadToWarChange(e.target.value)}
                 className={classes.inputField}
@@ -906,39 +1149,36 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
                 </IconButton>
               </Tooltip>
             </Box>
-            <Box display="flex" flexDirection="column">
-              <Box display="flex" alignItems="center">
-                <Button
-                  variant={wargameData.approvedFields?.roadToWar ? "contained" : "outlined"}
-                  size="small"
-                  className={`${classes.approveButton} ${
-                    wargameData.approvedFields?.roadToWar 
-                      ? classes.approveButtonApproved 
-                      : classes.approveButtonNotApproved
-                  }`}
-                  onClick={() => handleToggleApproval('roadToWar')}
-                  startIcon={wargameData.approvedFields?.roadToWar ? <DoneIcon /> : null}
-                >
-                  {wargameData.approvedFields?.roadToWar ? "Approved" : "Approve & Commit"}
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="secondary"
-                  style={{ marginLeft: 8 }}
-                  startIcon={<FullscreenIcon />}
-                  onClick={() => openTextEditor(
-                    'Road to War', 
-                    wargameData?.roadToWar || '', 
-                    'roadToWar',
-                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
-                  )}
-                >
-                  Open Editor
-                </Button>
-              </Box>
+            
+            {/* Keep the editor and assist buttons, but remove the approval button */}
+            <Box display="flex" flexDirection="row" alignItems="center" mt={2}>
+              <Button
+                variant="outlined"
+                size="small"
+                color="secondary"
+                startIcon={<FullscreenIcon />}
+                onClick={() => openTextEditor(
+                  'Road to War', 
+                  wargameData?.roadToWar || '', 
+                  'roadToWar',
+                  'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                )}
+              >
+                Open Editor
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                color="primary"
+                style={{ marginLeft: 8 }}
+                startIcon={<AutorenewIcon />}
+                onClick={handleMageAssist}
+              >
+                MAGE Assist
+              </Button>
               {wargameData.approvedFields?.roadToWar && (
-                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                <Typography variant="caption" color="textSecondary" style={{ marginLeft: 8, display: 'flex', alignItems: 'center' }}>
+                  <DoneIcon fontSize="small" style={{ color: '#4caf50', marginRight: 4 }} />
                   Content approved for execution
                 </Typography>
               )}
