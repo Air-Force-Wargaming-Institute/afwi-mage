@@ -6,20 +6,14 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Button,
   Tooltip,
   Chip,
   Fade
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import AddIcon from '@material-ui/icons/Add';
-import DeleteIcon from '@material-ui/icons/Delete';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import ErrorIcon from '@material-ui/icons/Error';
 import NewReleasesIcon from '@material-ui/icons/NewReleases';
-import SettingsIcon from '@material-ui/icons/Settings';
 import FlagIcon from './FlagIcon';
 
 const useStyles = makeStyles((theme) => ({
@@ -54,10 +48,21 @@ const useStyles = makeStyles((theme) => ({
   listItem: {
     borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
     transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    },
   },
   recentlyAddedItem: {
     backgroundColor: 'rgba(66, 133, 244, 0.15)',
     borderLeft: `4px solid ${theme.palette.primary.main}`,
+  },
+  selectedItem: {
+    backgroundColor: 'rgba(66, 133, 244, 0.2)',
+    borderLeft: `4px solid ${theme.palette.primary.main}`,
+    '&:hover': {
+      backgroundColor: 'rgba(66, 133, 244, 0.25)',
+    },
   },
   configuredChip: {
     marginRight: theme.spacing(1),
@@ -118,26 +123,14 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.shape.borderRadius,
     backgroundColor: 'rgba(66, 133, 244, 0.1)',
     border: '1px dashed rgba(66, 133, 244, 0.5)',
-  },
-  actionButtons: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1)
-  },
-  configureButton: {
-    minWidth: 'auto',
-    padding: theme.spacing(0.5, 1.5),
-    fontSize: '0.75rem',
-    marginRight: theme.spacing(1)
   }
 }));
 
 function NationConfigPane({ 
   nations = [], 
   onConfigureNation, 
-  onRemoveNation, 
-  onAddOrganization,
-  recentlyAddedId
+  recentlyAddedId,
+  selectedNationId = null
 }) {
   const classes = useStyles();
   const unconfiguredCount = nations.filter(nation => !nation.isConfigured).length;
@@ -165,7 +158,10 @@ function NationConfigPane({
               {nations.map((entity) => (
                 <ListItem 
                   key={entity.entityId} 
-                  className={`${classes.listItem} ${entity.entityId === recentlyAddedId ? classes.recentlyAddedItem : ''}`}
+                  className={`${classes.listItem} 
+                             ${entity.entityId === recentlyAddedId ? classes.recentlyAddedItem : ''} 
+                             ${entity.entityId === selectedNationId ? classes.selectedItem : ''}`}
+                  onClick={() => onConfigureNation(entity)}
                 >
                   <Box mr={2}>
                     <FlagIcon entityId={entity.entityId} entityType={entity.entityType} />
@@ -205,28 +201,6 @@ function NationConfigPane({
                       </Box>
                     }
                   />
-                  <ListItemSecondaryAction className={classes.actionButtons}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color={entity.entityId === recentlyAddedId ? "primary" : "default"}
-                      startIcon={<SettingsIcon />}
-                      onClick={() => onConfigureNation(entity)}
-                      className={classes.configureButton}
-                    >
-                      Configure
-                    </Button>
-                    <Tooltip title="Remove entity">
-                      <IconButton 
-                        edge="end" 
-                        aria-label="delete" 
-                        onClick={() => onRemoveNation(entity.entityId)}
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </ListItemSecondaryAction>
                 </ListItem>
               ))}
             </List>
@@ -240,7 +214,7 @@ function NationConfigPane({
                       : `${unconfiguredCount} entities need configuration`}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
-                    Configure each entity to define its strategic posture & disposition
+                    Select an entity to configure its strategic posture & disposition
                   </Typography>
                 </Box>
               </Fade>
@@ -252,21 +226,11 @@ function NationConfigPane({
               No nations or organizations added yet
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Select countries from the map or add organizations manually
+              Select countries from the map or add custom entities using the "Manage Custom Nations/Organizations" button
             </Typography>
           </Box>
         )}
       </Paper>
-      
-      <Button 
-        variant="contained" 
-        color="primary" 
-        startIcon={<AddIcon />} 
-        className={classes.addEntityButton}
-        onClick={onAddOrganization}
-      >
-        Add Organization
-      </Button>
     </Box>
   );
 }

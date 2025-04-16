@@ -558,7 +558,7 @@ function TheaterCard({
               {isEditing ? (
                 <TextField
                   className={classes.theaterDescription}
-                  label="Theater Description (Optional)"
+                  label="Theater Description (Rec)"
                   multiline
                   rows={2}
                   value={theaterDescription}

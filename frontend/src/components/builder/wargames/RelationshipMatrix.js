@@ -37,6 +37,7 @@ const useStyles = makeStyles((theme) => ({
   },
   progressContainer: {
     marginBottom: theme.spacing(2),
+    flexShrink: 0,
   },
   progressLabel: {
     display: 'flex',
@@ -50,8 +51,10 @@ const useStyles = makeStyles((theme) => ({
   },
   relationshipsList: {
     flexGrow: 1,
-    overflow: 'auto',
+    overflowY: 'auto',
     marginBottom: theme.spacing(2),
+    display: 'flex',
+    flexDirection: 'column',
   },
   relationshipItem: {
     padding: theme.spacing(2),
@@ -373,7 +376,31 @@ function RelationshipMatrix({
     const definedPairs = pairs.filter(pair => relationships[pair.key]?.type).length;
     
     setCompletionPercentage(totalPairs > 0 ? Math.round((definedPairs / totalPairs) * 100) : 0);
-  }, [nations, relationships]);
+    
+    // Clear selectedCell if one of its nations has been removed
+    if (selectedCell) {
+      const nation1Exists = nations.some(n => n.entityId === selectedCell.nation1.entityId);
+      const nation2Exists = nations.some(n => n.entityId === selectedCell.nation2.entityId);
+      
+      if (!nation1Exists || !nation2Exists) {
+        setSelectedCell(null);
+        setCurrentNotes('');
+        if (notesDialogOpen) {
+          setNotesDialogOpen(false);
+        }
+      }
+    }
+    
+    // Clear expandedNotes if one of its nations has been removed
+    if (expandedNotes) {
+      const nation1Exists = nations.some(n => n.entityId === expandedNotes.nation1.entityId);
+      const nation2Exists = nations.some(n => n.entityId === expandedNotes.nation2.entityId);
+      
+      if (!nation1Exists || !nation2Exists) {
+        setExpandedNotes(null);
+      }
+    }
+  }, [nations, relationships, selectedCell, notesDialogOpen, expandedNotes]);
   
   // Handler for setting relationship type
   const handleSetRelationship = (pairKey, relationType) => {
@@ -537,15 +564,6 @@ function RelationshipMatrix({
                   <Typography variant="body1">{pair.nation2.entityName}</Typography>
                 </Box>
                 
-                {relationType ? (
-                  <Box className={classes.relationshipStatus}>
-                    <Typography className={`${classes.relationshipLabel} ${getRelationshipLabelClass(relationType)}`}>
-                      <CheckCircleIcon className={classes.relationshipIcon} />
-                      {getRelationshipTypeLabel(relationType)}
-                    </Typography>
-                  </Box>
-                ) : null}
-                
                 <ButtonGroup variant="outlined" size="small" className={classes.buttonGroup}>
                   <Button
                     className={`${classes.relationshipButton} ${classes.allyButton} ${relationType === 'ally' ? 'selected' : ''}`}
@@ -634,7 +652,7 @@ function RelationshipMatrix({
         )}
       </Paper>
       
-      <Box display="flex" alignItems="center" justifyContent="space-between">
+      <Box display="flex" alignItems="center" justifyContent="space-between" flexShrink={0}>
         <Typography variant="body2" color="textSecondary">
           <b>{pairsToDefine.length}</b> relationships to define
         </Typography>

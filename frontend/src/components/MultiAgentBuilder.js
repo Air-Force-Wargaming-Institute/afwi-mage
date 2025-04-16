@@ -83,14 +83,6 @@ function MultiAgentBuilder() {
       component: AgentTeams
     },
     {
-      type: 'item',
-      id: 'wargame-builder',
-      label: 'Build a Wargame',
-      path: '/multi-agent/team-chat/builder/wargames',
-      icon: <PublicIcon />,
-      component: WargamesListPage
-    },
-    {
       type: 'divider',
       id: 'dev-divider'
     },

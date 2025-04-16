@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, GeoJSON, useMap, ZoomControl, LayerGroup, Polygon, Tooltip, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, useMap, ZoomControl, LayerGroup, Polygon, Tooltip, CircleMarker, Marker, useMapEvents } from 'react-leaflet';
 import { makeStyles } from '@material-ui/core/styles';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Box, CircularProgress, Typography, Snackbar } from '@material-ui/core';
+import { Box, CircularProgress, Typography, Snackbar, Paper, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
+import ZoomInIcon from '@material-ui/icons/ZoomIn';
+import ZoomOutIcon from '@material-ui/icons/ZoomOut';
+import HomeIcon from '@material-ui/icons/Home';
+import InfoIcon from '@material-ui/icons/Info';
+import CloseIcon from '@material-ui/icons/Close';
+import WarningIcon from '@material-ui/icons/Warning';
 
 // Import GeoJSON data from JavaScript wrapper instead of direct import
 import { loadCountriesGeoJSON, loadFallbackGeoJSON, countriesGeoJSON, fallbackGeoJSON } from '../../../assets/maps/countriesData';
@@ -461,7 +467,8 @@ function WargameMap({
   selectedNations = [], 
   onSelectNation, 
   onSelectOrganization,
-  conflictTheaters = []  // Add new prop for conflict theaters
+  onRemoveNation,
+  conflictTheaters = []
 }) {
   const classes = useStyles();
   const [worldGeoJSON, setWorldGeoJSON] = useState(null);
@@ -469,6 +476,11 @@ function WargameMap({
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState('');
   const [notification, setNotification] = useState(null);
+  const [removalDialog, setRemovalDialog] = useState({
+    open: false,
+    entityId: null,
+    entityName: null
+  });
   const mapContainerRef = useRef(null);
   const mapInitialized = useRef(false);
   const geoJsonLayerRef = useRef(null);
@@ -510,6 +522,116 @@ function WargameMap({
     return null;
   }, [conflictTheaters]);
   
+  // Helper function to reapply styles to all selected nations
+  const reapplySelectedNationsStyles = useCallback(() => {
+    if (!geoJsonLayerRef.current) return;
+    
+    try {
+      // Get all layers from the GeoJSON layer
+      const layers = geoJsonLayerRef.current.getLayers();
+      
+      layers.forEach(layer => {
+        if (!layer || !layer.feature || !layer.feature.properties) return;
+        
+        const props = layer.feature.properties;
+        const iso2 = props.ISO_A2 || props.iso_a2 || props.ISO2;
+        const iso3 = props.ISO_A3 || props.iso_a3 || props.ISO3 || props.ADM0_A3;
+        
+        const isSelected = selectedNations.includes(iso2) || selectedNations.includes(iso3);
+        
+        if (isSelected) {
+          // Get theater info if applicable
+          const nationId = iso2 || iso3;
+          const theaterInfo = getTheaterInfo(nationId);
+          
+          if (theaterInfo) {
+            // Country is part of a theater
+            const { side, isLead } = theaterInfo;
+            const colorCode = side.colorCode || '#4285f4';
+            
+            layer.setStyle({
+              fillColor: colorCode,
+              weight: isLead ? 3 : 2,
+              opacity: 1,
+              color: isLead ? '#FFFFFF' : colorCode,
+              dashArray: isLead ? '' : '1',
+              fillOpacity: isLead ? 0.6 : 0.4
+            });
+          } else {
+            // Default styling for selected nations not in theaters
+            layer.setStyle({
+              fillColor: '#4285f4',
+              weight: 2,
+              opacity: 1,
+              color: '#4285f4',
+              dashArray: '',
+              fillOpacity: 0.6
+            });
+          }
+          
+          // Bring selected countries to front
+          if (layer.bringToFront) {
+            layer.bringToFront();
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error reapplying styles to selected nations:", error);
+    }
+  }, [selectedNations, getTheaterInfo]);
+  
+  // Ensure styles are consistently applied whenever selectedNations changes
+  useEffect(() => {
+    if (selectedNations.length > 0) {
+      // Add a small delay to ensure map and layers are initialized
+      const timer = setTimeout(() => {
+        reapplySelectedNationsStyles();
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedNations, reapplySelectedNationsStyles]);
+
+  // Make sure styles are applied after the map is fully loaded and GeoJSON layer is ready
+  useEffect(() => {
+    if (worldGeoJSON && mapInitialized.current && geoJsonLayerRef.current && selectedNations.length > 0) {
+      // Apply styles after the GeoJSON layer is fully rendered
+      const timer = setTimeout(() => {
+        reapplySelectedNationsStyles();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [worldGeoJSON, reapplySelectedNationsStyles, selectedNations.length]);
+
+  // Add map event listeners to maintain styling during interaction
+  useEffect(() => {
+    // Only add listeners if map is initialized
+    if (mapRef.current && selectedNations.length > 0) {
+      const map = mapRef.current;
+      
+      // Function to reapply styles after map interactions
+      const handleMapInteraction = () => {
+        // Small delay to ensure the map rendering is complete
+        setTimeout(() => {
+          reapplySelectedNationsStyles();
+        }, 100);
+      };
+      
+      // Add listeners for map events that could affect styling
+      map.on('zoomend', handleMapInteraction);
+      map.on('moveend', handleMapInteraction);
+      map.on('layeradd', handleMapInteraction);
+      
+      // Clean up listeners when component unmounts or selectedNations changes
+      return () => {
+        map.off('zoomend', handleMapInteraction);
+        map.off('moveend', handleMapInteraction);
+        map.off('layeradd', handleMapInteraction);
+      };
+    }
+  }, [mapRef, selectedNations, reapplySelectedNationsStyles]);
+
   // Initialize country centers for selected nations
   useEffect(() => {
     // Set known country centers first
@@ -718,11 +840,48 @@ function WargameMap({
       mouseout: (e) => {
         const layer = e.target;
         const isSelected = iso2 && (selectedNations.includes(iso2) || (iso3 && selectedNations.includes(iso3)));
-        layer.setStyle({
-          weight: isSelected ? 2 : 1,
-          color: isSelected ? '#4285f4' : '#666666',
-          fillOpacity: isSelected ? 0.6 : 0.2
-        });
+        
+        // Instead of directly setting style, use the same logic as our reapplySelectedNationsStyles function
+        if (isSelected) {
+          // Get theater info if applicable
+          const nationId = iso2 || iso3;
+          const theaterInfo = getTheaterInfo(nationId);
+          
+          if (theaterInfo) {
+            // Country is part of a theater
+            const { side, isLead } = theaterInfo;
+            const colorCode = side.colorCode || '#4285f4';
+            
+            layer.setStyle({
+              fillColor: colorCode,
+              weight: isLead ? 3 : 2,
+              opacity: 1,
+              color: isLead ? '#FFFFFF' : colorCode,
+              dashArray: isLead ? '' : '1',
+              fillOpacity: isLead ? 0.6 : 0.4
+            });
+          } else {
+            // Default styling for selected nations
+            layer.setStyle({
+              fillColor: '#4285f4',
+              weight: 2,
+              opacity: 1,
+              color: '#4285f4',
+              dashArray: '',
+              fillOpacity: 0.6
+            });
+          }
+        } else {
+          // Non-selected nation styling
+          layer.setStyle({
+            fillColor: '#333333',
+            weight: 1,
+            opacity: 1,
+            color: '#666666',
+            dashArray: '1',
+            fillOpacity: 0.2
+          });
+        }
       },
       click: () => {
         // Only call onSelectNation if we have both a name and an iso2 code
@@ -731,28 +890,33 @@ function WargameMap({
           const countryCode = iso2 || (countryNameToCodeMapping[name] || name);
           
           if (selectedNations.includes(countryCode) || selectedNations.includes(iso3)) {
-            // Country is already selected, show notification
-            setNotification({
-              message: `${displayName} is already activated`,
-              severity: 'info'
+            // Show confirmation dialog
+            setRemovalDialog({
+              open: true,
+              entityId: countryCode,
+              entityName: name
             });
-            return;
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Selected country: ${name} (${countryCode})`);
+            }
+            
+            // Call the selection handler with the country code and name
+            if (onSelectNation) {
+              onSelectNation(countryCode, name);
+              
+              // Schedule a reapply of styles after selection is processed
+              setTimeout(() => {
+                reapplySelectedNationsStyles();
+              }, 100);
+            }
+            
+            // Show notification
+            setNotification({
+              message: `${name} activated successfully`,
+              severity: 'success'
+            });
           }
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`Selected country: ${name} (${countryCode})`);
-          }
-          
-          // Call the selection handler with the country code and name
-          if (onSelectNation) {
-            onSelectNation(countryCode, displayName);
-          }
-          
-          // Show notification
-          setNotification({
-            message: `${displayName} activated successfully`,
-            severity: 'success'
-          });
         } else {
           console.error("Unable to select country: missing name", feature.properties);
           setNotification({
@@ -936,6 +1100,28 @@ function WargameMap({
   // Handle notification close
   const handleCloseNotification = () => {
     setNotification(null);
+  };
+  
+  // Handle confirmation of nation removal
+  const handleConfirmRemoval = () => {
+    if (removalDialog.entityId && onRemoveNation) {
+      onRemoveNation(removalDialog.entityId);
+      setNotification({
+        message: `${removalDialog.entityName} has been removed from your wargame`,
+        severity: 'info'
+      });
+      
+      // Ensure styles are reapplied after a nation is removed
+      setTimeout(() => {
+        reapplySelectedNationsStyles();
+      }, 200);
+    }
+    setRemovalDialog({ open: false, entityId: null, entityName: null });
+  };
+  
+  // Handle cancellation of nation removal
+  const handleCancelRemoval = () => {
+    setRemovalDialog({ open: false, entityId: null, entityName: null });
   };
   
   // Ensure GeoJSON is refreshed only when selections change
@@ -1274,6 +1460,42 @@ function WargameMap({
           border-color: transparent;
         }
       `}</style>
+
+      {/* Add confirmation dialog */}
+      <Dialog
+        open={removalDialog.open}
+        onClose={handleCancelRemoval}
+        aria-labelledby="removal-dialog-title"
+      >
+        <DialogTitle id="removal-dialog-title" disableTypography>
+          <Box display="flex" alignItems="center">
+            <WarningIcon color="error" style={{ marginRight: 8 }} />
+            <Typography variant="h6">Remove {removalDialog.entityName}?</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Removing <b>{removalDialog.entityName}</b> will delete all of its configuration data, including:
+          </Typography>
+          <Box component="ul" mt={1} ml={2}>
+            <Typography component="li">DIME framework configuration (Diplomacy, Information, Military, Economic)</Typography>
+            <Typography component="li">All relationships with other nations and organizations</Typography>
+            <Typography component="li">Theater assignments and conflict roles</Typography>
+            <Typography component="li">Strategic objectives and posture settings</Typography>
+          </Box>
+          <Typography variant="body1" mt={2} style={{ marginTop: 16 }} color="error">
+            <b>This action cannot be undone.</b> Are you sure you want to remove {removalDialog.entityName} from the wargame?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelRemoval} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmRemoval} color="secondary" variant="contained">
+            Remove Nation
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

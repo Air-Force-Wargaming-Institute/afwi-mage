@@ -37,6 +37,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import agentTeamIcon from '../assets/agent-team.png';
 import BarChartIcon from '@material-ui/icons/BarChart';
 import PaletteIcon from '@material-ui/icons/Palette';
+import PublicIcon from '@material-ui/icons/Public';
 
 // Styled components using Material-UI's styled API
 const HeaderRoot = styled('header')(({ theme }) => ({
@@ -258,6 +259,8 @@ function HeaderStyled() {
   useEffect(() => {
     if (location.pathname === '/home') {
       setActiveTab('home');
+    } else if (location.pathname.startsWith('/wargame-builder')) {
+      setActiveTab('wargame-builder');
     } else if (location.pathname.startsWith('/multi-agent')) {
       setActiveTab('multi-agent');
     } else if (location.pathname.startsWith('/fine-tuning')) {
@@ -331,6 +334,17 @@ function HeaderStyled() {
                 >
                   <Box component="span" className="link-content">
                     <HomeIcon /> Home
+                  </Box>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/wargame-builder" 
+                  className={`${classes.navLink} ${activeTab === 'wargame-builder' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('wargame-builder')}
+                >
+                  <Box component="span" className="link-content">
+                    <PublicIcon /> Build a Wargame
                   </Box>
                 </Link>
               </li>

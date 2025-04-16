@@ -109,7 +109,8 @@ const useStyles = makeStyles((theme) => ({
   titleEditContainer: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: theme.spacing(3),
+    marginBottom: theme.spacing(1.5),
+    marginTop: theme.spacing(0.5),
   },
   titleEdit: {
     marginRight: theme.spacing(1),
@@ -117,6 +118,10 @@ const useStyles = makeStyles((theme) => ({
   editIcon: {
     marginLeft: theme.spacing(1),
     cursor: 'pointer',
+  },
+  compactTitle: {
+    fontSize: '2rem',
+    lineHeight: 1.2,
   },
   metadataContainer: {
     marginBottom: theme.spacing(3),
@@ -214,7 +219,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function ScenarioTab({ wargameData, onChange }) {
+function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, moveRoadToWarToRight = false }) {
   const classes = useStyles();
   const [newObjective, setNewObjective] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -528,31 +533,39 @@ function ScenarioTab({ wargameData, onChange }) {
               className={classes.titleEdit}
               placeholder="Enter scenario name"
               autoFocus
+              inputProps={{
+                style: { 
+                  fontSize: '1.25rem',
+                  padding: '6px 10px'
+                }
+              }}
             />
             <IconButton size="small" onClick={saveTitle} color="primary">
-              <CheckIcon />
+              <CheckIcon fontSize="small" />
             </IconButton>
             <IconButton size="small" onClick={cancelEditTitle}>
-              <CloseIcon />
+              <CloseIcon fontSize="small" />
             </IconButton>
           </>
         ) : (
           <>
-            <GradientText variant="h4" component="h1">
+            <GradientText variant="h5" component="h1" className={classes.compactTitle}>
               {wargameData?.name || 'Untitled Scenario'}
             </GradientText>
             <Tooltip title="Edit scenario name">
               <IconButton size="small" className={classes.editIcon} onClick={startEditingTitle}>
-                <EditIcon />
+                <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </>
         )}
       </Box>
 
-      {/* Main header section with designer and execution readiness */}
-      <Grid container spacing={3} className={classes.headerSection}>
+      {/* Main content in two-column layout */}
+      <Grid container spacing={3} style={{ marginTop: '4px' }}>
+        {/* Left Column - Basic Configuration */}
         <Grid item xs={12} md={6}>
+          {/* Designer Field */}
           <Typography variant="subtitle2" className={classes.formLabel}>
             Wargame Designer
           </Typography>
@@ -566,42 +579,7 @@ function ScenarioTab({ wargameData, onChange }) {
             onChange={handleDesignerChange}
           />
           
-          {/* Description field with TextEditorModal */}
-          <Box mt={2}>
-            <Typography variant="subtitle2" className={classes.formLabel}>
-              Description
-            </Typography>
-            <Box className={classes.textFieldContainer}>
-              <TextField
-                id="wargame-description"
-                variant="outlined"
-                size="small"
-                fullWidth
-                multiline
-                rows={2}
-                placeholder="Enter a short description of the wargame scenario"
-                value={wargameData?.description || ''}
-                onChange={(e) => handleDescriptionChange(e)}
-                className={classes.inputField}
-              />
-              <Tooltip title="Open fullscreen editor">
-                <IconButton 
-                  className={classes.expandButton}
-                  onClick={() => openTextEditor(
-                    'Wargame Description', 
-                    wargameData?.description || '', 
-                    'description',
-                    'Enter a short description of the wargame scenario'
-                  )}
-                  size="small"
-                >
-                  <FullscreenIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Box>
-          
-          {/* Timeline Information - moved here and made horizontal */}
+          {/* Timeline Information */}
           <Box mt={2}>
             <Typography variant="subtitle2" className={classes.formLabel}>
               Timeline Information
@@ -636,7 +614,7 @@ function ScenarioTab({ wargameData, onChange }) {
             </Box>
           </Box>
 
-          {/* Wargame Parameters moved here */}
+          {/* Wargame Parameters */}
           <Box mt={3}>
             <Typography variant="subtitle2" className={classes.formLabel}>
               Wargame Parameters
@@ -732,7 +710,7 @@ function ScenarioTab({ wargameData, onChange }) {
                 </Box>
               </Grid>
               
-              {/* Wargame Start Date - NEW */}
+              {/* Wargame Start Date */}
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" gutterBottom>
                   Wargame Start Date
@@ -764,56 +742,48 @@ function ScenarioTab({ wargameData, onChange }) {
               </Typography>
             </Box>
           </Box>
+          
+          {/* Execution Readiness Checklist */}
+          {showExecutionChecklist && (
+            <Box mt={4}>
+              <Typography variant="subtitle2" className={classes.formLabel}>
+                Wargame Execution Readiness
+              </Typography>
+              <Box className={classes.executionChecklistContainer}>
+                <ExecutionChecklist wargameData={wargameData} />
+              </Box>
+            </Box>
+          )}
         </Grid>
         
-        {/* Execution Readiness Checklist */}
+        {/* Right Column - Research Objectives and Road to War */}
         <Grid item xs={12} md={6}>
-          <Typography variant="subtitle2" className={classes.formLabel}>
-            Wargame Execution Readiness
-          </Typography>
-          <Box className={classes.executionChecklistContainer}>
-            <ExecutionChecklist wargameData={wargameData} />
-          </Box>
-        </Grid>
-      </Grid>
-
-      <Divider style={{ marginTop: '16px', marginBottom: '32px' }} />
-
-      <GradientText variant="h5" component="h2" className={classes.sectionTitle}>
-        Scenario Setup & Research Objectives
-      </GradientText>
-
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={6}>
+          {/* Description field with TextEditorModal */}
           <Box className={classes.section}>
-            <Box className={classes.fieldHeaderContainer}>
-              <Typography variant="h6" className={classes.formLabel}>
-                Road to War
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="textSecondary" paragraph>
-              Describe the narrative context and geopolitical situation leading up to the scenario.
+            <Typography variant="subtitle2" className={classes.formLabel}>
+              Description
             </Typography>
             <Box className={classes.textFieldContainer}>
               <TextField
-                id="road-to-war"
+                id="wargame-description"
                 variant="outlined"
-                multiline
-                rows={6}
+                size="small"
                 fullWidth
-                placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation..."
-                value={wargameData?.roadToWar || ''}
-                onChange={(e) => handleRoadToWarChange(e.target.value)}
+                multiline
+                rows={2}
+                placeholder="Enter a short description of the wargame scenario"
+                value={wargameData?.description || ''}
+                onChange={(e) => handleDescriptionChange(e)}
                 className={classes.inputField}
               />
               <Tooltip title="Open fullscreen editor">
                 <IconButton 
                   className={classes.expandButton}
                   onClick={() => openTextEditor(
-                    'Road to War', 
-                    wargameData?.roadToWar || '', 
-                    'roadToWar',
-                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                    'Wargame Description', 
+                    wargameData?.description || '', 
+                    'description',
+                    'Enter a short description of the wargame scenario'
                   )}
                   size="small"
                 >
@@ -821,47 +791,9 @@ function ScenarioTab({ wargameData, onChange }) {
                 </IconButton>
               </Tooltip>
             </Box>
-            <Box display="flex" flexDirection="column">
-              <Box display="flex" alignItems="center">
-                <Button
-                  variant={wargameData.approvedFields?.roadToWar ? "contained" : "outlined"}
-                  size="small"
-                  className={`${classes.approveButton} ${
-                    wargameData.approvedFields?.roadToWar 
-                      ? classes.approveButtonApproved 
-                      : classes.approveButtonNotApproved
-                  }`}
-                  onClick={() => handleToggleApproval('roadToWar')}
-                  startIcon={wargameData.approvedFields?.roadToWar ? <DoneIcon /> : null}
-                >
-                  {wargameData.approvedFields?.roadToWar ? "Approved" : "Approve & Commit"}
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="secondary"
-                  style={{ marginLeft: 8 }}
-                  startIcon={<FullscreenIcon />}
-                  onClick={() => openTextEditor(
-                    'Road to War', 
-                    wargameData?.roadToWar || '', 
-                    'roadToWar',
-                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
-                  )}
-                >
-                  Open Editor
-                </Button>
-              </Box>
-              {wargameData.approvedFields?.roadToWar && (
-                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-                  Content approved for execution
-                </Typography>
-              )}
-            </Box>
           </Box>
-        </Grid>
 
-        <Grid item xs={12} md={6}>
+          {/* Research Objectives */}
           <Box className={classes.section}>
             <Typography variant="h6" className={classes.formLabel}>
               Research Objectives
@@ -936,57 +868,84 @@ function ScenarioTab({ wargameData, onChange }) {
               </Grid>
             </Grid>
           </Box>
+          
+          {/* Road to War */}
+          <Box className={classes.section} mt={4}>
+            <Box className={classes.fieldHeaderContainer}>
+              <Typography variant="h6" className={classes.formLabel}>
+                Road to War
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="textSecondary" paragraph>
+              Describe the narrative context and geopolitical situation leading up to the scenario.
+            </Typography>
+            <Box className={classes.textFieldContainer}>
+              <TextField
+                id="road-to-war"
+                variant="outlined"
+                multiline
+                rows={10}
+                fullWidth
+                placeholder="E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation..."
+                value={wargameData?.roadToWar || ''}
+                onChange={(e) => handleRoadToWarChange(e.target.value)}
+                className={classes.inputField}
+              />
+              <Tooltip title="Open fullscreen editor">
+                <IconButton 
+                  className={classes.expandButton}
+                  onClick={() => openTextEditor(
+                    'Road to War', 
+                    wargameData?.roadToWar || '', 
+                    'roadToWar',
+                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                  )}
+                  size="small"
+                >
+                  <FullscreenIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Box display="flex" flexDirection="column">
+              <Box display="flex" alignItems="center">
+                <Button
+                  variant={wargameData.approvedFields?.roadToWar ? "contained" : "outlined"}
+                  size="small"
+                  className={`${classes.approveButton} ${
+                    wargameData.approvedFields?.roadToWar 
+                      ? classes.approveButtonApproved 
+                      : classes.approveButtonNotApproved
+                  }`}
+                  onClick={() => handleToggleApproval('roadToWar')}
+                  startIcon={wargameData.approvedFields?.roadToWar ? <DoneIcon /> : null}
+                >
+                  {wargameData.approvedFields?.roadToWar ? "Approved" : "Approve & Commit"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  style={{ marginLeft: 8 }}
+                  startIcon={<FullscreenIcon />}
+                  onClick={() => openTextEditor(
+                    'Road to War', 
+                    wargameData?.roadToWar || '', 
+                    'roadToWar',
+                    'E.g., Describe the events, tensions, and key factors that led to the current geopolitical situation...'
+                  )}
+                >
+                  Open Editor
+                </Button>
+              </Box>
+              {wargameData.approvedFields?.roadToWar && (
+                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                  Content approved for execution
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Grid>
       </Grid>
-      
-      <Divider />
-      
-      <Box className={classes.simulationSection}>
-        <GradientText variant="h5" component="h2">
-          Wargame Analysis & Reports
-        </GradientText>
-        
-        <Grid container spacing={3} style={{ marginTop: '16px' }}>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>Reports</Typography>
-            <Paper className={classes.reportsPaper} elevation={2}>
-              <Box textAlign="center" display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="100%">
-                <Typography 
-                  variant="body1" 
-                  className={classes.reportsIcon}
-                >
-                  📄
-                </Typography>
-                <Typography variant="h6" gutterBottom>
-                  No Simulation Reports Available
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Detailed reports will appear here after wargames complete.
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>Dashboard</Typography>
-            <Paper className={classes.dashboardPaper} elevation={2}>
-              <Typography 
-                variant="body1" 
-                className={classes.reportsIcon}
-              >
-                📊
-              </Typography>
-              <Typography variant="h6" gutterBottom>
-                No Dashboard Data Available
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Interactive visualizations and metrics will appear here
-                after simulation runs are complete.
-              </Typography>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
       
       {/* Text Editor Modal */}
       <TextEditorModal

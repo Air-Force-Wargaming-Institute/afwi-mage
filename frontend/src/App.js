@@ -35,6 +35,7 @@ import { useTheme } from '@material-ui/core/styles';
 import { Box, CssBaseline } from '@material-ui/core';
 import { StyledContainer } from './styles/StyledComponents';
 import backgroundImage from './assets/background.jpg';
+import WargameBuilder from './components/builder/wargames/WargameBuilder';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -95,9 +96,9 @@ const AuthenticatedRoutes = () => {
           <Route path="/retrieval/manage-databases" component={ManageVectorStores} />
           <Route path="/retrieval/librarian-agents" component={LibrarianAgents} />
           <Route exact path="/">
-            <Redirect to="/login" />
+            <Home />
           </Route>
-          <Redirect to="/login" />
+          <Route path="/wargame-builder" component={WargameBuilder} />
         </Switch>
       </Box>
       {/* AFWI MAGE Coin Logo - Don't show on standalone transcriber */}

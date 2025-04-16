@@ -1,1 +1,1 @@
-FROM /root/.ollama/models/nomic-embed-text-v1.5.f32.gguf
+FROM /root/.ollama/models/nomic-embed-text-v1.5-GGUF

@@ -6,7 +6,7 @@ service:
 
 vllm:
   chat_completion_url: http://host.docker.internal:8007/v1
-  chat_model: /models/DeepHermes-3-Llama-3-8B-Preview
+  chat_model: /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
   max_tokens: 4096
   temperature: 0.4
   timeout: 300
@@ -20,7 +20,7 @@ ollama:
   timeout: 300
   
   # Model identifier for Ollama
-  ollama_model: hf.co/NousResearch/DeepHermes-3-Llama-3-8B-Preview-GGUF:latest
+  ollama_model: hf.co/NousResearch/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2-GGUF:latest
   
   # Controls randomness in the output (range: 0.0-1.0)
   # Higher values = more creative, lower = more focused

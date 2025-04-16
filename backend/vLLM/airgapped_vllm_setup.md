@@ -186,8 +186,8 @@ Download these in the same way as the default model and update the paths accordi
 3. Clone the embedding model from HuggingFace
 - ```git clone https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF```
 
-4. Move the nomic-embed-text-v1.5.f32.gguf file into the ollama service
-- ```backend/ollama/nomic-embed-text-v1.5.f32.gguf```
+4. Move the nomic-embed-text-v1.5-GGUF file into the ollama service
+- ```backend/ollama/nomic-embed-text-v1.5-GGUF```
 - It might have to go in the backend's models folder: ```backend/models/base models```
 
 5. Update the docker compose and entrypoint.sh in vLLM and ollama

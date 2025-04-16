@@ -95,17 +95,26 @@ function WargamesListPage() {
           id: '1', 
           name: 'East Asia Confrontation', 
           description: 'Analysis of potential conflicts in the South China Sea',
-          createdAt: '2023-03-15T10:30:00Z',
-          modifiedAt: '2023-05-20T14:45:00Z',
-          lastExecuted: '2023-05-22T09:15:00Z',
+          createdAt: null,
+          modifiedAt: null,
+          lastExecuted: null,
           securityClassification: 'UNCLASSIFIED'
         },
         { 
           id: '2', 
           name: 'European Energy Crisis', 
           description: 'Simulation of European responses to energy infrastructure disruption',
-          createdAt: '2023-04-10T08:20:00Z',
-          modifiedAt: '2023-06-05T11:30:00Z',
+          createdAt: null,
+          modifiedAt: null,
+          lastExecuted: null,
+          securityClassification: 'CONFIDENTIAL'
+        },
+        { 
+          id: '3', 
+          name: 'EUCOM & PACOM Dual Theater Wargame', 
+          description: 'Simulation of a global crisis, dual theater wargame in European and Pacific theaters',
+          createdAt: null,
+          modifiedAt: null,
           lastExecuted: null,
           securityClassification: 'CONFIDENTIAL'
         },

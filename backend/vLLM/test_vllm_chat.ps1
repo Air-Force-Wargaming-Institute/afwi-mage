@@ -1,7 +1,7 @@
 param (
     [int]$MessageCount = 200,
     [string]$Endpoint = "http://localhost:8007/v1/chat/completions",
-    [string]$Model = "/models/DeepHermes-3-Llama-3-8B-Preview",
+    [string]$Model = "/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2",
     [int]$MaxConcurrent = 200
 )
 
