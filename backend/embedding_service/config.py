@@ -104,7 +104,7 @@ LLM_API_KEY = get_env("LLM_API_KEY", "")
 LLM_BASE_URL = get_env("LLM_BASE_URL", "")
 
 # Embedding model configurations
-DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "/models/bge-base-en-v1.5")
+DEFAULT_EMBEDDING_MODEL = get_env("DEFAULT_EMBEDDING_MODEL", "/models/nomic-embed-text:latest")
 EMBEDDING_MODEL_VERSION = get_env("EMBEDDING_MODEL_VERSION", "")
 EMBEDDING_DIMENSION = get_env_int("EMBEDDING_DIMENSION", 768)
 

@@ -58,7 +58,7 @@ This document outlines the steps for manually testing the embedding service, wit
        "name": "Metadata Test Store",
        "description": "Testing metadata preservation",
        "files": ["FILE_ID_1", "FILE_ID_2"],
-       "embedding_model": "nomic-embed-text",
+       "embedding_model": "nomic-embed-text:latest",
        "batch_processing": false
      }'
    ```

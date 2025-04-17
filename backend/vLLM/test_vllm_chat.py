@@ -19,7 +19,7 @@ load_dotenv()
 parser = argparse.ArgumentParser(description='Test vLLM OpenAI-compatible Chat API')
 parser.add_argument('--message-count', type=int, default=200, help='Number of messages to send')
 parser.add_argument('--endpoint', type=str, default="http://vllm:8000/v1/chat/completions", help='API endpoint URL')
-parser.add_argument('--model', type=str, default="/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2", help='Model path or name')
+parser.add_argument('--model', type=str, default="/models/DeepSeek-R1-Distill-Llama-8B-abliterated", help='Model path or name')
 parser.add_argument('--max-concurrent', type=int, default=200, help='Maximum concurrent requests')
 args = parser.parse_args()
 

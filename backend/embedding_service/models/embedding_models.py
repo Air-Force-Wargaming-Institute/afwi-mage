@@ -14,7 +14,7 @@ from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddin
 class NomicEmbeddings(HuggingFaceEmbeddings):
     """Nomic embeddings implementation."""
     
-    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5", **kwargs):
+    def __init__(self, model_name: str = "nomic-ai/nomic-embed-text:latest", **kwargs):
         """Initialize the Nomic embeddings."""
         model_kwargs = {"device": "cpu"}
         model_kwargs.update(kwargs.get("model_kwargs", {}))
@@ -52,8 +52,8 @@ def get_embedding_model(model_name: str, **kwargs) -> Embeddings:
             raise ImportError("Could not import VLLMOpenAIEmbeddings from core.embedding")
     
     # Use "/models/bge-base-en-v1.5" as the default model
-    if model_name != "/models/bge-base-en-v1.5":
-        model_name = "/models/bge-base-en-v1.5"
+    if model_name != "/models/nomic-embed-text:latest":
+        model_name = "/models/nomic-embed-text:latest"
     
     return VLLMOpenAIEmbeddings(model=model_name)
 

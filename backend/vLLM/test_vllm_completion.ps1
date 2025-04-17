@@ -5,7 +5,7 @@ $headers = @{
     "Content-Type" = "application/json"
 }
 $body = @{
-    model = "/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2"
+    model = "/models/DeepSeek-R1-Distill-Llama-8B-abliterated"
     prompt = "Write a long story about artificial intelligence:"
     max_tokens = 150
     temperature = 0.7

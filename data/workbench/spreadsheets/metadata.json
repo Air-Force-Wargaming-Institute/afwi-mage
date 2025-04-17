@@ -107,5 +107,46 @@
     "upload_date": "2025-04-12T03:35:59.372393",
     "modified_date": "2025-04-12T03:35:59.372393",
     "storage_path": "/app/data/workbench/spreadsheets/5401e648-0403-4789-97f1-23e04a9eaceb.xlsx"
+  },
+  "07d08959-25a4-44f4-9adb-81bd0a60bdcf": {
+    "filename": "Project-Management-Sample-Data.xlsx",
+    "size_bytes": 12105,
+    "sheet_count": 1,
+    "sheets": [
+      "Project Management Data"
+    ],
+    "columns": [
+      "Unnamed: 0",
+      "Unnamed: 1",
+      "Unnamed: 2",
+      "Unnamed: 3",
+      "Unnamed: 4",
+      "Unnamed: 5",
+      "Unnamed: 6",
+      "Unnamed: 7"
+    ],
+    "row_count": 51,
+    "sheets_metadata": {
+      "Project Management Data": {
+        "columns": [
+          "Unnamed: 0",
+          "Unnamed: 1",
+          "Unnamed: 2",
+          "Unnamed: 3",
+          "Unnamed: 4",
+          "Unnamed: 5",
+          "Unnamed: 6",
+          "Unnamed: 7"
+        ],
+        "row_count": 51
+      }
+    },
+    "id": "07d08959-25a4-44f4-9adb-81bd0a60bdcf",
+    "description": null,
+    "original_filename": "Project-Management-Sample-Data.xlsx",
+    "modified_filename": "Project-Management-Sample-Data.xlsx",
+    "upload_date": "2025-04-17T16:34:38.812889",
+    "modified_date": "2025-04-17T16:34:38.812889",
+    "storage_path": "/app/data/workbench/spreadsheets/07d08959-25a4-44f4-9adb-81bd0a60bdcf.xlsx"
   }
 }

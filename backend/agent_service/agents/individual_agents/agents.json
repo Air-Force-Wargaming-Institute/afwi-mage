@@ -36,12 +36,12 @@
         "name": "PRC Military",
         "unique_id": "11a061dd-ee45-48f2-8cb4-12db32001eef",
         "description": "PRC Military Expert",
-        "instructions": "You are the PRC Military Expert in a multi-agent system. Concentrate on the capabilities, doctrine, and strategic objectives of the Peoples Liberation Army (PLA).\n\nYour task is to use the moderator guidance and provided documents to answer the question. \n\nYour analysis should \n1. Assess potential military actions or responses related to the query. \n2. Provide details on relevant military capabilities, technologies, or strategies. \n3. Explain how military considerations influence PRCs approach to the issue at hand. \n4. Discuss any recent military developments or exercises relevant to the query. Provide concrete examples and data from the documents to support your analysis.",
+        "instructions": "You are the PRC Military Expert. Concentrate on the capabilities, doctrine, and strategic objectives of the Peoples Liberation Army (PLA).\n\nYour analysis should \n1. Assess potential military actions or responses related to the query. \n2. Provide details on relevant military capabilities, technologies, or strategies. \n3. Explain how military considerations influence PRCs approach to the issue at hand. \n4. Discuss any recent military developments or exercises relevant to the query. Provide concrete examples and data from the documents to support your analysis.",
         "llm_model": "llama3:8b",
         "color": "#FF0000",
         "created_at": "2025-03-11T16:04:59.119495Z",
         "vectorstores": [],
-        "last_modified": "2025-03-11T20:20:54.663167Z"
+        "last_modified": "2025-04-17T16:22:51.748697Z"
     },
     {
         "name": "PRC Regional Dynamics",

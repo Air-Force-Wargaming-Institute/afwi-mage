@@ -195,7 +195,7 @@ function BuildRetrievalDatabases() {
   // State for vector store creation
   const [vectorStoreName, setVectorStoreName] = useState('');
   const [vectorStoreDescription, setVectorStoreDescription] = useState('');
-  const [embeddingModel, setEmbeddingModel] = useState('nomic-embed-text');
+  const [embeddingModel, setEmbeddingModel] = useState('nomic-embed-text:latest');
   
   // Add state for paragraph-based chunking toggle
   const [useParagraphChunking, setUseParagraphChunking] = useState(true);
@@ -215,7 +215,7 @@ function BuildRetrievalDatabases() {
 
   // Available embedding models
   const [embeddingModels, setEmbeddingModels] = useState([
-    { id: 'nomic-embed-text', name: 'Nomic Embed Text' },
+    { id: 'nomic-embed-text:latest', name: 'Nomic Embed Text' },
   ]);
 
   // Load embedding models from the backend
