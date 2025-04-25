@@ -1,50 +1,32 @@
 {
-  "f09c6f80-b245-4d7c-873c-87ed077b59a6": {
-    "filename": "SampleData.xlsx",
-    "size_bytes": 36046,
-    "sheet_count": 3,
+  "ab089bfa-393c-47e4-b627-645626a44113": {
+    "filename": "garbage.csv",
+    "size_bytes": 91,
+    "sheet_count": 1,
     "sheets": [
-      "Instructions",
-      "SalesOrders",
-      "MyLinks"
+      "Sheet1"
     ],
     "columns": [
-      "Unnamed: 0",
-      "Unnamed: 1",
-      "Unnamed: 2"
+      "34",
+      "5",
+      "564",
+      "2",
+      "2342342342"
     ],
-    "row_count": 26,
+    "row_count": 2,
     "sheets_metadata": {
-      "Instructions": {
+      "Sheet1": {
         "columns": [
-          "Unnamed: 0",
-          "Unnamed: 1",
-          "Unnamed: 2"
+          "34",
+          "5",
+          "564",
+          "2",
+          "2342342342"
         ],
-        "row_count": 26
-      },
-      "SalesOrders": {
-        "columns": [
-          "OrderDate",
-          "Region",
-          "Rep",
-          "Item",
-          "Units",
-          "Unit Cost",
-          "Total"
-        ],
-        "row_count": 43
-      },
-      "MyLinks": {
-        "columns": [
-          "Unnamed: 0",
-          "Unnamed: 1",
-          "Unnamed: 2"
-        ],
-        "row_count": 8
+        "row_count": 2
       }
     },
-    "id": "f09c6f80-b245-4d7c-873c-87ed077b59a6",
+    "id": "ab089bfa-393c-47e4-b627-645626a44113",
     "description": null,
     "original_filename": "SampleData.xlsx",
     "modified_filename": "SampleData.xlsx",

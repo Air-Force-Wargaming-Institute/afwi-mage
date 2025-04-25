@@ -34,7 +34,7 @@ def get_embedding_model(model_id: str = "nomic-embed-text:latest") -> Embeddings
         logger.info(f"Using Ollama embeddings with model: {model_id} at {base_url}")
         return OllamaEmbeddings(
             model=model_id,
-            base_url=base_url,
+            base_url=base_url
         )
     except Exception as e:
         logger.error(f"Error initializing embedding model: {e}")
