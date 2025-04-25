@@ -34,17 +34,17 @@ services:
       - app-network
     ipc: host
     # command: >
-    #   --model /models/DeepSeek-R1-Distill-Llama-8B-abliterated
-    #   --tokenizer /models/DeepSeek-R1-Distill-Llama-8B-abliterated
+    #   --model /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
+    #   --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
     #   --dtype=half
     #   --gpu-memory-utilization=0.8
     #   --max-model-len=65536
     #   --tensor-parallel-size=2
     command: >
-      --model /models/DeepSeek-R1-Distill-Llama-8B-abliterated
-      --tokenizer /models/DeepSeek-R1-Distill-Llama-8B-abliterated
+      --model /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
+      --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
       --dtype=half
       --gpu-memory-utilization=0.88
-      --max-model-len=16384
+      --max-model-len=65536
       --tensor-parallel-size=2
     restart: unless-stopped

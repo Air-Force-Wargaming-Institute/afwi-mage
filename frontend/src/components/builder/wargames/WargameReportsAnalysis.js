@@ -61,7 +61,7 @@ function WargameReportsAnalysis({ wargameData }) {
       </GradientText>
       
       <Typography variant="body1" paragraph>
-        This section displays simulation results and analytics after the wargame has been executed.
+        This section displays experiment results and analytics after the wargame has been executed.
         You'll be able to view detailed reports, outcome summaries, and interactive visualizations.
       </Typography>
       
@@ -82,7 +82,7 @@ function WargameReportsAnalysis({ wargameData }) {
                   📄
                 </Typography>
                 <Typography variant="h6" gutterBottom>
-                  No Simulation Reports Available
+                  No Experiment Reports Available
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
                   Detailed reports will appear here after wargames complete.
@@ -105,7 +105,7 @@ function WargameReportsAnalysis({ wargameData }) {
               </Typography>
               <Typography variant="body2" color="textSecondary">
                 Interactive visualizations and metrics will appear here
-                after simulation runs are complete.
+                after experimentation runs are complete.
               </Typography>
             </Paper>
           </Grid>
@@ -118,7 +118,7 @@ function WargameReportsAnalysis({ wargameData }) {
         </GradientText>
         
         <Typography variant="body2" paragraph style={{ marginTop: '8px' }}>
-          Once the wargame is executed, this section will show how each of your research objectives was addressed by the simulation outcomes.
+          Once the wargame is executed, this section will show how each of your research objectives was addressed by the experimental outcomes.
         </Typography>
         
         <Box p={3} border={1} borderColor="rgba(255,255,255,0.12)" borderRadius={4} bgcolor="rgba(0,0,0,0.2)" textAlign="center">

@@ -66,7 +66,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
       - VLLM_API_BASE=http://host.docker.internal:8007/v1
       - VLLM_API_KEY=no_key
-      - VLLM_MODEL_NAME=/models/DeepSeek-R1-Distill-Llama-8B-abliterated
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview
     volumes:
       - ../data:/app/data
       - ./chat_service:/app

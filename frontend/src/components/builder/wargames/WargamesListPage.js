@@ -103,7 +103,7 @@ function WargamesListPage() {
         { 
           id: '2', 
           name: 'European Energy Crisis', 
-          description: 'Simulation of European responses to energy infrastructure disruption',
+          description: 'Experimentation of European responses to energy infrastructure disruption',
           createdAt: null,
           modifiedAt: null,
           lastExecuted: null,
@@ -112,7 +112,7 @@ function WargamesListPage() {
         { 
           id: '3', 
           name: 'EUCOM & PACOM Dual Theater Wargame', 
-          description: 'Simulation of a global crisis, dual theater wargame in European and Pacific theaters',
+          description: 'Experimentation of a global crisis, dual theater wargame in European and Pacific theaters',
           createdAt: null,
           modifiedAt: null,
           lastExecuted: null,
