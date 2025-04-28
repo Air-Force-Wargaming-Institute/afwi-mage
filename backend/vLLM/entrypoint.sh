@@ -11,31 +11,24 @@ nvidia-smi --query-gpu=memory.total,memory.free,memory.used --format=csv
 
 # Print environment variables
 echo "Environment variables:"
-env | grep -E "CUDA|GPU|MODEL|TENSOR"
+env | grep -E "CUDA|GPU|MODEL|TENSOR|VLLM"
 
-echo "Starting vLLM server with tensor parallelism across 2 GPUs..."
+echo "Starting vLLM server using environment variables..."
 
-# Force tensor parallelism to 2 regardless of arguments
-ARGS=()
-for ARG in "$@"; do
-    if [[ "$ARG" == "--tensor-parallel-size="* ]]; then
-        ARGS+=("--tensor-parallel-size=2")
-    elif [[ "$ARG" == "--gpu-memory-utilization="* ]]; then
-        ARGS+=("--gpu-memory-utilization=0.88")
-    else
-        ARGS+=("$ARG")
-    fi
-done
+# Build the command arguments from environment variables
+CMD_ARGS=(
+    --model "/models/${VLLM_Model_Folder}" \
+    --tokenizer "/models/${VLLM_Model_Folder}" \
+    --dtype=half \
+    --gpu-memory-utilization="${GPU_MEMORY_UTILIZATION}" \
+    --max-model-len="${MAX_MODEL_LEN}" \
+    --tensor-parallel-size="${GPU_COUNT}"
+)
 
-# Ensure tensor-parallel-size is set to 2
-if [[ ! " ${ARGS[*]} " =~ "--tensor-parallel-size=" ]]; then
-    ARGS+=("--tensor-parallel-size=2")
-fi
+# Add other potential arguments from env vars if needed, e.g.:
+# if [ -n "${QUANTIZATION}" ]; then CMD_ARGS+=(--quantization="${QUANTIZATION}"); fi
+# if [ -n "${TRUST_REMOTE_CODE}" ]; then CMD_ARGS+=(--trust-remote-code); fi
 
-# Ensure gpu-memory-utilization is set to 0.8
-if [[ ! " ${ARGS[*]} " =~ "--gpu-memory-utilization=" ]]; then
-    ARGS+=("--gpu-memory-utilization=0.88")
-fi
-
-# Execute the command with modified arguments
-exec python3 -m vllm.entrypoints.openai.api_server "${ARGS[@]}"
+# Execute the command
+echo "Executing: python3 -m vllm.entrypoints.openai.api_server ${CMD_ARGS[@]}"
+exec python3 -m vllm.entrypoints.openai.api_server "${CMD_ARGS[@]}"

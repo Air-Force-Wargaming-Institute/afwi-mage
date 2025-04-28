@@ -34,6 +34,8 @@ AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://agent:8001")
 REVIEW_SERVICE_URL = os.getenv("REVIEW_SERVICE_URL", "http://review:8004")
 EMBEDDING_SERVICE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding:8006")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8010")
+WORKBENCH_SERVICE_URL = os.getenv("WORKBENCH_SERVICE_URL", "http://workbench:8020")
+DIRECT_CHAT_SERVICE_URL = os.getenv("DIRECT_CHAT_SERVICE_URL", "http://direct_chat_service:8011")
 
 # Redis Configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

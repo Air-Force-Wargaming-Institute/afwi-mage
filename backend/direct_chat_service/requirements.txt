@@ -10,8 +10,8 @@ httpx>=0.24.0
 PyYAML>=6.0.1
 aiofiles>=24.1.0
 pytest-shutil>=1.8.1
-faiss-cpu>=1.7.0
-vllm
+faiss-gpu-cu12>=1.7.2
+vllm>=0.8.1
 aiohttp
 requests
 langchain-ollama

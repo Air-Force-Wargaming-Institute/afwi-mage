@@ -1,15 +1,10 @@
-FROM mage-base:latest
+FROM mage-common:latest
 
-# No need to install dependencies as they're in the base image
+WORKDIR /app
 
-# Copy service-specific files
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+
 COPY . .
 
-# Ensure the agents directory is copied
-COPY agents /app/agents
-
-# Expose port for the service
-EXPOSE 8001
-
-# Start the service
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"] 
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]

@@ -1,0 +1,86 @@
+###BASE IMAGE FOR COMMON DEPENDENCIES
+FROM python:3.11-slim AS mage-common
+
+# Set working directory
+WORKDIR /app
+
+COPY requirements-MAGE-common.txt .
+
+RUN pip install --upgrade pip
+
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements-MAGE-common.txt
+
+# Install common system dependencies needed across services
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    libmagic1 \
+    libreoffice \
+    libreoffice-writer \
+    python3-uno \
+    tesseract-ocr \
+    libtesseract-dev \
+    poppler-utils \
+    pkg-config \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up LibreOffice environment
+RUN mkdir -p /root/.config/libreoffice/4/user && \
+    chmod -R 777 /root/.config/libreoffice
+
+# Set environment variables for LibreOffice
+ENV PATH="/usr/lib/libreoffice/program:${PATH}"
+ENV URE_BOOTSTRAP="file:///usr/lib/libreoffice/program/fundamentalrc"
+ENV UNO_PATH="/usr/lib/libreoffice/program"
+ENV PYTHONPATH="/usr/lib/python3/dist-packages"
+
+# Create common directories
+RUN mkdir -p /app/data/uploads \
+    /app/data/extraction \
+    /app/data/vectorstores \
+    /app/data/datasets \
+    /app/data/outputs \
+    /app/data/logs \
+    /app/data/temp_conversions \
+    /app/models/base_models \
+    /app/doc_staging \
+    /app/nltk_data \
+    && chmod -R 777 /app/data
+
+
+
+# Install additional Python packages that were installed separately in some services
+#RUN --mount=type=cache,target=/root/.cache/pip pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+#RUN --mount=type=cache,target=/root/.cache/pip pip install unstructured==0.10.16
+#RUN --mount=type=cache,target=/root/.cache/pip pip install unstructured-inference==0.6.6 --no-deps
+#RUN --mount=type=cache,target=/root/.cache/pip pip install "pytesseract>=0.3"
+#RUN --mount=type=cache,target=/root/.cache/pip pip install "layoutparser[tesseract]>=0.3"
+#RUN --mount=type=cache,target=/root/.cache/pip pip install llama-cpp-python==0.2.11
+
+# Download NLTK data
+# RUN python -m nltk.downloader -d /app/nltk_data punkt averaged_perceptron_tagger
+
+
+
+# Create placeholder for service-specific files
+RUN mkdir -p /app/service 
+
+###BASE IMAGE FOR GPU DEPENDENCIES
+FROM mage-common AS mage-gpu
+
+COPY requirements-MAGE-GPU.txt .
+
+RUN pip install --upgrade pip
+
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements-MAGE-GPU.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install torch torchvision torchaudio
+# Set environment variables for AI models
+ENV CUDA_VISIBLE_DEVICES=-1
+ENV PYTHONUNBUFFERED=1
+
+
+
+
+

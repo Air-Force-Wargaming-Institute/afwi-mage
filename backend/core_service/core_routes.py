@@ -1,27 +1,63 @@
-from fastapi import APIRouter, HTTPException, Depends
-# import requests
-from config import UPLOAD_SERVICE_URL, EXTRACTION_SERVICE_URL, GENERATION_SERVICE_URL, AGENT_SERVICE_URL, REVIEW_SERVICE_URL, EMBEDDING_SERVICE_URL, AUTH_SERVICE_URL
+from fastapi import APIRouter, HTTPException, Depends, Request
+import httpx
+import logging
+from config import UPLOAD_SERVICE_URL, EXTRACTION_SERVICE_URL, GENERATION_SERVICE_URL, AGENT_SERVICE_URL, REVIEW_SERVICE_URL, EMBEDDING_SERVICE_URL, AUTH_SERVICE_URL, WORKBENCH_SERVICE_URL, DIRECT_CHAT_SERVICE_URL
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-# # 
-# async def verify_token(token: str):
-#     response = requests.get(f"{AUTH_SERVICE_URL}/api/users/me", headers={"Authorization": f"Bearer {token}"})
-#     if response.status_code != 200:
-#         raise HTTPException(status_code=401, detail="Invalid token")
-#     return response.json()
-    
-    # status = {}
-    # for service, url in services.items():
-    #     try:
-    #         response = requests.get(f"{url}/health", timeout=5)
-    #         status[service] = "up" if response.status_code == 200 else "down"
-    #     except requests.RequestException:
-    #         status[service] = "down"
-    
-    # return {"status": status}
 
-# Add other core-specific routes here, using the verify_token function as a dependency where needed
-# For example:
-# @router.get("/protected-route")
-# async def protected_route(user: dict = Depends(verify_token)):
-#     return {"message": "This is a protected route", "user": user}
+@router.get("/health")
+async def health_check():
+    """Health check endpoint for the API gateway."""
+    return {"status": "healthy"}
+
+@router.get("/service-status")
+async def service_status():
+    """Check status of all microservices."""
+    services = {
+        "upload": UPLOAD_SERVICE_URL,
+        "extraction": EXTRACTION_SERVICE_URL,
+        "generation": GENERATION_SERVICE_URL,
+        "agent": AGENT_SERVICE_URL,
+        "review": REVIEW_SERVICE_URL,
+        "embedding": EMBEDDING_SERVICE_URL,
+        "auth": AUTH_SERVICE_URL,
+        "workbench": WORKBENCH_SERVICE_URL,
+        "direct_chat": DIRECT_CHAT_SERVICE_URL
+    }
+    
+    results = {}
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        for service_name, url in services.items():
+            if not url:
+                results[service_name] = {"status": "unconfigured"}
+                continue
+                
+            try:
+                health_url = f"{url}/health"
+                response = await client.get(health_url)
+                if response.status_code == 200:
+                    results[service_name] = {"status": "healthy"}
+                else:
+                    results[service_name] = {"status": "unhealthy", "code": response.status_code}
+            except Exception as e:
+                results[service_name] = {"status": "unavailable", "error": str(e)}
+    
+    return {"services": results}
+
+@router.get("/info")
+async def get_info():
+    """Get information about the core service."""
+    return {
+        "name": "MAGE Core Service",
+        "version": "1.0.0",
+        "components": [
+            "Document Library",
+            "Model Registry",
+            "Service Discovery"
+        ]
+    }
+
+# Add more routes for the core service as needed

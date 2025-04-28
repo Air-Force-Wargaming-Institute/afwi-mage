@@ -1,8 +1,17 @@
-FROM mage-base:latest
+FROM mage-common:latest
 
-# No need to install dependencies as they're in the base image
+WORKDIR /app
 
-# Copy service-specific files
+# Install system dependencies including PostgreSQL client
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+
 COPY . .
 
 # Convert line endings to Unix format (LF)

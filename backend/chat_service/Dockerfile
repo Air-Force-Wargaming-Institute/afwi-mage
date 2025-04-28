@@ -1,13 +1,10 @@
-FROM mage-base:latest
+FROM mage-gpu:latest
 
-# Set working directory
 WORKDIR /app
 
-# Copy service-specific files
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+
 COPY . .
 
-# Expose port for the service
-EXPOSE 8009
-
-# Make sure we're in the right directory and the app can be found
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]

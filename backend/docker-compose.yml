@@ -1,7 +1,6 @@
 name: afwi-multi-agent-generative-engine
 
 include:
-  - vLLM/docker-compose.vllm.yml
   - ollama/docker-compose.ollama.yml
 
 networks:
@@ -61,12 +60,13 @@ services:
     build: ./chat_service
     ports:
       - "8009:8009"
+    env_file:
+      - path: ./Config.env
     environment:
       - CORE_SERVICE_URL=http://core:8000
       - DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
       - VLLM_API_BASE=http://host.docker.internal:8007/v1
       - VLLM_API_KEY=no_key
-      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview
     volumes:
       - ../data:/app/data
       - ./chat_service:/app
@@ -77,6 +77,39 @@ services:
       - ollama
     networks:
       - app-network
+
+  vllm:
+    build:
+      context: ./vLLM
+      dockerfile: Dockerfile
+    container_name: vllm-chat
+    ports:
+      - "8007:8000"
+    env_file:
+      - path: ./Config.env
+    environment:
+      - MAX_NUM_BATCHED_TOKENS=4096
+      - MAX_NUM_SEQS=256
+      - MAX_PADDING_LENGTH=256
+      - QUANTIZATION=awq
+      - TRUST_REMOTE_CODE=true
+      - HF_DATASETS_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+      - CPU_OFFLOAD_GB=0
+      - NCCL_P2P_DISABLE=1
+    shm_size: 1G
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - app-network
+    ipc: host
+    restart: unless-stopped
 
   agent:
     build: ./agent_service
