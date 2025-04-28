@@ -1,3 +1,5 @@
+# This plan needs to be reviewed
+
 # Embedding Service Refactoring Plan
 
 ## Problem Statement
