@@ -10,7 +10,7 @@ services:
       - MAX_NUM_BATCHED_TOKENS=4096
       - MAX_NUM_SEQS=256
       - MAX_PADDING_LENGTH=256
-      - MAX_MODEL_LEN=65536
+      - MAX_MODEL_LEN=20000
       - QUANTIZATION=awq
       - TRUST_REMOTE_CODE=true
       - HF_DATASETS_OFFLINE=1
@@ -18,7 +18,7 @@ services:
       - HF_HUB_OFFLINE=1
       # GPU Allocation - 80% split across both GPUs
       - GPU_MEMORY_UTILIZATION=0.88
-      - CUDA_VISIBLE_DEVICES=0,1
+      - CUDA_VISIBLE_DEVICES=0
       # - GPU_MEMORY_UTILIZATION=0.8
       # - CUDA_VISIBLE_DEVICES=0,1
       - NCCL_P2P_DISABLE=1
@@ -27,8 +27,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              #count: 1
-              count: 2
+              count: 1
+              #count: 2
               capabilities: [gpu]
     networks:
       - app-network
