@@ -241,6 +241,8 @@ services:
       - ../data:/app/data
       - ./models:/app/models
       - ./embedding_service:/app
+    env_file:
+      - path: ./Config.env
     environment:
       - CORE_SERVICE_URL=http://core:8000
       - API_KEY='None'
@@ -314,6 +316,8 @@ services:
     volumes:
       - ../data:/app/data
       - ./direct_chat_service:/app
+    env_file:
+      - path: ./Config.env
     environment:
       - CORE_SERVICE_URL=http://core:8000
       - EMBEDDING_SERVICE_URL=http://embedding:8006

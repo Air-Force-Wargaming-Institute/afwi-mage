@@ -75,6 +75,24 @@ if (-not $skipModelCheck) {
 } # End of if (-not $skipModelCheck)
 # --- End Model Check ---
 
+# --- Generate vLLM Dockerfile from Template ---
+$vllmTemplatePath = Join-Path $PSScriptRoot "backend/vLLM/Dockerfile.template"
+$vllmDockerfilePath = Join-Path $PSScriptRoot "backend/vLLM/Dockerfile"
+
+Write-Host "Generating $vllmDockerfilePath from $vllmTemplatePath using model '$expectedModelSubfolder'..."
+
+if (-not (Test-Path $vllmTemplatePath)) {
+    Write-Error "vLLM Dockerfile template not found: $vllmTemplatePath"
+    exit 1
+}
+
+$templateContent = Get-Content $vllmTemplatePath -Raw
+$dockerfileContent = $templateContent -replace '__MODEL_SUBFOLDER__', $expectedModelSubfolder
+Set-Content -Path $vllmDockerfilePath -Value $dockerfileContent -Encoding UTF8 -NoNewline
+
+Write-Host "Successfully generated $vllmDockerfilePath"
+# --- End Dockerfile Generation ---
+
 docker build -t mage-common:latest -f Dockerfile-multistage .
 
 docker build -t mage-gpu:latest -f Dockerfile-multistage .

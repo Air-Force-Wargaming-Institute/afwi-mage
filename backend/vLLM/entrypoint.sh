@@ -25,10 +25,6 @@ CMD_ARGS=(
     --tensor-parallel-size="${GPU_COUNT}"
 )
 
-# Add other potential arguments from env vars if needed, e.g.:
-# if [ -n "${QUANTIZATION}" ]; then CMD_ARGS+=(--quantization="${QUANTIZATION}"); fi
-# if [ -n "${TRUST_REMOTE_CODE}" ]; then CMD_ARGS+=(--trust-remote-code); fi
-
 # Execute the command
 echo "Executing: python3 -m vllm.entrypoints.openai.api_server ${CMD_ARGS[@]}"
 exec python3 -m vllm.entrypoints.openai.api_server "${CMD_ARGS[@]}"

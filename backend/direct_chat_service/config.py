@@ -72,7 +72,17 @@ def load_config() -> Config:
     
     with open(config_path, 'r') as f:
         config_dict = yaml.safe_load(f)
-    
+
+    # Check for environment variable override for vllm chat_model
+    vllm_model_name_env = os.getenv('VLLM_MODEL_NAME')
+    if vllm_model_name_env:
+        if 'vllm' in config_dict and isinstance(config_dict['vllm'], dict):
+            print(f"Overriding vllm.chat_model with environment variable VLLM_MODEL_NAME: {vllm_model_name_env}")
+            config_dict['vllm']['chat_model'] = vllm_model_name_env
+        else:
+            # Handle case where 'vllm' key might be missing or not a dict (optional, for robustness)
+            print("Warning: 'vllm' section not found or invalid in config, cannot apply VLLM_MODEL_NAME override.")
+            
     return Config(**config_dict)
 
 # Create a global config instance

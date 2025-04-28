@@ -454,9 +454,12 @@ def get_llm_response(prompt: str) -> str:
             base_url = VLLM_BASE_URL.rstrip('/')
             url = f"{base_url}/chat/completions"
             
-            # Use the specified model path
-            model = "/models/DeepHermes-3-Llama-3-8B-Preview"
-            
+            # Use the specified model path, defaulting if environment variable not set
+            default_model_path = "/models/DeepHermes-3-Llama-3-8B-Preview"
+            model = os.getenv('VLLM_MODEL_NAME', default_model_path)
+            if not model: # Handle case where env var might be empty
+                model = default_model_path
+
             # Log the model and URL being used
             logger.info(f"Using vLLM API at {url} with model {model}")
             

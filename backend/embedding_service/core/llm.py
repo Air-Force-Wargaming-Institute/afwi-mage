@@ -20,15 +20,24 @@ class VLLMLLM:
     LLM integration class for vLLM models using OpenAI-compatible API.
     """
     
-    def __init__(self, model: str = "/models/DeepHermes-3-Llama-3-8B-Preview", base_url: str = None):
+    # Define the default model path
+    DEFAULT_MODEL_PATH = "/models/DeepHermes-3-Llama-3-8B-Preview"
+
+    def __init__(self, model: str = None, base_url: str = None):
         """
         Initialize vLLM LLM integration.
         
         Args:
-            model: Model path to use
+            model: Model path to use. If None, uses VLLM_MODEL_NAME env var or default.
             base_url: Base URL for vLLM API
         """
-        self.model = model
+        # Determine the model path
+        if model is None:
+            self.model = os.getenv('VLLM_MODEL_NAME', self.DEFAULT_MODEL_PATH)
+            if not self.model: # Handle case where env var might be empty string
+                self.model = self.DEFAULT_MODEL_PATH
+        else:
+            self.model = model
         
         # Use config setting if available, with fallback to environment and default
         if base_url:
