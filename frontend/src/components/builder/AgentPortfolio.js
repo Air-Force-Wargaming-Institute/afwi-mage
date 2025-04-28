@@ -37,6 +37,8 @@ import robotIcon from '../../assets/robot-icon.png'; // Import the robot icon
 import { getApiUrl, getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
+import AgentCreationChat from './AgentCreationChat'; // Import the new component
+import CircularProgress from '@material-ui/core/CircularProgress';
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -323,6 +325,9 @@ function AgentPortfolio() {
   const [formErrors, setFormErrors] = useState({});
   const [editFormErrors, setEditFormErrors] = useState({});
   const [availableModels, setAvailableModels] = useState([]);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiGenerator, setShowAiGenerator] = useState(false);
 
   // --- State for Search, Filter, Sort ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -371,8 +376,28 @@ function AgentPortfolio() {
     }
   };
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const handleOpen = () => {
+    // Reset form and AI state when opening the dialog
+    setNewAgent({
+      name: '',
+      description: '',
+      llm_model: availableModels.length > 0 ? availableModels[0] : 'hermes3:8b', // Default to first available model or fallback
+      agent_instructions: '',
+      color: colorOptions[0]
+    });
+    setFormErrors({});
+    setAiPrompt('');
+    setAiLoading(false);
+    setShowAiGenerator(false); // Ensure AI section is hidden by default on open
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    // Optional: Reset AI state on close as well, though handleOpen covers reopening
+    // setShowAiGenerator(false);
+    // setAiPrompt(''); 
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -733,6 +758,91 @@ function AgentPortfolio() {
     setSortOrder(event.target.value);
   };
 
+  const handleAiPromptChange = (event) => {
+    setAiPrompt(event.target.value);
+  };
+
+  const handleAiGenerate = async () => {
+    console.log('AI Prompt:', aiPrompt);
+    if (!aiPrompt.trim()) {
+      setSnackbar({
+        open: true,
+        message: 'Please enter a description for the AI to generate from.',
+        severity: 'warning'
+      });
+      return; 
+    }
+
+    setAiLoading(true);
+    setFormErrors({}); // Clear previous form errors before generating
+
+    // --- Add check for token --- 
+    if (!token) {
+        setSnackbar({
+            open: true,
+            message: 'Authentication error: No token found. Please log in again.',
+            severity: 'error'
+        });
+        setAiLoading(false);
+        return;
+    }
+    // --- End token check ---
+
+    try {
+      console.log('Token being sent:', token); // Add this line
+      const response = await axios.post(
+        getGatewayUrl('/api/agent/generate_agent_instructions_from_prompt'), 
+        { prompt: aiPrompt }, 
+        { 
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json' // Ensure content type is set
+          } 
+        }
+      );
+      
+      const generatedData = response.data; // Assuming the backend returns { name, description, agent_instructions }
+      // --- End API Call ---
+
+      // --- Add logging to inspect the API response ---
+      console.log("AI instructions Generation API Response:", generatedData); 
+      console.log("Generated Instructions from API:", generatedData?.agent_instructions);
+      // --- End logging ---
+
+      // Validate response structure (optional but recommended)
+      if (!generatedData || typeof generatedData.name !== 'string' || typeof generatedData.description !== 'string' || typeof generatedData.agent_instructions !== 'string') {
+        throw new Error("Invalid response structure from AI generation endpoint.");
+      }
+
+      setNewAgent(prevState => ({
+        ...prevState,
+        // Only update the instructions from the generated data
+        agent_instructions: generatedData.agent_instructions || '',
+        // Keep existing color and model unless AI provides them (comment remains)
+        // color: generatedData.color || prevState.color, 
+        // llm_model: generatedData.llm_model || prevState.llm_model,
+      }));
+
+      setSnackbar({
+        open: true,
+        message: 'Agent fields populated by AI. Please review and adjust.',
+        severity: 'info'
+      });
+
+    } catch (error) {
+        console.error('Error generating agent from prompt:', error.response ? error.response.data : error.message);
+        setSnackbar({
+            open: true,
+            message: `Error generating agent details: ${error.response?.data?.detail || error.message || 'Please try again or fill manually.'}`, // Display more specific error if available
+            severity: 'error'
+        });
+    } finally {
+        setAiLoading(false);
+        // Decide whether to clear the prompt: maybe keep it for reference?
+        // setAiPrompt(''); // Clear prompt after attempt
+    }
+  };
+
   // --- Memoized calculation for displayed agents ---
   const displayedAgents = useMemo(() => {
     let filteredAgents = [...agents];
@@ -990,9 +1100,37 @@ function AgentPortfolio() {
           </Typography>
         </DialogTitle>
         <DialogContent className={classes.dialogContent}>
+          {/* --- Toggle Button for AI Generator --- */}
+          <Box mb={2} display="flex" justifyContent="center">
+            <Button 
+              variant="outlined" 
+              color="secondary" 
+              onClick={() => setShowAiGenerator(!showAiGenerator)}
+            >
+              {showAiGenerator ? 'Hide AI Assistant' : 'Generate with AI'}
+            </Button>
+          </Box>
+
+          {/* --- Conditionally render the AgentCreationChat component --- */}
+          {showAiGenerator && (
+            <AgentCreationChat 
+              prompt={aiPrompt}
+              onPromptChange={handleAiPromptChange}
+              onGenerate={handleAiGenerate}
+              isLoading={aiLoading}
+            />
+          )}
+
+          {/* --- Manual Fields --- */}
+          {/* Add a separator or adjust text if AI generator is hidden? */}
+          {!showAiGenerator && (
+             <Typography variant="subtitle1" gutterBottom align="center" style={{ marginBottom: '16px' }}>
+                Fill out the agent details manually:
+             </Typography>
+          )} 
           <Box display="flex" alignItems="center">
             <TextField
-              autoFocus
+              autoFocus // Maybe only autoFocus if AI generator is hidden?
               margin="dense"
               name="name"
               label="Agent Name"
@@ -1004,10 +1142,10 @@ function AgentPortfolio() {
               error={!!formErrors.name}
               helperText={formErrors.name}
             />
-            {renderTooltip(
-              "Agent Name",
-              "Enter a unique name for your agent. This name will be used to identify and interact with the agent in the system."
-            )}
+             {renderTooltip(
+               "Agent Name",
+               "Enter a unique name for your agent. This name will be used to identify and interact with the agent in the system."
+             )}
           </Box>
           <Box display="flex" flexDirection="column">
             <TextField
@@ -1024,59 +1162,59 @@ function AgentPortfolio() {
               error={!!formErrors.description}
               helperText={formErrors.description}
             />
-            <Typography className={classes.characterCount}>
-              {newAgent.description.length}/140 characters
-            </Typography>
+             <Typography className={classes.characterCount}>
+               {newAgent.description.length}/140 characters
+             </Typography>
           </Box>
           <Box display="flex" alignItems="center">
-            <TextField
-              margin="dense"
-              name="agent_instructions"
-              label="Agent Instructions"
-              type="text"
-              fullWidth
-              multiline
-              rows={8}
-              value={newAgent.agent_instructions}
-              onChange={handleChange}
-              required
-              className={classes.largeTextField}
-              error={!!formErrors.agent_instructions}
-              helperText={formErrors.agent_instructions}
-            />
-            {renderTooltip(
+             <TextField
+               margin="dense"
+               name="agent_instructions"
+               label="Agent Instructions"
+               type="text"
+               fullWidth
+               multiline
+               rows={8}
+               value={newAgent.agent_instructions}
+               onChange={handleChange}
+               required
+               className={classes.largeTextField}
+               error={!!formErrors.agent_instructions}
+               helperText={formErrors.agent_instructions}
+             />
+             {renderTooltip(
               "Agent Instructions",
               "Specify detailed instructions for the agent. These instructions guide the agent's behavior and responses when interacting with users or other agents."
-            )}
+             )}
           </Box>
           <Box display="flex" alignItems="center">
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="llm-model-label">LLM Model</InputLabel>
-              <Select
-                labelId="llm-model-label"
-                name="llm_model"
-                value={newAgent.llm_model}
-                onChange={handleChange}
-                required
-              >
-                {availableModels.map((modelName) => (
+             <FormControl fullWidth margin="dense">
+               <InputLabel id="llm-model-label">LLM Model</InputLabel>
+               <Select
+                 labelId="llm-model-label"
+                 name="llm_model"
+                 value={newAgent.llm_model}
+                 onChange={handleChange}
+                 required
+               >
+                 {availableModels.map((modelName) => (
                   <MenuItem key={modelName} value={modelName}>
-                    {modelName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {renderTooltip(
+                     {modelName}
+                   </MenuItem>
+                 ))}
+               </Select>
+             </FormControl>
+             {renderTooltip(
               "LLM Model",
               "Choose the Language Model for your agent. Different models have varying capabilities and performance characteristics."
-            )}
+             )}
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} color="primary">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} color="primary" disabled={descriptionError}>
+          <Button onClick={handleSubmit} color="primary" >
             Create
           </Button>
         </DialogActions>
@@ -1373,7 +1511,7 @@ function AgentPortfolio() {
         <DialogContent className={classes.infoDialogContent}>
           <Typography variant="body1">{infoDialogContent.content}</Typography>
           <Box mt={2}>
-            <Link href="http://10.11.45.216:3000/multi-agent/builder/user-guide" target="_blank" color="primary">
+            <Link href="http://localhost:3000/multi-agent/builder/user-guide" target="_blank" color="primary">
               Learn more in the Multi-Agent Portal User Guide
             </Link>
           </Box>

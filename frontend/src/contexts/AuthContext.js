@@ -103,6 +103,7 @@ export const AuthProvider = ({ children }) => {
     // Request interceptor - add token to all requests
     const requestInterceptor = axios.interceptors.request.use(
       config => {
+        console.log('[AuthContext Interceptor] Attaching token:', token);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }

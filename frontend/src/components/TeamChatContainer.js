@@ -232,7 +232,7 @@ function TeamChatContainer() {
       {/* Redirect support */}
       <Switch>
         <Route exact path="/multi-agent/team-chat">
-          <Redirect to="/multi-agent/team-chat/chat" />
+          <Redirect to="/multi-agent/team-chat/builder/agent-portfolio" />
         </Route>
       </Switch>
     </Container>

@@ -215,6 +215,7 @@ http:
       service: "agent-service"
       entryPoints:
         - "web"
+      priority: 10
       middlewares:
         - "cors-headers"
         - "auth-middleware"
@@ -241,7 +242,7 @@ http:
         - "cors-headers"
         - "auth-middleware"
         - "security-headers"
-      
+
   # Services with consistent health check paths
   services:
     # Special API Health Status service
