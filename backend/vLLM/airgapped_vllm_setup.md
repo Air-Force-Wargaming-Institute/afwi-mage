@@ -178,10 +178,10 @@ Download these in the same way as the default model and update the paths accordi
 ### Parker Start Here
 
 1. Clone an llm from HuggingFace
-- ```git clone https://huggingface.co/huihui-ai/DeepSeek-R1-Distill-Llama-8B-abliterated```
+- ```git clone https://huggingface.co/huihui-ai/DeepHermes-3-Llama-3-8B-Preview-abliterated```
 
 2. Move the cloned folder into the top level of teh vLLM service
-- eg. ```backend/vLLM/DeepSeek-R1-Distill-Llama-8B-abliterated```
+- eg. ```backend/vLLM/DeepHermes-3-Llama-3-8B-Preview-abliterated```
 
 3. Clone the embedding model from HuggingFace
 - ```git clone https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF```

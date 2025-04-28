@@ -105,11 +105,7 @@ class Job(BaseModel):
     parameters: Optional[JobParameters] = Field(None, description="Parameters used for the job")
     result: Optional[JobResult] = Field(None, description="Result of the completed job")
     
-    class Config:
-        # Allow datetime serialization
-        json_encoders = {
-            datetime: lambda v: v.isoformat() if v else None
-        }
+    model_config = {}
         # Handle potential NaT values from pandas during loading if needed
         # This might require custom parsing logic if loading directly into Pydantic
         # For now, we assume clean data in the store
@@ -180,7 +176,7 @@ def save_jobs_to_store(jobs_data: Dict[str, Dict]):
                 # Use Pydantic's dict method for proper serialization, including datetimes
                 # We need to convert our dictionary of Job models back to serializable dicts
                 serializable_data = {
-                    job_id: Job(**job_dict).dict(exclude_none=True) 
+                    job_id: Job(**job_dict).model_dump(mode='json', exclude_none=True)
                     for job_id, job_dict in jobs_data.items()
                 }
                 json.dump(serializable_data, f, indent=2, cls=DateTimeEncoder)
@@ -208,7 +204,7 @@ def create_job_entry(job_id: str, job_type: str, parameters: Optional[Dict] = No
     )
     
     # Store the dictionary representation
-    jobs[job_id] = new_job.dict()
+    jobs[job_id] = new_job.model_dump(mode='json')
     save_jobs_to_store(jobs)
     logger.info(f"Created new job entry: ID={job_id}, Type={job_type}")
     return new_job # Return the Pydantic model instance

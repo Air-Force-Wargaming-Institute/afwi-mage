@@ -127,6 +127,10 @@ async def process_question(
             agent_instructions = {}
             agent_descriptions = {}
             agent_models = {}
+            try:
+                vectorstore = team.vectorstore[0]
+            except (AttributeError, IndexError, TypeError):
+                vectorstore = ''
             for agent_uuid in team.agents:
                 agent = available_agents.get(agent_uuid)
                 if agent:
@@ -141,7 +145,7 @@ async def process_question(
                 raise Exception(f"No valid agents found for team {team.name}")
                 
             logger.info(f"Loaded agents: {', '.join(agent_names)}")
-            logger.info(f"Team vectorstore: {team.vectorstore[0]}")
+            logger.info(f"Team vectorstore: {vectorstore}")
             # Add to inputs for graph processing
             inputs = {
                 "question": question,
@@ -152,7 +156,7 @@ async def process_question(
                 "expert_instructions": agent_instructions,
                 "expert_models": agent_models,
                 "plan": plan,
-                "vectorstore": team.vectorstore[0],
+                "vectorstore": vectorstore,
                 "selected_experts": selected_agents,
                 "session_id": session_id,
                 "plan_notes": plan_notes,
