@@ -1,0 +1,22 @@
+FROM node:18.20.8-slim
+WORKDIR /app
+
+# Copy package files
+COPY package.json package.json
+COPY package-lock.json package-lock.json
+
+# Copy the pre-built node_modules instead of running npm install
+COPY node_modules ./node_modules
+
+# Copy the rest of the application source code
+COPY . .
+
+# Build the React app
+RUN npm run build
+
+# Install serve globally from the local node_modules
+RUN cp -r /app/node_modules/serve /usr/local/lib/node_modules/ && \
+    ln -s /usr/local/lib/node_modules/serve/bin/serve.js /usr/local/bin/serve
+
+EXPOSE 3000
+CMD ["serve", "-s", "build", "-p", "3000"] 

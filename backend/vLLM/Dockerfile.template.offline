@@ -1,0 +1,18 @@
+FROM vllm/vllm-openai:latest
+
+# Default value for GPU count
+ARG GPU_COUNT=1
+ENV TP_SIZE=$GPU_COUNT
+
+# Create an entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+RUN mkdir -p /models/__MODEL_SUBFOLDER__
+COPY ./models/__MODEL_SUBFOLDER__ /models/__MODEL_SUBFOLDER__
+
+# Set offline mode for HuggingFace
+ENV HF_DATASETS_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_HUB_OFFLINE=1
+
+ENTRYPOINT ["/entrypoint.sh"] 

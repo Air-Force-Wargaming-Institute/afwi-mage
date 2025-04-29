@@ -141,3 +141,14 @@ data/conversation_logs/*
 
 #reference files
 backend/VLLM_Docs/*
+
+# Offline build packages
+/offline_packages/
+/offline_packages/images/
+/offline_packages/backend_wheels/
+/offline_packages/backend_debs/
+/offline_packages/nltk_data/
+frontend_node_modules.tar.gz
+
+# Docker images
+*.tar

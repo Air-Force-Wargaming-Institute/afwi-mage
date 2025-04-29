@@ -1,0 +1,9 @@
+FROM mage-common-offline:latest
+
+COPY requirements-MAGE-GPU.txt .
+
+RUN pip install --upgrade pip
+
+# Set environment variables for AI models
+ENV CUDA_VISIBLE_DEVICES=-1
+ENV PYTHONUNBUFFERED=1 
