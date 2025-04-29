@@ -38,60 +38,73 @@ $extraReqFileContent = $extraRequirements -join "`n"
 # Using Docker to ensure Linux compatibility and use pip-tools
 Write-Host "Running pip-compile and pip download in Docker container for each service..." -ForegroundColor Cyan
 
-# Mount the entire backend and the wheels directory
-$dockerCommand = "
-    set -e
-    echo 'Upgrading pip, wheel, and installing pip-tools...'
-    pip install --upgrade pip wheel pip-tools
-    
-    # Create file for extra requirements
-    echo \"$extraReqFileContent\" > /tmp/extra_reqs.in
+# Construct the multi-line bash command for Docker
+# Escape PowerShell variables ($) with backticks (`)
+# Escape internal double quotes (") with backticks (`)
 
-    echo 'Processing services...'
-"
+$escapedExtraReqFileContent = $extraReqFileContent -replace '`', '`' # Escape backticks within the content itself if any
+
+$dockerCommand = @"
+set -e
+echo 'Upgrading pip, wheel, and installing pip-tools...'
+pip install --upgrade pip wheel pip-tools
+
+# Create file for extra requirements
+# Use escaped quotes and variables for bash interpretation
+echo `"$escapedExtraReqFileContent`" > /tmp/extra_reqs.in
+
+echo 'Processing services...'
+"@
 
 foreach ($serviceDir in $serviceDirs) {
     $serviceName = $serviceDir.Name
+    # Escape any characters in service name that might interfere with bash paths if necessary (unlikely for typical names)
     $reqFilePathInContainer = "/backend/$serviceName/requirements.txt"
     $compiledReqFilePathInContainer = "/backend/$serviceName/requirements-compiled.txt"
     $wheelOutputDirInContainer = "/wheels/$serviceName"
     
     Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
     
-    $dockerCommand += "
-    echo '  Compiling requirements for $serviceName...'
-    mkdir -p $wheelOutputDirInContainer
-    
-    # Combine original requirements with extra requirements for compilation if needed
-    if [ -f \"$reqFilePathInContainer\" ]; then
-        # Use -allow-unsafe for potential dependencies like tesseract variant of layoutparser
-        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer $reqFilePathInContainer /tmp/extra_reqs.in 2>/dev/null || echo \"    WARN: pip-compile failed for $serviceName, trying without extra reqs\" && \
-        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer $reqFilePathInContainer
-    else
-        # If service has no requirements.txt, compile only the extras
-        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer /tmp/extra_reqs.in
-    fi
-    
-    echo \"    Downloading wheels for $serviceName based on $compiledReqFilePathInContainer...\"
-    if [ -f \"$compiledReqFilePathInContainer\" ]; then
-        pip download --dest $wheelOutputDirInContainer -r $compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo \"    WARN: Failed to download some wheels with only-binary for $serviceName\"
-        pip download --dest $wheelOutputDirInContainer -r $compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo \"    WARN: Failed to download some wheels for $serviceName\"
-    else
-        echo \"    WARN: No compiled requirements file found for $serviceName\"
-    fi
-"
+    # Append commands for this service, ensuring variables are escaped for BASH
+    $dockerCommand += @"
+
+echo '  Compiling requirements for `$serviceName...'
+mkdir -p `$wheelOutputDirInContainer
+
+# Combine original requirements with extra requirements for compilation if needed
+if [ -f `"$reqFilePathInContainer`" ]; then
+    # Use -allow-unsafe for potential dependencies like tesseract variant of layoutparser
+    # Use escaped variables `$compiledReqFilePathInContainer`, `$reqFilePathInContainer`
+    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer `$reqFilePathInContainer /tmp/extra_reqs.in 2>/dev/null || echo `"    WARN: pip-compile failed for `$serviceName, trying without extra reqs`" && \
+    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer `$reqFilePathInContainer
+else
+    # If service has no requirements.txt, compile only the extras
+    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer /tmp/extra_reqs.in
+fi
+
+echo `"    Downloading wheels for `$serviceName based on `$compiledReqFilePathInContainer...`"
+if [ -f `"$compiledReqFilePathInContainer`" ]; then
+    # Use escaped variable `$wheelOutputDirInContainer`, `$compiledReqFilePathInContainer`
+    pip download --dest `$wheelOutputDirInContainer -r `$compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo `"    WARN: Failed to download some wheels with only-binary for `$serviceName`"`
+    pip download --dest `$wheelOutputDirInContainer -r `$compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo `"    WARN: Failed to download some wheels for `$serviceName`"`
+else
+    echo `"    WARN: No compiled requirements file found for `$serviceName`"`
+fi
+"@
 }
 
-$dockerCommand += "
-    echo 'Backend wheel downloads complete.'
-"
+$dockerCommand += @"
+
+echo 'Backend wheel downloads complete.'
+"@
 
 try {
     # Run the combined commands in Docker
+    # Pass the command string directly to bash -c
     docker run --rm `
         -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
         -v "${backendPath}:/backend:ro" ` # Mount backend read-only
-        python:3.11-slim bash -c $dockerCommand
+        python:3.11-slim bash -c "$dockerCommand"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
