@@ -12,6 +12,7 @@ import logging
 import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
+import uuid
 
 from langchain_core.documents import Document
 from langchain_text_splitters import TextSplitter, RecursiveCharacterTextSplitter
@@ -183,8 +184,18 @@ def load_documents(
                 doc_level_metadata = file_metadata[file_path].copy()
             else:
                 logger.warning(f"No document-level metadata provided or found for {file_path}, using defaults.")
-                doc_level_metadata['source'] = file_path # Add source at least
+                # Ensure required fields for defaulting
+                doc_level_metadata['original_filename'] = os.path.basename(file_path)
                 doc_level_metadata['security_classification'] = "UNCLASSIFIED"
+                doc_level_metadata['document_id'] = f"doc_{uuid.uuid4()}" # Generate default ID
+
+            # Ensure document_id is present, generate if missing
+            if 'document_id' not in doc_level_metadata or not doc_level_metadata['document_id']:
+                doc_level_metadata['document_id'] = f"doc_{uuid.uuid4()}"
+
+            # Ensure original_filename is present
+            if 'original_filename' not in doc_level_metadata or not doc_level_metadata['original_filename']:
+                doc_level_metadata['original_filename'] = os.path.basename(file_path)
 
             # Ensure source and file_path are set in the base metadata for splitter
             doc_level_metadata['source'] = file_path
@@ -192,10 +203,14 @@ def load_documents(
 
             # Instantiate the splitter with the document-level metadata
             # This metadata will be inherited by all chunks from this document
+            # Pass chunk_size and chunk_overlap for potential use in fallback
             text_splitter = SemanticBlockSplitter(
-                max_block_size=max_block_size,
+                # max_block_size=max_block_size, # We removed this, using fallback instead
                 min_block_size=min_block_size,
-                document_metadata=doc_level_metadata # Pass doc metadata here
+                max_block_size_fallback=5000, # Example fallback size
+                document_metadata=doc_level_metadata, # Pass doc metadata here
+                chunk_size=max_block_size, # Pass for fallback splitter
+                chunk_overlap=int(max_block_size * 0.1) # Example overlap for fallback
             )
 
             # Process each raw document (e.g., each page of a PDF)

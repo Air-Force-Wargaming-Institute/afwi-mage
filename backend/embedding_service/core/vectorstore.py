@@ -132,8 +132,8 @@ class VectorStoreManager:
             name: Name of the vector store
             description: Description of the vector store
             documents: List of documents to add to the vector store
-            embedding_model: Embedding model to use
-            embedding_model_name: Name of the embedding model
+            embedding_model: Embedding model instance to use for THIS operation
+            embedding_model_name: Name/ID of the embedding model (to be stored in metadata)
             file_infos: List of file info dictionaries
             chunk_size: Size of each chunk
             chunk_overlap: Overlap between chunks
@@ -534,7 +534,7 @@ class VectorStoreManager:
         vectorstore_id: str, 
         query_or_embedding: Any, 
         top_k: int = 5, 
-        score_threshold: float = 0.5,
+        score_threshold: float = 1.0,
         allowed_classifications: Optional[List[str]] = None
     ):
         """
@@ -544,49 +544,55 @@ class VectorStoreManager:
             vectorstore_id: ID of the vector store to query
             query_or_embedding: Text query or embedding vector
             top_k: Number of results to return
-            score_threshold: Minimum similarity score threshold
+            score_threshold: Minimum similarity score threshold (interpreted as max distance for text queries, min relevance for vector queries)
             allowed_classifications: Optional list of chunk classifications to allow in results.
                                    If None or empty, no classification filtering is applied.
 
         Returns:
             List of results with text and metadata
         """
+        logger.info(f"Starting query for vectorstore {vectorstore_id}")
         try:
             # Load the vector store
             vs_dir = self.base_dir / vectorstore_id
             if not vs_dir.exists() or not vs_dir.is_dir():
                 logger.error(f"Vector store directory {vs_dir} not found")
                 return []
-                
+
             # Get embedding model from metadata
             metadata_file = vs_dir / "metadata.json"
             if not metadata_file.exists():
                 logger.error(f"Vector store metadata file not found: {metadata_file}")
                 return []
-                
+
             try:
-                metadata = load_metadata(metadata_file)
-                embedding_model_name = metadata.get("embedding_model", "/models/bge-base-en-v1.5")
+                vs_info_metadata = load_metadata(metadata_file)
+                if not vs_info_metadata:
+                    logger.error(f"Failed loading vector store metadata from {metadata_file}")
+                    return []
+                embedding_model_name = vs_info_metadata.get("embedding_model", "nomic-embed-text:latest")
+                logger.info(f"Using embedding model from metadata: {embedding_model_name}")
             except Exception as e:
                 logger.error(f"Error loading vector store metadata: {str(e)}")
                 return []
-                
-            # Get the embedding model
+
+            # Get the embedding model *instance* based on the stored name
             from core.embedding import get_embedding_model
-            embedding_model = get_embedding_model(embedding_model_name)
-            if not embedding_model:
-                logger.error(f"Could not load embedding model {embedding_model_name}")
+            embedding_function = get_embedding_model(embedding_model_name)
+            if not embedding_function:
+                logger.error(f"Could not load embedding model {embedding_model_name} specified in metadata")
                 return []
-            
-            # Load the vector store
+
+            # Load the vector store using the correct embedding function
             try:
                 from langchain_community.vectorstores import FAISS
                 # Allow deserialization for custom metadata
-                vectorstore = FAISS.load_local(str(vs_dir), embedding_model, allow_dangerous_deserialization=True)
+                vectorstore = FAISS.load_local(str(vs_dir), embedding_function, allow_dangerous_deserialization=True)
+                logger.info(f"Successfully loaded FAISS index from {vs_dir}")
             except Exception as e:
-                logger.error(f"Error loading vector store: {str(e)}")
+                logger.error(f"Error loading vector store with model {embedding_model_name}: {str(e)}")
                 return []
-            
+
             # Construct the filter dictionary if classifications are provided
             search_filter = None
             if allowed_classifications:
@@ -602,17 +608,40 @@ class VectorStoreManager:
                 logger.info("No classification filter applied.")
 
             # Process the query and get raw results
+            raw_results = [] # Initialize
+            query_was_text = False # Flag to know score type
+
+            # Log filter details before search
+            logger.info(f"Attempting search with filter: {search_filter}")
+            if search_filter:
+                # Test the filter function with sample metadata for debugging
+                sample_meta_pass = {"chunk_classification": allowed_classifications[0]} if allowed_classifications else {}
+                sample_meta_fail = {"chunk_classification": "SOME_OTHER_CLASS"}
+                try:
+                    logger.debug(f"  Filter test (should pass): {search_filter(sample_meta_pass)}")
+                    logger.debug(f"  Filter test (should fail): {search_filter(sample_meta_fail)}")
+                except Exception as filter_err:
+                     logger.error(f"  Error testing filter function: {filter_err}")
+
             if isinstance(query_or_embedding, str):
-                logger.debug(f"Performing text similarity search with k={top_k}, filter={search_filter is not None}")
+                query_was_text = True # Mark that we used text query
+                logger.info(f"Performing text similarity search with k={top_k}, threshold={score_threshold}, filter={search_filter is not None}") # Added logging
                 # For text queries, use similarity_search_with_score with the filter
-                raw_results = vectorstore.similarity_search_with_score(
-                    query_or_embedding, 
-                    k=top_k,
-                    filter=search_filter # Pass the filter here
-                )
+                # This returns DISTANCE score (lower is better)
+                try:
+                    raw_results = vectorstore.similarity_search_with_score(
+                        query_or_embedding,
+                        k=top_k,
+                        filter=search_filter # Pass the filter here
+                    )
+                    logger.info(f"FAISS similarity_search_with_score returned {len(raw_results)} raw results.") # Added logging
+                except Exception as search_err:
+                    logger.error(f"Error during FAISS similarity_search_with_score: {search_err}", exc_info=True)
+                    return []
             else:
                 # For vector queries, use similarity_search_by_vector with the filter
-                logger.debug(f"Performing vector similarity search with k={top_k}, filter={search_filter is not None}")
+                query_was_text = False # Mark that we used vector query
+                logger.info(f"Performing vector similarity search with k={top_k}, threshold={score_threshold}, filter={search_filter is not None}") # Added logging
                 if isinstance(query_or_embedding, list):
                     query_embedding = query_or_embedding
                 elif isinstance(query_or_embedding, np.ndarray):
@@ -620,100 +649,132 @@ class VectorStoreManager:
                 else:
                     logger.error(f"Unsupported embedding type: {type(query_or_embedding)}")
                     return []
-                
+
                 # FAISS similarity_search_by_vector_with_relevance_scores supports filtering
-                raw_results = vectorstore.similarity_search_by_vector_with_relevance_scores(
-                    embedding=query_embedding,
-                    k=top_k,
-                    filter=search_filter # Pass the filter here
-                )
-                # Note: relevance scores are already 0-1, higher is better.
-            
+                # This returns RELEVANCE score (0-1, higher is better)
+                try:
+                    # The score_threshold parameter likely needs to be applied *after* getting results
+                    raw_vector_results = vectorstore.similarity_search_by_vector_with_relevance_scores(
+                        embedding=query_embedding,
+                        k=top_k,
+                        filter=search_filter # Pass the filter here
+                    )
+                    logger.info(f"FAISS similarity_search_by_vector_with_relevance_scores returned {len(raw_vector_results)} raw results.") # Added logging
+                    # Convert to the same (doc, score) tuple format as similarity_search_with_score for consistent processing
+                    raw_results = [(doc, score) for doc, score in raw_vector_results]
+                except Exception as search_err:
+                    logger.error(f"Error during FAISS similarity_search_by_vector_with_relevance_scores: {search_err}", exc_info=True)
+                    return []
+
             # Process results into a standardized format
             results = []
-            for doc, score in raw_results:
-                # If using similarity_search_by_vector_with_relevance_scores, score is already 0-1
-                # If using similarity_search_with_score (cosine distance), need conversion
-                # Assuming score is relevance score (0-1) for simplicity now, adjust if needed
-                if score >= score_threshold:
+            logger.info(f"Processing {len(raw_results)} raw results with score_threshold={score_threshold} (Query was text: {query_was_text})")
+            for i, (doc, score) in enumerate(raw_results):
+                # If text query -> score is distance (lower is better)
+                # If vector query -> score is relevance (higher is better, 0-1)
+
+                passes_threshold = False
+                if query_was_text:
+                    # Handle distance score. Threshold likely needs adjustment.
+                    # A common approach is to set a max distance.
+                    # Let's assume score_threshold (default 0.5) needs interpretation.
+                    # If we interpret score_threshold=0.5 as meaning "distance must be <= 0.5",
+                    # then the low scores (0.21, 0.35) *should* pass.
+                    # Alternative: Convert to similarity? 1 - dist? Let's stick to distance threshold for now.
+                    # Let's make the threshold explicit: A distance threshold, maybe 1.0 is a better default?
+                    # For now, assume score_threshold applies directly to distance (lower is better).
+                    distance_threshold = score_threshold # Assume threshold is for distance when query is text
+                    if score <= distance_threshold:
+                        passes_threshold = True
+                    logger.debug(f"  Result {i}: Distance score={score:.4f}. Passes threshold ({distance_threshold})? {passes_threshold}")
+                else:
+                    # Handle relevance score (higher is better)
+                    relevance_threshold = score_threshold # Assume threshold is for relevance when query is vector
+                    if score >= relevance_threshold:
+                        passes_threshold = True
+                    logger.debug(f"  Result {i}: Relevance score={score:.4f}. Passes threshold ({relevance_threshold})? {passes_threshold}")
+
+                if passes_threshold:
                     result = {
                         "text": doc.page_content,
-                        "score": float(score), # Assuming score is already relevance
+                        "score": float(score), # Keep original score for now
                         "metadata": doc.metadata
                     }
                     # Log the chunk classification of results that pass the threshold
                     chunk_class = result["metadata"].get("chunk_classification", "Unknown")
-                    logger.debug(f"Result passing threshold (Score: {score:.4f}, Class: {chunk_class})")
+                    logger.debug(f"Result passing threshold (Score: {score:.4f}, Class: {chunk_class}) - Adding to final results.")
                     results.append(result)
                 else:
                     chunk_class = doc.metadata.get("chunk_classification", "Unknown")
                     logger.debug(f"Result below threshold (Score: {score:.4f}, Class: {chunk_class})")
 
+            logger.info(f"Processed results: {len(results)} chunks passed threshold.")
+
             # Enrich results with complete metadata from the vector store metadata file
-            vs_metadata = self.get_vectorstore_info(vectorstore_id)
-            if vs_metadata and "files" in vs_metadata:
+            if vs_info_metadata and "files" in vs_info_metadata:
                 # Create a lookup map of document_id to full file metadata
                 doc_metadata_map = {}
-                for file_info in vs_metadata.get("files", []):
+                for file_info in vs_info_metadata.get("files", []):
                     if "document_id" in file_info:
                         doc_metadata_map[file_info["document_id"]] = file_info
-                
-                logger.info(f"Created document metadata map with {len(doc_metadata_map)} entries for vectorstore {vectorstore_id}")
-                
+
+                logger.info(f"Starting metadata enrichment for {len(results)} results using map with {len(doc_metadata_map)} entries.") # Added logging
+                # --- Debug: Print the map contents ---
+                print("\n--- Debug: Contents of doc_metadata_map ---")
+                for doc_id, info in doc_metadata_map.items():
+                    print(f"  Doc ID: {doc_id}, Info Keys: {list(info.keys())}")
+                    # Optionally print the full info if needed for deeper debug
+                    # print(f"    Full Info: {info}")
+                print("--- End Map Contents ---\n")
+                # --- End Debug ---
+
                 # Enrich each result with the complete metadata
+                enriched_results = [] # Create a new list for enriched results
                 for i, result in enumerate(results):
+                    logger.debug(f"Enriching result {i}")
                     if "metadata" in result and "document_id" in result["metadata"]:
                         doc_id = result["metadata"]["document_id"]
-                        logger.debug(f"Processing result {i} with document_id: {doc_id}")
-                        
+                        logger.debug(f"  Found document_id: {doc_id}")
+
                         if doc_id in doc_metadata_map:
                             file_info = doc_metadata_map[doc_id]
-                            
-                            # Preserve chunk-specific metadata
-                            chunk_specific = {
-                                k: result["metadata"].get(k) 
-                                for k in ["chunk_id", "page", "chunk_index", "chunk_classification", "semantic_block_index"]
-                                if k in result["metadata"]
-                            }
-                            
-                            # Create a new enriched metadata dict that combines file metadata with chunk metadata
-                            enriched_metadata = {}
-                            
-                            # Start with document identification 
+                            logger.debug(f"  Found matching file_info in map: {list(file_info.keys())}")
+
+                            # Preserve chunk-specific metadata fields that should be kept
+                            chunk_keys_to_preserve = ["semantic_block_index", "sub_chunk_index", "split_reason", "page", "chunk_classification"]
+                            chunk_specific_data = { k: result["metadata"][k] for k in chunk_keys_to_preserve if k in result["metadata"] }
+                            logger.debug(f"  Preserved chunk_specific metadata: {list(chunk_specific_data.keys())}")
+
+                            # Start with the full file_info as the base for enriched metadata
+                            enriched_metadata = file_info.copy()
+                            # Ensure document_id from the chunk matches (should always be true here)
                             enriched_metadata["document_id"] = doc_id
-                            
-                            # Add filename fields
-                            if "filename" in file_info:
-                                enriched_metadata["filename"] = file_info["filename"]
-                            if "original_filename" in result["metadata"]:
-                                enriched_metadata["original_filename"] = result["metadata"]["original_filename"]
-                            elif "original_filename" in file_info:
+
+                            # Now, merge/override with the preserved chunk-specific data
+                            enriched_metadata.update(chunk_specific_data)
+
+                            # --- Explicitly ensure original_filename from file_info exists ---
+                            if "original_filename" in file_info and "original_filename" not in enriched_metadata:
                                 enriched_metadata["original_filename"] = file_info["original_filename"]
-                                
-                            # Add critical security classification fields (doc level)
-                            if "security_classification" in file_info:
-                                enriched_metadata["security_classification"] = file_info["security_classification"]
-                            # Add chunk classification (already in chunk_specific)
-                            if "chunk_classification" in chunk_specific:
-                                enriched_metadata["chunk_classification"] = chunk_specific["chunk_classification"]
-                            elif "chunk_classification" in file_info: # Fallback? Unlikely needed
-                                 enriched_metadata["chunk_classification"] = file_info["chunk_classification"]
-                            else:
+                            # --- End explicit check ---
+
+                            # Ensure filename/original_filename consistency (optional refinement)
+                            # If chunk had a specific filename, keep it? Unlikely.
+                            # Default to using filenames from file_info.
+                            if "filename" not in enriched_metadata and "original_filename" in enriched_metadata:
+                                enriched_metadata["filename"] = enriched_metadata["original_filename"]
+
+                            # Ensure chunk_classification is present (it should be from chunk_specific_data)
+                            if "chunk_classification" not in enriched_metadata:
                                 enriched_metadata["chunk_classification"] = enriched_metadata.get("security_classification", "UNCLASSIFIED")
-                            
-                            # Add any remaining fields from file_info
-                            for key, value in file_info.items():
-                                if key not in enriched_metadata and key != "document_id":
-                                    enriched_metadata[key] = value
-                            
-                            # Add/override with chunk-specific fields
-                            for key, value in chunk_specific.items():
-                                enriched_metadata[key] = value
-                                    
-                            # Update the result metadata
+                                logger.warning(f"  Had to fallback chunk_classification for doc_id {doc_id}")
+
+                            # Update the result metadata with the fully enriched version
                             result["metadata"] = enriched_metadata
-                            logger.debug(f"Enriched metadata for result {i}: {json.dumps(enriched_metadata)}")
-                    
+                            logger.debug(f"  Enriched metadata for result {i}: {list(enriched_metadata.keys())}")
+                        else:
+                             logger.warning(f"  Document ID {doc_id} from chunk not found in vectorstore metadata map.") # Added warning
+
                     # Ensure each result has filename and security_classification
                     if "metadata" in result:
                         metadata = result["metadata"]
@@ -723,10 +784,18 @@ class VectorStoreManager:
                             metadata["security_classification"] = "UNCLASSIFIED"
                         if "chunk_classification" not in metadata:
                             metadata["chunk_classification"] = metadata.get("security_classification", "UNCLASSIFIED") # Default chunk to doc level
-            
-            logger.info(f"Query returned {len(results)} results after score threshold and enrichment.")
-            return results
-            
+                    else:
+                        logger.warning(f"Result {i} is missing the 'metadata' field entirely.")
+                        result["metadata"] = {} # Add empty dict to avoid errors
+
+                    enriched_results.append(result)
+            else:
+                 logger.warning(f"Skipping enrichment because vectorstore metadata ({vectorstore_id}) or 'files' key is missing.")
+                 enriched_results = results
+
+            logger.info(f"Query processing complete. Returning {len(enriched_results)} enriched results.")
+            return enriched_results
+
         except Exception as e:
             logger.error(f"Error querying vector store {vectorstore_id}: {str(e)}", exc_info=True)
             return []
@@ -750,7 +819,7 @@ def create_vectorstore_metadata(
         name: Name of the vector store
         description: Description of the vector store
         embedding_model: Name of the embedding model
-        files: List of file info dictionaries
+        files: List of file info dictionaries (these will be stored as is)
         chunk_size: Size of text chunks
         chunk_overlap: Overlap between chunks
         

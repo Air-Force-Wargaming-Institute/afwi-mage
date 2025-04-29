@@ -28,7 +28,7 @@ from core.vectorstore import load_metadata, save_metadata, VectorStoreManager
 import traceback
 from core.llm import generate_with_best_model
 from api.llm import generate_query_prompt, get_llm_response
-from helpers import get_vectorstore_manager
+from .helpers import get_vectorstore_manager
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
