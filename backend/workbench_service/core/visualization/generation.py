@@ -38,12 +38,14 @@ async def generate_visualization_code(
     # Get LLM client
     llm = get_llm_client()
     
+    spreadsheet_name = spreadsheet_id + '.xlsx'
+
     # Build the prompt with comprehensive data context
     system_prompt = _build_system_prompt(use_seaborn)
-    user_prompt = _build_user_prompt(prompt, spreadsheet_id, use_seaborn, data_context)
+    user_prompt = _build_user_prompt(prompt, spreadsheet_name, use_seaborn, data_context)
     
     try:
-        code = await _generate_vis_code(system_prompt, user_prompt, use_seaborn, spreadsheet_id, data_context)
+        code = await _generate_vis_code(system_prompt, user_prompt, use_seaborn, spreadsheet_name, data_context)
         return code
     except Exception as e:
         logger.error(f"Error generating visualization code: {str(e)}", exc_info=True)
@@ -51,7 +53,7 @@ async def generate_visualization_code(
 
 def _build_system_prompt(use_seaborn: bool) -> str:
     """Build the system prompt for the LLM."""
-    library = "Seaborn and Matplotlib" if use_seaborn else "Matplotlib"
+    library = "Matplotlib"
     
     return f"""You are an expert data visualization Python programmer who specializes in creating clear, 
 informative, and visually appealing charts using {library}. Your task is to write Python code 
@@ -61,15 +63,17 @@ Follow these guidelines:
 1. Generate complete, executable Python code, ensuring that the code is self-contained and can be run directly. Make your variables one single word, no spaces
 2. Use pandas to load and process Excel data
 3. The Excel files always exist in the '/app/data/workbench/spreadsheets/' directory. Make sure you use this absolute path as a prefix to the filename
-4. Use {'seaborn (preferred) and matplotlib' if use_seaborn else 'matplotlib only'} for visualization
-5. Include appropriate labels, titles, and styling
-6. Handle errors gracefully
-7. Follow best practices for data visualization
-8. Use the actual column names from the data
-9. Write clean, well-commented code
+4. Make sure that the Excel files have the correct file extension of '.xlsx'. This extension needs to either be part of the filename variable, or appended to the filename variable when you attempt to use pandas to load the file
+5. Use only matplotlib for visualization
+6. Include appropriate labels, titles, and styling
+7. Always use a new color for each line in a line chart, bar in a bar chart, slice in a pie chart, etc. Never duplicate colors.
+8. Handle errors gracefully
+9. Follow best practices for data visualization
+10. Use the actual column names from the data
+11. Write clean, well-commented code
 
-The code must be complete and self-contained. Do not use placeholder comments like "# Add your code here".
-Return ONLY the Python code with no additional explanation before or after.
+The code must be complete and self-contained. Place all of your thoughts and comments to the user about how the python code you cretaed works using placeholder in-line comments such as "# these values are the values of the column 'column_name'" or "# this is the code that creates the styling for the chart".
+It is crucial that you ONLY return the Python code with no additional explanation before or after and you will be punalized if you return anything other than the Python code.
 """
 
 def _build_user_prompt(
@@ -82,8 +86,8 @@ def _build_user_prompt(
     
     # If no data context is provided, use a simplified prompt
     if not data_context:
-        return f"""Please create a Python script that generates a {'seaborn' if use_seaborn else 'matplotlib'} 
-visualization based on my request: "{prompt}"
+        return f"""Please create a Python script that generates a matplotlib 
+visualization based on the users request. Here is the users request: "{prompt}"
 
 The data is in an Excel file with ID: {spreadsheet_id}
 """
@@ -123,8 +127,8 @@ The data is in an Excel file with ID: {spreadsheet_id}
         for row in sample_rows:
             sample_str += "| " + " | ".join([str(cell) for cell in row]) + " |\n"
     
-    return f"""Please create a Python script that generates a {'seaborn' if use_seaborn else 'matplotlib'} 
-visualization based on my request: "{prompt}"
+    return f"""Please create a Python script that generates a matplotlib 
+visualization based on the users request. Here is the users request: "{prompt}"
 
 The data is in an Excel file with the following information:
 - Filename: {spreadsheet_id}
@@ -137,7 +141,7 @@ The data is in an Excel file with the following information:
 
 {sample_str}
 
-Use the appropriate columns and visualization type to best represent the request.
+Use the appropriate columns and visualization type to best acheive the intent of the users request.
 The code should load the Excel file using pandas and create the visualization.
 Make the visualization clear, professional, and easy to interpret.
 """

@@ -211,7 +211,7 @@ const ChartBuilder = () => {
       });
     } catch (err) {
       console.error('Error generating visualization:', err);
-      setLocalError('Failed to generate visualization: ' + err.message);
+      setLocalError('Failed to generate visualization: try generating again:' + err.message);
       setCodeResult({status: 'error', data: null});
     }
   };
@@ -241,6 +241,22 @@ const ChartBuilder = () => {
       // Keep the existing image URL/data if execution fails
       setCodeResult(prevResult => ({...prevResult, status: 'error'}));
     }
+  };
+  
+  // Handle exporting the visualization
+  const handleExportVisualization = () => {
+    if (!codeResult.data?.data_url) {
+      alert("No visualization available to export.");
+      return;
+    }
+    
+    const link = document.createElement('a');
+    link.href = codeResult.data.data_url;
+    // Suggest a filename - you could make this more dynamic using the title or prompt
+    link.download = codeResult.data.title ? `${codeResult.data.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png` : 'visualization.png';
+    document.body.appendChild(link); // Required for Firefox
+    link.click();
+    document.body.removeChild(link);
   };
   
   // Render data context information
@@ -796,9 +812,9 @@ const ChartBuilder = () => {
                     Visualization Preview
                   </Typography>
                   <DownloadButton
-                    onClick={() => alert('Export functionality would be implemented here')}
-                    tooltip="Export Visualization"
-                    disabled={(!dataContext || connectionError)}
+                    onClick={handleExportVisualization}
+                    tooltip="Export Visualization as PNG"
+                    disabled={!codeResult.data?.data_url || connectionError}
                   />
                 </Box>
                 
