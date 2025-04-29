@@ -51,7 +51,7 @@ foreach ($script in $scripts) {
                 Write-Host "Warning: $script completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
             }
         } catch {
-            Write-Host "Error running $script: $_" -ForegroundColor Red
+            Write-Host "Error running ${script}: ${_}" -ForegroundColor Red
         }
     } else {
         Write-Host "Script $script not found!" -ForegroundColor Red
