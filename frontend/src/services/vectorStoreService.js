@@ -94,9 +94,17 @@ export const deleteVectorStore = async (id, token) => {
  */
 export const testVectorStoreQuery = async (id, query, options = {}, token) => {
   try {
+    // Include allowed_classifications in the payload if provided
+    const payload = { 
+      query, 
+      top_k: options.top_k,
+      score_threshold: options.score_threshold,
+      allowed_classifications: options.allowed_classifications
+    };
+    
     const response = await axios.post(
       getGatewayUrl(`/api/embedding/vectorstores/${id}/query`), 
-      { query, ...options },
+      payload,
       {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -154,9 +162,19 @@ export const analyzeVectorStore = async (id, options = {}, token) => {
  */
 export const llmQueryVectorStore = async (id, query, options = {}, token) => {
   try {
+    // Include allowed_classifications in the payload if provided
+    const payload = { 
+      query, 
+      top_k: options.top_k,
+      score_threshold: options.score_threshold,
+      use_llm: options.use_llm,
+      include_sources: options.include_sources,
+      allowed_classifications: options.allowed_classifications
+    };
+    
     const response = await axios.post(
       getGatewayUrl(`/api/embedding/vectorstores/${id}/llm-query`),
-      { query, ...options },
+      payload,
       {
         headers: {
           'Authorization': `Bearer ${token}`
