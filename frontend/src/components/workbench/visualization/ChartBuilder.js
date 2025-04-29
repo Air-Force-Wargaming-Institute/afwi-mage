@@ -246,19 +246,36 @@ const ChartBuilder = () => {
   // Render data context information
   const renderDataContext = () => {
     if (!dataContext) return null;
+    // Add a check for column_schema before accessing its length
     if (dataContext.loading) return <CircularProgress size={20} />;
     if (dataContext.error) return <Alert severity="error">{dataContext.error}</Alert>;
     
+    // Ensure dataContext.column_schema exists and is an array before rendering details
+    if (!dataContext.column_schema || !Array.isArray(dataContext.column_schema)) {
+        // Optionally return null or a loading/error indicator if schema is not ready
+        // console.warn("DataContext received without column_schema array.");
+        return (
+            <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                  File Analysis Summary
+                </Typography>
+                 <Typography variant="body2" color="text.secondary">
+                     {dataContext.file_info?.name || 'Loading...'}: Analyzing columns...
+                 </Typography>
+            </SubtleGlowPaper>
+        );
+    }
+
     return (
       <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
         <Typography variant="subtitle2" fontWeight="600" gutterBottom>
           File Analysis Summary
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.schema.length} columns
+          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.column_schema.length} columns
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Columns: {dataContext.schema.map(col => col.name).join(', ')}
+          Columns: {dataContext.column_schema.map(col => col.name).join(', ')}
         </Typography>
       </SubtleGlowPaper>
     );
@@ -369,7 +386,18 @@ const ChartBuilder = () => {
                       <em>Select a file</em>
                     </MenuItem>
                     {/* Actual spreadsheets would be populated here */}
-                    <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem>
+                    {/* <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem> */}
+                    {spreadsheets && spreadsheets.length > 0 ? (
+                      spreadsheets.map((sheet) => (
+                        <MenuItem key={sheet.id} value={sheet.id}>
+                          {sheet.filename || sheet.original_filename || sheet.id} {/* Display name, fallback to ID */}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>
+                        {isLoading ? 'Loading spreadsheets...' : (connectionError ? 'Backend unavailable' : 'No spreadsheets uploaded')}
+                      </MenuItem>
+                    )}
                   </Select>
                 </FormControl>
                 {renderDataContext()}
