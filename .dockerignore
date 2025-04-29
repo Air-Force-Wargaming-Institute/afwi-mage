@@ -24,6 +24,6 @@ venv/
 # Ignore logs
 *.log
 
-# IMPORTANT: Do NOT ignore offline_packages for the build context
-# We need these files copied into the images during the offline build
-# !offline_packages/ 
+# IMPORTANT: Explicitly do NOT ignore offline_packages for the build context
+!offline_packages/
+!offline_packages/** 
