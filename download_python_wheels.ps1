@@ -1,17 +1,18 @@
-# Script to download Python wheel packages for offline use
+# Script to download Python wheel packages for offline use, separated by service
 # Run this on a machine with internet access
 
-# Create directories if they don't exist
-if (-not (Test-Path -Path "offline_packages/backend_wheels")) {
-    New-Item -Path "offline_packages/backend_wheels" -ItemType Directory -Force
+# Base directory for wheels
+$baseWheelDir = "offline_packages/backend_wheels"
+if (-not (Test-Path -Path $baseWheelDir)) {
+    New-Item -Path $baseWheelDir -ItemType Directory -Force
 }
 
-Write-Host "Starting to download Python wheel packages..." -ForegroundColor Green
+Write-Host "Starting to download Python wheel packages per service..." -ForegroundColor Green
 
-# Check if wheels have already been downloaded
-$wheelCount = (Get-ChildItem -Path "offline_packages/backend_wheels" -Filter "*.whl" | Measure-Object).Count
-if ($wheelCount -gt 0) {
-    Write-Host "Found $wheelCount wheel packages already downloaded." -ForegroundColor Cyan
+# Check if wheels have already been downloaded (check base dir, less precise now)
+$baseWheelCount = (Get-ChildItem -Path $baseWheelDir -Recurse -Filter "*.whl" | Measure-Object).Count
+if ($baseWheelCount -gt 0) {
+    Write-Host "Found existing wheel packages ($baseWheelCount) in subdirectories." -ForegroundColor Cyan
     $skipDownload = Read-Host "Do you want to skip downloading and use existing packages? (y/n)"
     if ($skipDownload.ToLower() -eq 'y') {
         Write-Host "Using existing wheel packages." -ForegroundColor Green
@@ -23,64 +24,74 @@ if ($wheelCount -gt 0) {
 # Get the absolute path to the current directory
 $currentPath = (Get-Location).Path
 
-# Create a temporary requirements file with all service requirements combined
-$tempRequirementsFile = Join-Path $env:TEMP "combined_requirements.txt"
-$serviceNames = @(
-    "core_service",
-    "chat_service",
-    "auth_service",
-    "agent_service",
-    "upload_service",
-    "wargame_service",
-    "embedding_service",
-    "workbench_service",
-    "extraction_service",
-    "generation_service",
-    "direct_chat_service",
-    "review_service"
+# Find all service directories with a requirements.txt file
+$backendPath = Join-Path $currentPath "backend"
+$serviceDirs = Get-ChildItem -Path $backendPath -Directory | Where-Object { Test-Path -Path (Join-Path $_.FullName "requirements.txt") }
+
+# Add extra requirements needed by some services but not always in requirements.txt (e.g., from template)
+$extraRequirements = @(
+    "pytesseract>=0.3",
+    "layoutparser[tesseract]>=0.3" 
 )
+$extraReqFileContent = $extraRequirements -join "`n"
 
-# Create empty file
-"# Combined requirements for all services" | Set-Content $tempRequirementsFile
+# Using Docker to ensure Linux compatibility and use pip-tools
+Write-Host "Running pip-compile and pip download in Docker container for each service..." -ForegroundColor Cyan
 
-foreach ($service in $serviceNames) {
-    $requirementsPath = Join-Path $currentPath "backend/$service/requirements.txt"
-    if (Test-Path $requirementsPath) {
-        Write-Host "Adding requirements from $service..." -ForegroundColor Cyan
-        Get-Content $requirementsPath | Add-Content $tempRequirementsFile
-        # Add a separator for readability
-        "`n# End of $service requirements`n" | Add-Content $tempRequirementsFile
-    } else {
-        Write-Host "Warning: Requirements file for $service not found at $requirementsPath" -ForegroundColor Yellow
-    }
+# Mount the entire backend and the wheels directory
+$dockerCommand = "
+    set -e
+    echo 'Upgrading pip, wheel, and installing pip-tools...'
+    pip install --upgrade pip wheel pip-tools
+    
+    # Create file for extra requirements
+    echo \"$extraReqFileContent\" > /tmp/extra_reqs.in
+
+    echo 'Processing services...'
+"
+
+foreach ($serviceDir in $serviceDirs) {
+    $serviceName = $serviceDir.Name
+    $reqFilePathInContainer = "/backend/$serviceName/requirements.txt"
+    $compiledReqFilePathInContainer = "/backend/$serviceName/requirements-compiled.txt"
+    $wheelOutputDirInContainer = "/wheels/$serviceName"
+    
+    Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
+    
+    $dockerCommand += "
+    echo '  Compiling requirements for $serviceName...'
+    mkdir -p $wheelOutputDirInContainer
+    
+    # Combine original requirements with extra requirements for compilation if needed
+    if [ -f \"$reqFilePathInContainer\" ]; then
+        # Use -allow-unsafe for potential dependencies like tesseract variant of layoutparser
+        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer $reqFilePathInContainer /tmp/extra_reqs.in 2>/dev/null || echo \"    WARN: pip-compile failed for $serviceName, trying without extra reqs\" && \
+        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer $reqFilePathInContainer
+    else
+        # If service has no requirements.txt, compile only the extras
+        pip-compile --allow-unsafe --resolver=backtracking --output-file=$compiledReqFilePathInContainer /tmp/extra_reqs.in
+    fi
+    
+    echo \"    Downloading wheels for $serviceName based on $compiledReqFilePathInContainer...\"
+    if [ -f \"$compiledReqFilePathInContainer\" ]; then
+        pip download --dest $wheelOutputDirInContainer -r $compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo \"    WARN: Failed to download some wheels with only-binary for $serviceName\"
+        pip download --dest $wheelOutputDirInContainer -r $compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo \"    WARN: Failed to download some wheels for $serviceName\"
+    else
+        echo \"    WARN: No compiled requirements file found for $serviceName\"
+    fi
+"
 }
 
-# Add pytesseract/layoutparser
-"# Additional dependencies" | Add-Content $tempRequirementsFile
-"pytesseract>=0.3" | Add-Content $tempRequirementsFile
-"layoutparser[tesseract]>=0.3" | Add-Content $tempRequirementsFile
-
-# Using Docker to ensure Linux compatibility
-Write-Host "Running pip download in Docker container..." -ForegroundColor Cyan
-
-# Copy the combined requirements to a location accessible by Docker
-$dockerRequirementsPath = Join-Path $currentPath "offline_packages/combined_requirements.txt"
-Copy-Item -Path $tempRequirementsFile -Destination $dockerRequirementsPath -Force
+$dockerCommand += "
+    echo 'Backend wheel downloads complete.'
+"
 
 try {
-    # Use Docker to download Python packages
+    # Run the combined commands in Docker
     docker run --rm `
         -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
-        -v "${dockerRequirementsPath}:/requirements.txt" `
-        python:3.11-slim bash -c "
-            set -e
-            echo 'Upgrading pip and wheel...'
-            pip install --upgrade pip wheel
-            echo 'Downloading packages...'
-            pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: || echo 'Some packages could not be downloaded as wheels, trying without binary restriction...'
-            pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 || echo 'Some packages could not be downloaded.'
-            echo 'Backend wheel downloads complete.'
-        "
+        -v "${backendPath}:/backend:ro" ` # Mount backend read-only
+        python:3.11-slim bash -c $dockerCommand
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
@@ -88,15 +99,7 @@ try {
     }
 } catch {
     Write-Host "Error running Docker command: $_" -ForegroundColor Red
-} finally {
-    # Clean up temporary files
-    if (Test-Path $tempRequirementsFile) {
-        Remove-Item -Path $tempRequirementsFile -Force
-    }
-    if (Test-Path $dockerRequirementsPath) {
-        Remove-Item -Path $dockerRequirementsPath -Force
-    }
 }
 
-$finalWheelCount = (Get-ChildItem -Path "offline_packages/backend_wheels" -Filter "*.whl" | Measure-Object).Count
-Write-Host "Python wheel packages have been downloaded to offline_packages/backend_wheels/ ($finalWheelCount packages)" -ForegroundColor Green 
+$finalWheelCount = (Get-ChildItem -Path $baseWheelDir -Recurse -Filter "*.whl" | Measure-Object).Count
+Write-Host "Python wheel packages have been downloaded to service-specific subdirectories under $baseWheelDir ($finalWheelCount total packages)" -ForegroundColor Green 
