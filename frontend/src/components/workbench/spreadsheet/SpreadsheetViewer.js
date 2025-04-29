@@ -183,7 +183,7 @@ const SpreadsheetViewer = () => {
   const handleDownloadSpreadsheet = async (spreadsheetId, filename) => {
     try {
       // Construct the download URL using apiBaseUrl
-      const baseUrl = `http://10.11.45.216:8020/api/workbench/spreadsheets`
+      const baseUrl = `http://localhost:8020/api/workbench/spreadsheets`
       
       const downloadUrl = `${baseUrl}/${spreadsheetId}/download`;
       

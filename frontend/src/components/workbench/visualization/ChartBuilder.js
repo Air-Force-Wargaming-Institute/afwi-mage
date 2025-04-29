@@ -195,12 +195,11 @@ const ChartBuilder = () => {
     const request = {
       spreadsheet_id: selectedFile,
       visualization_type: selectedChartType,
-      description: vizRequest,
-      preferences: {
-        use_seaborn: useSeaborn,
-        style: selectedStyle,
-        color_palette: selectedPalette
-      }
+      prompt: vizRequest,
+      use_seaborn: useSeaborn,
+      style: selectedStyle,
+      color_palette: selectedPalette,
+      data_context: dataContext
     };
     
     try {
@@ -212,7 +211,7 @@ const ChartBuilder = () => {
       });
     } catch (err) {
       console.error('Error generating visualization:', err);
-      setLocalError('Failed to generate visualization: ' + err.message);
+      setLocalError('Failed to generate visualization: try generating again:' + err.message);
       setCodeResult({status: 'error', data: null});
     }
   };
@@ -239,26 +238,60 @@ const ChartBuilder = () => {
     } catch (err) {
       console.error('Error executing code:', err);
       setLocalError('Failed to execute code: ' + err.message);
-      setCodeResult({...codeResult, status: 'error'});
+      // Keep the existing image URL/data if execution fails
+      setCodeResult(prevResult => ({...prevResult, status: 'error'}));
     }
+  };
+  
+  // Handle exporting the visualization
+  const handleExportVisualization = () => {
+    if (!codeResult.data?.data_url) {
+      alert("No visualization available to export.");
+      return;
+    }
+    
+    const link = document.createElement('a');
+    link.href = codeResult.data.data_url;
+    // Suggest a filename - you could make this more dynamic using the title or prompt
+    link.download = codeResult.data.title ? `${codeResult.data.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png` : 'visualization.png';
+    document.body.appendChild(link); // Required for Firefox
+    link.click();
+    document.body.removeChild(link);
   };
   
   // Render data context information
   const renderDataContext = () => {
     if (!dataContext) return null;
+    // Add a check for column_schema before accessing its length
     if (dataContext.loading) return <CircularProgress size={20} />;
     if (dataContext.error) return <Alert severity="error">{dataContext.error}</Alert>;
     
+    // Ensure dataContext.column_schema exists and is an array before rendering details
+    if (!dataContext.column_schema || !Array.isArray(dataContext.column_schema)) {
+        // Optionally return null or a loading/error indicator if schema is not ready
+        // console.warn("DataContext received without column_schema array.");
+        return (
+            <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                  File Analysis Summary
+                </Typography>
+                 <Typography variant="body2" color="text.secondary">
+                     {dataContext.file_info?.name || 'Loading...'}: Analyzing columns...
+                 </Typography>
+            </SubtleGlowPaper>
+        );
+    }
+
     return (
       <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
         <Typography variant="subtitle2" fontWeight="600" gutterBottom>
           File Analysis Summary
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.schema.length} columns
+          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.column_schema.length} columns
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Columns: {dataContext.schema.map(col => col.name).join(', ')}
+          Columns: {dataContext.column_schema.map(col => col.name).join(', ')}
         </Typography>
       </SubtleGlowPaper>
     );
@@ -369,7 +402,18 @@ const ChartBuilder = () => {
                       <em>Select a file</em>
                     </MenuItem>
                     {/* Actual spreadsheets would be populated here */}
-                    <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem>
+                    {/* <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem> */}
+                    {spreadsheets && spreadsheets.length > 0 ? (
+                      spreadsheets.map((sheet) => (
+                        <MenuItem key={sheet.id} value={sheet.id}>
+                          {sheet.filename || sheet.original_filename || sheet.id} {/* Display name, fallback to ID */}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>
+                        {isLoading ? 'Loading spreadsheets...' : (connectionError ? 'Backend unavailable' : 'No spreadsheets uploaded')}
+                      </MenuItem>
+                    )}
                   </Select>
                 </FormControl>
                 {renderDataContext()}
@@ -768,9 +812,9 @@ const ChartBuilder = () => {
                     Visualization Preview
                   </Typography>
                   <DownloadButton
-                    onClick={() => alert('Export functionality would be implemented here')}
-                    tooltip="Export Visualization"
-                    disabled={(!dataContext || connectionError)}
+                    onClick={handleExportVisualization}
+                    tooltip="Export Visualization as PNG"
+                    disabled={!codeResult.data?.data_url || connectionError}
                   />
                 </Box>
                 
@@ -781,27 +825,49 @@ const ChartBuilder = () => {
                   overflow: 'hidden',
                   backgroundColor: '#1A1A1A',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  minHeight: '300px', // Ensure minimum height
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
                 }}>
-                  {dataContext && dataContext.loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-                      <CircularProgress size={40} />
-                    </Box>
-                  ) : dataContext && dataContext.error ? (
-                    <Alert severity="error">{dataContext.error}</Alert>
-                  ) : (
-                    <Box>
+                  {codeResult.status === 'loading' ? (
+                    <CircularProgress size={40} />
+                  ) : codeResult.status === 'error' ? (
+                    <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
+                      {localError || "Failed to generate or execute visualization."}
+                    </Alert>
+                  ) : codeResult.data?.data_url ? (
+                    <Box sx={{ width: '100%' }}>
                       <img
-                        src={FakePlotImage}
-                        alt="Generated visualization"
-                        style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain' }}
+                        // Use the data_url directly from the codeResult state
+                        src={codeResult.data.data_url} 
+                        alt={codeResult.data.title || "Generated Visualization"} // Use title for alt text if available
+                        style={{ 
+                          display: 'block', // Prevents extra space below image
+                          width: '100%', 
+                          height: 'auto', 
+                          maxHeight: '500px', 
+                          objectFit: 'contain' 
+                        }}
+                        // Add error handling for the image itself
+                        onError={(e) => {
+                          e.target.onerror = null; // Prevent infinite loop if placeholder also fails
+                          setLocalError("Failed to load visualization image from the server.");
+                        }}
                       />
                       <Box sx={{ p: 2 }}>
                         <Typography variant="body2" color="text.secondary">
-                          {vizRequest || "Sales data across different products showing monthly trends"}
+                          {/* You might want to display the actual title/prompt used if available */}
+                          {vizRequest || "Generated visualization based on your request."} 
                         </Typography>
                       </Box>
                     </Box>
+                  ) : (
+                     // Default state before generation or if no image URL is present
+                    <Typography variant="body2" color="text.secondary">
+                      {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
+                    </Typography>
                   )}
                 </SubtleGlowPaper>
               </Box>
