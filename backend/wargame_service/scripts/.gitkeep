@@ -1,0 +1,4 @@
+# Add utility or maintenance scripts here later if needed.
+# For example:
+# - reset_data.py: Script to clear the wargames storage.
+# - migrate_schema.py: Script to handle data schema migrations if storage changes. 
