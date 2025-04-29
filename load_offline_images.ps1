@@ -9,7 +9,7 @@ try {
     $existingImages = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -ne "<none>:<none>" }
     Write-Host "Found $($existingImages.Count) existing Docker images" -ForegroundColor Cyan
 } catch {
-    Write-Host "Warning: Could not retrieve existing Docker images: $_" -ForegroundColor Yellow
+    Write-Host "Warning: Could not retrieve existing Docker images: ${_}" -ForegroundColor Yellow
 }
 
 # Function to extract image name from tar file
@@ -38,7 +38,7 @@ function Get-ImageNameFromTar {
             }
         }
     } catch {
-        Write-Host "Warning: Could not extract image name from $tarPath: $_" -ForegroundColor Yellow
+        Write-Host "Warning: Could not extract image name from ${tarPath}: ${_}" -ForegroundColor Yellow
     }
     
     # Default: If we can't extract the name, return the filename-based guess
