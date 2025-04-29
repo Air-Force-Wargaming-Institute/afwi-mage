@@ -39,11 +39,8 @@ $extraReqFileContent = $extraRequirements -join "`n"
 Write-Host "Running pip-compile and pip download in Docker container for each service..." -ForegroundColor Cyan
 
 # Construct the multi-line bash command for Docker
-# Escape PowerShell variables ($) with backticks (`)
-# Escape internal double quotes (") with backticks (`)
-# Use single quotes within BASH echo to prevent interpretation of special chars like []
-
-$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\''" # Escape single quotes for BASH single-quoted string
+# Escape single quotes within the extra requirements content for bash echo
+$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\\''"
 
 $dockerCommand = @"
 set -e
@@ -51,7 +48,6 @@ echo 'Upgrading pip, wheel, and installing pip-tools...'
 pip install --upgrade pip wheel pip-tools
 
 # Create file for extra requirements
-# Use single quotes in BASH to treat content literally
 echo '$escapedExtraReqFileContent' > /tmp/extra_reqs.in
 
 echo 'Processing services...'
@@ -59,37 +55,41 @@ echo 'Processing services...'
 
 foreach ($serviceDir in $serviceDirs) {
     $serviceName = $serviceDir.Name
-    # Escape any characters in service name that might interfere with bash paths if necessary (unlikely for typical names)
-    $reqFilePathInContainer = "/backend/$serviceName/requirements.txt"
-    $compiledReqFilePathInContainer = "/backend/$serviceName/requirements-compiled.txt"
-    $wheelOutputDirInContainer = "/wheels/$serviceName"
+    # Escape single quotes in service name just in case, for bash variable assignment
+    $escapedServiceNameForBash = $serviceName -replace "'", "'\\''"
     
     Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
     
-    # Append commands for this service, ensuring variables are escaped for BASH
+    # Append commands for this service, using BASH variables
+    # Note: We escape the $ for BASH variables with backslash `\` so PowerShell passes it literally
     $dockerCommand += @"
 
-echo '  Compiling requirements for `$serviceName...'
-mkdir -p `$wheelOutputDirInContainer
+echo '  Processing service: $escapedServiceNameForBash'
+# Define BASH variables for paths
+SERVICE_NAME='$escapedServiceNameForBash'
+REQ_FILE="/backend/$SERVICE_NAME/requirements.txt"
+COMPILED_REQ_FILE="/backend/$SERVICE_NAME/requirements-compiled.txt"
+WHEEL_DIR="/wheels/$SERVICE_NAME"
+
+echo "  Compiling requirements for $SERVICE_NAME..."
+mkdir -p "$WHEEL_DIR" # Use BASH variable with quotes
 
 # Combine original requirements with extra requirements for compilation if needed
-if [ -f `"$reqFilePathInContainer`" ]; then
-    # Use -allow-unsafe for potential dependencies like tesseract variant of layoutparser
-    # Use escaped variables `$compiledReqFilePathInContainer`, `$reqFilePathInContainer`
-    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer `$reqFilePathInContainer /tmp/extra_reqs.in 2>/dev/null || echo `"    WARN: pip-compile failed for `$serviceName, trying without extra reqs`" && \
-    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer `$reqFilePathInContainer
+if [ -f "$REQ_FILE" ]; then
+    # Use BASH variables with quotes
+    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" "$REQ_FILE" /tmp/extra_reqs.in 2>/dev/null || echo "    WARN: pip-compile failed for $SERVICE_NAME, trying without extra reqs" && \
+    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" "$REQ_FILE"
 else
-    # If service has no requirements.txt, compile only the extras
-    pip-compile --allow-unsafe --resolver=backtracking --output-file=`$compiledReqFilePathInContainer /tmp/extra_reqs.in
+    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" /tmp/extra_reqs.in
 fi
 
-echo `"    Downloading wheels for `$serviceName based on `$compiledReqFilePathInContainer...`"
-if [ -f `"$compiledReqFilePathInContainer`" ]; then
-    # Use escaped variable `$wheelOutputDirInContainer`, `$compiledReqFilePathInContainer`
-    pip download --dest `$wheelOutputDirInContainer -r `$compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo `"    WARN: Failed to download some wheels with only-binary for `$serviceName`"`
-    pip download --dest `$wheelOutputDirInContainer -r `$compiledReqFilePathInContainer --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo `"    WARN: Failed to download some wheels for `$serviceName`"`
+echo "    Downloading wheels for $SERVICE_NAME based on $COMPILED_REQ_FILE..."
+if [ -f "$COMPILED_REQ_FILE" ]; then
+    # Use BASH variables with quotes
+    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo "    WARN: Failed to download some wheels with only-binary for $SERVICE_NAME"
+    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo "    WARN: Failed to download some wheels for $SERVICE_NAME"
 else
-    echo `"    WARN: No compiled requirements file found for `$serviceName`"`
+    echo "    WARN: No compiled requirements file found for $SERVICE_NAME"
 fi
 "@
 }
@@ -101,7 +101,7 @@ echo 'Backend wheel downloads complete.'
 
 try {
     # Run the combined commands in Docker
-    # Pass the command string directly to bash -c, ensure docker run is on one line
+    # Pass the command string directly to bash -c
     docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${backendPath}:/backend:ro" python:3.11-slim bash -c "$dockerCommand"
 
     if ($LASTEXITCODE -ne 0) {
