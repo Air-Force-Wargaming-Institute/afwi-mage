@@ -58,7 +58,10 @@ class VisualizationRequest(BaseModel):
     """Request to generate a visualization from natural language."""
     spreadsheet_id: str = Field(..., description="ID of the spreadsheet to visualize")
     prompt: str = Field(..., description="Natural language description of the desired visualization")
+    visualization_type: str = Field(..., description="Type of visualization to generate; can be 'bar', 'line', 'pie', 'scatter', 'heatmap'")
     use_seaborn: bool = Field(True, description="Whether to use seaborn for visualization")
+    style: str = Field(..., description="Style of the visualization")
+    color_palette: str = Field(..., description="Color palette of the visualization")
     data_context: Optional[DataContext] = Field(None, description="Comprehensive data context")
 
 class CodeExecutionRequest(BaseModel):
@@ -111,20 +114,39 @@ async def generate_visualization(request: VisualizationRequest, background_tasks
         title = request.prompt.split('.')[0].strip()
         if len(title) > 50:
             title = title[:47] + "..."
+
+        # Convert Pydantic model to dict if it exists
+        data_context_dict = request.data_context.model_dump() if request.data_context else None
         
         # Generate the visualization code using the LLM
+        print(f"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$Generating visualization code for spreadsheet: {request.spreadsheet_id}")
         code = await generate_visualization_code(
             request.prompt,
             request.spreadsheet_id,
             request.use_seaborn,
-            request.data_context
+            data_context_dict
         )
         
+        print(f"Generated code: {code}")
+
         # Execute the generated code
-        image_path, image_data = await execute_visualization_code(
-            code, 
-            visualization_id
+        # Execute the provided code
+        result= await execute_visualization_code(
+            visualization_id,
+            code,
+            data_context_dict
         )
+
+        if result.get('success'):
+            image_data = result.get('image_data')
+            file_path = result.get('file_path')
+            output_filename = result.get('output_filename')
+            data_url = result.get('data_url')
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to execute code: {result.get('error')}"
+            )
         
         # Create the visualization object
         visualization = {
@@ -134,8 +156,10 @@ async def generate_visualization(request: VisualizationRequest, background_tasks
             "prompt": request.prompt,
             "code": code,
             "created_at": datetime.utcnow().isoformat(),
-            "image_url": f"/api/workbench/visualizations/{visualization_id}/image",
-            "image_data": image_data  # Include base64 data in the response
+            #image_url": f"/api/workbench/visualizations/{visualization_id}/image",
+            "image_url": file_path + output_filename,
+            "image_data": image_data,
+            "data_url": data_url
         }
         
         return visualization
@@ -162,10 +186,21 @@ async def execute_code(visualization_id: str, request: CodeExecutionRequest):
     
     try:
         # Execute the provided code
-        image_path, image_data = await execute_visualization_code(
-            request.code, 
-            visualization_id
+        result= await execute_visualization_code(
+            visualization_id,
+            request.code
         )
+
+        if result.get('success'):
+            image_data = result.get('image_data')
+            file_path = result.get('file_path')
+            output_filename = result.get('output_filename')
+            data_url = result.get('data_url')
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to execute code: {result.get('error')}"
+            )
         
         # In a real implementation, this would update the visualization in storage
         return {
@@ -175,8 +210,10 @@ async def execute_code(visualization_id: str, request: CodeExecutionRequest):
             "prompt": "Original prompt",  # This would be retrieved from storage
             "code": request.code,
             "created_at": datetime.utcnow().isoformat(),
-            "image_url": f"/api/workbench/visualizations/{visualization_id}/image",
-            "image_data": image_data
+            #"image_url": f"/api/workbench/visualizations/{visualization_id}/image",
+            "image_url": file_path + output_filename,
+            "image_data": image_data,
+            "data_url": data_url
         }
     except Exception as e:
         logger.error(f"Error executing visualization code: {str(e)}", exc_info=True)
@@ -229,5 +266,5 @@ async def get_visualization(visualization_id: str):
         "prompt": "Show me a bar chart of sales by region",
         "code": "import matplotlib.pyplot as plt...",
         "created_at": "2023-08-01T12:00:00Z",
-        "image_url": f"/api/workbench/visualizations/{visualization_id}/image"
+        "image_url": f"/api/workbench/visualizations/{visualization_id}/"
     } 

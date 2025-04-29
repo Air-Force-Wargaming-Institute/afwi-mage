@@ -115,7 +115,7 @@ const TranscriptionDisplay = () => {
       
       // For development, use a placeholder URL - this will actually throw an error
       // but the implementation structure is correct for when backend is available
-      const wsUrl = `ws://10.11.45.216:8000/api/transcription/stream/${sessionId}`;
+      const wsUrl = `ws://localhost:8000/api/transcription/stream/${sessionId}`;
       
       // Instead of creating an actual connection, we'll fake it for now
       console.log(`[WebSocket] Connecting to ${wsUrl}`);

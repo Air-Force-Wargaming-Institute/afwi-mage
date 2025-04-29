@@ -7,6 +7,7 @@ using LLMs with comprehensive data context from Excel files.
 
 import logging
 import json
+import re
 from typing import Dict, Any, Optional, List
 
 # Import LLM integration
@@ -42,12 +43,8 @@ async def generate_visualization_code(
     user_prompt = _build_user_prompt(prompt, spreadsheet_id, use_seaborn, data_context)
     
     try:
-        # In a real implementation, this would call the LLM
-        # response = await llm.generate(system_prompt, user_prompt)
-        # return response.code
-        
-        # For now, return a hard-coded example
-        return _generate_example_code(prompt, use_seaborn, data_context)
+        code = await _generate_vis_code(system_prompt, user_prompt, use_seaborn, spreadsheet_id, data_context)
+        return code
     except Exception as e:
         logger.error(f"Error generating visualization code: {str(e)}", exc_info=True)
         raise
@@ -61,14 +58,15 @@ informative, and visually appealing charts using {library}. Your task is to writ
 that creates the visualization described in the user's request based on their data.
 
 Follow these guidelines:
-1. Generate complete, executable Python code
+1. Generate complete, executable Python code, ensuring that the code is self-contained and can be run directly. Make your variables one single word, no spaces
 2. Use pandas to load and process Excel data
-3. Use {'seaborn (preferred) and matplotlib' if use_seaborn else 'matplotlib only'} for visualization
-4. Include appropriate labels, titles, and styling
-5. Handle errors gracefully
-6. Follow best practices for data visualization
-7. Use the actual column names from the data
-8. Write clean, well-commented code
+3. The Excel files always exist in the '/app/data/workbench/spreadsheets/' directory. Make sure you use this absolute path as a prefix to the filename
+4. Use {'seaborn (preferred) and matplotlib' if use_seaborn else 'matplotlib only'} for visualization
+5. Include appropriate labels, titles, and styling
+6. Handle errors gracefully
+7. Follow best practices for data visualization
+8. Use the actual column names from the data
+9. Write clean, well-commented code
 
 The code must be complete and self-contained. Do not use placeholder comments like "# Add your code here".
 Return ONLY the Python code with no additional explanation before or after.
@@ -129,7 +127,7 @@ The data is in an Excel file with ID: {spreadsheet_id}
 visualization based on my request: "{prompt}"
 
 The data is in an Excel file with the following information:
-- Filename: {file_info.get('name', 'data.xlsx')}
+- Filename: {spreadsheet_id}
 - Sheets: {', '.join(file_info.get('sheets', ['Sheet1']))}
 - Total rows: {row_count}
 
@@ -143,6 +141,63 @@ Use the appropriate columns and visualization type to best represent the request
 The code should load the Excel file using pandas and create the visualization.
 Make the visualization clear, professional, and easy to interpret.
 """
+
+async def _generate_vis_code(
+    system_prompt: str,
+    user_prompt: str,
+    use_seaborn: bool,
+    spreadsheet_id: str,
+    data_context: Optional[Dict[str, Any]]
+) -> str:
+    """Generate visualization code using the system and user prompts."""
+    # Get LLM client
+    llm = get_llm_client()
+    
+    try:
+        # Use the LLM to generate code based on the system and user prompts
+        llm_response = await llm.generate(system_prompt, user_prompt)
+        print(llm_response)
+        response_content = None
+        if llm.llm_provider == 'ollama':
+            if message_data := llm_response.get('message'):
+                response_content = message_data.get('content')
+        elif llm.llm_provider == 'vllm':
+            if choices := llm_response.get('choices'):
+                if isinstance(choices, list) and len(choices) > 0:
+                    if message_data := choices[0].get('message'):
+                        response_content = message_data.get('content')
+
+        if not response_content:
+            logger.error(f"Failed to extract code from LLM response. Raw response: {llm_response}")
+            raise ValueError("LLM response did not contain the expected code content.")
+
+        logger.info("Successfully received code from LLM.")
+
+
+        # # Often, LLMs wrap the code in markdown backticks, let's try to remove them
+        # cleaned_code = response_content.strip()
+        # if cleaned_code.startswith("```python"):
+        #     cleaned_code = cleaned_code[len("```python"):].strip()
+        # elif cleaned_code.startswith("```"):
+        #      cleaned_code = cleaned_code[len("```"):].strip()
+        # if cleaned_code.endswith("```"):
+        #     cleaned_code = cleaned_code[:-len("```")].strip()
+        # return cleaned_code
+        # Try to extract code block using regex
+        match = re.search(r"```(?:python)?\s*(.*?)\s*```", response_content, re.DOTALL)
+
+        if match:
+            llm_code = match.group(1).strip()
+        else:
+            # If no backticks found, assume the whole response is the code
+            llm_code = response_content.strip()
+
+        logger.info("Successfully extracted/cleaned code from LLM response.")
+        return llm_code
+    except Exception as e:
+        logger.error(f"Error during LLM code generation: {str(e)}", exc_info=True)
+        # Re-raise the exception to be handled by the calling function
+        raise
 
 def _generate_example_code(
     prompt: str, 

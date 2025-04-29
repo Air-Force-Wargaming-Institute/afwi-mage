@@ -195,12 +195,11 @@ const ChartBuilder = () => {
     const request = {
       spreadsheet_id: selectedFile,
       visualization_type: selectedChartType,
-      description: vizRequest,
-      preferences: {
-        use_seaborn: useSeaborn,
-        style: selectedStyle,
-        color_palette: selectedPalette
-      }
+      prompt: vizRequest,
+      use_seaborn: useSeaborn,
+      style: selectedStyle,
+      color_palette: selectedPalette,
+      data_context: dataContext
     };
     
     try {
@@ -809,27 +808,49 @@ const ChartBuilder = () => {
                   overflow: 'hidden',
                   backgroundColor: '#1A1A1A',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  minHeight: '300px', // Ensure minimum height
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
                 }}>
-                  {dataContext && dataContext.loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-                      <CircularProgress size={40} />
-                    </Box>
-                  ) : dataContext && dataContext.error ? (
-                    <Alert severity="error">{dataContext.error}</Alert>
-                  ) : (
-                    <Box>
+                  {codeResult.status === 'loading' ? (
+                    <CircularProgress size={40} />
+                  ) : codeResult.status === 'error' ? (
+                    <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
+                      {localError || "Failed to generate or execute visualization."}
+                    </Alert>
+                  ) : codeResult.data?.image_data ? (
+                    <Box sx={{ width: '100%' }}>
                       <img
-                        src={FakePlotImage}
-                        alt="Generated visualization"
-                        style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain' }}
+                        // Use the image_url from the codeResult state, prepended with apiBaseUrl
+                        src={`${codeResult.data.data_url}`} 
+                        alt={`${codeResult.data.data_url}`}
+                        style={{ 
+                          display: 'block', // Prevents extra space below image
+                          width: '100%', 
+                          height: 'auto', 
+                          maxHeight: '500px', 
+                          objectFit: 'contain' 
+                        }}
+                        // Add error handling for the image itself
+                        onError={(e) => {
+                          e.target.onerror = null; // Prevent infinite loop if placeholder also fails
+                          setLocalError("Failed to load visualization image from the server.");
+                        }}
                       />
                       <Box sx={{ p: 2 }}>
                         <Typography variant="body2" color="text.secondary">
-                          {vizRequest || "Sales data across different products showing monthly trends"}
+                          {/* You might want to display the actual title/prompt used if available */}
+                          {vizRequest || "Generated visualization based on your request."} 
                         </Typography>
                       </Box>
                     </Box>
+                  ) : (
+                     // Default state before generation or if no image URL is present
+                    <Typography variant="body2" color="text.secondary">
+                      {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
+                    </Typography>
                   )}
                 </SubtleGlowPaper>
               </Box>

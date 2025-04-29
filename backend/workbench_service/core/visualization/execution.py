@@ -42,7 +42,7 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate a filename for this visualization output
-    output_filename = f"{visualization_id}_{uuid.uuid4().hex[:8]}.png"
+    output_filename = f"{visualization_id}.png"
     output_path = output_dir / output_filename
     
     # Clear any existing plots
@@ -89,7 +89,8 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
                 "success": True,
                 "image_url": public_url,
                 "data_url": data_url,
-                "file_path": str(output_path)
+                "output_filename": output_filename,
+                "file_path": "/app/data/workbench/spreadsheets/visualizations/"
             }
         else:
             return {
