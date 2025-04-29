@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, Grid, Card, CardContent, CardActionArea, Divider, Chip, Button } from '@material-ui/core';
+import {
+  Typography,
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  CardActionArea,
+  Divider,
+  Chip,
+  Button,
+  CircularProgress,
+  Snackbar
+} from '@material-ui/core';
+import Alert from '@material-ui/lab/Alert';
 import { makeStyles } from '@material-ui/core/styles';
 import { StyledContainer, GradientText, GradientBorderCard } from '../../../styles/StyledComponents';
 import { AddButton, DeleteButton, EditButton, CopyButton } from '../../../styles/ActionButtons';
@@ -9,6 +22,8 @@ import CalendarTodayIcon from '@material-ui/icons/CalendarToday';
 import UpdateIcon from '@material-ui/icons/Update';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import AddIcon from '@material-ui/icons/Add';
+import { listWargames, createWargame, deleteWargame, getWargame } from '../../../services/wargameService';
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@material-ui/core';
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -70,6 +85,12 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'flex-start',
     marginBottom: theme.spacing(1),
   },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '300px',
+  },
 }));
 
 function WargamesListPage() {
@@ -79,73 +100,44 @@ function WargamesListPage() {
   const [selectedWargame, setSelectedWargame] = useState(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [wargameToDelete, setWargameToDelete] = useState(null);
-  
-  // Initialize with mock data - we'll use localStorage to persist wargames
-  const [wargameBuilds, setWargameBuilds] = useState(() => {
-    try {
-      // Try to load wargames from localStorage
-      const savedWargames = localStorage.getItem('wargameBuilds');
-      if (savedWargames) {
-        return JSON.parse(savedWargames);
-      }
-      
-      // Default mock data if no saved wargames
-      return [
-        { 
-          id: '1', 
-          name: 'East Asia Confrontation', 
-          description: 'Analysis of potential conflicts in the South China Sea',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'UNCLASSIFIED'
-        },
-        { 
-          id: '2', 
-          name: 'European Energy Crisis', 
-          description: 'Experimentation of European responses to energy infrastructure disruption',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'CONFIDENTIAL'
-        },
-        { 
-          id: '3', 
-          name: 'EUCOM & PACOM Dual Theater Wargame', 
-          description: 'Experimentation of a global crisis, dual theater wargame in European and Pacific theaters',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'CONFIDENTIAL'
-        },
-      ];
-    } catch (error) {
-      console.error("Error loading wargame builds from localStorage:", error);
-      return [];
-    }
-  });
+  const [wargameBuilds, setWargameBuilds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Save wargames to localStorage whenever they change
   useEffect(() => {
+    const fetchWargames = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await listWargames();
+        setWargameBuilds(data || []);
+      } catch (err) {
+        console.error("Error fetching wargame list:", err);
+        setError(err.message || "Failed to load wargames.");
+        setWargameBuilds([]);
+      }
+      setLoading(false);
+    };
+
+    fetchWargames();
+  }, []);
+
+  const handleOpenCreateModal = () => setIsCreateModalOpen(true);
+  const handleCloseCreateModal = () => setIsCreateModalOpen(false);
+
+  const handleOpenEditorModal = async (wargameSummary) => {
+    setLoading(true);
+    setError(null);
     try {
-      localStorage.setItem('wargameBuilds', JSON.stringify(wargameBuilds));
-    } catch (error) {
-      console.error("Error saving wargame builds to localStorage:", error);
+      const fullWargameData = await getWargame(wargameSummary.id);
+      setSelectedWargame(fullWargameData);
+      setIsEditorModalOpen(true);
+    } catch (err) {
+      console.error(`Error fetching full wargame data for ${wargameSummary.id}:`, err);
+      setError(err.message || `Failed to load wargame '${wargameSummary.name}'.`);
+    } finally {
+      setLoading(false);
     }
-  }, [wargameBuilds]);
-
-  const handleOpenCreateModal = () => {
-    setIsCreateModalOpen(true);
-  };
-
-  const handleCloseCreateModal = () => {
-    setIsCreateModalOpen(false);
-  };
-
-  const handleOpenEditorModal = (wargame) => {
-    console.log("Opening editor for wargame:", wargame);
-    setSelectedWargame(wargame);
-    setIsEditorModalOpen(true);
   };
 
   const handleCloseEditorModal = () => {
@@ -153,69 +145,82 @@ function WargamesListPage() {
     setSelectedWargame(null);
   };
 
-  const handleCreateWargame = (wargameData) => {
-    console.log("Creating new wargame build:", wargameData); 
-    
-    // Create a new wargame object with an ID
-    const newWargame = {
-      id: Date.now().toString(), // Simple ID generation
-      ...wargameData,
-      createdAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
-      lastExecuted: null
-    };
-    
-    // Add it to our list of wargames
-    const updatedWargames = [...wargameBuilds, newWargame];
-    setWargameBuilds(updatedWargames);
-    
-    // Close the create modal
-    handleCloseCreateModal();
-    
-    // Open the editor modal for the new wargame
-    setTimeout(() => handleOpenEditorModal(newWargame), 100);
+  const handleCreateWargame = async (wargameData) => {
+    setError(null);
+    try {
+      const newWargame = await createWargame(wargameData);
+      setWargameBuilds(prevBuilds => [...prevBuilds, newWargame]);
+      handleCloseCreateModal();
+      setSelectedWargame(newWargame);
+      setIsEditorModalOpen(true);
+    } catch (err) {
+      console.error("Error creating wargame:", err);
+      setError(err.message || "Failed to create wargame.");
+    }
   };
 
-  // New handlers for the action buttons
-  const handleDuplicateWargame = (event, wargame) => {
-    event.stopPropagation(); // Prevent event bubbling to card click
-
-    // Create a duplicate with a new ID and updated timestamps
-    const duplicatedWargame = {
-      ...wargame,
-      id: Date.now().toString(),
-      name: `${wargame.name} (Copy)`,
-      createdAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
-      lastExecuted: null
-    };
-    
-    setWargameBuilds([...wargameBuilds, duplicatedWargame]);
+  const handleDuplicateWargame = async (event, wargame) => {
+    event.stopPropagation();
+    setError(null);
+    setLoading(true);
+    try {
+      const fullWargameToDuplicate = await getWargame(wargame.id);
+      const duplicatedWargameData = {
+        ...fullWargameToDuplicate,
+        id: undefined,
+        name: `${fullWargameToDuplicate.name} (Copy)`,
+        createdAt: undefined,
+        modifiedAt: undefined,
+        lastExecuted: null,
+      };
+      delete duplicatedWargameData.id;
+      delete duplicatedWargameData.createdAt;
+      delete duplicatedWargameData.modifiedAt;
+      const newWargame = await createWargame(duplicatedWargameData);
+      setWargameBuilds(prevBuilds => [...prevBuilds, newWargame]);
+    } catch (err) {
+      console.error("Error duplicating wargame:", err);
+      setError(err.message || "Failed to duplicate wargame.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteWargame = (event, wargameId) => {
-    event.stopPropagation(); // Prevent event bubbling to card click
-    
-    const updatedWargames = wargameBuilds.filter(wargame => wargame.id !== wargameId);
-    setWargameBuilds(updatedWargames);
+  const handleDeleteWargameClick = (event, wargame) => {
+    event.stopPropagation();
+    setWargameToDelete(wargame);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  const handleCloseConfirmDelete = () => {
+    setIsConfirmDeleteOpen(false);
+    setWargameToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!wargameToDelete) return;
+    setError(null);
+    try {
+      await deleteWargame(wargameToDelete.id);
+      setWargameBuilds(prevBuilds => prevBuilds.filter(wg => wg.id !== wargameToDelete.id));
+    } catch (err) {
+      console.error("Error deleting wargame:", err);
+      setError(err.message || `Failed to delete wargame '${wargameToDelete.name}'.`);
+    } finally {
+      handleCloseConfirmDelete();
+    }
   };
 
   const handleEditWargame = (event, wargame) => {
-    event.stopPropagation(); // Prevent event bubbling to card click
+    event.stopPropagation();
     handleOpenEditorModal(wargame);
   };
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'Not available';
-    
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric'
-      });
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch (error) {
       return 'Invalid date';
     }
@@ -236,24 +241,40 @@ function WargamesListPage() {
           Create New Wargame Build
         </Button>
       </Box>
-      
-      {wargameBuilds.length > 0 ? (
+
+      {loading && (
+        <Box className={classes.loadingContainer}>
+          <CircularProgress />
+          <Typography style={{ marginLeft: 16 }}>Loading Wargames...</Typography>
+        </Box>
+      )}
+
+      {error && !loading && (
+        <Box my={2}>
+          <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>
+        </Box>
+      )}
+
+      {!loading && wargameBuilds.length === 0 && !error && (
+        <Box className={classes.noBuildsMessage}>
+          <Typography variant="body1" paragraph>You haven't created any wargame builds yet.</Typography>
+          <Typography variant="body2" color="textSecondary">Click the '+' button above to create your first wargame build.</Typography>
+        </Box>
+      )}
+
+      {!loading && wargameBuilds.length > 0 && (
         <Grid container spacing={3}>
           {wargameBuilds.map((wargame) => (
             <Grid item xs={12} sm={6} md={4} key={wargame.id}>
               <GradientBorderCard className={classes.card}>
-                <CardActionArea 
+                <CardActionArea
                   className={classes.cardActionArea}
                   onClick={() => handleOpenEditorModal(wargame)}
                 >
                   <CardContent className={classes.cardContent}>
                     <Box className={classes.cardHeader}>
-                      <GradientText variant="h6" component="h2">
-                        {wargame.name}
-                      </GradientText>
+                      <GradientText variant="h6" component="h2">{wargame.name}</GradientText>
                     </Box>
-                    
-                    {/* Add Designer field */}
                     {wargame.designer && (
                       <Typography variant="body2" style={{ 
                         marginBottom: '8px',
@@ -264,68 +285,27 @@ function WargamesListPage() {
                         <b>Designer:</b>&nbsp;{wargame.designer}
                       </Typography>
                     )}
-                    
-                    <Typography variant="body2" color="textSecondary" component="p">
-                      {wargame.description}
-                    </Typography>
-                    
+                    <Typography variant="body2" color="textSecondary" component="p">{wargame.description}</Typography>
                     <Box className={classes.dateInfo}>
                       <Divider style={{ margin: '8px 0' }} />
-                      
-                      <Box className={classes.dateItem}>
-                        <CalendarTodayIcon className={classes.dateIcon} />
-                        <Typography variant="caption">
-                          Created: {formatDate(wargame.createdAt)}
-                        </Typography>
-                      </Box>
-                      
-                      <Box className={classes.dateItem}>
-                        <UpdateIcon className={classes.dateIcon} />
-                        <Typography variant="caption">
-                          Modified: {formatDate(wargame.modifiedAt)}
-                        </Typography>
-                      </Box>
-                      
-                      <Box className={classes.dateItem}>
-                        <PlayArrowIcon className={classes.dateIcon} />
-                        <Typography variant="caption">
-                          Last Executed: {formatDate(wargame.lastExecuted)}
-                        </Typography>
-                      </Box>
+                      <Box className={classes.dateItem}><CalendarTodayIcon className={classes.dateIcon} /><Typography variant="caption">Created: {formatDate(wargame.createdAt)}</Typography></Box>
+                      <Box className={classes.dateItem}><UpdateIcon className={classes.dateIcon} /><Typography variant="caption">Modified: {formatDate(wargame.modifiedAt)}</Typography></Box>
+                      <Box className={classes.dateItem}><PlayArrowIcon className={classes.dateIcon} /><Typography variant="caption">Last Executed: {formatDate(wargame.lastExecuted)}</Typography></Box>
                     </Box>
                   </CardContent>
                 </CardActionArea>
-                
                 <Box className={classes.actionsContainer}>
-                  <CopyButton 
-                    tooltip="Duplicate Wargame"
-                    onClick={(e) => handleDuplicateWargame(e, wargame)}
-                  />
-                  <EditButton 
-                    tooltip="Edit Wargame"
-                    onClick={(e) => handleEditWargame(e, wargame)}
-                  />
-                  <DeleteButton 
-                    tooltip="Delete Wargame"
-                    onClick={(e) => handleDeleteWargame(e, wargame.id)}
-                  />
+                  <CopyButton tooltip="Duplicate Wargame" onClick={(e) => handleDuplicateWargame(e, wargame)} />
+                  <EditButton tooltip="Edit Wargame" onClick={(e) => handleEditWargame(e, wargame)} />
+                  <DeleteButton tooltip="Delete Wargame" onClick={(e) => handleDeleteWargameClick(e, wargame)} />
                 </Box>
               </GradientBorderCard>
             </Grid>
           ))}
         </Grid>
-      ) : (
-        <Box className={classes.noBuildsMessage}>
-          <Typography variant="body1" paragraph>
-            You haven't created any wargame builds yet.
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Click the '+' button above to create your first wargame build.
-          </Typography>
-        </Box>
       )}
 
-      <CreateWargameModal 
+      <CreateWargameModal
         open={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onCreate={handleCreateWargame}
@@ -336,6 +316,34 @@ function WargamesListPage() {
         onClose={handleCloseEditorModal}
         wargameData={selectedWargame}
       />
+
+      <Dialog
+        open={isConfirmDeleteOpen}
+        onClose={handleCloseConfirmDelete}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete the wargame build "{wargameToDelete?.name}"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirmDelete} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="secondary" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setError(null)} severity="error" variant="filled">
+          {error}
+        </Alert>
+      </Snackbar>
     </StyledContainer>
   );
 }

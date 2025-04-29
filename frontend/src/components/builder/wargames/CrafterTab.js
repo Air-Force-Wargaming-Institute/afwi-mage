@@ -406,26 +406,17 @@ function CrafterTab({ wargameData, onChange }) {
   // Check if all nation relationships are defined
   useEffect(() => {
     if (selectedNations.length < 2) {
-      // Need at least 2 nations to have relationships
       setRelationshipsComplete(false);
       return;
     }
     
-    // Calculate total number of nation pairs (combinations)
+    // Count how many relationships we should have
     const totalPairsNeeded = (selectedNations.length * (selectedNations.length - 1)) / 2;
     
-    // Count how many relationships are defined
+    // Count defined relationships
     const definedRelationships = Object.values(nationRelationships).filter(rel => rel.type).length;
     
-    // Add debug logging
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Relationships: ${definedRelationships}/${totalPairsNeeded} defined`, 
-        { selectedNations, nationRelationships });
-    }
-    
-    // Allow overriding relationship check with debug flag in localStorage
-    const debugMode = localStorage.getItem('theater-debug-mode') === 'true';
-    setRelationshipsComplete(definedRelationships >= totalPairsNeeded || debugMode);
+    setRelationshipsComplete(definedRelationships >= totalPairsNeeded);
   }, [selectedNations, nationRelationships]);
 
   // Clear recently added effect after a delay
@@ -805,23 +796,6 @@ function CrafterTab({ wargameData, onChange }) {
   // Handle notification close
   const handleCloseNotification = () => {
     setNotification(null);
-  };
-  
-  // Debug helper to toggle theater debug mode (development only)
-  const toggleDebugMode = () => {
-    const currentMode = localStorage.getItem('theater-debug-mode') === 'true';
-    localStorage.setItem('theater-debug-mode', (!currentMode).toString());
-    
-    setNotification({
-      message: `Theater debug mode ${!currentMode ? 'enabled' : 'disabled'}`,
-      severity: !currentMode ? 'warning' : 'info'
-    });
-    
-    // Force re-evaluation of relationshipsComplete
-    const totalPairsNeeded = (selectedNations.length * (selectedNations.length - 1)) / 2;
-    const definedRelationships = Object.values(nationRelationships).filter(rel => rel.type).length;
-    const debugMode = !currentMode;
-    setRelationshipsComplete(definedRelationships >= totalPairsNeeded || debugMode);
   };
   
   // Handle saving the entire theaters configuration
@@ -1218,7 +1192,6 @@ function CrafterTab({ wargameData, onChange }) {
                     nations={selectedNations}
                     theaters={theaters}
                     onChange={handleUpdateTheaters}
-                    wargameId={wargameData.id}
                   />
                   
                   {!relationshipsComplete && (
@@ -1229,9 +1202,6 @@ function CrafterTab({ wargameData, onChange }) {
                       </Typography>
                       <Typography variant="body2">
                         Please define all relationships between nations on the main screen before configuring theaters of conflict.
-                      </Typography>
-                      <Typography variant="body2" color="error" style={{ marginTop: '8px' }}>
-                        {`Nations available: ${selectedNations.length}, Relationships defined: ${Object.values(nationRelationships).filter(rel => rel.type).length} of ${(selectedNations.length * (selectedNations.length - 1)) / 2} required`}
                       </Typography>
                     </Box>
                   )}
