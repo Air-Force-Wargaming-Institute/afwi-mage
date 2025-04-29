@@ -19,7 +19,7 @@ services:
       - CPU_OFFLOAD_GB=8
       # GPU Allocation - 80% split across both GPUs
       - GPU_MEMORY_UTILIZATION=0.88
-      - CUDA_VISIBLE_DEVICES=0,1
+      - CUDA_VISIBLE_DEVICES=0
       # - GPU_MEMORY_UTILIZATION=0.8
       # - CUDA_VISIBLE_DEVICES=0,1
       - NCCL_P2P_DISABLE=1
@@ -29,8 +29,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              #count: 1
-              count: 2
+              count: 1
+              #count: 2
               capabilities: [gpu]
     networks:
       - app-network
@@ -43,10 +43,10 @@ services:
     #   --max-model-len=65536
     #   --tensor-parallel-size=2
     command: >
-      --model /models/DeepSeek-R1-Distill-Llama-8B-abliterated
-      --tokenizer /models/DeepSeek-R1-Distill-Llama-8B-abliterated
+      --model /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
+      --tokenizer /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
       --dtype=half
       --gpu-memory-utilization=0.88
-      --max-model-len=65536
-      --tensor-parallel-size=2
+      --max-model-len=16384
+      --tensor-parallel-size=1
     restart: unless-stopped
