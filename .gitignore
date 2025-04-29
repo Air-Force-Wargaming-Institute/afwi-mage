@@ -155,3 +155,6 @@ frontend_node_modules.tar.gz
 
 # Docker images
 *.tar
+
+# Backup files
+*.original
