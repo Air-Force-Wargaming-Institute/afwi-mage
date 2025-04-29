@@ -95,7 +95,7 @@ foreach ($serviceDir in $serviceDirs) {
             $overallSuccess = $false
         }
     } catch {
-        Write-Host "Error running Docker command for $serviceName: $_" -ForegroundColor Red
+        Write-Host "Error running Docker command for $($serviceName): $_" -ForegroundColor Red
         $overallSuccess = $false
     }
 }
