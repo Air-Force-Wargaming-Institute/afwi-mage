@@ -40,7 +40,7 @@ Write-Host "Running pip-compile and pip download in Docker container for each se
 
 # Construct the multi-line bash command for Docker
 # Escape single quotes within the extra requirements content for bash echo
-$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\\''"
+$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\''" 
 
 $dockerCommand = @"
 set -e
@@ -56,14 +56,14 @@ echo 'Processing services...'
 foreach ($serviceDir in $serviceDirs) {
     $serviceName = $serviceDir.Name
     # Escape single quotes in service name just in case, for bash variable assignment
-    $escapedServiceNameForBash = $serviceName -replace "'", "'\\''"
+    $escapedServiceNameForBash = $serviceName -replace "'", "'\''" 
     
     Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
     
-    # Append commands for this service, using BASH variables
-    # Note: We escape the $ for BASH variables with backslash `\` so PowerShell passes it literally
+    # Append commands for this service, using BASH variables AND adding debugging
     $dockerCommand += @"
 
+echo '--------------------------------------------------'
 echo '  Processing service: $escapedServiceNameForBash'
 # Define BASH variables for paths
 SERVICE_NAME='$escapedServiceNameForBash'
@@ -71,26 +71,67 @@ REQ_FILE="/backend/$SERVICE_NAME/requirements.txt"
 COMPILED_REQ_FILE="/backend/$SERVICE_NAME/requirements-compiled.txt"
 WHEEL_DIR="/wheels/$SERVICE_NAME"
 
+echo "  Using REQ_FILE: $REQ_FILE"
+echo "  Using COMPILED_REQ_FILE: $COMPILED_REQ_FILE"
+echo "  Using WHEEL_DIR: $WHEEL_DIR"
+
 echo "  Compiling requirements for $SERVICE_NAME..."
 mkdir -p "$WHEEL_DIR" # Use BASH variable with quotes
+COMPILE_CMD1="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" \"$REQ_FILE\" /tmp/extra_reqs.in"
+COMPILE_CMD2="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" \"$REQ_FILE\""
+COMPILE_CMD3="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" /tmp/extra_reqs.in"
+COMPILE_EXIT_CODE=0
 
-# Combine original requirements with extra requirements for compilation if needed
 if [ -f "$REQ_FILE" ]; then
-    # Use BASH variables with quotes
-    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" "$REQ_FILE" /tmp/extra_reqs.in 2>/dev/null || echo "    WARN: pip-compile failed for $SERVICE_NAME, trying without extra reqs" && \
-    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" "$REQ_FILE"
+    $COMPILE_CMD1 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
+    if [ $COMPILE_EXIT_CODE -ne 0 ]; then
+        echo "    WARN: pip-compile (with extra reqs) failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE. Trying without..."
+        echo "    Compile error log (if any):"
+        cat /tmp/pip_compile_error.log || echo "    No error log found."
+        COMPILE_EXIT_CODE=0 # Reset for next try
+        $COMPILE_CMD2 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
+        if [ $COMPILE_EXIT_CODE -ne 0 ]; then
+             echo "    ERROR: pip-compile (without extra reqs) also failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE."
+             echo "    Compile error log (if any):"
+             cat /tmp/pip_compile_error.log || echo "    No error log found."
+        fi
+    fi
 else
-    pip-compile --allow-unsafe --resolver=backtracking --output-file="$COMPILED_REQ_FILE" /tmp/extra_reqs.in
+    echo "    INFO: No requirements.txt found for $SERVICE_NAME. Compiling only extra reqs."
+    $COMPILE_CMD3 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
+    if [ $COMPILE_EXIT_CODE -ne 0 ]; then
+        echo "    ERROR: pip-compile (only extra reqs) failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE."
+        echo "    Compile error log (if any):"
+        cat /tmp/pip_compile_error.log || echo "    No error log found."
+    fi
 fi
+rm -f /tmp/pip_compile_error.log # Clean up log file
+echo "  Finished compiling for $SERVICE_NAME (Compile Exit Code: $COMPILE_EXIT_CODE)"
 
-echo "    Downloading wheels for $SERVICE_NAME based on $COMPILED_REQ_FILE..."
-if [ -f "$COMPILED_REQ_FILE" ]; then
-    # Use BASH variables with quotes
-    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps || echo "    WARN: Failed to download some wheels with only-binary for $SERVICE_NAME"
-    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --no-deps || echo "    WARN: Failed to download some wheels for $SERVICE_NAME"
+
+if [ -f "$COMPILED_REQ_FILE" ] && [ $COMPILE_EXIT_CODE -eq 0 ]; then
+    echo "    Downloading wheels for $SERVICE_NAME based on $COMPILED_REQ_FILE..."
+    DOWNLOAD_EXIT_CODE1=0
+    DOWNLOAD_EXIT_CODE2=0
+    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps 2>/tmp/pip_download_error.log || DOWNLOAD_EXIT_CODE1=$?
+    if [ $DOWNLOAD_EXIT_CODE1 -ne 0 ]; then
+        echo "    WARN: Failed to download some wheels with only-binary for $SERVICE_NAME (Exit Code: $DOWNLOAD_EXIT_CODE1). Retrying without restriction..."
+        echo "    Download error log (if any):"
+        cat /tmp/pip_download_error.log || echo "    No error log found."
+        pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --no-deps 2>/tmp/pip_download_error.log || DOWNLOAD_EXIT_CODE2=$?
+        if [ $DOWNLOAD_EXIT_CODE2 -ne 0 ]; then
+             echo "    ERROR: Failed to download some wheels even without only-binary for $SERVICE_NAME (Exit Code: $DOWNLOAD_EXIT_CODE2)."
+             echo "    Download error log (if any):"
+             cat /tmp/pip_download_error.log || echo "    No error log found."
+        fi
+    fi
+    rm -f /tmp/pip_download_error.log # Clean up log file
+    echo "    Finished downloading wheels for $SERVICE_NAME."
 else
-    echo "    WARN: No compiled requirements file found for $SERVICE_NAME"
+    echo "    WARN: Skipping wheel download for $SERVICE_NAME (No compiled file or compile failed)."
 fi
+echo '--------------------------------------------------'
+
 "@
 }
 
