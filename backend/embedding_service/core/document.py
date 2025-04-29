@@ -12,6 +12,7 @@ import logging
 import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
+import uuid
 
 from langchain_core.documents import Document
 from langchain_text_splitters import TextSplitter, RecursiveCharacterTextSplitter
@@ -25,6 +26,7 @@ from langchain_community.document_loaders import (
     UnstructuredHTMLLoader,
     UnstructuredMarkdownLoader
 )
+from .semantic_block_splitter import SemanticBlockSplitter
 
 # Set up logging
 logger = logging.getLogger("embedding_service")
@@ -130,137 +132,134 @@ def copy_files_to_staging(
 
 def load_documents(
     file_paths: List[str],
-    chunk_size: int = 1000,
-    chunk_overlap: int = 100,
-    file_metadata: Optional[Dict[str, Dict[str, Any]]] = None
+    file_metadata: Optional[Dict[str, Dict[str, Any]]] = None,
+    max_block_size: int = 1500,
+    min_block_size: int = 50
 ) -> Tuple[List[Document], List[str]]:
     """
-    Load documents from the specified file paths and split them into chunks.
-    
+    Load documents from the specified file paths and split them into semantic blocks.
+
     Args:
         file_paths: List of file paths to load
-        chunk_size: Size of text chunks
-        chunk_overlap: Overlap between chunks
-        file_metadata: Optional metadata for each file
-        
+        file_metadata: Optional metadata for each file (document level)
+        max_block_size: Max characters for a semantic block chunk.
+        min_block_size: Min characters for a semantic block chunk.
+
     Returns:
-        Tuple of (list of documents, list of skipped files)
+        Tuple of (list of documents chunked semantically, list of skipped files)
     """
-    logger.info(f"Loading documents from {len(file_paths)} file paths")
-    
-    # Create text splitter
-    text_splitter = get_text_splitter(
-        use_paragraph_chunking=True,
-        max_paragraph_length=1500,
-        min_paragraph_length=50,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap
-    )
-    
+    logger.info(f"Loading documents from {len(file_paths)} file paths using SemanticBlockSplitter")
+
     # Initialize outputs
     all_documents = []
     skipped_files = []
-    
+
     for file_path in file_paths:
         try:
             # Ensure we have the absolute path
             abs_file_path = os.path.abspath(file_path)
             logger.info(f"Processing file: {abs_file_path}")
-            
+
             # Check if file exists
             if not os.path.exists(abs_file_path):
                 logger.error(f"File does not exist: {abs_file_path}")
                 skipped_files.append(file_path)
                 continue
-                
+
             # Get document loader
             loader = get_document_loader(abs_file_path)
             if not loader:
                 logger.warning(f"Could not find a suitable loader for {abs_file_path}")
                 skipped_files.append(file_path)
                 continue
-                
-            # Load document
-            doc = loader.load()
-            
-            # Extract metadata
-            base_metadata = {}
-            if file_metadata and file_path in file_metadata:
-                base_metadata.update(file_metadata[file_path])
-            
-            # Add source and file_path to metadata
-            if base_metadata:
-                for d in doc:
-                    if 'source' not in d.metadata:
-                        d.metadata['source'] = file_path
-                    if 'file_path' not in d.metadata:
-                        d.metadata['file_path'] = file_path
-            
-            # Split document
-            split_docs = text_splitter.split_documents(doc)
-            all_documents.extend(split_docs)
-            
-            logger.info(f"Loaded {len(split_docs)} chunks from {file_path}")
-            
-        except Exception as e:
-            logger.error(f"Error loading {file_path}: {str(e)}")
-            skipped_files.append(file_path)
-    
-    logger.info(f"Successfully loaded {len(all_documents)} chunks from {len(file_paths) - len(skipped_files)} files")
-    return all_documents, skipped_files
 
-def get_text_splitter(
-    use_paragraph_chunking: bool = True,
-    max_paragraph_length: int = 1500,
-    min_paragraph_length: int = 50,
-    chunk_size: int = 1000,
-    chunk_overlap: int = 100
-) -> TextSplitter:
-    """
-    Get a text splitter based on the specified parameters.
-    
-    Args:
-        use_paragraph_chunking: Whether to use paragraph-based chunking
-        max_paragraph_length: Maximum paragraph length
-        min_paragraph_length: Minimum paragraph length
-        chunk_size: Size of text chunks
-        chunk_overlap: Overlap between chunks
-        
-    Returns:
-        Text splitter
-    """
-    logger.info(f"Creating text splitter with chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
-    
-    # For now, we'll just use RecursiveCharacterTextSplitter
-    # In a more advanced implementation, you could implement paragraph-based chunking
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", ". ", " ", ""]
-    )
-    
-    return splitter
+            # Load document(s) from the file
+            # loader.load() can return multiple Document objects (e.g., PDF pages)
+            raw_docs = loader.load()
+            logger.debug(f"Loaded {len(raw_docs)} raw documents from loader for {file_path}")
+
+            # Get document-level metadata for this specific file
+            doc_level_metadata = {}
+            if file_metadata and file_path in file_metadata:
+                doc_level_metadata = file_metadata[file_path].copy()
+            else:
+                logger.warning(f"No document-level metadata provided or found for {file_path}, using defaults.")
+                # Ensure required fields for defaulting
+                doc_level_metadata['original_filename'] = os.path.basename(file_path)
+                doc_level_metadata['security_classification'] = "UNCLASSIFIED"
+                doc_level_metadata['document_id'] = f"doc_{uuid.uuid4()}" # Generate default ID
+
+            # Ensure document_id is present, generate if missing
+            if 'document_id' not in doc_level_metadata or not doc_level_metadata['document_id']:
+                doc_level_metadata['document_id'] = f"doc_{uuid.uuid4()}"
+
+            # Ensure original_filename is present
+            if 'original_filename' not in doc_level_metadata or not doc_level_metadata['original_filename']:
+                doc_level_metadata['original_filename'] = os.path.basename(file_path)
+
+            # Ensure source and file_path are set in the base metadata for splitter
+            doc_level_metadata['source'] = file_path
+            doc_level_metadata['file_path'] = file_path
+
+            # Instantiate the splitter with the document-level metadata
+            # This metadata will be inherited by all chunks from this document
+            # Pass chunk_size and chunk_overlap for potential use in fallback
+            text_splitter = SemanticBlockSplitter(
+                # max_block_size=max_block_size, # We removed this, using fallback instead
+                min_block_size=min_block_size,
+                max_block_size_fallback=5000, # Example fallback size
+                document_metadata=doc_level_metadata, # Pass doc metadata here
+                chunk_size=max_block_size, # Pass for fallback splitter
+                chunk_overlap=int(max_block_size * 0.1) # Example overlap for fallback
+            )
+
+            # Process each raw document (e.g., each page of a PDF)
+            for raw_doc in raw_docs:
+                # Merge page-specific metadata if available (like page number)
+                # The splitter will then merge this with the doc_level_metadata
+                page_specific_metadata = raw_doc.metadata.copy()
+                
+                # Split the content of this raw document
+                # The splitter needs texts and metadatas lists
+                split_docs = text_splitter.split_documents_from_texts(
+                    [raw_doc.page_content],
+                    [page_specific_metadata] # Pass page metadata
+                )
+                all_documents.extend(split_docs)
+
+            logger.info(f"Processed {len(raw_docs)} raw docs into {len(split_docs)} semantic chunks from {file_path}")
+
+        except Exception as e:
+            logger.error(f"Error loading/splitting {file_path}: {str(e)}", exc_info=True)
+            skipped_files.append(file_path)
+
+    logger.info(f"Successfully loaded and split {len(all_documents)} semantic chunks from {len(file_paths) - len(skipped_files)} files")
+    return all_documents, skipped_files
 
 async def process_documents(
     file_paths: List[str],
-    text_splitter: TextSplitter,
+    text_splitter: TextSplitter, # Might need adjustment if splitter created inside
     security_classification: Optional[str] = None,
     batch_size: int = 1000,
     job_id: Optional[str] = None
 ) -> Tuple[List[Document], List[Dict[str, Any]]]:
     """
     Process documents asynchronously.
-    
+
     Args:
         file_paths: List of file paths to process
         text_splitter: Text splitter to use
         security_classification: Optional security classification to apply
         batch_size: Batch size for processing
         job_id: Optional job ID for tracking progress
-        
+
     Returns:
         Tuple of (list of documents, list of file infos)
     """
+    # This function seems unused or needs significant refactoring
+    # in light of the changes to load_documents.
+    # For now, marking as pass.
+    logger.warning("process_documents function needs review after splitter changes.")
     pass
 
 def create_chunk_metadata(
@@ -272,14 +271,14 @@ def create_chunk_metadata(
 ) -> Dict[str, Any]:
     """
     Create metadata for a document chunk.
-    
+
     Args:
         doc_metadata: Document metadata
         chunk_index: Index of the chunk
         chunk_text: Text of the chunk
         page_number: Optional page number
         total_chunks: Optional total number of chunks
-        
+
     Returns:
         Chunk metadata
     """
@@ -292,12 +291,12 @@ def extract_document_metadata(
 ) -> Dict[str, Any]:
     """
     Extract metadata from a document.
-    
+
     Args:
         file_path: Path to the document
         content: Content of the document
         security_classification: Optional security classification
-        
+
     Returns:
         Document metadata
     """
@@ -309,11 +308,11 @@ def get_file_security_info(
 ) -> Dict[str, Dict[str, Any]]:
     """
     Get security classification and other metadata for files.
-    
+
     Args:
         file_paths: List of file paths
         upload_dir: Base directory for uploads
-        
+
     Returns:
         Dictionary mapping file paths to security info
     """

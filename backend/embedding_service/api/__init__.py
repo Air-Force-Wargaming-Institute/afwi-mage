@@ -13,16 +13,16 @@ import logging
 
 
 # Ensure log directory exists
-log_dir = Path('/app/data/logs')
-log_dir.mkdir(parents=True, exist_ok=True)
+# log_dir = Path('/app/data/logs')
+# log_dir.mkdir(parents=True, exist_ok=True)
 
 # Configure logging
-logging.basicConfig(
-    filename=log_dir / 'embedding_service.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(
+#     filename=log_dir / 'embedding_service.log',
+#     level=logging.INFO,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
+# logger = logging.getLogger(__name__)
 
 # Set up the path to ensure modules can be found
 module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
