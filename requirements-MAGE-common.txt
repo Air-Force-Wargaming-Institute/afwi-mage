@@ -1,0 +1,39 @@
+# Web Framework and Core Dependencies
+fastapi>=0.115.11
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.20 
+pydantic>=2.0,<3.0.0
+
+# LangChain and AI
+langchain-openai>=0.3 
+langchain-community>=0.3 
+langchain-core>=0.3 
+langchain-text-splitters>=0.3
+langchain-openai>=0.3
+langchain-ollama>=0.3
+langchain>=0.3
+langgraph>=0.3 
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Document Processing
+python-docx==1.1.2
+
+# File Operations
+aiofiles==24.1.0
+
+# HTTP and API
+requests==2.31.0
+httpx>=0.24.0
+
+# Utilities
+python-dotenv==1.0.1
+typing-extensions==4.12.2
+pytest-shutil==1.8.1
+PyYAML>=6.0.1
+joblib>=1.2.0
+pytest>=7.3.1
+
+PyPDF4==1.27.0

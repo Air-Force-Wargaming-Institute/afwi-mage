@@ -72,6 +72,8 @@ Thumbs.db
 *.xlsx
 *.xls
 !requirements.txt
+!requirements-MAGE-GPU.txt
+!requirements-MAGE-common.txt
 !README.md
 
 # But don't ignore the directories themselves
