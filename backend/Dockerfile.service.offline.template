@@ -1,10 +1,10 @@
 # Stage 1: Copy wheels
 FROM scratch as wheels_copier
-COPY ../offline_packages/backend_wheels /wheels
+COPY offline_packages/backend_wheels /wheels
 
 # Stage 2: Copy NLTK data (if needed)
 FROM scratch as nltk_data_copier
-COPY ../offline_packages/nltk_data /nltk_data
+COPY offline_packages/nltk_data /nltk_data
 
 # Stage 3: Actual build
 FROM mage-common-offline:latest

@@ -1,0 +1,116 @@
+services:
+  # ... other services ...
+
+  core:
+    build:
+      context: .
+      dockerfile: ./backend/core_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of core service ...
+
+  upload:
+    build:
+      context: .
+      dockerfile: ./backend/upload_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of upload service ...
+
+  chat_db:
+    # ... chat_db service ...
+
+  init-data:
+    # ... init-data service ...
+
+  chat_service:
+    build:
+      context: .
+      dockerfile: ./backend/chat_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of chat_service ...
+
+  vllm:
+    build: # ADDED build section for vLLM
+      context: .
+      dockerfile: ./backend/vLLM/Dockerfile # Assuming the generated Dockerfile is here
+    image: vllm/vllm-openai:latest # Keep image for fallback/reference if needed
+    # ... rest of vllm service ...
+
+  agent:
+    build:
+      context: .
+      dockerfile: ./backend/agent_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of agent service ...
+
+  extraction:
+    build:
+      context: .
+      dockerfile: ./backend/extraction_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of extraction service ...
+
+  embedding:
+    build:
+      context: .
+      dockerfile: ./backend/embedding_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-gpu-offline:latest # Uses GPU base
+    # ... rest of embedding service ...
+
+  review:
+    build:
+      context: .
+      dockerfile: ./backend/review_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of review service ...
+
+  generation:
+    build:
+      context: .
+      dockerfile: ./backend/generation_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of generation service ...
+
+  direct_chat_service:
+    build:
+      context: .
+      dockerfile: ./backend/direct_chat_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of direct_chat_service ...
+
+  workbench_service:
+    build:
+      context: .
+      dockerfile: ./backend/workbench_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of workbench_service ...
+
+  auth_service:
+    build:
+      context: .
+      dockerfile: ./backend/auth_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    # ... rest of auth_service ...
+
+  ollama:
+    build:
+      context: .
+      dockerfile: ./backend/ollama/Dockerfile # Assuming the modified Dockerfile is here
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    image: ollama/ollama # Keep original image? Or build from Dockerfile? Decide based on offline strategy for Ollama
+    # ... rest of ollama service ...
+
+  # ... other services like traefik, redis, etc. ...
+
+# ... rest of docker-compose.yml ... 

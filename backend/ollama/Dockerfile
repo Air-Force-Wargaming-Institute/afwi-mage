@@ -1,34 +1,41 @@
-FROM ollama/ollama:latest
+# Stage 1: Copy wheels
+FROM scratch as wheels_copier
+COPY offline_packages/backend_wheels /wheels
 
-# Create directory for models and ensure permissions
-RUN mkdir -p /root/.ollama/models && \
-    chmod 755 /root/.ollama/models
+# Stage 2: Copy NLTK data (if needed)
+FROM scratch as nltk_data_copier
+COPY offline_packages/nltk_data /nltk_data
 
-# Copy the GGUF model and configuration files
-COPY nomic-embed-text-v1.5.f32.gguf /root/.ollama/models/
-COPY Modelfile /root/.ollama/models/Modelfile
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Stage 3: Actual build
+FROM mage-common-offline:latest
 
-# Set offline environment variables and optimizations
-ENV OLLAMA_SKIP_UPDATE_CHECK=true \
-    HF_DATASETS_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1 \
-    HF_HUB_OFFLINE=1 \
-    CURL_CA_BUNDLE= \
-    SSL_CERT_FILE= \
-    CUDA_VISIBLE_DEVICES=1 \
-    CUDA_LAUNCH_BLOCKING=0 \
-    OMP_NUM_THREADS=32 \
-    OLLAMA_CUDA_MALLOC=2GB \
-    OLLAMA_CUDA_MAX_SPLIT=32 \
-    OLLAMA_DEVICE=cuda \
-    OLLAMA_CONTEXT_LENGTH=2048 \
-    OLLAMA_BATCH_SIZE=64 \
-    OLLAMA_NUM_GPU=1 \
-    OLLAMA_GPU_LAYERS=all \
-    OLLAMA_F16=false
+WORKDIR /app
 
-EXPOSE 11434
+# Copy wheels from the first stage
+COPY --from=wheels_copier /wheels /app/wheels
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Copy NLTK data (if needed)
+COPY --from=nltk_data_copier /nltk_data /app/nltk_data
+
+# Copy requirements and install using local wheels
+COPY requirements.txt .
+RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
+
+# For extraction_service, uncomment and adjust:
+# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps
+# RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps
+
+# Copy application code
+COPY . .
+
+# For core_service, uncomment:
+# RUN pip install --no-index --find-links=/app/wheels -e .
+
+# Create necessary directories (adjust based on service needs)
+RUN mkdir -p /app/data/uploads && chmod -R 777 /app/data
+
+# Expose port (adjust based on service)
+EXPOSE 8000
+
+# Start the application (adjust based on service)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 

@@ -1,54 +1,41 @@
-FROM mage-gpu:latest
+# Stage 1: Copy wheels
+FROM scratch as wheels_copier
+COPY offline_packages/backend_wheels /wheels
+
+# Stage 2: Copy NLTK data (if needed)
+FROM scratch as nltk_data_copier
+COPY offline_packages/nltk_data /nltk_data
+
+# Stage 3: Actual build
+FROM mage-gpu-offline:latest
 
 WORKDIR /app
 
-# Install essential system dependencies including tesseract for OCR
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    tesseract-ocr \
-    libtesseract-dev \
-    poppler-utils \
-    pkg-config \
-    libmagic1 \
-    && rm -rf /var/lib/apt/lists/*
+# Copy wheels from the first stage
+COPY --from=wheels_copier /wheels /app/wheels
 
-# Copy requirements first for better caching
+# Copy NLTK data (if needed)
+COPY --from=nltk_data_copier /nltk_data /app/nltk_data
+
+# Copy requirements and install using local wheels
 COPY requirements.txt .
+RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
 
-# Set environment variables for CPU-only operation
-#ENV CUDA_VISIBLE_DEVICES=-1
-ENV PYTHONUNBUFFERED=1
-
-# Install main dependencies from requirements.txt
-RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
-
-# Install unstructured with minimal dependencies
-RUN --mount=type=cache,target=/root/.cache/pip pip install unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps
-#RUN --mount=type=cache,target=/root/.cache/pip pip install "pytesseract>=0.3"
-#RUN --mount=type=cache,target=/root/.cache/pip pip install "layoutparser[tesseract]>=0.3"
-
-# Create necessary directories
-RUN mkdir -p /app/data/vectorstores /app/data/uploads /app/doc_staging
+# For extraction_service, uncomment and adjust:
+# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps
+# RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps
 
 # Copy application code
 COPY . .
 
-# Ensure Python recognizes the directory as a package
-RUN touch /app/__init__.py
-RUN touch /app/api/__init__.py
-RUN touch /app/core/__init__.py
-RUN touch /app/utils/__init__.py
+# For core_service, uncomment:
+# RUN pip install --no-index --find-links=/app/wheels -e .
 
-# Set environment variables
-ENV PYTHONPATH="/app"
-ENV HOST="0.0.0.0"
-ENV PORT=8006
-ENV UPLOAD_DIR="/app/data/uploads"
-ENV VECTORSTORE_DIR="/app/data/vectorstores"
-ENV DOC_STAGING_DIR="/app/doc_staging"
+# Create necessary directories (adjust based on service needs)
+RUN mkdir -p /app/data/uploads && chmod -R 777 /app/data
 
-# Make scripts executable
-RUN chmod +x /app/docker-start.py
+# Expose port (adjust based on service)
+EXPOSE 8006
 
-# Run the application
-CMD ["python3", "/app/docker-start.py"] 
+# Start the application (adjust based on service)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8006"] 

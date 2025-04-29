@@ -25,16 +25,24 @@ foreach ($imageFile in $imageFiles) {
     
     # Determine image name from filename pattern
     $imageName = $null
+    
+    # Check special cases FIRST
+    if ($baseName -eq "mage_common_offline") {
+        $imageName = "mage-common-offline:latest"
+    }
+    elseif ($baseName -eq "mage_gpu_offline") {
+        $imageName = "mage-gpu-offline:latest"
+    }
     # Handle pattern like redis_redis-stack_7.4.0-v3-x86_64.tar
-    if ($baseName -match "^([^_]+)_([^_]+)_(.+)$") {
+    elseif ($baseName -match "^([^_]+)_([^_]+)_(.+)$") {
         $imageName = "$($Matches[1])/$($Matches[2]):$($Matches[3])"
     }
     # Handle pattern like postgres_13.tar
     elseif ($baseName -match "^([^_]+)_([^_]+)$") {
         $imageName = "$($Matches[1]):$($Matches[2])"
     }
-    # Simple case like mage-common-offline.tar
-    else {
+    # Handle simple names last (ensure it hasn't been set by special cases)
+    elseif (-not $imageName) { 
         $imageName = $baseName
         # If it doesn't contain a colon, assume it's "latest"
         if ($imageName -notmatch ":") {
@@ -58,14 +66,17 @@ foreach ($imageFile in $imageFiles) {
     $simpleImageName = $imageName -replace "^.*\/", ""
     foreach ($existing in $existingImages) {
         $simpleExisting = $existing -replace "^.*\/", ""
-        if ($simpleExisting -eq $simpleImageName) {
+        # Check if the simple name matches and we haven't already added this exact match
+        if (($simpleExisting -eq $simpleImageName) -and ($existing -notin $imageMatches)) {
             $imageExists = $true
             $imageMatches += $existing
         }
     }
     
     if ($imageExists) {
-        Write-Host "  Image already exists as: $($imageMatches -join ', ')" -ForegroundColor Yellow
+        # Remove duplicates from matches for cleaner output
+        $uniqueMatches = $imageMatches | Select-Object -Unique
+        Write-Host "  Image already exists as: $($uniqueMatches -join ', ')" -ForegroundColor Yellow
         Write-Host "  Skipping..." -ForegroundColor Yellow
     } else {
         # Before image loading - get current repositories and tags
@@ -98,6 +109,10 @@ foreach ($imageFile in $imageFiles) {
                 # Special case check - might have been a duplicate that docker doesn't report
                 if ($output -match "already exists") {
                     Write-Host "  Image appears to be already loaded (according to docker)" -ForegroundColor Yellow
+                    # Try to add the expected name if it wasn't already found
+                    if ($imageName -notin $existingImages) {
+                        $existingImages += $imageName
+                    }
                 }
             }
         } else {

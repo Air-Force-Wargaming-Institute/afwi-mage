@@ -1,25 +1,41 @@
-FROM mage-gpu:latest
+# Stage 1: Copy wheels
+FROM scratch as wheels_copier
+COPY offline_packages/backend_wheels /wheels
+
+# Stage 2: Copy NLTK data (if needed)
+FROM scratch as nltk_data_copier
+COPY offline_packages/nltk_data /nltk_data
+
+# Stage 3: Actual build
+FROM mage-common-offline:latest
 
 WORKDIR /app
 
-# Install system dependencies including CUDA support
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy wheels from the first stage
+COPY --from=wheels_copier /wheels /app/wheels
 
-# Copy requirements first for better caching
+# Copy NLTK data (if needed)
+COPY --from=nltk_data_copier /nltk_data /app/nltk_data
+
+# Copy requirements and install using local wheels
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
 
-# Copy the rest of the application
+# For extraction_service, uncomment and adjust:
+# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps
+# RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps
+
+# Copy application code
 COPY . .
 
-ENV SERVICE_PORT=8011
+# For core_service, uncomment:
+# RUN pip install --no-index --find-links=/app/wheels -e .
 
-# Expose the port the app runs on
-EXPOSE ${SERVICE_PORT}
+# Create necessary directories (adjust based on service needs)
+RUN mkdir -p /app/data/uploads && chmod -R 777 /app/data
 
-# Update CMD to include connection optimization settings
-CMD uvicorn app:app --host 0.0.0.0 --port ${SERVICE_PORT} --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
+# Expose port (adjust based on service)
+EXPOSE 8011
+
+# Start the application (adjust based on service)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011"] 
