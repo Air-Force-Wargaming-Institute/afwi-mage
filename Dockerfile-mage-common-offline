@@ -3,6 +3,10 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Copy offline packages into the base image
+COPY offline_packages/backend_wheels /app/wheels
+COPY offline_packages/nltk_data /app/nltk_data
+
 COPY requirements-MAGE-common.txt .
 
 RUN pip install --upgrade pip

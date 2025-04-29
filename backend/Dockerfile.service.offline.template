@@ -1,24 +1,17 @@
-# Stage 1: Wheels (REMOVED - Copying directly in main stage)
-# FROM scratch as wheels_copier
-# COPY offline_packages/backend_wheels /wheels
+# REMOVED: Stage 1 Wheels
+# REMOVED: Stage 2 NLTK data
 
-# Stage 2: Copy NLTK data (if needed - NOW ONLY COPIED BY SPECIFIC SERVICES)
-FROM scratch as nltk_data_copier
-COPY ../../offline_packages/nltk_data /nltk_data
-
-# Stage 3: Actual build
+# Stage 3: Actual build (Now main stage)
 # ARG SERVICE_NAME # REMOVED - Context is now the service dir
 FROM mage-common-offline:latest
 
 WORKDIR /app
 
-# Copy ALL wheels directly into this stage
-COPY ../../offline_packages/backend_wheels /app/wheels
+# REMOVED: Copy ALL wheels - They are now in the base image at /app/wheels
 
-# REMOVED: General NLTK data copy - will be added specifically for extraction_service
-# COPY --from=nltk_data_copier /nltk_data /app/nltk_data
+# REMOVED: General NLTK data copy - It's now in the base image at /app/nltk_data
 
-# Copy requirements and install using local wheels, then cleanup wheels
+# Copy requirements and install using local wheels (from base image), then cleanup wheels
 # Copy requirements from the build context (which IS the service dir)
 COPY requirements.txt .
 # Ensure the wheels dir exists even if no wheels were copied (for rm -rf)
