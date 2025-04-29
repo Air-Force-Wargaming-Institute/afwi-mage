@@ -24,6 +24,15 @@ venv/
 # Ignore logs
 *.log
 
-# IMPORTANT: Explicitly do NOT ignore offline_packages for the build context
-!offline_packages/
-!offline_packages/** 
+# --- Docker Build Specific Ignores ---
+# Ignore the downloaded Docker image tarballs - they aren't needed in build context
+offline_packages/images/
+
+# Ignore the large LLM models - only the vLLM Dockerfile needs them directly
+backend/vLLM/models/
+
+# IMPORTANT: Explicitly do NOT ignore the WHEELS or NLTK data needed for COPY
+!offline_packages/backend_wheels/
+!offline_packages/backend_wheels/**
+!offline_packages/nltk_data/
+!offline_packages/nltk_data/** 
