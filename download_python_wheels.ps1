@@ -41,8 +41,9 @@ Write-Host "Running pip-compile and pip download in Docker container for each se
 # Construct the multi-line bash command for Docker
 # Escape PowerShell variables ($) with backticks (`)
 # Escape internal double quotes (") with backticks (`)
+# Use single quotes within BASH echo to prevent interpretation of special chars like []
 
-$escapedExtraReqFileContent = $extraReqFileContent -replace '`', '`' # Escape backticks within the content itself if any
+$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\''" # Escape single quotes for BASH single-quoted string
 
 $dockerCommand = @"
 set -e
@@ -50,8 +51,8 @@ echo 'Upgrading pip, wheel, and installing pip-tools...'
 pip install --upgrade pip wheel pip-tools
 
 # Create file for extra requirements
-# Use escaped quotes and variables for bash interpretation
-echo `"$escapedExtraReqFileContent`" > /tmp/extra_reqs.in
+# Use single quotes in BASH to treat content literally
+echo '$escapedExtraReqFileContent' > /tmp/extra_reqs.in
 
 echo 'Processing services...'
 "@
