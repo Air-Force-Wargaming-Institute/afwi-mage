@@ -71,7 +71,7 @@ Copy-Item -Path $tempRequirementsFile -Destination $dockerRequirementsPath -Forc
 try {
     # Use Docker to download Python packages
     # Use single line docker run command
-    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${dockerRequirementsPath}:/requirements.txt:ro" python:3.11-slim bash -c "pip install --upgrade pip wheel && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: || (echo WARN: Failed only-binary, retrying... && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311)"
+    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${dockerRequirementsPath}:/requirements.txt:ro" python:3.11-slim bash -c "pip install --upgrade pip wheel && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: || (echo WARN: Failed only-binary, retrying... && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 --no-deps)"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
