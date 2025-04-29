@@ -38,11 +38,17 @@ $extraReqFileContent = $extraRequirements -join "`n"
 # Using Docker to ensure Linux compatibility and use pip-tools
 Write-Host "Running pip-compile and pip download in Docker container for each service..." -ForegroundColor Cyan
 
-# Construct the multi-line bash command for Docker
+# Construct the multi-line bash script content
+$tempScriptName = "temp_download_script.sh"
+$tempScriptHostPath = Join-Path $currentPath "offline_packages/$tempScriptName"
+$tempScriptContainerPath = "/tmp/$tempScriptName"
+
 # Escape single quotes within the extra requirements content for bash echo
 $escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\''" 
 
-$dockerCommand = @"
+# Start building the bash script content
+$bashScriptContent = @"
+#!/bin/bash
 set -e
 echo 'Upgrading pip, wheel, and installing pip-tools...'
 pip install --upgrade pip wheel pip-tools
@@ -60,8 +66,8 @@ foreach ($serviceDir in $serviceDirs) {
     
     Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
     
-    # Append commands for this service, using BASH variables AND adding debugging
-    $dockerCommand += @"
+    # Append commands for this service to the script content
+    $bashScriptContent += @"
 
 echo '--------------------------------------------------'
 echo '  Processing service: $escapedServiceNameForBash'
@@ -135,15 +141,24 @@ echo '--------------------------------------------------'
 "@
 }
 
-$dockerCommand += @"
+# Add final message to the script content
+$bashScriptContent += @"
 
 echo 'Backend wheel downloads complete.'
 "@
 
+# Write the bash script to the temporary file
+Write-Host "Writing temporary bash script to $tempScriptHostPath" -ForegroundColor Gray
+$bashScriptContent | Set-Content -Path $tempScriptHostPath -Encoding Ascii -NoNewline
+
 try {
-    # Run the combined commands in Docker
-    # Pass the command string directly to bash -c
-    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${backendPath}:/backend:ro" python:3.11-slim bash -c "$dockerCommand"
+    # Run the container, mounting the script and executing it
+    Write-Host "Executing script in Docker container..." -ForegroundColor Cyan
+    docker run --rm `
+        -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
+        -v "${backendPath}:/backend:ro" `
+        -v "${tempScriptHostPath}:${tempScriptContainerPath}:ro" ` # Mount the script read-only
+        python:3.11-slim bash "$tempScriptContainerPath"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
@@ -151,6 +166,12 @@ try {
     }
 } catch {
     Write-Host "Error running Docker command: $_" -ForegroundColor Red
+} finally {
+    # Clean up the temporary script file
+    if (Test-Path $tempScriptHostPath) {
+        Write-Host "Cleaning up temporary script: $tempScriptHostPath" -ForegroundColor Gray
+        Remove-Item -Path $tempScriptHostPath -Force
+    }
 }
 
 $finalWheelCount = (Get-ChildItem -Path $baseWheelDir -Recurse -Filter "*.whl" | Measure-Object).Count
