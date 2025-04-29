@@ -357,7 +357,7 @@ services:
     build:
       context: .
       dockerfile: ./backend/vLLM/Dockerfile # Generated offline Dockerfile
-      args:
+      args: {} # Explicitly define args as an empty map
         # GPU_COUNT argument can be passed during build if needed, defaults to 1 in template
     container_name: vllm-chat
     ports:
