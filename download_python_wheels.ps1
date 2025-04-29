@@ -134,7 +134,7 @@ $scriptTemplateContainerPath = "/tmp/$scriptTemplateName"
 
 # Write the script template content to the host file (using UTF8 without BOM)
 Write-Host "Creating/Overwriting script template: $scriptTemplateHostPath" -ForegroundColor Gray
-New-Item -Path $scriptTemplateHostPath -ItemType File -Value $scriptTemplateContent -Encoding UTF8 -Force | Out-Null
+Set-Content -Path $scriptTemplateHostPath -Value $scriptTemplateContent -Encoding UTF8 -Force
 
 # Path for the extra requirements file on host and in container
 $extraReqFileName = "extra_reqs.in"
