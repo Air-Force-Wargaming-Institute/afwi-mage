@@ -70,8 +70,21 @@ Copy-Item -Path $tempRequirementsFile -Destination $dockerRequirementsPath -Forc
 
 try {
     # Use Docker to download Python packages
-    # Use single line docker run command
-    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${dockerRequirementsPath}:/requirements.txt:ro" python:3.11-slim bash -c "pip install --upgrade pip wheel && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: || (echo WARN: Failed only-binary, retrying... && pip download --dest /wheels -r /requirements.txt --platform manylinux2014_x86_64 --python-version 311)"
+    # Strategy: Install all deps, freeze the list, then download wheels for the frozen list.
+    $dockerCommand = @"
+set -e ;
+ pip install --upgrade pip wheel ;
+ echo 'INFO: Installing all dependencies to resolve full list...' ;
+ pip install -r /requirements.txt ;
+ echo 'INFO: Freezing resolved dependencies...' ;
+ pip freeze > /frozen_requirements.txt ;
+ echo 'INFO: Downloading wheels for frozen dependencies...' ;
+ pip download --dest /wheels -r /frozen_requirements.txt --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: || \
+ (echo 'WARN: Failed only-binary download for frozen list, retrying without...' && pip download --dest /wheels -r /frozen_requirements.txt --platform manylinux2014_x86_64 --python-version 311) ;
+ echo 'INFO: Wheel download process complete.'
+"@
+
+    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${dockerRequirementsPath}:/requirements.txt:ro" python:3.11-slim bash -c $dockerCommand
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
