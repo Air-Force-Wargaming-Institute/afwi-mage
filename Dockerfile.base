@@ -58,7 +58,6 @@ RUN pip install --no-cache-dir unstructured==0.10.16
 RUN pip install --no-cache-dir unstructured-inference==0.6.6 --no-deps
 RUN pip install --no-cache-dir "pytesseract>=0.3"
 RUN pip install --no-cache-dir "layoutparser[tesseract]>=0.3"
-RUN pip install --no-cache-dir llama-cpp-python==0.2.11
 
 # Download NLTK data
 RUN python -m nltk.downloader -d /app/nltk_data punkt averaged_perceptron_tagger

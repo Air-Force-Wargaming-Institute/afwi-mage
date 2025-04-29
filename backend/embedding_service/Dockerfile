@@ -27,9 +27,6 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install unstructured==0.10.16
 #RUN --mount=type=cache,target=/root/.cache/pip pip install "pytesseract>=0.3"
 #RUN --mount=type=cache,target=/root/.cache/pip pip install "layoutparser[tesseract]>=0.3"
 
-# Install llama-cpp-python with CPU support
-RUN --mount=type=cache,target=/root/.cache/pip pip install llama-cpp-python==0.2.11
-
 # Create necessary directories
 RUN mkdir -p /app/data/vectorstores /app/data/uploads /app/doc_staging
 

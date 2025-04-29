@@ -46,7 +46,6 @@ foreach ($service in $services) {
         "extraction_service" {
             $serviceContent = $serviceContent -replace "# For extraction_service, uncomment and adjust:", "# Installing extraction-specific dependencies"
             $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps", "RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps"
-            $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels llama-cpp-python==0.2.11", "RUN pip install --no-index --find-links=/app/wheels llama-cpp-python==0.2.11"
             $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels \"pytesseract>=0.3\" \"layoutparser\[tesseract\]>=0.3\" --no-deps", "RUN pip install --no-index --find-links=/app/wheels \"pytesseract>=0.3\" \"layoutparser[tesseract]>=0.3\" --no-deps"
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8002"
             $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8002\"]"

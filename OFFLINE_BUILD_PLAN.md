@@ -234,7 +234,6 @@
        RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
        # Example for embedding_service:
        # RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 ... --no-deps
-       # RUN pip install --no-index --find-links=/app/wheels llama-cpp-python==0.2.11
 
        # Copy application code
        COPY . .
