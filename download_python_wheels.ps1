@@ -132,9 +132,9 @@ $scriptTemplateName = "temp_download_script_template.sh"
 $scriptTemplateHostPath = Join-Path $currentPath "offline_packages/$scriptTemplateName"
 $scriptTemplateContainerPath = "/tmp/$scriptTemplateName"
 
-# Write the script template content to the host file (using UTF8 without BOM)
+# Write the script template content to the host file (using ASCII to avoid BOM)
 Write-Host "Creating/Overwriting script template: $scriptTemplateHostPath" -ForegroundColor Gray
-Set-Content -Path $scriptTemplateHostPath -Value $scriptTemplateContent -Encoding UTF8 -Force
+Set-Content -Path $scriptTemplateHostPath -Value $scriptTemplateContent -Encoding Ascii -Force
 
 # Path for the extra requirements file on host and in container
 $extraReqFileName = "extra_reqs.in"
