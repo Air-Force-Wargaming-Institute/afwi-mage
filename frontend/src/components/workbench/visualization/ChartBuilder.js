@@ -238,7 +238,8 @@ const ChartBuilder = () => {
     } catch (err) {
       console.error('Error executing code:', err);
       setLocalError('Failed to execute code: ' + err.message);
-      setCodeResult({...codeResult, status: 'error'});
+      // Keep the existing image URL/data if execution fails
+      setCodeResult(prevResult => ({...prevResult, status: 'error'}));
     }
   };
   
@@ -820,12 +821,12 @@ const ChartBuilder = () => {
                     <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
                       {localError || "Failed to generate or execute visualization."}
                     </Alert>
-                  ) : codeResult.data?.image_data ? (
+                  ) : codeResult.data?.data_url ? (
                     <Box sx={{ width: '100%' }}>
                       <img
-                        // Use the image_url from the codeResult state, prepended with apiBaseUrl
-                        src={`${codeResult.data.data_url}`} 
-                        alt={`${codeResult.data.data_url}`}
+                        // Use the data_url directly from the codeResult state
+                        src={codeResult.data.data_url} 
+                        alt={codeResult.data.title || "Generated Visualization"} // Use title for alt text if available
                         style={{ 
                           display: 'block', // Prevents extra space below image
                           width: '100%', 

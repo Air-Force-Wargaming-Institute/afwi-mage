@@ -78,6 +78,7 @@ class Visualization(BaseModel):
     created_at: str
     image_url: str
     image_data: Optional[str] = None  # Base64 encoded image
+    data_url: Optional[str] = None # Added data URL for direct embedding
     
     model_config = {
         "json_schema_extra": {
@@ -88,7 +89,8 @@ class Visualization(BaseModel):
                 "prompt": "Show me a bar chart of sales by region",
                 "code": "import matplotlib.pyplot as plt...",
                 "created_at": "2023-07-15T14:30:00Z",
-                "image_url": "/api/workbench/visualizations/vis123/image"
+                "image_url": "/api/workbench/visualizations/vis123/image",
+                "data_url": "data:image/png;base64,..."
             }
         }
     }
@@ -138,10 +140,10 @@ async def generate_visualization(request: VisualizationRequest, background_tasks
         )
 
         if result.get('success'):
-            image_data = result.get('image_data')
+            # image_data = result.get('image_data') # Not strictly needed if using data_url
             file_path = result.get('file_path')
             output_filename = result.get('output_filename')
-            data_url = result.get('data_url')
+            data_url = result.get('data_url') # Get the data URL
         else:
             raise HTTPException(
                 status_code=500,
@@ -157,9 +159,9 @@ async def generate_visualization(request: VisualizationRequest, background_tasks
             "code": code,
             "created_at": datetime.utcnow().isoformat(),
             #image_url": f"/api/workbench/visualizations/{visualization_id}/image",
-            "image_url": file_path + output_filename,
-            "image_data": image_data,
-            "data_url": data_url
+            "image_url": result.get("file_reference_path"), # Use the reference path
+            # "image_data": image_data, # Not strictly needed if using data_url
+            "data_url": data_url # Include the data URL in the response
         }
         
         return visualization
@@ -192,10 +194,10 @@ async def execute_code(visualization_id: str, request: CodeExecutionRequest):
         )
 
         if result.get('success'):
-            image_data = result.get('image_data')
+            # image_data = result.get('image_data') # Not strictly needed if using data_url
             file_path = result.get('file_path')
             output_filename = result.get('output_filename')
-            data_url = result.get('data_url')
+            data_url = result.get('data_url') # Get the data URL
         else:
             raise HTTPException(
                 status_code=500,
@@ -211,9 +213,9 @@ async def execute_code(visualization_id: str, request: CodeExecutionRequest):
             "code": request.code,
             "created_at": datetime.utcnow().isoformat(),
             #"image_url": f"/api/workbench/visualizations/{visualization_id}/image",
-            "image_url": file_path + output_filename,
-            "image_data": image_data,
-            "data_url": data_url
+            "image_url": result.get("file_reference_path"), # Use the reference path
+            # "image_data": image_data, # Not strictly needed if using data_url
+            "data_url": data_url # Include the data URL in the response
         }
     except Exception as e:
         logger.error(f"Error executing visualization code: {str(e)}", exc_info=True)
