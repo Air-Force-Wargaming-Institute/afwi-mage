@@ -189,6 +189,7 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
     score_threshold: float = 0.5
+    allowed_classifications: Optional[List[str]] = None
     
     model_config = {
         "extra": "ignore"
@@ -481,7 +482,7 @@ async def query_vectorstore(
     
     Args:
         vectorstore_id: ID of the vector store to query
-        query_request: Query parameters
+        query_request: Query parameters including optional classification filter
         manager: Vector store manager dependency
         
     Returns:
@@ -493,14 +494,15 @@ async def query_vectorstore(
         if not vs_info:
             raise HTTPException(status_code=404, detail=f"Vector store {vectorstore_id} not found")
         
-        logger.info(f"DEBUGGING: Querying vector store '{vectorstore_id}' with query: '{query_request.query}', top_k={query_request.top_k}")
+        logger.info(f"DEBUGGING: Querying vector store '{vectorstore_id}' with query: '{query_request.query}', top_k={query_request.top_k}, filter={query_request.allowed_classifications}")
         
         # Query the vector store using the enhanced method
         results = manager.query_vector_store(
             vectorstore_id,
             query_request.query,
             top_k=query_request.top_k,
-            score_threshold=query_request.score_threshold
+            score_threshold=query_request.score_threshold,
+            allowed_classifications=query_request.allowed_classifications
         )
         
         # Debug log the results to verify metadata enrichment

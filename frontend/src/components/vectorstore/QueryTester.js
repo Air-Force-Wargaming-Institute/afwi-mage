@@ -17,7 +17,11 @@ import {
   Grid,
   FormHelperText,
   Collapse,
-  IconButton
+  IconButton,
+  FormControlLabel,
+  Checkbox,
+  FormGroup,
+  FormLabel
 } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import SearchIcon from '@material-ui/icons/Search';
@@ -66,6 +70,9 @@ const getScoreColor = (score) => {
   if (score >= 0.4) return '#ffc107'; // Medium relevance - amber
   return '#ff9800'; // Low relevance - orange
 };
+
+// Define standard classification levels
+const CLASSIFICATION_LEVELS = ['UNCLASSIFIED', 'CONFIDENTIAL', 'SECRET', 'TOP SECRET'];
 
 // Component-specific styles
 const useStyles = {
@@ -365,6 +372,19 @@ const useStyles = {
       transform: 'translateY(-1px)',
     },
   }),
+  filterSection: theme => ({
+    marginTop: theme.spacing(2),
+    paddingTop: theme.spacing(1),
+    borderTop: `1px solid ${theme.palette.divider}`,
+  }),
+  checkboxGroup: theme => ({
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  }),
+  checkboxLabel: theme => ({
+    marginRight: theme.spacing(2),
+  }),
 };
 
 const QueryTester = ({ vectorStore }) => {
@@ -414,6 +434,9 @@ const QueryTester = ({ vectorStore }) => {
   // New state variable for document expansion
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [showFullText, setShowFullText] = useState({});
+  
+  // Add state for classification filtering
+  const [selectedClassifications, setSelectedClassifications] = useState(CLASSIFICATION_LEVELS);
   
   // Memory cleanup effect
   useEffect(() => {
@@ -491,17 +514,19 @@ const QueryTester = ({ vectorStore }) => {
     setHasSearched(true);
 
     try {
+      const queryOptions = {
+        top_k: topK,
+        score_threshold: scoreThreshold,
+        allowed_classifications: selectedClassifications,
+        truncate_text: false,
+        max_text_length: 10000
+      };
+
       if (queryMode === 'raw') {
-        // Regular vectorstore query
         const results = await testVectorStoreQuery(
           vectorStore.id, 
           queryText.trim(),
-          { 
-            top_k: topK,
-            score_threshold: scoreThreshold,
-            truncate_text: false, // Ensure we get full text
-            max_text_length: 10000 // Set a high value to avoid truncation
-          },
+          queryOptions,
           token
         );
         
@@ -515,17 +540,13 @@ const QueryTester = ({ vectorStore }) => {
           setError('No results found for this query. Try adjusting your search terms or query settings.');
         }
       } else {
-        // LLM-enhanced query
         const response = await llmQueryVectorStore(
           vectorStore.id,
           queryText.trim(),
           {
-            top_k: topK,
-            score_threshold: scoreThreshold,
+            ...queryOptions,
             use_llm: true,
-            include_sources: true,
-            truncate_text: false,
-            max_text_length: 10000
+            include_sources: true
           },
           token
         );
@@ -542,7 +563,7 @@ const QueryTester = ({ vectorStore }) => {
     } finally {
       setIsQuerying(false);
     }
-  }, [queryText, queryMode, topK, scoreThreshold, vectorStore.id, rowsPerPage]);
+  }, [queryText, queryMode, topK, scoreThreshold, vectorStore.id, rowsPerPage, token, selectedClassifications]);
 
   // Update the analyzeVectorstore callback to use raw_response directly
   const analyzeVectorstore = useCallback(async () => {
@@ -592,6 +613,16 @@ const QueryTester = ({ vectorStore }) => {
     return text.replace(regex, '<span class="highlighted-term">$1</span>');
   }, [queryText]);
 
+  // Handle classification checkbox changes
+  const handleClassificationChange = (event) => {
+    const { name, checked } = event.target;
+    setSelectedClassifications(prev => 
+      checked 
+        ? [...prev, name] // Add classification
+        : prev.filter(c => c !== name) // Remove classification
+    );
+  };
+
   const renderResultItem = (result, index) => {
     // Create HTML with highlighted terms
     const highlightedHtml = highlightQueryTerms(result.text);
@@ -617,7 +648,7 @@ const QueryTester = ({ vectorStore }) => {
             <Typography variant="subtitle1">
               Match {page * rowsPerPage + index + 1}
             </Typography>
-            <SecurityClassification classification={result.metadata?.security_classification} />
+            <SecurityClassification classification={result.metadata?.chunk_classification || result.metadata?.security_classification} />
           </Box>
           <Box display="flex" alignItems="center">
             <Typography variant="body2" style={{ marginRight: 8 }}>
@@ -1415,60 +1446,28 @@ const QueryTester = ({ vectorStore }) => {
                   </Grid>
                 </Grid>
                 
-                {/* Keep relevance score explanation below both sliders */}
-                <Alert severity="info" style={{...classes.compactAlert, marginTop: 8}}>
-                  <Typography variant="body2">
-                    <strong>What is relevance score?</strong> It measures how semantically similar a document chunk is to your query. 
-                    Scores are normalized to a 0-1 scale, where:
-                    <Grid container spacing={1} style={{ marginTop: 4 }}>
-                      {/* Reorder from low (left) to high (right) */}
-                      <Grid item xs={6} sm={3}>
-                        <Box 
-                          style={{ 
-                            ...classes.compactRelevanceBox,
-                            backgroundColor: 'rgba(255, 152, 0, 0.1)', 
-                            borderLeft: '4px solid #ff9800' 
-                          }}
-                        >
-                          <Typography variant="caption"><strong>0.0-0.4:</strong> Low</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Box 
-                          style={{ 
-                            ...classes.compactRelevanceBox,
-                            backgroundColor: 'rgba(255, 193, 7, 0.1)', 
-                            borderLeft: '4px solid #ffc107' 
-                          }}
-                        >
-                          <Typography variant="caption"><strong>0.4-0.6:</strong> Moderate</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Box 
-                          style={{ 
-                            ...classes.compactRelevanceBox,
-                            backgroundColor: 'rgba(139, 195, 74, 0.1)', 
-                            borderLeft: '4px solid #8bc34a' 
-                          }}
-                        >
-                          <Typography variant="caption"><strong>0.6-0.8:</strong> High</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Box 
-                          style={{ 
-                            ...classes.compactRelevanceBox,
-                            backgroundColor: 'rgba(76, 175, 80, 0.1)', 
-                            borderLeft: '4px solid #4caf50' 
-                          }}
-                        >
-                          <Typography variant="caption"><strong>0.8-1.0:</strong> Very High</Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </Typography>
-                </Alert>
+                {/* Classification Filter Section */}
+                <Box style={classes.filterSection}>
+                  <FormLabel component="legend">Filter by Classification</FormLabel>
+                  <FormGroup style={classes.checkboxGroup}>
+                    {CLASSIFICATION_LEVELS.map((level) => (
+                      <FormControlLabel
+                        key={level}
+                        control={
+                          <Checkbox 
+                            checked={selectedClassifications.includes(level)}
+                            onChange={handleClassificationChange} 
+                            name={level} 
+                            size="small"
+                          />
+                        }
+                        label={level}
+                        style={classes.checkboxLabel}
+                      />
+                    ))}
+                  </FormGroup>
+                  <FormHelperText>Select the classification levels to include in the results.</FormHelperText>
+                </Box>
               </AccordionDetails>
             </Accordion>
           </GradientBorderPaper>

@@ -529,16 +529,25 @@ class VectorStoreManager:
             logger.error(f"Error deleting vector store {vs_id}: {str(e)}")
             return False
             
-    def query_vector_store(self, vectorstore_id, query_or_embedding, top_k=5, score_threshold=0.5):
+    def query_vector_store(
+        self, 
+        vectorstore_id: str, 
+        query_or_embedding: Any, 
+        top_k: int = 5, 
+        score_threshold: float = 0.5,
+        allowed_classifications: Optional[List[str]] = None
+    ):
         """
-        Query a vector store with a text query or embedding.
-        
+        Query a vector store with a text query or embedding, optionally filtering by classification.
+
         Args:
             vectorstore_id: ID of the vector store to query
             query_or_embedding: Text query or embedding vector
             top_k: Number of results to return
             score_threshold: Minimum similarity score threshold
-            
+            allowed_classifications: Optional list of chunk classifications to allow in results.
+                                   If None or empty, no classification filtering is applied.
+
         Returns:
             List of results with text and metadata
         """
@@ -572,96 +581,74 @@ class VectorStoreManager:
             # Load the vector store
             try:
                 from langchain_community.vectorstores import FAISS
+                # Allow deserialization for custom metadata
                 vectorstore = FAISS.load_local(str(vs_dir), embedding_model, allow_dangerous_deserialization=True)
             except Exception as e:
                 logger.error(f"Error loading vector store: {str(e)}")
                 return []
             
+            # Construct the filter dictionary if classifications are provided
+            search_filter = None
+            if allowed_classifications:
+                # Ensure list is not empty and contains valid strings
+                valid_classifications = [str(c).upper() for c in allowed_classifications if isinstance(c, str) and c]
+                if valid_classifications:
+                    # Use a lambda function for filtering as FAISS might not support $in directly
+                    search_filter = lambda metadata: metadata.get("chunk_classification", "UNCLASSIFIED").upper() in valid_classifications
+                    logger.info(f"Applying classification filter: {valid_classifications}")
+                else:
+                    logger.warning("allowed_classifications provided but was empty or invalid.")
+            else:
+                logger.info("No classification filter applied.")
+
             # Process the query and get raw results
             if isinstance(query_or_embedding, str):
-                # For text queries, use similarity_search_with_score
+                logger.debug(f"Performing text similarity search with k={top_k}, filter={search_filter is not None}")
+                # For text queries, use similarity_search_with_score with the filter
                 raw_results = vectorstore.similarity_search_with_score(
                     query_or_embedding, 
-                    k=top_k
+                    k=top_k,
+                    filter=search_filter # Pass the filter here
                 )
             else:
-                # For vector queries, generate the embeddings and use similarity_search_with_score
-                # Using a workaround since similarity_search_by_vector_with_score doesn't exist
-                try:
-                    # Create a temporary document with the embedding
-                    from langchain_core.documents import Document
-                    import numpy as np
-                    
-                    # Get the embedding for the query directly using the embedding model
-                    if isinstance(query_or_embedding, list):
-                        query_embedding = query_or_embedding
-                    elif isinstance(query_or_embedding, np.ndarray):
-                        query_embedding = query_or_embedding.tolist()
-                    else:
-                        # If it's not a list or numpy array, it might be something else we can't handle
-                        logger.error(f"Unsupported embedding type: {type(query_or_embedding)}")
-                        return []
-                    
-                    # Use the FAISS index directly for similarity search with the embedding
-                    # This is a lower-level approach that bypasses the missing method
-                    if hasattr(vectorstore, '_index') and hasattr(vectorstore, '_docstore'):
-                        # Convert the embedding to the right format if needed
-                        if not isinstance(query_embedding, np.ndarray):
-                            query_embedding = np.array(query_embedding, dtype=np.float32)
-                        
-                        # Make sure the embedding has the right shape
-                        if len(query_embedding.shape) == 1:
-                            query_embedding = query_embedding.reshape(1, -1)
-                            
-                        # Search the FAISS index
-                        scores, indices = vectorstore._index.search(query_embedding, k=top_k)
-                        
-                        # Get the documents for these indices
-                        raw_results = []
-                        scores = scores[0]  # Flatten scores
-                        indices = indices[0]  # Flatten indices
-                        
-                        # Filter results by score threshold
-                        filtered_indices = []
-                        filtered_scores = []
-                        
-                        for i, (idx, score) in enumerate(zip(indices, scores)):
-                            # FAISS returns negative scores where higher (less negative) is better
-                            # Convert to positive scores where higher is better
-                            adjusted_score = 1.0 - (score / 2.0)  # Convert to a 0-1 scale
-                            
-                            if adjusted_score >= score_threshold:
-                                filtered_indices.append(idx)
-                                filtered_scores.append(adjusted_score)
-                        
-                        # Get documents for filtered indices
-                        for idx, score in zip(filtered_indices, filtered_scores):
-                            if idx in vectorstore._docstore._dict:
-                                doc = vectorstore._docstore._dict[idx]
-                                raw_results.append((doc, score))
-                    else:
-                        # Fallback to regular search if we can't access the index directly
-                        logger.warning("Could not access FAISS index directly, falling back to text search")
-                        # Generate a random document ID to use as a query
-                        import random
-                        import string
-                        random_query = ''.join(random.choices(string.ascii_letters, k=10))
-                        raw_results = vectorstore.similarity_search_with_score(random_query, k=top_k)
-                except Exception as e:
-                    logger.error(f"Error performing vector search: {str(e)}")
+                # For vector queries, use similarity_search_by_vector with the filter
+                logger.debug(f"Performing vector similarity search with k={top_k}, filter={search_filter is not None}")
+                if isinstance(query_or_embedding, list):
+                    query_embedding = query_or_embedding
+                elif isinstance(query_or_embedding, np.ndarray):
+                    query_embedding = query_or_embedding.tolist()
+                else:
+                    logger.error(f"Unsupported embedding type: {type(query_or_embedding)}")
                     return []
+                
+                # FAISS similarity_search_by_vector_with_relevance_scores supports filtering
+                raw_results = vectorstore.similarity_search_by_vector_with_relevance_scores(
+                    embedding=query_embedding,
+                    k=top_k,
+                    filter=search_filter # Pass the filter here
+                )
+                # Note: relevance scores are already 0-1, higher is better.
             
             # Process results into a standardized format
             results = []
             for doc, score in raw_results:
+                # If using similarity_search_by_vector_with_relevance_scores, score is already 0-1
+                # If using similarity_search_with_score (cosine distance), need conversion
+                # Assuming score is relevance score (0-1) for simplicity now, adjust if needed
                 if score >= score_threshold:
                     result = {
                         "text": doc.page_content,
-                        "score": float(score),
+                        "score": float(score), # Assuming score is already relevance
                         "metadata": doc.metadata
                     }
+                    # Log the chunk classification of results that pass the threshold
+                    chunk_class = result["metadata"].get("chunk_classification", "Unknown")
+                    logger.debug(f"Result passing threshold (Score: {score:.4f}, Class: {chunk_class})")
                     results.append(result)
-            
+                else:
+                    chunk_class = doc.metadata.get("chunk_classification", "Unknown")
+                    logger.debug(f"Result below threshold (Score: {score:.4f}, Class: {chunk_class})")
+
             # Enrich results with complete metadata from the vector store metadata file
             vs_metadata = self.get_vectorstore_info(vectorstore_id)
             if vs_metadata and "files" in vs_metadata:
@@ -685,7 +672,7 @@ class VectorStoreManager:
                             # Preserve chunk-specific metadata
                             chunk_specific = {
                                 k: result["metadata"].get(k) 
-                                for k in ["chunk_id", "page", "chunk_index"]
+                                for k in ["chunk_id", "page", "chunk_index", "chunk_classification", "semantic_block_index"]
                                 if k in result["metadata"]
                             }
                             
@@ -703,24 +690,29 @@ class VectorStoreManager:
                             elif "original_filename" in file_info:
                                 enriched_metadata["original_filename"] = file_info["original_filename"]
                                 
-                            # Add critical security classification fields
+                            # Add critical security classification fields (doc level)
                             if "security_classification" in file_info:
                                 enriched_metadata["security_classification"] = file_info["security_classification"]
-                            if "content_security_classification" in file_info:
-                                enriched_metadata["content_security_classification"] = file_info["content_security_classification"]
+                            # Add chunk classification (already in chunk_specific)
+                            if "chunk_classification" in chunk_specific:
+                                enriched_metadata["chunk_classification"] = chunk_specific["chunk_classification"]
+                            elif "chunk_classification" in file_info: # Fallback? Unlikely needed
+                                 enriched_metadata["chunk_classification"] = file_info["chunk_classification"]
+                            else:
+                                enriched_metadata["chunk_classification"] = enriched_metadata.get("security_classification", "UNCLASSIFIED")
                             
                             # Add any remaining fields from file_info
                             for key, value in file_info.items():
                                 if key not in enriched_metadata and key != "document_id":
                                     enriched_metadata[key] = value
                             
-                            # Add chunk-specific fields
+                            # Add/override with chunk-specific fields
                             for key, value in chunk_specific.items():
                                 enriched_metadata[key] = value
                                     
                             # Update the result metadata
                             result["metadata"] = enriched_metadata
-                            logger.debug(f"Enriched metadata for result {i}: {enriched_metadata}")
+                            logger.debug(f"Enriched metadata for result {i}: {json.dumps(enriched_metadata)}")
                     
                     # Ensure each result has filename and security_classification
                     if "metadata" in result:
@@ -729,7 +721,10 @@ class VectorStoreManager:
                             metadata["filename"] = metadata["original_filename"]
                         if "security_classification" not in metadata:
                             metadata["security_classification"] = "UNCLASSIFIED"
+                        if "chunk_classification" not in metadata:
+                            metadata["chunk_classification"] = metadata.get("security_classification", "UNCLASSIFIED") # Default chunk to doc level
             
+            logger.info(f"Query returned {len(results)} results after score threshold and enrichment.")
             return results
             
         except Exception as e:
