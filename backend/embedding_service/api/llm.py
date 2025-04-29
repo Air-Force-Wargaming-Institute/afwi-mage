@@ -455,7 +455,7 @@ def get_llm_response(prompt: str) -> str:
             url = f"{base_url}/chat/completions"
             
             # Use the specified model path
-            model = "/models/DeepHermes-3-Llama-3-8B-Preview"
+            model = "/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2"
             
             # Log the model and URL being used
             logger.info(f"Using vLLM API at {url} with model {model}")
