@@ -19,7 +19,8 @@ COPY --from=nltk_data_copier /nltk_data /app/nltk_data
 
 # Copy requirements and install using local wheels
 COPY requirements.txt .
-RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
+RUN pip install --no-index --find-links=/app/wheels -r requirements.txt \
+    && rm -rf /app/wheels # Clean up wheels after installation
 
 # Installing extraction-specific dependencies
 RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps

@@ -3,10 +3,14 @@
 
 Write-Host "Starting to modify backend Dockerfiles for offline use..." -ForegroundColor Green
 
+# Define services to exclude from templating
+$excludeServices = @("vLLM", "ollama")
+
 # Get all backend services (directories that contain a Dockerfile)
 $services = Get-ChildItem -Path "backend" -Directory | 
     Where-Object { 
-        Test-Path -Path (Join-Path -Path $_.FullName -ChildPath "Dockerfile") -PathType Leaf 
+        (Test-Path -Path (Join-Path -Path $_.FullName -ChildPath "Dockerfile") -PathType Leaf) -and `
+        ($_.Name -notin $excludeServices) # Exclude specified services
     }
 
 # Template path
@@ -19,18 +23,20 @@ if (-not (Test-Path -Path $templatePath)) {
 # Read the template content
 $templateContent = Get-Content -Path $templatePath -Raw
 
+Write-Host "Applying generic offline template to services (excluding: $($excludeServices -join ', '))..." -ForegroundColor Cyan
+
 # Process each service
 foreach ($service in $services) {
     $serviceName = $service.Name
     $dockerfilePath = Join-Path -Path $service.FullName -ChildPath "Dockerfile"
     $dockerfileBackupPath = Join-Path -Path $service.FullName -ChildPath "Dockerfile.original"
     
-    Write-Host "Processing $serviceName..." -ForegroundColor Cyan
+    Write-Host "  Processing $serviceName..." -ForegroundColor Gray
     
     # Backup original Dockerfile if backup doesn't already exist
     if (-not (Test-Path -Path $dockerfileBackupPath)) {
         Copy-Item -Path $dockerfilePath -Destination $dockerfileBackupPath
-        Write-Host "  Original Dockerfile backed up to $dockerfileBackupPath" -ForegroundColor Gray
+        Write-Host "    Original Dockerfile backed up to $dockerfileBackupPath" -ForegroundColor DarkGray
     }
     
     # Modify the template content based on the service
@@ -121,8 +127,8 @@ foreach ($service in $services) {
     
     # Write the modified template to the service's Dockerfile
     $serviceContent | Set-Content -Path $dockerfilePath
-    Write-Host "  Dockerfile updated for offline use" -ForegroundColor Gray
+    Write-Host "    Dockerfile updated for offline use" -ForegroundColor DarkGray
 }
 
-Write-Host "Backend Dockerfiles have been modified for offline use" -ForegroundColor Green
-Write-Host "Original Dockerfiles have been backed up with .original extension" -ForegroundColor Green 
+Write-Host "Backend Dockerfiles modification complete (skipped excluded services)." -ForegroundColor Green
+Write-Host "Original Dockerfiles have been backed up with .original extension (where applicable)." -ForegroundColor Green 
