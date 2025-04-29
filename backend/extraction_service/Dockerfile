@@ -7,7 +7,7 @@ FROM scratch as nltk_data_copier
 COPY offline_packages/nltk_data /nltk_data
 
 # Stage 3: Actual build
-# ARG SERVICE_NAME # REMOVED - No longer needed
+ARG SERVICE_NAME # Re-add Argument to specify the service
 FROM mage-common-offline:latest
 
 WORKDIR /app
@@ -21,7 +21,8 @@ COPY offline_packages/backend_wheels /app/wheels
 # Copy NLTK data (specific to extraction_service)\nCOPY --from=nltk_data_copier /nltk_data /app/nltk_data
 
 # Copy requirements and install using local wheels, then cleanup wheels
-COPY requirements.txt .
+# Copy requirements from the specific service directory
+COPY ./backend/${SERVICE_NAME}/requirements.txt .
 # Ensure the wheels dir exists even if no wheels were copied (for rm -rf)
 RUN mkdir -p /app/wheels \
     && pip install --no-index --find-links=/app/wheels -r requirements.txt \
@@ -31,8 +32,8 @@ RUN mkdir -p /app/wheels \
 RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps
 RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps
 
-# Copy application code
-COPY . .
+# Copy ONLY the specific service's application code
+COPY ./backend/${SERVICE_NAME}/ ./ 
 
 # For core_service, uncomment:
 # RUN pip install --no-index --find-links=/app/wheels -e .
