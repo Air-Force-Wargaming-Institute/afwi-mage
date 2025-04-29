@@ -233,22 +233,21 @@ services:
       dockerfile: ./backend/embedding_service/Dockerfile
       args:
         - BASE_IMAGE=mage-gpu-offline:latest
-      ports:
-        - "8006:8006"
-      volumes:
-        - ../data:/app/data
-        # - ./models:/app/models # Models likely handled by ollama/base image
-        - ./backend/embedding_service:/app # Source mount
-      environment:
-        - CORE_SERVICE_URL=http://core:8000
-        - API_KEY='None' # Original value
-        - BASE_URL='None' # Original value
-        - OLLAMA_BASE_URL=http://ollama:11434
-      depends_on:
-        - init-data
-        - ollama # Add dependency
-      networks:
-        - app-network
+    ports:
+      - "8006:8006"
+    volumes:
+      - ../data:/app/data
+      - ./backend/embedding_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - API_KEY='None' # Original value
+      - BASE_URL='None' # Original value
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - init-data
+      - ollama # Add dependency
+    networks:
+      - app-network
 
   workbench_service: # Renamed from 'workbench' in original for consistency
     build:
