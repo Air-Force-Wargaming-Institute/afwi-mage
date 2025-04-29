@@ -3,134 +3,112 @@
 
 Write-Host "Starting to load Docker images..." -ForegroundColor Green
 
-# Get list of currently installed Docker images with their IDs
+# Get list of currently installed Docker images
 $existingImages = @()
-$existingImageDetails = @{}
 try {
-    # Collect both format and ID information
-    $imageData = docker images --format "{{.Repository}}:{{.Tag}}|{{.ID}}"
-    foreach ($item in $imageData) {
-        if ($item -match "^(.+)\|(.+)$") {
-            $repoTag = $Matches[1]
-            $imageId = $Matches[2]
-            
-            if ($repoTag -ne "<none>:<none>") {
-                $existingImages += $repoTag
-                $existingImageDetails[$repoTag] = $imageId
-                
-                # Also store normalized versions (for handling registry URLs, etc.)
-                $normalizedName = $repoTag -replace "^.*\/", "" # Remove registry/namespace
-                $existingImageDetails[$normalizedName] = $imageId
-            }
-        }
-    }
+    $existingImages = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -ne "<none>:<none>" }
     Write-Host "Found $($existingImages.Count) existing Docker images" -ForegroundColor Cyan
 } catch {
-    Write-Host "Warning: Could not retrieve existing Docker images: ${_}" -ForegroundColor Yellow
+    Write-Host "Warning: Could not retrieve existing Docker images: $_" -ForegroundColor Yellow
 }
 
 # Load all Docker images from the offline_packages/images directory
-Get-ChildItem -Path "offline_packages/images" -Filter "*.tar" | ForEach-Object {
-    $imagePath = $_.FullName
+$imageFiles = Get-ChildItem -Path "offline_packages/images" -Filter "*.tar"
+$totalImages = $imageFiles.Count
+$currentImage = 0
+
+foreach ($imageFile in $imageFiles) {
+    $currentImage++
+    $imagePath = $imageFile.FullName
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($imagePath)
+    Write-Host "[$currentImage/$totalImages] Processing $baseName..." -ForegroundColor Cyan
     
-    # Get actual image name by loading the first part of the tar file's manifest
-    $imageName = ""
-    try {
-        # Extract image name from manifest.json in the tar file
-        $manifestJson = & tar -xOf $imagePath manifest.json 2>$null | Select-Object -First 1
-        if ($manifestJson) {
-            $manifest = $manifestJson | ConvertFrom-Json
-            if ($manifest.RepoTags -and $manifest.RepoTags.Count -gt 0) {
-                $imageName = $manifest.RepoTags[0]
-                Write-Host "  Found image name in tar: $imageName" -ForegroundColor Gray
-            }
+    # Determine image name from filename pattern
+    $imageName = $null
+    # Handle pattern like redis_redis-stack_7.4.0-v3-x86_64.tar
+    if ($baseName -match "^([^_]+)_([^_]+)_(.+)$") {
+        $imageName = "$($Matches[1])/$($Matches[2]):$($Matches[3])"
+    }
+    # Handle pattern like postgres_13.tar
+    elseif ($baseName -match "^([^_]+)_([^_]+)$") {
+        $imageName = "$($Matches[1]):$($Matches[2])"
+    }
+    # Simple case like mage-common-offline.tar
+    else {
+        $imageName = $baseName
+        # If it doesn't contain a colon, assume it's "latest"
+        if ($imageName -notmatch ":") {
+            $imageName = "$imageName:latest"
         }
-    } catch {
-        Write-Host "  Warning: Could not extract image name from tar: ${_}" -ForegroundColor Yellow
     }
     
-    # If we couldn't get the name from the tar, try to guess from filename
-    if (-not $imageName) {
-        # Handle the common naming pattern we use in the tar files
-        if ($baseName -match "(.+?)_(.+)$") {
-            # This handles cases like "redis_redis-stack_7.4.0-v3-x86_64"
-            if ($baseName -match "^([^_]+)_(.+?)_(.+)$") {
-                $imageName = "$($Matches[1])/$($Matches[2]):$($Matches[3])"
-            } else {
-                # Standard case like "postgres_13"
-                $imageName = "$($Matches[1]):$($Matches[2])"
-            }
-        } else {
-            # Just replace underscores with colons as a last resort
-            $imageName = $baseName -replace "_", ":"
-        }
-        Write-Host "  Using filename-based image name: $imageName" -ForegroundColor Gray
-    }
+    Write-Host "  Image name (from filename): $imageName" -ForegroundColor Gray
     
-    # Check multiple variations of the image name
+    # Check if any close matches exist in Docker
     $imageExists = $false
-    $existingImageName = ""
+    $imageMatches = @()
     
-    # 1. Check exact match
+    # Exact match
     if ($existingImages -contains $imageName) {
         $imageExists = $true
-        $existingImageName = $imageName
+        $imageMatches += $imageName
     }
     
-    # 2. Check without registry prefix
-    if (-not $imageExists) {
-        $simpleName = $imageName -replace "^.*\/", ""
-        if ($existingImages -contains $simpleName) {
+    # Match without registry prefix
+    $simpleImageName = $imageName -replace "^.*\/", ""
+    foreach ($existing in $existingImages) {
+        $simpleExisting = $existing -replace "^.*\/", ""
+        if ($simpleExisting -eq $simpleImageName) {
             $imageExists = $true
-            $existingImageName = $simpleName
-        }
-    }
-    
-    # 3. Check normalized versions (registry/namespace variations)
-    if (-not $imageExists) {
-        foreach ($existing in $existingImages) {
-            $normalizedExisting = $existing -replace "^.*\/", ""
-            $normalizedCurrent = $imageName -replace "^.*\/", ""
-            
-            if ($normalizedExisting -eq $normalizedCurrent) {
-                $imageExists = $true
-                $existingImageName = $existing
-                break
-            }
+            $imageMatches += $existing
         }
     }
     
     if ($imageExists) {
-        Write-Host "Image $imageName already exists as $existingImageName in Docker, skipping..." -ForegroundColor Yellow
+        Write-Host "  Image already exists as: $($imageMatches -join ', ')" -ForegroundColor Yellow
+        Write-Host "  Skipping..." -ForegroundColor Yellow
     } else {
-        Write-Host "Loading image from $imagePath..." -ForegroundColor Cyan
-        
-        # Store the list of image IDs before loading
-        $beforeIds = docker images -q
+        # Before image loading - get current repositories and tags
+        $beforeImages = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -ne "<none>:<none>" }
         
         # Load the image
-        docker load -i $imagePath
+        Write-Host "  Loading image from $imagePath..." -ForegroundColor Cyan
+        $output = docker load -i $imagePath
         
-        # Get the new images that were loaded
-        $afterIds = docker images -q
-        $newIds = $afterIds | Where-Object { $_ -notin $beforeIds }
+        # Extract the loaded image name from docker load output
+        $loadedImageName = $null
+        if ($output -match "Loaded image: (.+)") {
+            $loadedImageName = $Matches[1]
+            Write-Host "  Successfully loaded: $loadedImageName" -ForegroundColor Green
+        }
         
-        if ($newIds) {
-            foreach ($newId in $newIds) {
-                $newImageInfo = docker images --filter "id=$newId" --format "{{.Repository}}:{{.Tag}}"
-                foreach ($newImage in $newImageInfo) {
-                    if ($newImage -ne "<none>:<none>") {
-                        $existingImages += $newImage
-                        $existingImageDetails[$newImage] = $newId
-                        Write-Host "Loaded image: $newImage" -ForegroundColor Green
-                    }
+        # If we couldn't get the name from output, check what's new
+        if (-not $loadedImageName) {
+            $afterImages = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -ne "<none>:<none>" }
+            $newImages = $afterImages | Where-Object { $_ -notin $beforeImages }
+            
+            if ($newImages.Count -gt 0) {
+                foreach ($newImage in $newImages) {
+                    Write-Host "  New image detected: $newImage" -ForegroundColor Green
+                    $existingImages += $newImage
+                }
+            } else {
+                Write-Host "  Warning: No new images detected after loading" -ForegroundColor Yellow
+                
+                # Special case check - might have been a duplicate that docker doesn't report
+                if ($output -match "already exists") {
+                    Write-Host "  Image appears to be already loaded (according to docker)" -ForegroundColor Yellow
                 }
             }
         } else {
-            Write-Host "Warning: No new images detected after loading $imagePath" -ForegroundColor Yellow
+            # Add the successfully loaded image to our tracking list
+            if ($loadedImageName -notin $existingImages) {
+                $existingImages += $loadedImageName
+            }
         }
     }
+    
+    Write-Host ""
 }
 
-Write-Host "All Docker images have been loaded" -ForegroundColor Green 
+Write-Host "All Docker images have been processed" -ForegroundColor Green 
