@@ -1,6 +1,6 @@
-# Stage 1: Copy wheels
-FROM scratch as wheels_copier
-COPY offline_packages/backend_wheels /wheels
+# Stage 1: Wheels (REMOVED - Copying directly in main stage)
+# FROM scratch as wheels_copier
+# COPY offline_packages/backend_wheels /wheels
 
 # Stage 2: Copy NLTK data (if needed - NOW ONLY COPIED BY SPECIFIC SERVICES)
 FROM scratch as nltk_data_copier
@@ -11,15 +11,15 @@ FROM mage-common-offline:latest
 
 WORKDIR /app
 
-# Copy wheels from the first stage
-COPY --from=wheels_copier /wheels /app/wheels
+# Copy wheels directly into this stage
+COPY offline_packages/backend_wheels /app/wheels
 
 # REMOVED: General NLTK data copy - will be added specifically for extraction_service
 # COPY --from=nltk_data_copier /nltk_data /app/nltk_data
 
 # Copy NLTK data (specific to extraction_service)\nCOPY --from=nltk_data_copier /nltk_data /app/nltk_data
 
-# Copy requirements and install using local wheels
+# Copy requirements and install using local wheels, then cleanup wheels
 COPY requirements.txt .
 RUN pip install --no-index --find-links=/app/wheels -r requirements.txt \
     && rm -rf /app/wheels # Clean up wheels after installation
