@@ -5,10 +5,10 @@ ARG GPU_COUNT=1
 ENV TP_SIZE=$GPU_COUNT
 
 # Create an entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+COPY backend/vLLM/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 RUN mkdir -p /models/__MODEL_SUBFOLDER__
-COPY ./models/__MODEL_SUBFOLDER__ /models/__MODEL_SUBFOLDER__
+COPY backend/vLLM/models/__MODEL_SUBFOLDER__ /models/__MODEL_SUBFOLDER__
 
 # Set offline mode for HuggingFace
 ENV HF_DATASETS_OFFLINE=1
