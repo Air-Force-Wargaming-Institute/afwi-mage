@@ -2,7 +2,7 @@
 FROM scratch as wheels_copier
 COPY offline_packages/backend_wheels /wheels
 
-# Stage 2: Copy NLTK data (if needed)
+# Stage 2: Copy NLTK data (if needed - NOW ONLY COPIED BY SPECIFIC SERVICES)
 FROM scratch as nltk_data_copier
 COPY offline_packages/nltk_data /nltk_data
 
@@ -14,8 +14,8 @@ WORKDIR /app
 # Copy wheels from the first stage
 COPY --from=wheels_copier /wheels /app/wheels
 
-# Copy NLTK data (if needed)
-COPY --from=nltk_data_copier /nltk_data /app/nltk_data
+# REMOVED: General NLTK data copy - will be added specifically for extraction_service
+# COPY --from=nltk_data_copier /nltk_data /app/nltk_data
 
 # Copy requirements and install using local wheels
 COPY requirements.txt .
