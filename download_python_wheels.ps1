@@ -35,141 +35,85 @@ $extraRequirements = @(
 )
 $extraReqFileContent = $extraRequirements -join "`n"
 
-# Using Docker to ensure Linux compatibility and use pip-tools
-Write-Host "Running pip-compile and pip download in Docker container for each service..." -ForegroundColor Cyan
+# --- Prepare Common Docker Execution Environment ---
+Write-Host "Preparing Docker environment..." -ForegroundColor Cyan
 
-# Construct the multi-line bash script content
-$tempScriptName = "temp_download_script.sh"
-$tempScriptHostPath = Join-Path $currentPath "offline_packages/$tempScriptName"
-$tempScriptContainerPath = "/tmp/$tempScriptName"
+# Path for the generic script template on host and in container
+$scriptTemplateName = "temp_download_script_template.sh"
+$scriptTemplateHostPath = Join-Path $currentPath "offline_packages/$scriptTemplateName"
+$scriptTemplateContainerPath = "/tmp/$scriptTemplateName"
 
-# Escape single quotes within the extra requirements content for bash echo
-$escapedExtraReqFileContent = $extraReqFileContent -replace "'", "'\''" 
+# Path for the extra requirements file on host and in container
+$extraReqFileName = "extra_reqs.in"
+$extraReqFileHostPath = Join-Path $currentPath "offline_packages/$extraReqFileName"
+$extraReqFileContainerPath = "/tmp/$extraReqFileName"
 
-# Start building the bash script content
-$bashScriptContent = @"
-#!/bin/bash
-set -e
-echo 'Upgrading pip, wheel, and installing pip-tools...'
-pip install --upgrade pip wheel pip-tools
+# Write the extra requirements to the host file
+$extraReqFileContent | Out-File -FilePath $extraReqFileHostPath -Encoding Ascii -NoNewline
 
-# Create file for extra requirements
-echo '$escapedExtraReqFileContent' > /tmp/extra_reqs.in
+# Run a preliminary container to install pip-tools (avoids doing it repeatedly)
+# We reuse the base image tag as the upgraded image tag
+$baseImage = "python:3.11-slim"
+$upgradedImage = "python:3.11-slim-pip-tools"
+Write-Host "Checking/Creating Python image with pip-tools ($upgradedImage)..." -ForegroundColor Cyan
+if (-not (docker image inspect $upgradedImage -f '{{.Id}}' 2>$null)) {
+    Write-Host "  Building $upgradedImage..." -ForegroundColor Gray
+    $dockerBuildCmd = "FROM $baseImage
+RUN pip install --upgrade pip wheel pip-tools"
+    $dockerBuildCmd | docker build -t $upgradedImage - 
+} else {
+    Write-Host "  Image $upgradedImage already exists." -ForegroundColor Gray
+}
 
-echo 'Processing services...'
-"@
+# Check if the script template exists
+if (-not (Test-Path $scriptTemplateHostPath)) {
+    Write-Error "Script template not found at $scriptTemplateHostPath. Please ensure it was created correctly."
+    exit 1
+}
+
+# --- Loop Through Services and Run Docker ---
+Write-Host "Running Docker container for each service..." -ForegroundColor Cyan
+$overallSuccess = $true
 
 foreach ($serviceDir in $serviceDirs) {
     $serviceName = $serviceDir.Name
-    # Escape single quotes in service name just in case, for bash variable assignment
-    $escapedServiceNameForBash = $serviceName -replace "'", "'\''" 
-    
+    Write-Host "--------------------------------------------------" -ForegroundColor Cyan
     Write-Host "  Processing $serviceName..." -ForegroundColor Cyan
-    
-    # Append commands for this service to the script content
-    $bashScriptContent += @"
 
-echo '--------------------------------------------------'
-echo '  Processing service: $escapedServiceNameForBash'
-# Define BASH variables for paths
-SERVICE_NAME='$escapedServiceNameForBash'
-REQ_FILE="/backend/$SERVICE_NAME/requirements.txt"
-COMPILED_REQ_FILE="/backend/$SERVICE_NAME/requirements-compiled.txt"
-WHEEL_DIR="/wheels/$SERVICE_NAME"
+    try {
+        # Run the container for this specific service, passing SERVICE_NAME as env var
+        docker run --rm `
+            -e "SERVICE_NAME=$serviceName" `
+            -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
+            -v "${backendPath}:/backend:ro" `
+            -v "${scriptTemplateHostPath}:${scriptTemplateContainerPath}:ro" `
+            -v "${extraReqFileHostPath}:${extraReqFileContainerPath}:ro" `
+            $upgradedImage bash "$scriptTemplateContainerPath"
 
-echo "  Using REQ_FILE: $REQ_FILE"
-echo "  Using COMPILED_REQ_FILE: $COMPILED_REQ_FILE"
-echo "  Using WHEEL_DIR: $WHEEL_DIR"
-
-echo "  Compiling requirements for $SERVICE_NAME..."
-mkdir -p "$WHEEL_DIR" # Use BASH variable with quotes
-COMPILE_CMD1="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" \"$REQ_FILE\" /tmp/extra_reqs.in"
-COMPILE_CMD2="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" \"$REQ_FILE\""
-COMPILE_CMD3="pip-compile --allow-unsafe --resolver=backtracking --output-file=\"$COMPILED_REQ_FILE\" /tmp/extra_reqs.in"
-COMPILE_EXIT_CODE=0
-
-if [ -f "$REQ_FILE" ]; then
-    $COMPILE_CMD1 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
-    if [ $COMPILE_EXIT_CODE -ne 0 ]; then
-        echo "    WARN: pip-compile (with extra reqs) failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE. Trying without..."
-        echo "    Compile error log (if any):"
-        cat /tmp/pip_compile_error.log || echo "    No error log found."
-        COMPILE_EXIT_CODE=0 # Reset for next try
-        $COMPILE_CMD2 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
-        if [ $COMPILE_EXIT_CODE -ne 0 ]; then
-             echo "    ERROR: pip-compile (without extra reqs) also failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE."
-             echo "    Compile error log (if any):"
-             cat /tmp/pip_compile_error.log || echo "    No error log found."
-        fi
-    fi
-else
-    echo "    INFO: No requirements.txt found for $SERVICE_NAME. Compiling only extra reqs."
-    $COMPILE_CMD3 2>/tmp/pip_compile_error.log || COMPILE_EXIT_CODE=$?
-    if [ $COMPILE_EXIT_CODE -ne 0 ]; then
-        echo "    ERROR: pip-compile (only extra reqs) failed for $SERVICE_NAME with code $COMPILE_EXIT_CODE."
-        echo "    Compile error log (if any):"
-        cat /tmp/pip_compile_error.log || echo "    No error log found."
-    fi
-fi
-rm -f /tmp/pip_compile_error.log # Clean up log file
-echo "  Finished compiling for $SERVICE_NAME (Compile Exit Code: $COMPILE_EXIT_CODE)"
-
-
-if [ -f "$COMPILED_REQ_FILE" ] && [ $COMPILE_EXIT_CODE -eq 0 ]; then
-    echo "    Downloading wheels for $SERVICE_NAME based on $COMPILED_REQ_FILE..."
-    DOWNLOAD_EXIT_CODE1=0
-    DOWNLOAD_EXIT_CODE2=0
-    pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --only-binary=:all: --no-deps 2>/tmp/pip_download_error.log || DOWNLOAD_EXIT_CODE1=$?
-    if [ $DOWNLOAD_EXIT_CODE1 -ne 0 ]; then
-        echo "    WARN: Failed to download some wheels with only-binary for $SERVICE_NAME (Exit Code: $DOWNLOAD_EXIT_CODE1). Retrying without restriction..."
-        echo "    Download error log (if any):"
-        cat /tmp/pip_download_error.log || echo "    No error log found."
-        pip download --dest "$WHEEL_DIR" -r "$COMPILED_REQ_FILE" --platform manylinux2014_x86_64 --python-version 311 --no-deps 2>/tmp/pip_download_error.log || DOWNLOAD_EXIT_CODE2=$?
-        if [ $DOWNLOAD_EXIT_CODE2 -ne 0 ]; then
-             echo "    ERROR: Failed to download some wheels even without only-binary for $SERVICE_NAME (Exit Code: $DOWNLOAD_EXIT_CODE2)."
-             echo "    Download error log (if any):"
-             cat /tmp/pip_download_error.log || echo "    No error log found."
-        fi
-    fi
-    rm -f /tmp/pip_download_error.log # Clean up log file
-    echo "    Finished downloading wheels for $SERVICE_NAME."
-else
-    echo "    WARN: Skipping wheel download for $SERVICE_NAME (No compiled file or compile failed)."
-fi
-echo '--------------------------------------------------'
-
-"@
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Warning: Docker command for $serviceName completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
+            $overallSuccess = $false
+        }
+    } catch {
+        Write-Host "Error running Docker command for $serviceName: $_" -ForegroundColor Red
+        $overallSuccess = $false
+    }
 }
 
-# Add final message to the script content
-$bashScriptContent += @"
-
-echo 'Backend wheel downloads complete.'
-"@
-
-# Write the bash script to the temporary file
-Write-Host "Writing temporary bash script to $tempScriptHostPath" -ForegroundColor Gray
-$bashScriptContent | Set-Content -Path $tempScriptHostPath -Encoding Ascii -NoNewline
-
-try {
-    # Run the container, mounting the script and executing it
-    Write-Host "Executing script in Docker container..." -ForegroundColor Cyan
-    # Put docker run on a single line to avoid PowerShell parsing issues
-    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${backendPath}:/backend:ro" -v "${tempScriptHostPath}:${tempScriptContainerPath}:ro" python:3.11-slim bash "$tempScriptContainerPath"
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
-        Write-Host "Some packages may not have been downloaded correctly." -ForegroundColor Yellow
+# --- Cleanup ---
+finally {
+    # Clean up the temporary extra requirements file
+    if (Test-Path $extraReqFileHostPath) {
+        Write-Host "Cleaning up temporary file: $extraReqFileHostPath" -ForegroundColor Gray
+        Remove-Item -Path $extraReqFileHostPath -Force
     }
-} catch {
-    Write-Host "Error running Docker command: $_" -ForegroundColor Red
-} finally {
-    # Clean up the temporary script file
-    if (Test-Path $tempScriptHostPath) {
-        Write-Host "Cleaning up temporary script: $tempScriptHostPath" -ForegroundColor Gray
-        Remove-Item -Path $tempScriptHostPath -Force
-    }
+    # Note: We leave the script template as it might be useful
+}
+
+# --- Final Summary ---
+if (-not $overallSuccess) {
+     Write-Host "Warning: One or more services failed during wheel download." -ForegroundColor Yellow
 }
 
 $finalWheelCount = (Get-ChildItem -Path $baseWheelDir -Recurse -Filter "*.whl" | Measure-Object).Count
-Write-Host "Python wheel packages have been downloaded to service-specific subdirectories under $baseWheelDir ($finalWheelCount total packages)" -ForegroundColor Green 
+Write-Host "Python wheel package download process complete. ($finalWheelCount total packages found in subdirectories)" -ForegroundColor Green 
