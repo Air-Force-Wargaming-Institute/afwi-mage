@@ -24,7 +24,10 @@ services:
       - app-network
 
   core:
-    build: ./core_service
+    build:
+      context: ./core_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8000:8000"
     environment:
@@ -57,7 +60,10 @@ services:
       - app-network
 
   chat:
-    build: ./chat_service
+    build:
+      context: ./chat_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8009:8009"
     env_file:
@@ -79,9 +85,7 @@ services:
       - app-network
 
   vllm:
-    build:
-      context: ./vLLM
-      dockerfile: Dockerfile
+    image: vllm/vllm-openai:latest
     container_name: vllm-chat
     ports:
       - "8007:8000"
@@ -112,7 +116,10 @@ services:
     restart: unless-stopped
 
   agent:
-    build: ./agent_service
+    build:
+      context: ./agent_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8001:8001"
     volumes:
@@ -130,7 +137,10 @@ services:
       - app-network
 
   extraction:
-    build: ./extraction_service
+    build:
+      context: ./extraction_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8002:8002"
     volumes:
@@ -144,7 +154,10 @@ services:
       - app-network
 
   generation:
-    build: ./generation_service
+    build:
+      context: ./generation_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8003:8003"
     volumes:
@@ -159,7 +172,10 @@ services:
       - app-network
 
   review:
-    build: ./review_service
+    build:
+      context: ./review_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8004:8004"
     volumes:
@@ -174,7 +190,10 @@ services:
       - app-network
 
   upload:
-    build: ./upload_service
+    build:
+      context: ./upload_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8005:8005"
     volumes:
@@ -234,7 +253,10 @@ services:
      - "5432:5432"
 
   embedding:
-    build: ./embedding_service
+    build:
+      context: ./embedding_service
+      args:
+        - BASE_IMAGE=mage-gpu-offline:latest
     ports:
       - "8006:8006"
     volumes:
@@ -254,7 +276,10 @@ services:
       - app-network
 
   workbench:
-    build: ./workbench_service
+    build:
+      context: ./workbench_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8020:8020"
     volumes:
@@ -288,7 +313,10 @@ services:
       "
 
   auth:
-   build: ./auth_service
+   build:
+     context: ./auth_service
+     args:
+       - BASE_IMAGE=mage-common-offline:latest
    volumes:
      - ./auth_service:/app
    depends_on:
@@ -310,7 +338,10 @@ services:
      - app-network
 
   direct_chat_service:
-    build: ./direct_chat_service
+    build:
+      context: ./direct_chat_service
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
     ports:
       - "8011:8011"
     volumes:

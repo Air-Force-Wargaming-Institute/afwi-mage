@@ -1,0 +1,17 @@
+ARG BASE_IMAGE=mage-common-offline:latest
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-index --find-links=/app/wheels -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Set default port (can be overridden by specific services)
+EXPOSE 8000
+
+# Default command (can be overridden by specific services)
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"] 

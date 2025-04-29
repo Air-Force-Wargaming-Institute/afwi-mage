@@ -46,41 +46,73 @@ foreach ($service in $services) {
         "extraction_service" {
             $serviceContent = $serviceContent -replace "# For extraction_service, uncomment and adjust:", "# Installing extraction-specific dependencies"
             $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps", "RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps"
-            $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels \"pytesseract>=0.3\" \"layoutparser\[tesseract\]>=0.3\" --no-deps", "RUN pip install --no-index --find-links=/app/wheels \"pytesseract>=0.3\" \"layoutparser[tesseract]>=0.3\" --no-deps"
+            # Fix the escaping for square brackets in pip install command
+            $tesseractLine = '# RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps'
+            $fixedTesseractLine = 'RUN pip install --no-index --find-links=/app/wheels "pytesseract>=0.3" "layoutparser[tesseract]>=0.3" --no-deps'
+            $serviceContent = $serviceContent -replace [regex]::Escape($tesseractLine), $fixedTesseractLine
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8002"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8002\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "embedding_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8006"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8006\"]"
+            # Fix the escaping for CMD directive 
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8006"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
+            # Also update to use mage-gpu-offline
+            $serviceContent = $serviceContent -replace "FROM mage-common-offline:latest", "FROM mage-gpu-offline:latest"
         }
         "agent_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8001"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8001\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "generation_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8003"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8003\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "review_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8004"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8004\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "upload_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8005"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8005\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8005"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "chat_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8009"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8009\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8009"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "direct_chat_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8011"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8011\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         "workbench_service" {
             $serviceContent = $serviceContent -replace "EXPOSE 8000", "EXPOSE 8020"
-            $serviceContent = $serviceContent -replace "CMD \[\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"\]", "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8020\"]"
+            # Fix the escaping for CMD directive
+            $oldCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]'
+            $newCmd = 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8020"]'
+            $serviceContent = $serviceContent -replace [regex]::Escape($oldCmd), $newCmd
         }
         default {
             # No specific customizations for other services

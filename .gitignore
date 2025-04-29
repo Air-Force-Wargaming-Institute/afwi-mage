@@ -75,6 +75,7 @@ Thumbs.db
 !requirements-MAGE-GPU.txt
 !requirements-MAGE-common.txt
 !README.md
+!service-dockerfile-template.txt
 
 # But don't ignore the directories themselves
 !data/
