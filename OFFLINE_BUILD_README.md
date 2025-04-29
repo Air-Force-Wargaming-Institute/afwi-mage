@@ -15,7 +15,7 @@ Execute these steps on a machine with internet access:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/afwi-multi-agent-generative-engine.git
+   git clone https://web.git.mil/air-force-wargaming-institute/afwi-multi-agent-generative-engine.git
    cd afwi-multi-agent-generative-engine
    ```
 
