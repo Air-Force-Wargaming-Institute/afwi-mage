@@ -154,11 +154,8 @@ $bashScriptContent | Set-Content -Path $tempScriptHostPath -Encoding Ascii -NoNe
 try {
     # Run the container, mounting the script and executing it
     Write-Host "Executing script in Docker container..." -ForegroundColor Cyan
-    docker run --rm `
-        -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
-        -v "${backendPath}:/backend:ro" `
-        -v "${tempScriptHostPath}:${tempScriptContainerPath}:ro" ` # Mount the script read-only
-        python:3.11-slim bash "$tempScriptContainerPath"
+    # Put docker run on a single line to avoid PowerShell parsing issues
+    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${backendPath}:/backend:ro" -v "${tempScriptHostPath}:${tempScriptContainerPath}:ro" python:3.11-slim bash "$tempScriptContainerPath"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
