@@ -103,18 +103,6 @@ http:
     compress:
       compress: {}
       
-    # New middleware to strip /api/wargame prefix
-    # strip-api-wargame-prefix:
-    #   stripPrefix:
-    #     prefixes:
-    #       - "/api/wargame"
-    replace-wargame-path:
-      replacePathRegex:
-        # Make the trailing slash optional in the match, capture only what's after
-        regex: "^/api/wargame/?(.*)$"
-        # Keep the replacement the same, ${1} will now be empty or the subpath like /{id}
-        replacement: "/api/v1/wargames${1}"
-    
   # Routers with corrected path patterns
   routers:
     # Health Check Router
@@ -252,18 +240,6 @@ http:
         - "auth-middleware"
         - "security-headers"
       
-    # New Router for Wargame Service
-    wargame-router:
-      entryPoints:
-        - web
-      rule: "PathPrefix(`/api/wargame`)"
-      service: wargame-service
-      middlewares:
-        - cors-headers
-        # - auth-middleware # Temporarily commented out for debugging
-        - security-headers
-        - replace-wargame-path
-
   # Services with consistent health check paths
   services:
     # Special API Health Status service
@@ -381,13 +357,3 @@ http:
           interval: "120s"
           timeout: "5s"
           followRedirects: true
-
-    # New Service for Wargame Builder
-    wargame-service:
-      loadBalancer:
-        servers:
-          - url: "http://wargame_service:8012"
-        healthCheck:
-          path: "/health"
-          interval: "100s"
-          timeout: "10s"
