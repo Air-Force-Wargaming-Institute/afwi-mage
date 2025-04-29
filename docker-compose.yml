@@ -1,5 +1,24 @@
+name: afwi-multi-agent-generative-engine-offline # Updated name for clarity
+
+networks:
+  app-network:
+    driver: bridge
+
 services:
-  # ... other services ...
+  init-data:
+    image: busybox
+    volumes:
+      - ../data:/data
+    command: >
+      sh -c "
+        mkdir -p /data/uploads && chmod -R 777 /data/uploads &&
+        mkdir -p /data/workbench/spreadsheets && 
+        chmod -R 777 /data/workbench &&
+        touch /data/workbench/spreadsheets/.gitkeep &&
+        echo 'Initialized data directories successfully'
+      "
+    networks:
+      - app-network
 
   core:
     build:
@@ -7,36 +26,63 @@ services:
       dockerfile: ./backend/core_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of core service ...
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
+      - UPLOAD_SERVICE_URL=http://upload:8005
+      - EXTRACTION_SERVICE_URL=http://extraction:8002
+      - GENERATION_SERVICE_URL=http://generation:8003
+      - AGENT_SERVICE_URL=http://agent:8001
+      - REVIEW_SERVICE_URL=http://review:8004
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - WORKBENCH_SERVICE_URL=http://workbench:8020
+      - VLLM_INSTANCES=http://vllm:8000/v1=generate # Adjusted port based on vLLM service def
+      - OLLAMA_BASE_URLS=http://ollama:11434
+      - DIRECT_CHAT_SERVICE_URL=http://direct_chat_service:8011
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ../data:/app/data:rw
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app-network
 
-  upload:
-    build:
-      context: .
-      dockerfile: ./backend/upload_service/Dockerfile
-      args:
-        - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of upload service ...
-
-  chat_db:
-    # ... chat_db service ...
-
-  init-data:
-    # ... init-data service ...
-
-  chat_service:
+  chat_service: # Renamed from 'chat' in original for consistency
     build:
       context: .
       dockerfile: ./backend/chat_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of chat_service ...
-
-  vllm:
-    build: # ADDED build section for vLLM
-      context: .
-      dockerfile: ./backend/vLLM/Dockerfile # Assuming the generated Dockerfile is here
-    image: vllm/vllm-openai:latest # Keep image for fallback/reference if needed
-    # ... rest of vllm service ...
+    ports:
+      - "8009:8009"
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=postgresql://postgres:password@db:5432/chat_db # Target main db service
+      - VLLM_API_BASE=http://vllm:8000/v1 # Target vLLM service directly
+      - VLLM_API_KEY=no_key # Assuming no key needed for internal service
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview-abliterated # Match model folder name
+    volumes:
+      - ../data:/app/data
+      - ./backend/chat_service:/app # Source mount for development? Maybe remove for pure offline build? Keeping for now.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+      - ollama # Keep dependency? Ollama is built now.
+      - vllm # Add dependency on vllm
+      - db # Add dependency on db
+    networks:
+      - app-network
 
   agent:
     build:
@@ -44,7 +90,22 @@ services:
       dockerfile: ./backend/agent_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of agent service ...
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../data:/app/data
+      # - ./models:/app/models # Models are baked into base images or vLLM/Ollama
+      - ./backend/agent_service:/app # Source mount
+      - ./backend/agent_service/agents:/app/agents # Source mount
+    environment:
+      - PYTHONPATH=/app
+      - CORE_SERVICE_URL=http://core:8000
+      - DATABASE_URL=postgresql://postgres:password@db:5432/agent_db # Target main db service
+    depends_on:
+      - init-data
+      - db # Add dependency
+    networks:
+      - app-network
 
   extraction:
     build:
@@ -52,23 +113,17 @@ services:
       dockerfile: ./backend/extraction_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of extraction service ...
-
-  embedding:
-    build:
-      context: .
-      dockerfile: ./backend/embedding_service/Dockerfile
-      args:
-        - BASE_IMAGE=mage-gpu-offline:latest # Uses GPU base
-    # ... rest of embedding service ...
-
-  review:
-    build:
-      context: .
-      dockerfile: ./backend/review_service/Dockerfile
-      args:
-        - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of review service ...
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../data:/app/data
+      # - ./models:/app/models # Models baked in
+      - ./backend/extraction_service:/app # Source mount
+      - nltk_data_volume:/app/nltk_data # Keep named volume? Or rely on COPY in Dockerfile? Relying on COPY for now.
+    depends_on:
+      - init-data
+    networks:
+      - app-network
 
   generation:
     build:
@@ -76,7 +131,188 @@ services:
       dockerfile: ./backend/generation_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of generation service ...
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../data:/app/data
+      # - ./models:/app/models # Models baked in
+      - ./backend/generation_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  review:
+    build:
+      context: .
+      dockerfile: ./backend/review_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    ports:
+      - "8004:8004"
+    volumes:
+      - ../data:/app/data
+      # - ../models:/app/models # Path seems wrong, should be ./backend/models? Models baked in anyway.
+      - ./backend/review_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  upload:
+    build:
+      context: .
+      dockerfile: ./backend/upload_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    ports:
+      - "8005:8005"
+    volumes:
+      - ../data:/app/data
+      # - ./models:/app/models # Models baked in
+      - ./backend/upload_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+    depends_on:
+      - init-data
+    networks:
+      - app-network
+
+  api_gateway:
+    image: traefik:v3.3.4
+    container_name: mage_api_gateway
+    command:
+      - "--configFile=/etc/traefik/traefik.yaml"
+    ports:
+      - "80:80"
+      - "8080:8080"  # localhost:8080/dashboard
+      - "8082:8082"  # localhost:8082/metrics
+      - "8083:8083"  # NEW: localhost:8083/ping
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Requires Docker socket access
+      - ./backend/api_gateway/traefik.yaml:/etc/traefik/traefik.yaml:ro # Adjusted path
+      - ./backend/api_gateway/dynamic_conf.yaml:/etc/traefik/dynamic/dynamic_conf.yaml # Adjusted path
+      - ../data/logs/traefik:/var/log/traefik
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:8083/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  db:
+   image: postgres:13
+   environment:
+     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+     POSTGRES_MULTIPLE_DATABASES: dbname,authdb,chat_db,agent_db,direct_chat_db # Added other DBs here based on service env vars
+   volumes:
+     - postgres_data:/var/lib/postgresql/data
+     - ./backend/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh # Adjusted path
+   networks:
+     - app-network
+   healthcheck:
+     test: ["CMD-SHELL", "pg_isready -U postgres"]
+     interval: 5s
+     timeout: 5s
+     retries: 5
+     start_period: 10s
+   ports:
+     - "5432:5432"
+
+  embedding:
+    build:
+      context: .
+      dockerfile: ./backend/embedding_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-gpu-offline:latest # Uses GPU base
+    ports:
+      - "8006:8006"
+    volumes:
+      - ../data:/app/data
+      # - ./models:/app/models # Models likely handled by ollama/base image
+      - ./backend/embedding_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - API_KEY='None' # Original value
+      - BASE_URL='None' # Original value
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - init-data
+      - ollama # Add dependency
+    networks:
+      - app-network
+
+  workbench_service: # Renamed from 'workbench' in original for consistency
+    build:
+      context: .
+      dockerfile: ./backend/workbench_service/Dockerfile
+      args:
+        - BASE_IMAGE=mage-common-offline:latest
+    ports:
+      - "8020:8020"
+    volumes:
+      - ../data:/app/data
+      - ../data/workbench:/app/data/workbench # Keep original volume mounts
+      - ../data/workbench/spreadsheets:/app/data/workbench/spreadsheets # Keep original volume mounts
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - DEBUG=1
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+      - WORKBENCH_SPREADSHEETS_DIR=/app/data/workbench/spreadsheets
+      - LLM_PROVIDER=vllm # Original value
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+      - core
+      - embedding
+    networks:
+      - app-network
+    command: > # Keep original command
+      sh -c "
+        mkdir -p /app/data/workbench/spreadsheets && 
+        chmod -R 777 /app/data/workbench && 
+        ls -la /app/data/workbench && 
+        ls -la /app/data/workbench/spreadsheets &&
+        echo 'Directory structure verified!' &&
+        uvicorn app:app --host 0.0.0.0 --port 8020 --reload --timeout-keep-alive 75
+      "
+
+  auth_service: # Renamed from 'auth' in original for consistency
+   build:
+     context: .
+     dockerfile: ./backend/auth_service/Dockerfile
+     args:
+       - BASE_IMAGE=mage-common-offline:latest
+   volumes:
+     - ./backend/auth_service:/app # Source mount
+   depends_on:
+     db:
+       condition: service_healthy
+   environment:
+     - DATABASE_URL=postgresql://postgres:password@db:5432/authdb # Target main db service
+     - SECRET_KEY=your-secret-key-here-change-in-production # Original value
+     - DISABLE_AUTH=false # Original value
+     - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 # Original value
+     - ACCESS_TOKEN_EXPIRE_MINUTES=1440 # Original value
+     - PORT=8010 # Original value
+     - HOST=0.0.0.0 # Original value
+     - PYTHONUNBUFFERED=1 # Original value
+   ports:
+     - "8010:8010"
+   restart: always # Original value
+   networks:
+     - app-network
 
   direct_chat_service:
     build:
@@ -84,33 +320,92 @@ services:
       dockerfile: ./backend/direct_chat_service/Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of direct_chat_service ...
+    ports:
+      - "8011:8011"
+    volumes:
+      - ../data:/app/data
+      - ./backend/direct_chat_service:/app # Source mount
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - MODEL_SERVICE_URL=http://model_service:8008 # What is model_service? Assuming vllm for now. Change if incorrect.
+      - PYTHONPATH=/app
+      - SERVICE_PORT=8011 # Original value
+      - DATABASE_URL=postgresql://postgres:password@db:5432/direct_chat_db # Target main db service
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - init-data
+      - embedding
+      - db # Add dependency
+    networks:
+      - app-network
+    command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100 # Original command
 
-  workbench_service:
+  redis:
+    image: redis/redis-stack:7.4.0-v3-x86_64
+    ports:
+      - "6379:6379"
+      - "6380:8001" # Map internal RedisInsight port
+    networks:
+      - app-network
+    volumes:
+      - redis_data:/data # Added volume for persistence
+
+  # --- vLLM Service (Using Build) ---
+  vllm:
     build:
       context: .
-      dockerfile: ./backend/workbench_service/Dockerfile
+      dockerfile: ./backend/vLLM/Dockerfile # Generated offline Dockerfile
       args:
-        - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of workbench_service ...
+        # GPU_COUNT argument can be passed during build if needed, defaults to 1 in template
+    container_name: vllm-chat
+    ports:
+      - "8007:8000" # Exposing the internal port 8000 from entrypoint script
+    env_file:
+      - path: ./backend/Config.env # Original env_file
+        required: true # Make sure it exists
+    environment:
+      # Inherited from original docker-compose.vllm.yml / Config.env
+      # Ensure relevant vars like MAX_NUM_BATCHED_TOKENS, QUANTIZATION etc. are in Config.env
+      # Offline flags are set in the generated Dockerfile
+      - NCCL_P2P_DISABLE=1 # Example, keep relevant env vars
+    shm_size: 1G # Keep from original
+    deploy: # Keep from original
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all # Or specify count if needed
+              capabilities: [gpu]
+    networks:
+      - app-network
+    ipc: host # Keep from original
+    restart: unless-stopped
+    # Removed volumes mapping models, as they are copied in the Dockerfile
 
-  auth_service:
-    build:
-      context: .
-      dockerfile: ./backend/auth_service/Dockerfile
-      args:
-        - BASE_IMAGE=mage-common-offline:latest
-    # ... rest of auth_service ...
-
+  # --- Ollama Service (Using Build) ---
   ollama:
     build:
       context: .
-      dockerfile: ./backend/ollama/Dockerfile # Assuming the modified Dockerfile is here
+      dockerfile: ./backend/ollama/Dockerfile # Generated offline Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-    image: ollama/ollama # Keep original image? Or build from Dockerfile? Decide based on offline strategy for Ollama
-    # ... rest of ollama service ...
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama # Use named volume for persistence
+    networks:
+      - app-network
+    restart: unless-stopped
+    # Add healthcheck if needed
+    # Add deploy/resources if GPU access is needed by Ollama itself (unlikely?)
 
-  # ... other services like traefik, redis, etc. ...
+volumes:
+  postgres_data:
+  nltk_data_volume: # Still defined, but might not be used if Dockerfile COPY is sufficient
+  ollama_data:
+  redis_data: # Added for Redis persistence
 
 # ... rest of docker-compose.yml ... 
