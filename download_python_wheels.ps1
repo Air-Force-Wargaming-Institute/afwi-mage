@@ -100,11 +100,8 @@ echo 'Backend wheel downloads complete.'
 
 try {
     # Run the combined commands in Docker
-    # Pass the command string directly to bash -c
-    docker run --rm `
-        -v "${currentPath}/offline_packages/backend_wheels:/wheels" `
-        -v "${backendPath}:/backend:ro" ` # Mount backend read-only
-        python:3.11-slim bash -c "$dockerCommand"
+    # Pass the command string directly to bash -c, ensure docker run is on one line
+    docker run --rm -v "${currentPath}/offline_packages/backend_wheels:/wheels" -v "${backendPath}:/backend:ro" python:3.11-slim bash -c "$dockerCommand"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Docker command completed with exit code $LASTEXITCODE" -ForegroundColor Yellow
