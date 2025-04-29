@@ -65,9 +65,22 @@ import { MetadataDisplay, SecurityClassification } from './MetadataDisplay';
 
 // Helper function to get color based on relevance score
 const getScoreColor = (score) => {
-  if (score >= 0.8) return '#4caf50'; // High relevance - green
-  if (score >= 0.6) return '#8bc34a'; // Good relevance - light green
-  if (score >= 0.4) return '#ffc107'; // Medium relevance - amber
+  // Normalize score to be between 0 and 1 if it's not already
+  // Handles distance scores (0-2) and relevance scores (0-1)
+  let normalizedScore = 0;
+  if (typeof score === 'number') {
+    if (score >= 0 && score <= 1) { // Assumes 0-1 relevance score
+      normalizedScore = score;
+    } else if (score > 1 && score <= 2) { // Assumes 0-2 distance score (lower is better)
+      normalizedScore = (2 - score) / 2; // Convert distance to relevance
+    } else if (score < 0) { // Handle potential cosine similarity scores (-1 to 1)
+      normalizedScore = (score + 1) / 2;
+    }
+  }
+
+  if (normalizedScore >= 0.8) return '#4caf50'; // High relevance - green
+  if (normalizedScore >= 0.6) return '#8bc34a'; // Good relevance - light green
+  if (normalizedScore >= 0.4) return '#ffc107'; // Medium relevance - amber
   return '#ff9800'; // Low relevance - orange
 };
 
@@ -600,47 +613,84 @@ const QueryTester = ({ vectorStore }) => {
   // Highlights query terms in the result text - memoized to improve performance
   const highlightQueryTerms = useCallback((text) => {
     if (!text || !queryText) return text;
-    
+
     const queryTerms = queryText
       .toLowerCase()
-      .split(/\s+/)
-      .filter(term => term.length > 3) // Filter out small words
+      .split(/\s+/) // Split by whitespace
+      .filter(term => term.length > 3) // Keep the length filter
       .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // Escape regex special chars
-    
-    if (queryTerms.length === 0) return text;
-    
-    const regex = new RegExp(`(${queryTerms.join('|')})`, 'gi');
-    return text.replace(regex, '<span class="highlighted-term">$1</span>');
-  }, [queryText]);
 
-  // Handle classification checkbox changes
-  const handleClassificationChange = (event) => {
-    const { name, checked } = event.target;
-    setSelectedClassifications(prev => 
-      checked 
-        ? [...prev, name] // Add classification
-        : prev.filter(c => c !== name) // Remove classification
+    if (queryTerms.length === 0) return text;
+
+    // Refined regex: Use word boundaries (\b) to match whole words only
+    const regex = new RegExp(`\\b(${queryTerms.join('|')})\\b`, 'gi');
+
+    // Replace matched terms with highlighted span
+    // Using a function ensures proper handling of case in the original text
+    return text.replace(regex, (match) =>
+      `<span class="highlighted-term">${match}</span>`
     );
+  }, [queryText]); // Depend only on queryText
+
+  // Helper function to get relevance label based on score
+  const getRelevanceLabel = (score) => {
+      // Normalize score first
+      let normalizedScore = 0;
+      if (typeof score === 'number') {
+          if (score >= 0 && score <= 1) {
+              normalizedScore = score;
+          } else if (score > 1 && score <= 2) {
+              normalizedScore = (2 - score) / 2;
+          } else if (score < 0) {
+              normalizedScore = (score + 1) / 2;
+          }
+      }
+
+      if (normalizedScore >= 0.8) return 'Very High';
+      if (normalizedScore >= 0.6) return 'High';
+      if (normalizedScore >= 0.4) return 'Moderate';
+      return 'Low';
   };
 
   const renderResultItem = (result, index) => {
     // Create HTML with highlighted terms
     const highlightedHtml = highlightQueryTerms(result.text);
-    
-    // Get relevance label based on score
-    const getRelevanceLabel = (score) => {
-      if (score >= 0.8) return 'Very High';
-      if (score >= 0.6) return 'High';
-      if (score >= 0.4) return 'Moderate';
-      return 'Low';
-    };
-    
-    // Get normalized score (should be 0-1)
-    const normalizedScore = result.score;
-    
-    // Get original score for reference (if available)
-    const originalScore = result.original_score !== undefined ? result.original_score : null;
-    
+
+    // Get normalized score (0-1) for display consistency
+    const originalScore = result.score; // Keep the original score from backend
+    let normalizedScore = 0;
+    let scoreType = 'Relevance'; // Default assumption
+
+    if (typeof originalScore === 'number') {
+        if (originalScore >= 0 && originalScore <= 1) { // Assumes 0-1 relevance score
+            normalizedScore = originalScore;
+            scoreType = 'Relevance';
+        } else if (originalScore > 1 && originalScore <= 2) { // Assumes 0-2 distance score (lower is better)
+            normalizedScore = (2 - originalScore) / 2; // Convert distance to relevance
+            scoreType = 'Similarity (from distance)';
+        } else if (originalScore < 0) { // Handle potential cosine similarity scores (-1 to 1)
+             normalizedScore = (originalScore + 1) / 2;
+             scoreType = 'Similarity (from cosine)';
+        }
+    }
+
+    // Define tooltip content
+    const tooltipContent = (
+      <div>
+        <Typography variant="body2">
+          <strong>{scoreType}: {getRelevanceLabel(normalizedScore)}</strong> ({(normalizedScore * 100).toFixed(1)}%)
+        </Typography>
+        <Typography variant="caption" display="block" color="textSecondary">
+          Score indicates semantic relevance to query (0=Low, 1=High).
+        </Typography>
+        {typeof originalScore === 'number' && originalScore !== normalizedScore && (
+          <Typography variant="caption" display="block" color="textSecondary">
+            (Original backend score: {originalScore.toFixed(2)})
+          </Typography>
+        )}
+      </div>
+    );
+
     return (
       <GradientBorderPaper key={index} style={classes.resultItem} elevation={2}>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
@@ -650,61 +700,58 @@ const QueryTester = ({ vectorStore }) => {
             </Typography>
             <SecurityClassification classification={result.metadata?.chunk_classification || result.metadata?.security_classification} />
           </Box>
-          <Box display="flex" alignItems="center">
-            <Typography variant="body2" style={{ marginRight: 8 }}>
-              Relevance:
-            </Typography>
-            <Tooltip 
-              title={
-                <div>
-                  <Typography variant="body2">
-                    <strong>Relevance: {getRelevanceLabel(normalizedScore)}</strong> ({(normalizedScore * 100).toFixed(1)}%)
-                  </Typography>
-                  {originalScore !== null && (
-                    <Typography variant="body2">
-                      Raw similarity score: {originalScore.toFixed(2)}
-                    </Typography>
-                  )}
-                  <Typography variant="body2">
-                    Scores range from 0 (no match) to 1 (perfect match)
-                  </Typography>
-                </div>
-              }
-            >
-              <div>
-                <Typography 
-                  style={{...classes.relevanceScore, color: getScoreColor(normalizedScore)}}
-                >
-                  {normalizedScore.toFixed(2)}
-                  <div 
-                    style={{ 
-                      width: `${normalizedScore * 100}%`, 
-                      height: '4px', 
-                      backgroundColor: getScoreColor(normalizedScore),
-                      borderRadius: '2px',
-                      marginTop: '2px'
-                    }} 
-                  />
-                </Typography>
-              </div>
-            </Tooltip>
-          </Box>
+          {/* Make score more prominent */}
+          <Tooltip title={tooltipContent}>
+            <Box textAlign="right">
+              {/* Score Value */}
+              <Typography
+                variant="h6" // Increased size
+                style={{
+                  fontWeight: 'bold', // Bolded
+                  color: getScoreColor(originalScore), // Color based on original score interpretation
+                  marginBottom: '4px' // Add space below score
+                }}
+              >
+                {normalizedScore.toFixed(2)}
+              </Typography>
+              {/* Score Bar */}
+              <div
+                style={{
+                  width: '60px', // Fixed width for the bar container
+                  height: '6px', // Thicker bar
+                  backgroundColor: 'rgba(0, 0, 0, 0.1)', // Background for the bar area
+                  borderRadius: '3px',
+                  overflow: 'hidden', // Ensure inner bar respects border radius
+                  marginLeft: 'auto' // Align bar to the right
+                }}
+              >
+                <div
+                  style={{
+                    width: `${normalizedScore * 100}%`,
+                    height: '100%',
+                    backgroundColor: getScoreColor(originalScore), // Use original score for color logic
+                    borderRadius: '3px',
+                  }}
+                 />
+               </div>
+             </Box>
+          </Tooltip>
         </Box>
-        
+
         {/* Enhanced Metadata Display */}
         <MetadataDisplay metadata={result.metadata} />
-        
+
         <Divider style={classes.divider} />
-        
-        <Typography variant="body2" 
-          dangerouslySetInnerHTML={{ 
+
+        <Typography variant="body2"
+          dangerouslySetInnerHTML={{
             __html: highlightedHtml.replace(
-              /<span class="highlighted-term">(.+?)<\/span>/g, 
+              /<span class="highlighted-term">(.+?)<\/span>/g,
               '<span style="background-color:rgba(255,235,59,0.3);padding:0 1px;border-radius:2px;">$1</span>'
-            ) 
-          }} 
+            )
+          }}
         />
-        
+
         {/* Add expand/collapse button if text is long */}
         {result.text.length > 500 && (
           <Button
@@ -840,6 +887,16 @@ const QueryTester = ({ vectorStore }) => {
       ...prev,
       [sourceId]: !prev[sourceId]
     }));
+  };
+
+  // Handle classification checkbox changes
+  const handleClassificationChange = (event) => {
+    const { name, checked } = event.target;
+    setSelectedClassifications(prev =>
+      checked
+        ? [...prev, name] // Add classification
+        : prev.filter(c => c !== name) // Remove classification
+    );
   };
 
   return (
@@ -1454,10 +1511,10 @@ const QueryTester = ({ vectorStore }) => {
                       <FormControlLabel
                         key={level}
                         control={
-                          <Checkbox 
+                          <Checkbox
                             checked={selectedClassifications.includes(level)}
-                            onChange={handleClassificationChange} 
-                            name={level} 
+                            onChange={handleClassificationChange}
+                            name={level}
                             size="small"
                           />
                         }

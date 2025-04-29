@@ -336,11 +336,12 @@ def get_file_security_info(file_path: str) -> Dict[str, Any]:
     Returns:
         Dictionary with security classification and metadata
     """
-    # Default classification if metadata file is not found
+    # Default classification if metadata file is not found or cannot be determined
+    # Return None instead of defaulting to UNCLASSIFIED
     default_info = {
         "filename": os.path.basename(file_path),
-        "security_classification": "UNCLASSIFIED",
-        "content_security_classification": "UNCLASSIFIED",
+        "security_classification": None, 
+        "content_security_classification": None,
         "document_id": f"generated_{uuid.uuid4()}"  # Generate a fallback ID if none exists
     }
     
@@ -385,28 +386,36 @@ def get_file_security_info(file_path: str) -> Dict[str, Any]:
             logger.info(f"Read metadata for {file_path}: {security_info}")
             return security_info
         else:
+            logger.warning(f"No metadata file found for {file_path}, attempting content extraction.")
             # Try to extract classification from file content
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(2000)  # Read first 2000 chars to check for classification
+                    # Read a larger chunk to increase chances of finding markings
+                    content = f.read(5000)  
                 
-                # Look for classification patterns in content
-                classification_pattern = r'(UNCLASSIFIED|CONFIDENTIAL|SECRET|TOP SECRET)(?://[A-Z/]+)?'
+                # Look for classification patterns in content (more robust regex)
+                # Looks for standard classifications, potentially with caveats
+                classification_pattern = r'\b(UNCLASSIFIED|CONFIDENTIAL|SECRET|TOP SECRET)(//[A-Z0-9/\s,-]+)?\b'
                 match = re.search(classification_pattern, content.upper())
                 
                 if match:
-                    classification = match.group(0)
-                    logger.info(f"Extracted classification from content of {file_path}: {classification}")
+                    # Use normalize function for consistency
+                    classification = normalize_security_classification(match.group(0))
+                    logger.info(f"Extracted classification '{classification}' from content of {file_path}.")
+                    # Update default_info if classification found in content
                     default_info["security_classification"] = classification
                     default_info["content_security_classification"] = classification
+                else:
+                    logger.warning(f"No classification pattern found in content for {file_path}. Classification remains unknown.")
+                    
             except Exception as content_err:
-                logger.warning(f"Could not read file content for classification: {str(content_err)}")
+                logger.warning(f"Could not read file content for classification extraction: {str(content_err)}")
             
-            logger.warning(f"No metadata file found for {file_path}, using default classification")
+            # Return default_info which now contains None if classification wasn't found
             return default_info
     except Exception as e:
         logger.error(f"Error reading metadata for {file_path}: {str(e)}")
-        return default_info
+        return default_info # Return info with None for classification on error
 
 
 def extract_metadata_from_file(file_path: str) -> Dict[str, Any]:

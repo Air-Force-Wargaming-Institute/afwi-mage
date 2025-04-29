@@ -34,8 +34,6 @@ http:
           - "http://127.0.0.1:3000"
           - "http://localhost"
           - "http://127.0.0.1"
-          - "http://10.11.45.216:3000"
-          - "http://10.11.45.216"
         accessControlAllowCredentials: true
         accessControlAllowHeaders:
           - "Authorization"

@@ -359,7 +359,14 @@ class SemanticBlockSplitter(TextSplitter):
 
                 # Default to document classification if no block marking found
                 if chunk_classification is None:
-                    chunk_classification = base_doc_classification
+                    # --- STRICT DEFAULTING --- 
+                    # Inherit directly from the document level, do not default to UNCLASSIFIED
+                    # unless the document itself is UNCLASSIFIED.
+                    chunk_classification = base_doc_classification 
+                    logger.debug(f"Chunk {block_index} inherited classification '{chunk_classification}' from document.")
+                    # --- END STRICT DEFAULTING ---
+                else:
+                    logger.debug(f"Chunk {block_index} detected classification: {chunk_classification}")
 
                 # Check if block exceeds fallback size limit
                 if len(block) > self.max_block_size_fallback:

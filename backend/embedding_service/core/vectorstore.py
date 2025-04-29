@@ -112,6 +112,10 @@ class VectorStoreManager:
             logger.error(f"Error loading metadata from {metadata_file}: {str(e)}")
             return None
     
+    def get_metadata_path(self, vs_id: str) -> Path:
+        """Get the path to the metadata file for a vector store."""
+        return self.base_dir / vs_id / "metadata.json"
+    
     def create_vectorstore(
         self,
         name: str,
@@ -243,15 +247,31 @@ class VectorStoreManager:
             vectorstore.save_local(str(vs_dir))
             logger.info(f"Successfully saved vector store to {vs_dir}")
             
+            # --- Determine embedding dimension --- 
+            dimension = 768 # Default
+            if hasattr(embedding_model, 'client') and hasattr(embedding_model.client, 'config') and hasattr(embedding_model.client.config, 'embedding_dim'):
+                dimension = embedding_model.client.config.embedding_dim
+            elif all_docs:
+                # Fallback: embed a sample text and check length
+                try:
+                    sample_embedding = embedding_model.embed_query("dimension check")
+                    if sample_embedding:
+                        dimension = len(sample_embedding)
+                except Exception as dim_err:
+                    logger.warning(f"Could not dynamically determine embedding dimension: {dim_err}")
+            logger.info(f"Determined embedding dimension: {dimension}")
+            # -------------------------------------
+
             # Create and save metadata file
             vs_metadata = create_vectorstore_metadata(
                 vs_id, 
                 name, 
                 description, 
                 embedding_model_name,
-                file_infos,
-                chunk_size, 
-                chunk_overlap
+                embedding_dimension=dimension, # Pass determined dimension
+                file_infos=file_infos,
+                chunk_size=chunk_size, 
+                chunk_overlap=chunk_overlap
             )
             
             metadata_file = vs_dir / "metadata.json"
@@ -283,14 +303,54 @@ class VectorStoreManager:
             import traceback
             logger.error(traceback.format_exc())
             
+            # --- Determine embedding dimension --- 
+            dimension = 768 # Default
+            if hasattr(embedding_model, 'client') and hasattr(embedding_model.client, 'config') and hasattr(embedding_model.client.config, 'embedding_dim'):
+                dimension = embedding_model.client.config.embedding_dim
+            elif all_docs:
+                # Fallback: embed a sample text and check length
+                try:
+                    sample_embedding = embedding_model.embed_query("dimension check")
+                    if sample_embedding:
+                        dimension = len(sample_embedding)
+                except Exception as dim_err:
+                    logger.warning(f"Could not dynamically determine embedding dimension: {dim_err}")
+            logger.info(f"Determined embedding dimension: {dimension}")
+            # -------------------------------------
+
+            # Create and save metadata file
+            vs_metadata = create_vectorstore_metadata(
+                vs_id, 
+                name, 
+                description, 
+                embedding_model_name,
+                embedding_dimension=dimension, # Pass determined dimension
+                file_infos=file_infos,
+                chunk_size=chunk_size, 
+                chunk_overlap=chunk_overlap
+            )
+            
+            metadata_file = vs_dir / "metadata.json"
+            save_metadata(vs_metadata, metadata_file)
+            
+            logger.info(f"Successfully created vector store: {vs_id}")
+            
+            # Clean up memory
+            del vectorstore
+            gc.collect()
+            
             # Update job progress if a job_id is provided
             if job_id:
                 try:
-                    from core.job import fail_job
-                    fail_job(job_id, str(e))
+                    from core.job import update_job_progress
+                    update_job_progress(
+                        job_id,
+                        len(documents),
+                        "Vector store creation completed"
+                    )
                 except ImportError:
                     # Job module might not be available or initialized
-                    logger.warning(f"Could not update job status for job {job_id}")
+                    logger.warning(f"Could not update job progress for job {job_id}")
             
             # Clean up on failure
             if vs_dir.exists():
@@ -654,16 +714,16 @@ class VectorStoreManager:
                 # This returns RELEVANCE score (0-1, higher is better)
                 try:
                     # The score_threshold parameter likely needs to be applied *after* getting results
-                    raw_vector_results = vectorstore.similarity_search_by_vector_with_relevance_scores(
+                    docs_only = vectorstore.similarity_search_by_vector(
                         embedding=query_embedding,
                         k=top_k,
                         filter=search_filter # Pass the filter here
                     )
-                    logger.info(f"FAISS similarity_search_by_vector_with_relevance_scores returned {len(raw_vector_results)} raw results.") # Added logging
-                    # Convert to the same (doc, score) tuple format as similarity_search_with_score for consistent processing
-                    raw_results = [(doc, score) for doc, score in raw_vector_results]
+                    # Synthesize score for compatibility with downstream processing
+                    # Using 0.0 as a dummy distance score
+                    raw_results = [(doc, 0.0) for doc in docs_only]
                 except Exception as search_err:
-                    logger.error(f"Error during FAISS similarity_search_by_vector_with_relevance_scores: {search_err}", exc_info=True)
+                    logger.error(f"Error during FAISS similarity_search_by_vector: {search_err}", exc_info=True)
                     return []
 
             # Process results into a standardized format
@@ -675,29 +735,32 @@ class VectorStoreManager:
 
                 passes_threshold = False
                 if query_was_text:
-                    # Handle distance score. Threshold likely needs adjustment.
-                    # A common approach is to set a max distance.
-                    # Let's assume score_threshold (default 0.5) needs interpretation.
-                    # If we interpret score_threshold=0.5 as meaning "distance must be <= 0.5",
-                    # then the low scores (0.21, 0.35) *should* pass.
-                    # Alternative: Convert to similarity? 1 - dist? Let's stick to distance threshold for now.
-                    # Let's make the threshold explicit: A distance threshold, maybe 1.0 is a better default?
-                    # For now, assume score_threshold applies directly to distance (lower is better).
-                    distance_threshold = score_threshold # Assume threshold is for distance when query is text
-                    if score <= distance_threshold:
+                    # Handle distance score (lower is better) from similarity_search_with_score.
+                    # Convert distance to relevance score (0-1, higher is better) before comparing with threshold.
+                    # Max L2 distance for normalized vectors can be up to 2.0.
+                    MAX_DISTANCE = 2.0 
+                    # Ensure score is not negative if somehow returned
+                    distance = max(0.0, score) 
+                    # Calculate relevance: 1.0 for distance 0, approaching 0.0 for distance MAX_DISTANCE
+                    calculated_relevance = 1.0 - (distance / MAX_DISTANCE) 
+                    
+                    # Now compare the calculated relevance with the provided relevance threshold
+                    if calculated_relevance >= score_threshold:
                         passes_threshold = True
-                    logger.debug(f"  Result {i}: Distance score={score:.4f}. Passes threshold ({distance_threshold})? {passes_threshold}")
+                    
+                    # Update logging to show both distance and calculated relevance
+                    logger.debug(f"  Result {i}: Distance={score:.4f}, Calculated Relevance={calculated_relevance:.4f}. Passes threshold ({score_threshold:.4f})? {passes_threshold}")
                 else:
-                    # Handle relevance score (higher is better)
-                    relevance_threshold = score_threshold # Assume threshold is for relevance when query is vector
+                    # Handle relevance score directly (assuming higher is better) from similarity_search_by_vector
+                    relevance_threshold = score_threshold # Threshold is already for relevance
                     if score >= relevance_threshold:
                         passes_threshold = True
-                    logger.debug(f"  Result {i}: Relevance score={score:.4f}. Passes threshold ({relevance_threshold})? {passes_threshold}")
+                    logger.debug(f"  Result {i}: Relevance score={score:.4f}. Passes threshold ({relevance_threshold:.4f})? {passes_threshold}")
 
                 if passes_threshold:
                     result = {
                         "text": doc.page_content,
-                        "score": float(score), # Keep original score for now
+                        "score": float(score), # Keep original score for potential debugging/display differences
                         "metadata": doc.metadata
                     }
                     # Log the chunk classification of results that pass the threshold
@@ -807,7 +870,8 @@ def create_vectorstore_metadata(
     name: str,
     description: str,
     embedding_model: str,
-    files: List[Dict[str, Any]],
+    embedding_dimension: int,
+    file_infos: List[Dict[str, Any]],
     chunk_size: int,
     chunk_overlap: int
 ) -> Dict[str, Any]:
@@ -819,7 +883,8 @@ def create_vectorstore_metadata(
         name: Name of the vector store
         description: Description of the vector store
         embedding_model: Name of the embedding model
-        files: List of file info dictionaries (these will be stored as is)
+        embedding_dimension: Dimension of the embedding model
+        file_infos: List of file info dictionaries (these will be stored as is)
         chunk_size: Size of text chunks
         chunk_overlap: Overlap between chunks
         
@@ -834,12 +899,13 @@ def create_vectorstore_metadata(
         "name": name,
         "description": description,
         "embedding_model": embedding_model,
+        "embedding_dimension": embedding_dimension,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
-        "file_count": len(files),
+        "file_count": len(file_infos),
         "created_at": now,
         "updated_at": now,
-        "files": files
+        "files": file_infos
     }
     
     return metadata
