@@ -7,13 +7,13 @@ FROM scratch as nltk_data_copier
 COPY offline_packages/nltk_data /nltk_data
 
 # Stage 3: Actual build
-ARG SERVICE_NAME # Argument to specify which service's wheels to copy
+# ARG SERVICE_NAME # REMOVED - No longer needed
 FROM mage-common-offline:latest
 
 WORKDIR /app
 
-# Copy service-specific wheels directly into this stage
-COPY offline_packages/backend_wheels/${SERVICE_NAME} /app/wheels
+# Copy ALL wheels directly into this stage
+COPY offline_packages/backend_wheels /app/wheels
 
 # REMOVED: General NLTK data copy - will be added specifically for extraction_service
 # COPY --from=nltk_data_copier /nltk_data /app/nltk_data
