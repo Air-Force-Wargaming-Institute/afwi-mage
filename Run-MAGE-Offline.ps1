@@ -77,7 +77,7 @@ Write-Host "Using pre-built offline base images" -ForegroundColor Cyan
 
 # --- Change to Backend Directory and Build Services ---
 Write-Host "Building backend services..." -ForegroundColor Cyan
-cd ./backend/
+# cd ./backend/ # REMOVED: Build context is set to '.' in docker-compose.yml, so run from project root
 
 # Rename frontend Dockerfile to use offline version
 $frontendDockerfilePath = Join-Path $PSScriptRoot "frontend/Dockerfile"
