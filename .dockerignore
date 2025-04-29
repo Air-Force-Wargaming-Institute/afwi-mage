@@ -1,0 +1,29 @@
+# Ignore Git directory
+.git/
+
+# Ignore IDE folders
+.vscode/
+.idea/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ignore virtual environments
+env/
+venv/
+
+# Ignore backup files
+*.original
+
+# Ignore logs
+*.log
+
+# IMPORTANT: Do NOT ignore offline_packages for the build context
+# We need these files copied into the images during the offline build
+# !offline_packages/ 
