@@ -22,11 +22,10 @@ services:
 
   core:
     build:
-      context: .
-      dockerfile: ./backend/core_service/Dockerfile
+      context: ./backend/core_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=core_service
     ports:
       - "8000:8000"
     environment:
@@ -60,11 +59,10 @@ services:
 
   chat_service: # Renamed from 'chat' in original for consistency
     build:
-      context: .
-      dockerfile: ./backend/chat_service/Dockerfile
+      context: ./backend/chat_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=chat_service
     ports:
       - "8009:8009"
     environment:
@@ -88,11 +86,10 @@ services:
 
   agent:
     build:
-      context: .
-      dockerfile: ./backend/agent_service/Dockerfile
+      context: ./backend/agent_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=agent_service
     ports:
       - "8001:8001"
     volumes:
@@ -112,11 +109,10 @@ services:
 
   extraction:
     build:
-      context: .
-      dockerfile: ./backend/extraction_service/Dockerfile
+      context: ./backend/extraction_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=extraction_service
     ports:
       - "8002:8002"
     volumes:
@@ -131,11 +127,10 @@ services:
 
   generation:
     build:
-      context: .
-      dockerfile: ./backend/generation_service/Dockerfile
+      context: ./backend/generation_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=generation_service
     ports:
       - "8003:8003"
     volumes:
@@ -151,11 +146,10 @@ services:
 
   review:
     build:
-      context: .
-      dockerfile: ./backend/review_service/Dockerfile
+      context: ./backend/review_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=review_service
     ports:
       - "8004:8004"
     volumes:
@@ -171,11 +165,10 @@ services:
 
   upload:
     build:
-      context: .
-      dockerfile: ./backend/upload_service/Dockerfile
+      context: ./backend/upload_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=upload_service
     ports:
       - "8005:8005"
     volumes:
@@ -236,11 +229,10 @@ services:
 
   embedding:
     build:
-      context: .
-      dockerfile: ./backend/embedding_service/Dockerfile
+      context: ./backend/embedding_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-gpu-offline:latest
-        - SERVICE_NAME=embedding_service
     ports:
       - "8006:8006"
     volumes:
@@ -259,11 +251,10 @@ services:
 
   workbench_service: # Renamed from 'workbench' in original for consistency
     build:
-      context: .
-      dockerfile: ./backend/workbench_service/Dockerfile
+      context: ./backend/workbench_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=workbench_service
     ports:
       - "8020:8020"
     volumes:
@@ -298,11 +289,10 @@ services:
 
   auth_service: # Renamed from 'auth' in original for consistency
    build:
-     context: .
-     dockerfile: ./backend/auth_service/Dockerfile
+     context: ./backend/auth_service
+     dockerfile: Dockerfile
      args:
        - BASE_IMAGE=mage-common-offline:latest
-       - SERVICE_NAME=auth_service
    volumes:
      - ./backend/auth_service:/app # Source mount
    depends_on:
@@ -325,11 +315,10 @@ services:
 
   direct_chat_service:
     build:
-      context: .
-      dockerfile: ./backend/direct_chat_service/Dockerfile
+      context: ./backend/direct_chat_service
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=direct_chat_service
     ports:
       - "8011:8011"
     volumes:
@@ -395,11 +384,10 @@ services:
   # --- Ollama Service (Using Build) ---
   ollama:
     build:
-      context: .
-      dockerfile: ./backend/ollama/Dockerfile
+      context: ./backend/ollama
+      dockerfile: Dockerfile
       args:
         - BASE_IMAGE=mage-common-offline:latest
-        - SERVICE_NAME=ollama
     container_name: ollama
     ports:
       - "11434:11434"

@@ -52,7 +52,7 @@ foreach ($service in $services) {
         "extraction_service" {
             # Add the NLTK data copy step specifically for extraction
             $nltkCopyLine = "# Copy NLTK data (specific to extraction_service)\nCOPY --from=nltk_data_copier /nltk_data /app/nltk_data"
-            $serviceContent = $serviceContent -replace "# Copy requirements and install using local wheels", "$nltkCopyLine`n`n# Copy requirements and install using local wheels"
+            $serviceContent = $serviceContent -replace "# Copy requirements and install using local wheels, then cleanup wheels", "$nltkCopyLine`n`n# Copy requirements and install using local wheels, then cleanup wheels"
 
             $serviceContent = $serviceContent -replace "# For extraction_service, uncomment and adjust:", "# Installing extraction-specific dependencies"
             $serviceContent = $serviceContent -replace "# RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps", "RUN pip install --no-index --find-links=/app/wheels unstructured==0.10.16 unstructured-inference==0.6.6 --no-deps"
