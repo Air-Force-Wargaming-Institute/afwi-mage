@@ -1,26 +1,50 @@
-FROM mage-base:latest
+# First stage: Install dependencies from wheels
+FROM python:3.12-slim AS builder
 
-# No need to install dependencies as they're in the base image
+WORKDIR /build
 
-# Copy service-specific files
-COPY . .
+# Install build dependencies for source packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    python3-dev \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
 
-# Ensure Python recognizes the directory as a package
-RUN touch /app/__init__.py
-RUN touch /app/api/__init__.py
-RUN touch /app/core/__init__.py
-RUN touch /app/utils/__init__.py
+# Copy requirements and wheel files for installation
+COPY requirements.txt /build/
+COPY wheels/ /build/wheels/
+
+# Install dependencies from local wheels
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Create a new virtual environment
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Install dependencies into the virtual environment
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Second stage: Create the final image
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Create necessary directories
+RUN mkdir -p /app/data
+
+# Copy application code
+COPY . /app/
 
 # Set environment variables
-ENV UPLOAD_DIR="/app/data/uploads"
-ENV VECTORSTORE_DIR="/app/data/vectorstores"
-ENV DOC_STAGING_DIR="/app/doc_staging"
-ENV USE_OLLAMA_EMBEDDINGS="true"
-ENV OLLAMA_BASE_URL="http://ollama:11434"
-ENV OLLAMA_EMBEDDING_MODEL="nomic-embed-text:latest"
+ENV PYTHONPATH=/app
 
-# Make scripts executable
-RUN chmod +x /app/docker-start.py
+# Expose port
+EXPOSE 8000
 
-# Run the application
-CMD ["python3", "/app/docker-start.py"]
+# Start the API server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

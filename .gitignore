@@ -50,6 +50,14 @@ Thumbs.db
 /backend/chat_service/wheels/*
 /backend/core_service/wheels/*
 /backend/direct_chat_service/wheels/*
+/backend/embedding_service/wheels/*
+/backend/extraction_service/wheels/*
+/backend/generation_service/wheels/*
+/backend/process_service/wheels/*
+/backend/review_service/wheels/*
+/backend/upload_service/wheels/*
+/backend/workbench_service/wheels/*
+!**/wheels/.gitkeep
 
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*

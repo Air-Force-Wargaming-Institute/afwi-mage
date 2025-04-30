@@ -145,6 +145,42 @@ To add airgapped support to a new service:
 - Built on FastAPI and Uvicorn
 - Handles core application logic
 
+## Dependency Challenges and Limitations
+
+### Strict Version Constraints
+
+Some packages present significant challenges in airgapped environments due to strict version requirements:
+
+1. **Version-Specific Dependencies**: Packages like `unstructured-inference` that require exact versions (e.g., `onnx==1.14.1`) can be problematic when those specific versions are no longer available or cannot be downloaded in binary form for the target platform.
+
+2. **Build Dependency Chains**: Packages that require complex build dependencies in a specific order, which may not be possible to resolve in an airgapped environment without internet access to resolve transitive dependencies.
+
+### Strategies for Addressing Dependency Challenges
+
+In a truly airgapped environment, the following approaches should be considered:
+
+1. **Package Modification**: For services like the embedding_service that depend on problematic packages:
+   - Consider forking and modifying dependency requirements to use available versions
+   - Test thoroughly with alternative version numbers before deployment
+   - Document all modifications in a service-specific README
+
+2. **Package Freezing**: For each service:
+   - Maintain a carefully managed `requirements.txt` with pinned versions
+   - Create a comprehensive test suite to verify that all dependencies work together
+   - Periodically review and update dependencies to ensure security and compatibility
+
+3. **Pre-built Docker Images**: For the most challenging services:
+   - Consider creating and distributing pre-built Docker images that already contain all dependencies
+   - This eliminates the need to resolve dependencies during deployment
+   - Images can be transferred to airgapped environments as complete units
+
+4. **Fall-back Options**: Provide alternative configurations that:
+   - Remove problematic dependencies
+   - Offer reduced functionality that can operate reliably in airgapped environments
+   - Clearly document the limitations and differences
+
+**IMPORTANT NOTE**: In the case of services like the embedding_service that require packages with strict version dependencies (such as unstructured-inference requiring onnx==1.14.1), attempts to use alternative download approaches (e.g., downloading without dependencies and then downloading newer onnx versions) will likely fail at Docker build time in a truly airgapped environment. This is because these packages will attempt to verify their dependencies during installation.
+
 ## Implementation Details
 
 ### Dependency Management Logic
@@ -241,3 +277,5 @@ To add airgapped support to a new service:
 This airgapped deployment design enables the AFWI Multi-Agent Generative Engine to operate securely in environments with strict network isolation requirements. The approach balances security, usability, and efficiency while maintaining full functionality of the services.
 
 The multi-stage Docker builds provide an optimized deployment that minimizes resource usage while ensuring all dependencies are available without internet access. Cross-platform preparation scripts make it easy to prepare deployment packages in various environments.
+
+However, for services with complex dependency requirements involving specific package versions, it may be necessary to develop custom solutions or pre-built images that can be transferred to airgapped environments as complete units.

@@ -4,7 +4,7 @@ uvicorn>=0.34.0
 pydantic>=2.0,<3.0
 
 # Data processing and manipulation
-numpy==1.24.3
+numpy==1.26.0
 
 # Document processing
 pypdf>=5.3.1
