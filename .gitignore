@@ -48,6 +48,7 @@ Thumbs.db
 /backend/agent_service/wheels/*
 /backend/auth_service/wheels/*
 /backend/chat_service/wheels/*
+/backend/core_service/wheels/*
 
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*

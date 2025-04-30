@@ -18,13 +18,13 @@ The airgapped deployment solution enables the AFWI backend services (agent_servi
 The core challenge of airgapped deployment is managing dependencies without internet access. The approach uses a two-phase strategy:
 
 #### Phase 1: Preparation (Connected Environment)
-- Pre-download all Python package dependencies as wheel files
-- Ensure wheels are Linux-compatible by using Docker during the download
-- Package all application code, configuration, and wheel files for transfer
+- Pre-download all Python package dependencies (both binary wheels and source packages)
+- Ensure compatibility with the target Linux environment by using Docker during the download
+- Package all application code, configuration, and dependency files for transfer
 
 #### Phase 2: Deployment (Airgapped Environment)
 - Build Docker images using only local resources (no internet access)
-- Install dependencies from pre-downloaded wheel files
+- Install dependencies from pre-downloaded wheels and source packages
 - Run services with required configuration
 
 ### 2. Multi-Stage Docker Builds
@@ -36,6 +36,13 @@ To optimize the final image size and performance, both services utilize multi-st
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
+
+# Install build dependencies for source packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and wheel files for installation
 COPY requirements.txt /build/
@@ -70,20 +77,21 @@ COPY . /app/
 ```
 
 This approach provides several benefits:
-- Wheel files are used only during the build and not included in the final image
+- Wheels and source packages are used only during the build and not included in the final image
 - Significantly reduced final image size
 - Improved startup performance and resource efficiency
 
 ### 3. Cross-Platform Scripts
 
-Three different wheel download scripts support various environments:
+Three different download scripts support various environments:
 
 1. **download_wheels.py** - Linux/macOS Python script
 2. **download_wheels_windows.py** - Windows-friendly Python script
 3. **download_wheels.ps1** - PowerShell script for Windows
 
 All scripts:
-- Use Docker to ensure Linux compatibility of wheels
+- Use Docker to ensure Linux compatibility of dependencies
+- Handle both binary wheels and source packages
 - Apply platform-specific path handling
 - Include detailed logging and error handling
 - Offer archive creation for easy transfer
@@ -97,6 +105,7 @@ Deployment scripts simplify the process in the airgapped environment:
 
 These scripts:
 - Verify prerequisites (Docker)
+- Provide information about the available wheels and source packages
 - Build the Docker image
 - Provide clear instructions for running the container
 - Include options for persistent storage
@@ -111,6 +120,7 @@ Since wheel files are binary and potentially large, they should not be tracked i
    - agent_service
    - auth_service
    - chat_service
+   - core_service
 
 To add airgapped support to a new service:
 1. Create the wheels directory with a `.gitkeep` file
@@ -130,20 +140,34 @@ To add airgapped support to a new service:
 - Implements secure token management
 - Uses entrypoint script for initialization
 
+#### Core Service
+- Provides central API functionality
+- Built on FastAPI and Uvicorn
+- Handles core application logic
+
 ## Implementation Details
 
 ### Dependency Management Logic
 
-1. **Platform-Specific Wheel Targeting**:
+1. **Package Download Strategy**:
    ```python
-   # Ensure wheels are compatible with Linux target environment
-   pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /requirements.txt
+   # Install build dependencies for compiling source packages
+   apt-get update && apt-get install -y build-essential
+   
+   # Download both wheel and source packages
+   pip download --dest /wheels --platform manylinux2014_x86_64 --python-version 3.12 -r /requirements.txt
    ```
 
 2. **Docker-Based Installation**:
    ```dockerfile
+   # Install build dependencies for source packages
+   RUN apt-get update && apt-get install -y --no-install-recommends \
+       build-essential \
+       gcc \
+       python3-dev
+
    # Using --no-index ensures no internet access is attempted
-   # --find-links points to the local wheel directory
+   # --find-links points to the local wheel/source directory
    RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
    ```
 
@@ -156,7 +180,7 @@ To add airgapped support to a new service:
 
 ### Container Size Optimization
 
-1. **Multi-Stage Build** - Eliminates build tools and wheel files from final image
+1. **Multi-Stage Build** - Eliminates build tools and package files from final image
 2. **Minimal Base Image** - Uses python:3.12-slim instead of larger alternatives
 3. **Dependency Isolation** - Only required Python packages are installed
 
@@ -183,7 +207,7 @@ To add airgapped support to a new service:
 1. **Preparation** (internet-connected environment):
    - Clone/download repository
    - Run appropriate download_wheels script for platform
-   - Verify wheels in wheels/ directory
+   - Verify wheels and source packages in wheels/ directory
    - Create transfer archive
 
 2. **Transfer**:
