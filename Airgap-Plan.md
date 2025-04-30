@@ -101,7 +101,23 @@ These scripts:
 - Provide clear instructions for running the container
 - Include options for persistent storage
 
-### 5. Platform Configuration
+### 5. Git Management of Wheel Files
+
+Since wheel files are binary and potentially large, they should not be tracked in git. The project follows these conventions:
+
+1. All wheel files in `backend/*/wheels/` directories are excluded in `.gitignore`
+2. Empty `.gitkeep` files are included in each wheels directory to ensure the directory structure is preserved
+3. Services with airgapped support currently include:
+   - agent_service
+   - auth_service
+   - chat_service
+
+To add airgapped support to a new service:
+1. Create the wheels directory with a `.gitkeep` file
+2. Add the wheels path to `.gitignore` (e.g., `/backend/new_service/wheels/*`)
+3. Implement the download and deployment scripts following existing patterns
+
+### 6. Platform Configuration
 
 #### Agent Service
 - Focused on RESTful API endpoints

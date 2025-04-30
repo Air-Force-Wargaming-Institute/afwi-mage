@@ -1,13 +1,42 @@
-FROM mage-base:latest
+# First stage: Install dependencies from wheels
+FROM python:3.12-slim AS builder
 
-# Set working directory
+WORKDIR /build
+
+# Copy requirements and wheel files for installation
+COPY requirements.txt /build/
+COPY wheels/ /build/wheels/
+
+# Install dependencies from local wheels
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Create a new virtual environment
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Install dependencies into the virtual environment
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Second stage: Create the final image
+FROM python:3.12-slim
+
 WORKDIR /app
 
-# Copy service-specific files
-COPY . .
+# Copy the virtual environment from the builder stage
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Create necessary directories
+RUN mkdir -p /app/data
+
+# Copy application code
+COPY . /app/
+
+# Ensure proper permissions
+RUN chmod -R 755 /app
 
 # Expose port for the service
 EXPOSE 8009
 
-# Make sure we're in the right directory and the app can be found
+# Start the service
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]
