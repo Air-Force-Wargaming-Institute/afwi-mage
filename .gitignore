@@ -44,6 +44,10 @@ Thumbs.db
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
 
+# Airgapped deployment wheels
+/backend/agent_service/wheels/*
+/backend/auth_service/wheels/*
+
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*
 !/data/builder/TEAMS/TEAM-TEMPLATE/*

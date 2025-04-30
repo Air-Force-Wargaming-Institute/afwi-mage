@@ -1,9 +1,36 @@
-FROM mage-base:latest
+# First stage: Install dependencies from wheels
+FROM python:3.12-slim AS builder
 
-# No need to install dependencies as they're in the base image
+WORKDIR /build
 
-# Copy service-specific files
-COPY . .
+# Copy requirements and wheel files for installation
+COPY requirements.txt /build/
+COPY wheels/ /build/wheels/
+
+# Install dependencies from local wheels
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Create a new virtual environment
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Install dependencies into the virtual environment
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Second stage: Create the final image
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Create necessary directories
+RUN mkdir -p /app/data
+
+# Copy application code
+COPY . /app/
 
 # Convert line endings to Unix format (LF)
 RUN tr -d '\r' < /app/entrypoint.sh > /app/entrypoint_unix.sh && \
@@ -11,6 +38,9 @@ RUN tr -d '\r' < /app/entrypoint.sh > /app/entrypoint_unix.sh && \
 
 # Make the script executable
 RUN chmod +x /app/entrypoint.sh
+
+# Ensure proper permissions
+RUN chmod -R 755 /app
 
 # Use the entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]
