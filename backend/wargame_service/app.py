@@ -15,6 +15,11 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# --- Health Check --- (Defined before including the main router)
+@app.get("/api/wargame/health", tags=["Health"])
+async def health_check():
+    return {"status": "healthy"}
+
 # --- Middleware --- (Optional: Add CORS, etc., if not handled by gateway)
 # origins = [
 #     "http://localhost",
@@ -40,11 +45,6 @@ app.add_middleware(
 # --- Routers ---
 # Include the API router with a prefix
 app.include_router(api_router)
-
-# --- Health Check --- (Can be kept in main.py or moved here)
-@app.get("/api/wargame/health", tags=["Health"])
-async def health_check():
-    return {"status": "ok"}
 
 # --- Root Endpoint --- (Optional)
 @app.get("/", tags=["Root"])
