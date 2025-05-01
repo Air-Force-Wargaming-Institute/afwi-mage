@@ -43,8 +43,8 @@ services:
     #   --max-model-len=65536
     #   --tensor-parallel-size=2
     command: >
-      --model /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
-      --tokenizer /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
+      --model /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
+      --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
       --dtype=half
       --gpu-memory-utilization=0.88
       --max-model-len=16384

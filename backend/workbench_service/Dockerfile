@@ -1,5 +1,5 @@
 # First stage: Install dependencies from wheels
-FROM python:3.12-slim AS builder
+FROM afwi-mage-base:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -21,7 +21,7 @@ ENV PATH="/venv/bin:$PATH"
 RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
 
 # Second stage: Create the final image
-FROM python:3.12-slim
+FROM afwi-mage-base:3.12-slim
 
 WORKDIR /app
 

@@ -1,4 +1,4 @@
-FROM mage-base:latest
+FROM afwi-mage-base:latest
 
 # No need to install dependencies as they're in the base image
 

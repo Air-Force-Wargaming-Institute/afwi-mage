@@ -1,93 +1,217 @@
-# PowerShell script for downloading Linux-compatible Python wheels for airgapped installation
-# This script uses Docker to ensure the wheels are compatible with the target Linux environment.
+# PowerShell script to download Linux-compatible Python wheels for core_service
+# Uses Docker for compatibility and copies required wheels locally.
 
-# Create wheels directory if it doesn't exist
-$wheelsDir = Join-Path -Path $PSScriptRoot -ChildPath "wheels"
-if (-not (Test-Path -Path $wheelsDir)) {
-    New-Item -Path $wheelsDir -ItemType Directory | Out-Null
+param(
+    [Parameter()]
+    [switch]$AutoZip
+)
+
+$ServiceName = "core_service"
+Write-Host "[$ServiceName] Downloading Linux-compatible wheels for airgapped installation..." -ForegroundColor Cyan
+
+# Check if Docker is available
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Error "[$ServiceName] Error: Docker is required but not found in PATH. Please install Docker."
+    exit 1
 }
 
-# Get absolute paths
-$wheelsPath = (Get-Item -Path $wheelsDir).FullName
-$requirementsPath = Join-Path -Path $PSScriptRoot -ChildPath "requirements.txt"
+# --- Path Definitions ---
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$wheelsDirRelative = "../backend_wheels"
+$localWheelsDirRelative = "./wheels"
+$nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
+$listFileName = "downloaded_wheels_list.txt"
+$requirementsFile = "requirements.txt"
 
-# Convert Windows paths to Docker-compatible format
-$normalizedWheelsPath = $wheelsPath.Replace("\", "/").Replace("C:", "/c")
-$normalizedRequirementsPath = $requirementsPath.Replace("\", "/").Replace("C:", "/c")
-
-Write-Host "Downloading Linux-compatible wheels for airgapped installation..."
-Write-Host "Wheels directory: $wheelsPath"
-Write-Host "Requirements file: $requirementsPath"
-
-# Docker command to download wheels inside a container
-$dockerCmd = "docker run --rm -v '$normalizedWheelsPath`:/wheels' -v '$normalizedRequirementsPath`:/requirements.txt' python:3.12-slim bash -c 'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /requirements.txt'"
-
-Write-Host "Running Docker to download Linux-compatible wheels..."
-Write-Host "Docker Command: $dockerCmd"
-
+# Resolve absolute paths
 try {
-    # Execute Docker command
-    Invoke-Expression $dockerCmd
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Docker command failed with exit code $LASTEXITCODE" -ForegroundColor Red
+    $scriptDirAbsolute = (Resolve-Path -Path $scriptDir).Path
+    $wheelsDirAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $wheelsDirRelative)).Path
+    $localWheelsDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $localWheelsDirRelative
+    $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
+    $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
+    $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
+} catch {
+    Write-Error "[$ServiceName] Error resolving initial paths: $_"
+    exit 1
+}
+
+# --- Pre-checks ---
+# Check for requirements.txt
+if (-not (Test-Path $requirementsFileAbsolute -PathType Leaf)) {
+    Write-Error "[$ServiceName] Error: requirements.txt not found at $requirementsFileAbsolute"
+    exit 1
+}
+
+# Create central wheels directory if it doesn't exist
+if (-not (Test-Path $wheelsDirAbsolute -PathType Container)) {
+    Write-Host "[$ServiceName] Creating central wheels directory: $wheelsDirAbsolute" -ForegroundColor Yellow
+    try {
+        New-Item -ItemType Directory -Path $wheelsDirAbsolute -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Error "[$ServiceName] Failed to create central wheels directory '$wheelsDirAbsolute': $_"
         exit 1
     }
+} else {
+    # Write-Host "[$ServiceName] Using existing central wheels directory: $wheelsDirAbsolute" -ForegroundColor DarkGray
+}
+
+# --- Download Wheels using Docker ---
+Write-Host "[$ServiceName] Running Docker to download Linux-compatible wheels to $wheelsDirAbsolute..." -ForegroundColor Yellow
+
+# Normalize paths for Docker volume mounting
+Function Normalize-DockerPath ($path) {
+    $normalized = $path.Replace('\', '/')
+    if ($IsWindows) {
+        $driveLetter = $normalized.Substring(0, 1).ToLower()
+        $normalized = "/$driveLetter" + $normalized.Substring(2)
+    }
+    return $normalized
+}
+
+$normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
+$normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
+
+# Note: PyPDF4 might be problematic as it often lacks wheels. Pip download might only get source.
+$dockerArgs = @(
+    "run", "--rm",
+    "-v", "$normalizedWheelsPath:/wheels",
+    "-v", "$normalizedRequirementsPath:/reqs/requirements.txt:ro",
+    "python:3.12-slim",
+    "bash", "-c",
+    'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, potential source-only packages ignored."'
+)
+& docker @dockerArgs
+
+if ($LASTEXITCODE -ne 0) {
+    # Check specific message if possible, otherwise just warn
+    Write-Warning "[$ServiceName] Docker command finished with non-zero exit code ($LASTEXITCODE). This might be okay if source packages were downloaded, check Docker logs."
+} else {
+    Write-Host "[$ServiceName] Docker wheel download command finished." -ForegroundColor Green
+}
+
+# --- List Downloaded Wheels & Save List ---
+Write-Host "[$ServiceName] Listing downloaded wheels from $wheelsDirAbsolute..." -ForegroundColor Cyan
+$wheels = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl"
+
+if ($wheels.Count -eq 0) {
+     Write-Warning "[$ServiceName] No wheel files found in $wheelsDirAbsolute. Check Docker output for errors."
+} else {
+    Write-Host "[$ServiceName] Found $($wheels.Count) Linux-compatible wheel files in $wheelsDirAbsolute." -ForegroundColor Green
+    # foreach ($wheel in $wheels) { Write-Host "  - $($wheel.Name)" -ForegroundColor DarkGray } # Verbose
+}
+
+Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
+try {
+    # Regenerate list based on requirements.txt, not just directory contents
+    # Exclude commented lines, specifically handling the PyPDF4 case if needed
+    $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' -and $_ -notmatch '^#.*PyPDF4' } | ForEach-Object { ($_ -split '[<>=!~\[\]]')[0].Trim() }
     
-    # Separately download PyPDF4 which doesn't have binary distributions
-    Write-Host "`nSeparately downloading PyPDF4 (source-only package)..." -ForegroundColor Cyan
-    $pypdf4Cmd = "docker run --rm -v '$normalizedWheelsPath`:/wheels' python:3.12-slim pip download --dest /wheels PyPDF4>=1.27.0"
-    
-    try {
-        Invoke-Expression $pypdf4Cmd
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "Warning: Could not download PyPDF4." -ForegroundColor Yellow
-            Write-Host "The build may fail if PyPDF4 is required." -ForegroundColor Yellow
+    $foundWheels = @()
+    foreach ($req in $requiredPackages) {
+        # Simple match - might need refinement for complex version specs or extras
+        $matchingWheel = $wheels | Where-Object { $_.Name -match "^$([regex]::Escape($req))(-|_)" }
+        if ($matchingWheel) {
+            $foundWheels += $matchingWheel.Name
         } else {
-            Write-Host "PyPDF4 downloaded successfully as source package." -ForegroundColor Green
+            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$req' in $wheelsDirAbsolute" 
+            # Add special note for PyPDF4 if it was expected
+            if ($req -eq 'PyPDF4') {
+                 Write-Warning "[$ServiceName] Note: PyPDF4 often only downloads as a source package (.tar.gz), not a wheel. It might need separate handling during Docker build."
+            }
+        }
+    }
+
+    $foundWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
+    Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
+
+} catch {
+    Write-Error "[$ServiceName] Error saving wheel list to file '$listFilePath': $_"
+    # Continue to copy step if possible
+}
+
+# --- Copy Wheels Locally ---
+Write-Host "[$ServiceName] Attempting to copy required wheels to the local ./wheels directory..." -ForegroundColor Yellow
+$copyScriptPath = Join-Path -Path $scriptDirAbsolute -ChildPath "copy_wheels_from_list.ps1"
+
+if (-not (Test-Path $listFilePath -PathType Leaf)) {
+    Write-Warning "[$ServiceName] Cannot copy wheels: List file '$listFilePath' not found or not created."
+} elseif (-not (Test-Path $copyScriptPath -PathType Leaf)) {
+    Write-Warning "[$ServiceName] Cannot copy wheels: copy_wheels_from_list.ps1 not found in $scriptDirAbsolute."
+} else {
+    try {
+        & $copyScriptPath
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "[$ServiceName] The copy_wheels_from_list.ps1 script finished with errors/warnings (Exit Code: $LASTEXITCODE). Check its output."
+        } else {
+            Write-Host "[$ServiceName] Local ./wheels directory populated successfully based on list." -ForegroundColor Green
         }
     } catch {
-        Write-Host "Warning: Error downloading PyPDF4: $_" -ForegroundColor Yellow
-        Write-Host "The build may fail if PyPDF4 is required." -ForegroundColor Yellow
+        Write-Error "[$ServiceName] Failed to execute copy_wheels_from_list.ps1: $_"
+    }
+}
+
+# --- NLTK Data Handling (Placeholder) ---
+# Check if NLTK is in requirements and handle data download if needed
+$nltkRequired = $false
+try {
+    $nltkRequired = Get-Content $requirementsFileAbsolute | Select-String -Pattern '^nltk\b' -Quiet
+} catch { Write-Warning "[$ServiceName] Could not read requirements file to check for NLTK." }
+
+if ($nltkRequired) {
+    Write-Host "[$ServiceName] NLTK requirement detected." -ForegroundColor Yellow
+    # Ensure nltk_data directory exists
+    if (-not (Test-Path $nltkDataDirAbsolute -PathType Container)) {
+        Write-Host "[$ServiceName] Creating NLTK data directory: $nltkDataDirAbsolute" -ForegroundColor Yellow
+        try {
+            New-Item -ItemType Directory -Path $nltkDataDirAbsolute -ErrorAction Stop | Out-Null
+        } catch {
+            Write-Error "[$ServiceName] Failed to create NLTK data directory '$nltkDataDirAbsolute': $_"
+        }
     }
     
-    # List the downloaded wheels
-    $wheels = Get-ChildItem -Path $wheelsDir -Filter "*.whl"
-    $sourcePackages = @(Get-ChildItem -Path $wheelsDir -Filter "*.tar.gz") + @(Get-ChildItem -Path $wheelsDir -Filter "*.zip")
-    
-    Write-Host "`nDownloaded $($wheels.Count) wheel files to $wheelsDir`:" -ForegroundColor Green
-    foreach ($wheel in $wheels) {
-        Write-Host "  - $($wheel.Name)" -ForegroundColor Cyan
+    # Placeholder: Add logic here to download NLTK data (e.g., using another Docker command)
+    # Example: Trigger a docker command to download 'punkt', 'stopwords' etc. into a volume mounted at $nltkDataDirAbsolute
+    Write-Warning "[$ServiceName] NLTK data download logic is not implemented yet. Please handle manually if needed for airgapped environment."
+    # Consider creating a separate script like download_nltk_data.ps1 and calling it here.
+}
+
+# --- Final Instructions --- 
+Write-Host ""
+Write-Host "[$ServiceName] Wheels are downloaded to central location: $wheelsDirAbsolute" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Required wheels copied to local location: $localWheelsDirAbsolute" -ForegroundColor Cyan
+Write-Host "[$ServiceName] To use in airgapped environment:" -ForegroundColor Cyan
+Write-Host "   1. Copy the '$ServiceName' directory (containing the local '$localWheelsDirRelative' folder) to the target machine." -ForegroundColor White
+# Write-Host "   2. If NLTK is used, ensure the '$nltkDataDirRelative' folder is populated and copied."
+Write-Host "   3. Update Dockerfile build process if necessary to use '$localWheelsDirRelative'. (Note: May need extra steps for source packages like PyPDF4)" -ForegroundColor Yellow
+Write-Host "   4. Run deployment scripts (e.g., airgapped_deploy.ps1) which should use the local wheels." -ForegroundColor White
+
+# Create a package.zip file for easy transfer
+$doZip = $false
+if ($AutoZip) {
+    $doZip = $true
+    Write-Host "[$ServiceName] Auto-zipping enabled via parameter." -ForegroundColor DarkGray
+} else {
+    Write-Host ""
+    Write-Host "[$ServiceName] Would you like to create a zip archive of the $ServiceName directory (including local wheels) for transfer? (Y/N)" -ForegroundColor Yellow
+    $response = Read-Host
+    if ($response -eq "Y" -or $response -eq "y") {
+        $doZip = $true
     }
-    
-    Write-Host "`nDownloaded $($sourcePackages.Count) source packages to $wheelsDir`:" -ForegroundColor Green
-    foreach ($pkg in $sourcePackages) {
-        Write-Host "  - $($pkg.Name)" -ForegroundColor Cyan
+}
+
+if ($doZip) {
+    $zipFileName = "${ServiceName}_airgapped.zip"
+    $zipFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $zipFileName
+    Write-Host "[$ServiceName] Creating archive $zipFileName ..." -ForegroundColor Yellow
+    try {
+        # Use explicit path and wildcard within that path
+        Compress-Archive -Path (Join-Path $scriptDirAbsolute '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
+        Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
+        Write-Host "[$ServiceName] Transfer this file to your airgapped environment." -ForegroundColor Cyan
+    } catch {
+        Write-Error "[$ServiceName] Failed to create zip archive: $_"
     }
-    
-    Write-Host "`nIMPORTANT NOTICE ABOUT AIRGAPPED DEPLOYMENT:" -ForegroundColor Yellow
-    Write-Host "---------------------------------------------" -ForegroundColor Yellow
-    Write-Host "1. This setup has been modified to be completely airgapped" -ForegroundColor Yellow
-    Write-Host "2. The Dockerfile no longer requires internet access during build" -ForegroundColor Yellow
-    Write-Host "3. All Python dependencies are provided as wheel files and source packages" -ForegroundColor Yellow
-    Write-Host "4. Source-only packages like PyPDF4 are handled separately" -ForegroundColor Yellow
-    Write-Host "`nTo use these packages in an airgapped environment:" -ForegroundColor Green
-    Write-Host "1. Copy the entire core_service directory to the target machine" -ForegroundColor Green
-    Write-Host "2. Build the Docker image using: docker build -t core_service ." -ForegroundColor Green
-    Write-Host "3. Run the container using: docker run -p 8000:8000 core_service" -ForegroundColor Green
-    
-    # Offer to create a zip file for easy transfer
-    Write-Host "`nWould you like to create a zip file of the core_service directory for transfer? (y/n)" -ForegroundColor Yellow
-    $createZip = Read-Host
-    
-    if ($createZip -eq "y" -or $createZip -eq "Y") {
-        $zipPath = Join-Path -Path $PSScriptRoot -ChildPath "core_service_airgapped.zip"
-        Write-Host "Creating zip file at: $zipPath" -ForegroundColor Cyan
-        Compress-Archive -Path "$PSScriptRoot\*" -DestinationPath $zipPath -Force
-        Write-Host "Zip file created successfully." -ForegroundColor Green
-    }
-    
-} catch {
-    Write-Host "Error: $_" -ForegroundColor Red
-    exit 1
-} 
+}
+
+Write-Host "[$ServiceName] Script finished." -ForegroundColor Cyan

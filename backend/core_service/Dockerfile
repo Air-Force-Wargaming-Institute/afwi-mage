@@ -1,9 +1,9 @@
 # First stage: Install dependencies from wheels
-FROM python:3.12-slim AS builder
+FROM afwi-mage-base:3.12-slim AS builder
 
 WORKDIR /build
 
-# Note: We rely on build tools already in the python:3.12-slim image
+# Note: We rely on build tools already in the afwi-mage-base:3.12-slim image
 # For a true airgapped deployment, we don't use apt-get which requires internet
 
 # Copy requirements and wheel files for installation
@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirem
 RUN pip install --no-cache-dir --no-index --find-links=/build/wheels PyPDF4 || echo "PyPDF4 not found in wheels directory, skipping"
 
 # Second stage: Create the final image
-FROM python:3.12-slim
+FROM afwi-mage-base:3.12-slim
 
 WORKDIR /app
 

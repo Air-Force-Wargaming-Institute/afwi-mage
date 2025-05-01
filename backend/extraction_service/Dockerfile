@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM afwi-mage-base:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -26,7 +26,7 @@ RUN mkdir -p /build/nltk_data
 COPY wheels/nltk_data/ /build/nltk_data/
 
 # Second stage: Create the final image
-FROM python:3.12-slim
+FROM afwi-mage-base:3.12-slim
 
 WORKDIR /app
 

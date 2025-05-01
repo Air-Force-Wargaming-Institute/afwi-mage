@@ -1,4 +1,4 @@
-FROM ollama/ollama:latest
+FROM ollama/ollama:0.6.7
 
 # Create directory for models and ensure permissions
 RUN mkdir -p /root/.ollama/models && \
