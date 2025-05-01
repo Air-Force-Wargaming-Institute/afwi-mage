@@ -1,22 +1,43 @@
-FROM mage-base:latest
+# First stage: Install dependencies from wheels
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies for potential source packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and wheel files for installation
+COPY requirements.txt /build/
+COPY wheels/ /build/wheels/
+
+# Create a new virtual environment
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Install dependencies from local wheels
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+
+# Second stage: Create the final image
+FROM python:3.12-slim
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
     ffmpeg \
     libsm6 \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the virtual environment from the builder stage
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
 
 # Copy application code
-COPY . .
+COPY . /app/
 
 # Create necessary directories
 RUN mkdir -p /app/data/workbench/spreadsheets
@@ -38,4 +59,4 @@ ENV WORKBENCH_SPREADSHEETS_DIR=/app/data/workbench/spreadsheets
 EXPOSE 8020
 
 # Run using uvicorn server
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8020", "--reload"] 
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8020"] 
