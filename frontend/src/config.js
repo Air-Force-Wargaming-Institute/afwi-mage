@@ -12,6 +12,7 @@ const API_URLS = {
   AUTH: `${API_BASE_URL}:${process.env.REACT_APP_AUTH_SERVICE_PORT}`,
   DIRECT_CHAT: `${API_BASE_URL}:${process.env.REACT_APP_DIRECT_CHAT_SERVICE_PORT}`,
   WORKBENCH: `${API_BASE_URL}:${process.env.REACT_APP_WORKBENCH_SERVICE_PORT || '8020'}`,
+  TRANSCRIPTION: `${API_BASE_URL}:${process.env.REACT_APP_TRANSCRIPTION_SERVICE_PORT || '8021'}`,
 };
 
 export const getApiUrl = (service, endpoint) => {

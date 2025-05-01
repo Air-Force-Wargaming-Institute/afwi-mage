@@ -18,6 +18,9 @@ services:
         mkdir -p /data/uploads && chmod -R 777 /data/uploads &&
         mkdir -p /data/workbench/spreadsheets && 
         chmod -R 777 /data/workbench &&
+        mkdir -p /data/transcription/sessions &&
+        mkdir -p /data/transcription/whisper_models &&
+        mkdir -p /data/transcription/huggingface_cache &&
         touch /data/workbench/spreadsheets/.gitkeep &&
         echo 'Initialized data directories successfully'
       "
@@ -40,6 +43,7 @@ services:
       - VLLM_INSTANCES=http://vllm:8000/v1=generate
       - OLLAMA_BASE_URLS=http://ollama:11434
       - DIRECT_CHAT_SERVICE_URL=http://direct_chat_service:8011
+      - TRANSCRIPTION_SERVICE_URL=http://transcription:8021
       - DEBUG=1
       - PYTHONUNBUFFERED=1
       - REDIS_HOST=redis
@@ -185,7 +189,7 @@ services:
    environment:
      POSTGRES_USER: ${POSTGRES_USER:-postgres}
      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-     POSTGRES_MULTIPLE_DATABASES: dbname,authdb
+     POSTGRES_MULTIPLE_DATABASES: dbname,authdb,transcriptiondb
    volumes:
      - postgres_data:/var/lib/postgresql/data
      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
@@ -300,24 +304,24 @@ services:
   transcription:
     build: ./transcription_service
     ports:
-      - "8012:8012"
+      - "8021:8021"
     volumes:
-      - ../data:/app/data # General data volume (might not be strictly needed)
-      # Mount host directories for model caches
-      - ./data/whisper_models:/app/.cache/whisperx # WhisperX/FasterWhisper models
-      - ./data/huggingface_cache:/app/.cache/huggingface # Pyannote/HF models
-      # - ./transcription_service:/app # Uncomment for local development if needed
+      - ../data/transcription/sessions:/app/data/sessions
+      - ../data/transcription/whisper_models:/app/.cache/whisperx
+      - ../data/transcription/huggingface_cache:/app/.cache/huggingface
     environment:
-      - CORE_SERVICE_URL=http://core:8000 # Example, if needed
-      - TRANSCRIPTION_SERVICE_PORT=8012
-      - MODEL_CACHE_DIR=/app/.cache/whisperx # Path inside container
-      - HF_HOME=/app/.cache/huggingface      # Path inside container
-      - DEFAULT_MODEL=large-v2               # Whisper model (e.g., base, small, medium, large-v2)
-      - DEVICE=cuda                          # cuda or cpu
-      - COMPUTE_TYPE=float16                 # float16, int8, float32
+      - CORE_SERVICE_URL=http://core:8000
+      - TRANSCRIPTION_SERVICE_PORT=8021
+      - ARTIFACT_STORAGE_BASE_PATH=/app/data/sessions
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/transcriptiondb
+      - MODEL_CACHE_DIR=/app/.cache/whisperx
+      - HF_HOME=/app/.cache/huggingface
+      - DEFAULT_MODEL=large-v2
+      - DEVICE=cuda
+      - COMPUTE_TYPE=float16
       - BATCH_SIZE=16
-      - HF_TOKEN=${HF_TOKEN:-}               # Pass HuggingFace Token from host env (set HF_TOKEN=your_token in .env file or export)
-      - NVIDIA_VISIBLE_DEVICES=all           # Ensure GPU is visible
+      - HF_TOKEN=${HF_TOKEN:-}
+      - NVIDIA_VISIBLE_DEVICES=all
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=info
     deploy:
@@ -325,10 +329,11 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1 # Request one GPU
+              count: 1
               capabilities: [gpu]
     depends_on:
-      - init-data # Or other relevant dependencies
+      - init-data
+      - db
     networks:
       - app-network
     restart: unless-stopped
@@ -392,8 +397,8 @@ volumes:
   postgres_data:
   nltk_data_volume:
   ollama_data:
-  # Removed whisper_cache named volume
-  # No need to define host-mounted volumes here, but ensure host dirs exist:
-  # ./data/whisper_models
-  # ./data/huggingface_cache
+  # Ensure host directories exist relative to the backend directory (where docker-compose.yml is):
+  # ../data/transcription/sessions
+  # ../data/transcription/whisper_models
+  # ../data/transcription/huggingface_cache
 

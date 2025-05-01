@@ -14,6 +14,14 @@ whisperx @ git+https://github.com/m-bain/whisperX.git
 # Pyannote for diarization
 pyannote.audio>=3.1.1 # Or pin to a version known compatible with whisperx
 
+# Audio processing helper
+pydub>=0.25.1
+numpy>=1.24.0 # Often needed by audio/ML libs
+
+# Database Driver (for session storage)
+asyncpg>=0.29.0 # Async PostgreSQL driver
+SQLAlchemy>=2.0 # ORM or Core API (Optional but recommended for structure)
+
 # Torch dependencies (ensure compatibility with Docker image CUDA version)
 # Using cu126 index as requested (suitable for CUDA >= 12.6)
 torch>=2.1.0 --index-url https://download.pytorch.org/whl/cu126

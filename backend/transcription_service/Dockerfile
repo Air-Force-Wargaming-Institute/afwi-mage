@@ -49,10 +49,10 @@ RUN mkdir -p ${MODEL_CACHE_DIR} && \
     chmod -R 777 /app/.cache # Ensure write permissions for cache directories
 
 # Make port available to the world outside this container
-EXPOSE 8012
+EXPOSE 8021
 
 # Define environment variable for the port (can be overridden)
-ENV TRANSCRIPTION_SERVICE_PORT=8012
+ENV TRANSCRIPTION_SERVICE_PORT=8021
 
 # Run the application using the venv python
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8012"] 
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8021"] 

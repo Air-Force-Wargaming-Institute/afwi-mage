@@ -1,7 +1,7 @@
 // RecordTranscribe.js
 // This component is used to record and transcribe audio in a new MAGE browserwindow.
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { 
   Box, 
   Typography, 
@@ -49,7 +49,8 @@ import {
   Edit as EditIcon,
 } from '@material-ui/icons';
 import WaveSurfer from 'wavesurfer.js';
-import { getApiUrl } from '../../config';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 import { GradientBorderPaper, GradientText, StyledContainer, AnimatedGradientPaper } from '../../styles/StyledComponents';
 import { DeleteButton } from '../../styles/ActionButtons';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
@@ -335,6 +336,7 @@ const RecordTranscribe = () => {
   const theme = useTheme();
   const classes = useStyles();
   const { state, dispatch } = useTranscription();
+  const { token } = useContext(AuthContext);
   
   // Remove local refs and state related to recording controls/waveform
   // const intervalRef = useRef(null);
@@ -368,7 +370,11 @@ const RecordTranscribe = () => {
     eventMetadata, // Needed for forms
     // markers: activeMarkers, // Handled by child
     // availableMarkerTypes, // Handled by child
-    loadedSessionId // Still needed for mode checks
+    loadedSessionId, // Still needed for mode checks
+    // Assume context tracks initial loaded data for comparison
+    // initialSessionData // We'll check for existence/changes later
+    // Assume context tracks if changes were made
+    // isDirty 
   } = state;
 
   // --- Helper function to check for unsaved form data ---
@@ -486,10 +492,65 @@ const RecordTranscribe = () => {
   // }, [transcriptionText]); // Scroll when text changes
 
   // Determine if fields should be disabled (Keep - used by multiple sections)
-  const isReadOnly = loadedSessionId || recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
+  // Disable forms ONLY if actively recording or paused, allow editing loaded sessions
+  const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
   
   // Construct the full classification string for display (Keep)
   const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
+
+  // --- Save Changes Logic (for loaded sessions) ---
+  const handleSaveChanges = async () => {
+      if (!loadedSessionId || !token) {
+          setSnackbarMessage("Cannot save: No session loaded or not authenticated.");
+          setSnackbarOpen(true);
+          return;
+      }
+
+      // Prepare payload with current state data
+      const updatePayload = {
+          session_name: audioFilename,
+          event_metadata: eventMetadata,
+          participants: participants,
+          full_transcript_text: transcriptionText // Assuming transcript text is editable
+      };
+
+      // Remove null/undefined values? The backend might handle this.
+      // Example: Clean payload if needed
+      // const cleanedPayload = Object.entries(updatePayload).reduce((acc, [key, value]) => {
+      //     if (value !== null && value !== undefined) acc[key] = value;
+      //     return acc;
+      // }, {});
+
+      try {
+          const saveUrl = getGatewayUrl(`/api/transcription/sessions/${loadedSessionId}`);
+          const response = await fetch(saveUrl, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(updatePayload) // Send the full current state
+          });
+
+          if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to save changes: ${response.status} ${errorText || response.statusText}`);
+          }
+
+          const result = await response.json();
+          setSnackbarMessage("Changes saved successfully.");
+          setSnackbarOpen(true);
+          // Optionally: Dispatch an action to reset the 'isDirty' state or update 'initialSessionData' in context
+          // dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
+          console.log("Save successful:", result);
+
+      } catch (error) {
+          console.error("Error saving session changes:", error);
+          setSnackbarMessage(`Error saving changes: ${error.message}`);
+          setSnackbarOpen(true);
+          dispatch({ type: ACTIONS.SET_ERROR, payload: `Failed to save changes: ${error.message}` });
+      }
+  };
 
   return (
     <Box className={classes.root}>
@@ -531,18 +592,27 @@ const RecordTranscribe = () => {
                   <Divider />
 
                   {/* Session Metadata Form */}
-                  <SessionMetadataForm isReadOnly={isReadOnly} />
+                  <SessionMetadataForm isReadOnly={isFormDisabled} />
                   <Divider />
 
                   {/* Participants Form */}
-                  <ParticipantManager isReadOnly={isReadOnly} />
+                  <ParticipantManager isReadOnly={isFormDisabled} />
                   <Divider />
 
                   {/* Save Changes button (Remains, logic needs review) */}
                   {loadedSessionId && (
-                     <Button variant="contained" color="secondary" size="small" startIcon={<SaveIcon />} onClick={() => { /* TODO: Implement save */ }} style={{ marginTop: '8px' }}>
-                         Save Changes
-                     </Button>
+                     <Button 
+                         variant="contained" 
+                         color="secondary" 
+                         size="small" 
+                         startIcon={<SaveIcon />} 
+                         onClick={handleSaveChanges} 
+                         // disabled={!isDirty || isFormDisabled} // Enable button based on changes
+                         disabled={isFormDisabled} // Temporarily disable only if recording/paused
+                         style={{ marginTop: '8px' }}
+                     >
+                          Save Changes
+                      </Button>
                   )}
 
                 </GradientBorderPaper>
@@ -558,7 +628,7 @@ const RecordTranscribe = () => {
 
                   {/* Realtime Tagging Panel */}
                   <Box sx={{ px: 1.5, pb: 1 }}>
-                    <RealtimeTaggingPanel isReadOnly={isReadOnly} />
+                    <RealtimeTaggingPanel isReadOnly={isFormDisabled} />
                   </Box>
 
                   <Divider sx={{ mx: 2 }}/>

@@ -2,7 +2,7 @@ import requests
 import os
 
 # Configuration
-SERVICE_URL = "http://localhost:8012/api/transcribe/"
+SERVICE_URL = "http://localhost:8021/api/transcription/"
 FILE_NAME = "Barack Obama Speech 2004.mp3"
 FILE_PATH = os.path.join(os.path.dirname(__file__), FILE_NAME)
 
