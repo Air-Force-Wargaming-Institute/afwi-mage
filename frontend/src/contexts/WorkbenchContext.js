@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { AuthContext } from './AuthContext';
-import { getApiUrl } from '../config';
+import { getApiUrl,getGatewayUrl } from '../config';
 
 export const WorkbenchContext = createContext();
 
@@ -62,53 +62,55 @@ export const WorkbenchProvider = ({ children }) => {
     setTransformationState(null);
   }, []); // No dependencies needed
 
-  // Setup axios headers with authentication token
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
+  // // Setup axios headers with authentication token
+  // useEffect(() => {
+  //   if (token) {
+  //     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  //   } else {
+  //     delete axios.defaults.headers.common['Authorization'];
+  //   }
+  // }, [token]);
 
   // Check if backend is available when component mounts
   useEffect(() => {
     // Get API base URL
-    const baseUrl = getApiUrl('WORKBENCH', '');
+    const baseUrl = '';
     console.log('Workbench API base URL:', baseUrl);
     console.log('Environment:', process.env.NODE_ENV);
     console.log('API_BASE_URL:', process.env.REACT_APP_API_BASE_URL);
     console.log('WORKBENCH_SERVICE_PORT:', process.env.REACT_APP_WORKBENCH_SERVICE_PORT);
-    setApiBaseUrl(baseUrl);
+    //setApiBaseUrl(baseUrl);
     
     let isMounted = true; // Flag to prevent state updates on unmounted component
 
-    const checkBackendConnection = async () => {
-      try {
-        const healthUrl = baseUrl.endsWith('/') ? `${baseUrl}health` : `${baseUrl}/health`;
-        console.log('Checking backend connection at:', healthUrl);
-        await axios.get(healthUrl, { timeout: 5000 }); // Slightly increased timeout
+    setInitialCheckDone(true); // Mark initial check as complete
+    setConnectionError(false);
+    // const checkBackendConnection = async () => {
+    //   try {
+    //     const healthUrl = baseUrl.endsWith('/') ? `${baseUrl}health` : `${baseUrl}/health`;
+    //     console.log('Checking backend connection at:', healthUrl);
+    //     await axios.get(healthUrl, { timeout: 5000 }); // Slightly increased timeout
 
-        if (isMounted) {
-          console.log('Backend connection successful');
-          setConnectionError(false); // Explicitly set to false only on success
-          setError(null); // Clear any previous connection-related errors
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('Backend connection check failed:', error);
-          setConnectionError(true); // Set connection error on failure
-          // Optionally set a general error message
-          // setError('Initial connection to backend failed. Please ensure it is running.');
-        }
-      } finally {
-        if (isMounted) {
-          setInitialCheckDone(true); // Mark initial check as complete
-        }
-      }
-    };
+    //     if (isMounted) {
+    //       console.log('Backend connection successful');
+    //       setConnectionError(false); // Explicitly set to false only on success
+    //       setError(null); // Clear any previous connection-related errors
+    //     }
+    //   } catch (error) {
+    //     if (isMounted) {
+    //       console.error('Backend connection check failed:', error);
+    //       setConnectionError(true); // Set connection error on failure
+    //       // Optionally set a general error message
+    //       // setError('Initial connection to backend failed. Please ensure it is running.');
+    //     }
+    //   } finally {
+    //     if (isMounted) {
+    //       setInitialCheckDone(true); // Mark initial check as complete
+    //     }
+    //   }
+    // };
     
-    checkBackendConnection();
+    // checkBackendConnection();
 
     return () => {
       isMounted = false; // Cleanup function
@@ -137,7 +139,13 @@ export const WorkbenchProvider = ({ children }) => {
         : `${apiBaseUrl}/api/workbench/spreadsheets/list`;
       
       console.log('Fetching spreadsheets from URL:', url);
-      const response = await axios.get(url);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       console.log('Spreadsheets response:', response.data);
 
       // Ensure all spreadsheets have is_transformed flag set properly
@@ -163,7 +171,7 @@ export const WorkbenchProvider = ({ children }) => {
       
       // Check if component is still mounted before setting state
       if (error.message === 'Network Error' || error.code === 'ECONNREFUSED') {
-         setConnectionError(true); // Set connection error on network failure
+         //setConnectionError(true); // Set connection error on network failure
          setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
          setError('Failed to load spreadsheets. Please try again later.');
@@ -207,7 +215,14 @@ export const WorkbenchProvider = ({ children }) => {
         console.log('Creating duplicate spreadsheet:', transformationParams.create_duplicate);
       }
       
-      const response = await axios.post(url, transformationParams, options);
+      const response = await axios.post(getGatewayUrl(url), 
+        transformationParams, 
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       console.log('Transformation response:', response.data);
       setIsLoading(false);
       return response.data;
@@ -215,7 +230,7 @@ export const WorkbenchProvider = ({ children }) => {
       console.error('Error transforming spreadsheet:', error);
       
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else if (error.response) {
         // The request was made and the server responded with a status code
@@ -245,7 +260,13 @@ export const WorkbenchProvider = ({ children }) => {
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/jobs/${jobId}`);
       console.log('Fetching job status from URL:', url);
-      const response = await axios.get(url, options);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       // Update job in the jobs array
       setJobs(prevJobs => 
@@ -301,7 +322,13 @@ export const WorkbenchProvider = ({ children }) => {
     try {
       const url = joinPaths(apiBaseUrl, 'api/workbench/jobs/list');
       console.log('Listing jobs from URL:', url);
-      const response = await axios.get(url, { params: filter, ...options });
+      const response = await axios.get(getGatewayUrl(url), { params: filter, ...options },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setJobs(response.data);
       setIsLoading(false);
       return response.data;
@@ -362,7 +389,13 @@ export const WorkbenchProvider = ({ children }) => {
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/jobs/${jobId}/cancel`);
       console.log('Cancelling job at URL:', url);
-      const response = await axios.post(url, {}, options);
+      const response = await axios.post(getGatewayUrl(url), {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       // Update job in the jobs array
       setJobs(prevJobs => 
@@ -429,9 +462,10 @@ export const WorkbenchProvider = ({ children }) => {
     }
     
     try {
-      const url = joinPaths(apiBaseUrl, 'api/workbench/spreadsheets/upload');
-      const response = await axios.post(url, formData, {
+      const url = 'api/workbench/spreadsheets/upload';
+      const response = await axios.post(getGatewayUrl(url), formData, {
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
@@ -441,7 +475,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error uploading spreadsheet:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to upload spreadsheet. Please try again.');
@@ -458,7 +492,13 @@ export const WorkbenchProvider = ({ children }) => {
     
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/info`);
-      const response = await axios.get(url);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setSelectedSpreadsheet(response.data);
       setIsLoading(false);
       return response.data;
@@ -466,7 +506,7 @@ export const WorkbenchProvider = ({ children }) => {
       console.error('Error fetching spreadsheet details:', error);
       
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError(`Failed to load spreadsheet details: ${error.message}`);
@@ -480,12 +520,18 @@ export const WorkbenchProvider = ({ children }) => {
   const getSpreadsheetSheets = useCallback(async (spreadsheetId) => {
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/sheets`);
-      const response = await axios.get(url);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       return response.data;
     } catch (error) {
       console.error('Error fetching spreadsheet sheets:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       }
       throw error;
@@ -500,12 +546,18 @@ export const WorkbenchProvider = ({ children }) => {
         endpoint += `?sheet_name=${encodeURIComponent(sheetName)}`;
       }
       const url = joinPaths(apiBaseUrl, endpoint);
-      const response = await axios.get(url);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       return response.data;
     } catch (error) {
       console.error('Error fetching spreadsheet summary:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       }
       throw error;
@@ -518,8 +570,14 @@ export const WorkbenchProvider = ({ children }) => {
     setError(null);
     
     try {
-      const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/operate`);
-      const response = await axios.post(url, operation);
+      const url = `api/workbench/spreadsheets/${spreadsheetId}/operate`;
+      const response = await axios.post(getGatewayUrl(url), operation,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setIsLoading(false);
       // Set results for potential display
       setAnalysisResults(response.data);
@@ -527,7 +585,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error performing cell operation:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to process spreadsheet. Please try again.');
@@ -543,8 +601,14 @@ export const WorkbenchProvider = ({ children }) => {
     setError(null);
     
     try {
-      const url = joinPaths(apiBaseUrl, 'api/workbench/visualizations/generate');
-      const response = await axios.post(url, request);
+      const url = `api/workbench/visualizations/generate`;
+      const response = await axios.post(getGatewayUrl(url), request,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setIsLoading(false);
       
       // Add to visualizations list if not already there
@@ -560,7 +624,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error generating visualization:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to generate visualization. Please try again.');
@@ -577,7 +641,13 @@ export const WorkbenchProvider = ({ children }) => {
     
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/visualizations/${visualizationId}/execute`);
-      const response = await axios.post(url, { code });
+      const response = await axios.post(getGatewayUrl(url), { code },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setIsLoading(false);
       
       // Update visualizations list
@@ -591,7 +661,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error executing visualization code:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to execute visualization code. Please check for errors in your code.');
@@ -608,13 +678,19 @@ export const WorkbenchProvider = ({ children }) => {
     
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}/context`);
-      const response = await axios.get(url);
+      const response = await axios.get(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       setIsLoading(false);
       return response.data;
     } catch (error) {
       console.error('Error extracting data context:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to extract data context. Please try again.');
@@ -631,7 +707,13 @@ export const WorkbenchProvider = ({ children }) => {
     
     try {
       const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}`);
-      const response = await axios.delete(url);
+      const response = await axios.delete(getGatewayUrl(url),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       // Remove the spreadsheet from the local state
       setSpreadsheets(prev => prev.filter(sheet => sheet.id !== spreadsheetId));
@@ -646,7 +728,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error deleting spreadsheet:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to delete spreadsheet. Please try again.');
@@ -662,8 +744,14 @@ export const WorkbenchProvider = ({ children }) => {
     setError(null);
     
     try {
-      const url = joinPaths(apiBaseUrl, `api/workbench/spreadsheets/${spreadsheetId}`);
-      const response = await axios.patch(url, updates);
+      const url = `api/workbench/spreadsheets/${spreadsheetId}`;
+      const response = await axios.patch(getGatewayUrl(url), updates,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       // Update the spreadsheet in the local state
       setSpreadsheets(prev => 
@@ -684,7 +772,7 @@ export const WorkbenchProvider = ({ children }) => {
     } catch (error) {
       console.error('Error updating spreadsheet:', error);
       if (error.message === 'Network Error') {
-        setConnectionError(true);
+        //setConnectionError(true);
         setError('Cannot connect to backend services. Please ensure the backend is running.');
       } else {
         setError('Failed to update spreadsheet. Please try again.');

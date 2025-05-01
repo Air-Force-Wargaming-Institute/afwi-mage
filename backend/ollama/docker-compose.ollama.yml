@@ -22,7 +22,6 @@ services:
       - HF_HUB_OFFLINE=1
       # GPU Allocation - 10% split across both GPUs
       - CUDA_VISIBLE_DEVICES=0
-      #- CUDA_VISIBLE_DEVICES=0,1
       - OLLAMA_GPU_MEMORY_UTILIZATION=0.1
       - OLLAMA_GPU_LAYERS_AUTO=1
       - OLLAMA_NUM_GPU=1

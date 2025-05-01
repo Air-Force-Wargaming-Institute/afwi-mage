@@ -1,35 +1,95 @@
 [
     {
-        "name": "china 4 team",
-        "unique_id": "4201d5c7-b002-4123-8d86-64142eaacd75",
-        "description": "china 4 team",
+        "name": "CASI CMSI Research Team",
+        "unique_id": "ecc68abb-b280-4e34-a541-ace910da6cee",
+        "description": "CASI CMSI Research Team",
         "agents": [
-            "64f2077a-e5d8-44ba-a7e3-9c0ca36092bb",
-            "b5f3b973-b159-4213-a0f3-8aff1a0726c9",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593",
-            "7094e92e-e1e6-420f-be8e-1c59929662bc"
+            "f4f60ea7-1e63-4b05-a919-4154a428ea17",
+            "65100e24-0319-4903-86f9-8d491c87a7d7",
+            "11a061dd-ee45-48f2-8cb4-12db32001eef",
+            "c2371707-2910-41bc-8be3-4a69c53edd5b"
         ],
         "color": "#FF0000",
-        "created_at": "2025-03-13T16:04:27.991879Z",
-        "last_modified": "2025-04-02T16:39:34.735311Z",
+        "created_at": "2025-04-17T16:25:30.869002Z",
+        "last_modified": "2025-04-17T16:25:30.869026Z",
         "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+            "4cd2e6d6-5af4-4419-b890-33c4cd0e135d"
         ]
     },
     {
-        "name": "sdfsdfsdfs",
-        "unique_id": "f90601c9-75c2-4a8f-b6c2-903508b08956",
-        "description": "asdfasdfasdfasdfa",
+        "name": "US Team",
+        "unique_id": "0df4a525-6bb0-418a-ba4d-ac94575995ba",
+        "description": "United States 4-member team",
         "agents": [
-            "ebddca47-1dba-4f84-a8f6-2b3a4584353c",
-            "62257ba9-5c8a-45b3-95c9-e89c0e924509",
-            "0c1437ac-305a-48e1-876a-f5b22a37f593"
+            "f00b6752-c575-4aea-a122-3e3356e95658",
+            "b586a3b2-dd44-43b1-a985-9a65f489c660",
+            "30c5f080-0764-440a-acae-47addcf445ef",
+            "6aa7aaf9-f61f-48ab-a5e4-d7df9347c770"
+        ],
+        "color": "#1E90FF",
+        "created_at": "2025-04-22T17:45:29.968747Z",
+        "last_modified": "2025-04-22T17:48:11.744682Z",
+        "vectorstore": []
+    },
+    {
+        "name": "PRC Team",
+        "unique_id": "fb215b42-f934-444d-80a9-41908fb1f2a6",
+        "description": "The People's Republic of China 4-member team",
+        "agents": [
+            "c2371707-2910-41bc-8be3-4a69c53edd5b",
+            "11a061dd-ee45-48f2-8cb4-12db32001eef",
+            "f4f60ea7-1e63-4b05-a919-4154a428ea17",
+            "6aa7aaf9-f61f-48ab-a5e4-d7df9347c770"
         ],
         "color": "#FF0000",
-        "created_at": "2025-03-18T18:30:32.038105Z",
-        "last_modified": "2025-03-18T18:30:32.038117Z",
+        "created_at": "2025-04-22T17:47:40.969763Z",
+        "last_modified": "2025-04-22T19:54:07.464892Z",
         "vectorstore": [
-            "8430a1e2-4350-4ff3-8de2-4d9311f26677"
+            "4f697641-244a-4d0b-a9f4-607227edb026",
+            "3ad51d9d-e072-40cd-84ab-1a71067badea"
         ]
+    },
+    {
+        "name": "NATO Team",
+        "unique_id": "649a21c8-3553-46a0-b12d-3821a8aada34",
+        "description": "The North Atlantic Treaty Organization's 2-member team",
+        "agents": [
+            "ebddca47-1dba-4f84-a8f6-2b3a4584353c",
+            "e3912426-7286-4553-8afa-b43b0975b415"
+        ],
+        "color": "#32CD32",
+        "created_at": "2025-04-22T17:49:05.078243Z",
+        "last_modified": "2025-04-22T17:49:05.078279Z",
+        "vectorstore": []
+    },
+    {
+        "name": "Analysis Team",
+        "unique_id": "31e1b0b6-1446-44ed-8977-dfb3393ac971",
+        "description": "4-member Analysis Team",
+        "agents": [
+            "caf519ac-1681-4129-aab4-0c7ee276eba8",
+            "f9b7ca15-9f37-4e29-9ce8-1fa4b99345d5",
+            "534c1a3e-6710-496c-b49a-29ba73dd46de",
+            "9b7f3b26-e6c1-4618-aaa6-3098fe8bf1b6"
+        ],
+        "color": "#808080",
+        "created_at": "2025-04-22T18:01:46.491885Z",
+        "last_modified": "2025-04-22T18:01:46.491907Z",
+        "vectorstore": []
+    },
+    {
+        "name": "US-NATO Team",
+        "unique_id": "0955bdb2-bfea-4272-9bcd-8ecf4dcbff64",
+        "description": "4-member team representing the US and NATO together",
+        "agents": [
+            "ebddca47-1dba-4f84-a8f6-2b3a4584353c",
+            "e3912426-7286-4553-8afa-b43b0975b415",
+            "62257ba9-5c8a-45b3-95c9-e89c0e924509",
+            "b586a3b2-dd44-43b1-a985-9a65f489c660"
+        ],
+        "color": "#0000FF",
+        "created_at": "2025-04-22T18:04:29.752914Z",
+        "last_modified": "2025-04-22T18:04:29.752931Z",
+        "vectorstore": []
     }
 ]

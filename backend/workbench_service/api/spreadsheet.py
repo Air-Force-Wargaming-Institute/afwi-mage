@@ -15,6 +15,9 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
 from datetime import datetime
+import pandas as pd
+import numpy as np
+from api.visualization import DataContext, Statistics, FileInfo, ColumnSchema
 
 # Import Pydantic models
 from pydantic import BaseModel, Field
@@ -138,7 +141,7 @@ class SpreadsheetUpdateRequest(BaseModel):
         }
     }
 
-@router.get("/list", response_model=List[SpreadsheetInfo])
+@router.get("/api/workbench/spreadsheets/list", response_model=List[SpreadsheetInfo])
 async def list_spreadsheets():
     """
     List all available spreadsheets.
@@ -151,7 +154,7 @@ async def list_spreadsheets():
     # Get all spreadsheets from the manager
     return spreadsheet_manager.list_spreadsheets()
 
-@router.post("/upload")
+@router.post("/api/workbench/spreadsheets/upload")
 async def upload_spreadsheet(
     file: UploadFile = File(...),
     description: Optional[str] = Form(None)
@@ -189,7 +192,7 @@ async def upload_spreadsheet(
         "description": description
     }
 
-@router.post("/{spreadsheet_id}/operate", response_model=OperationResult)
+@router.post("/api/workbench/spreadsheets/{spreadsheet_id}/operate", response_model=OperationResult)
 async def operate_on_cells(
     spreadsheet_id: str,
     operation: CellOperation,
@@ -241,7 +244,7 @@ async def operate_on_cells(
             "error": f"Unsupported operation: {operation.operation}"
         }
 
-@router.get("/{spreadsheet_id}/info", response_model=SpreadsheetInfo)
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/info", response_model=SpreadsheetInfo)
 async def get_spreadsheet_info(spreadsheet_id: str):
     """
     Get information about a specific spreadsheet.
@@ -269,7 +272,7 @@ async def get_spreadsheet_info(spreadsheet_id: str):
     except HTTPException as e:
         raise e
 
-@router.get("/{spreadsheet_id}/sheets")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/sheets")
 async def get_spreadsheet_sheets(spreadsheet_id: str):
     """
     Get the list of sheets in a spreadsheet.
@@ -312,7 +315,7 @@ async def get_spreadsheet_sheets(spreadsheet_id: str):
     except HTTPException as e:
         raise e
 
-@router.get("/{spreadsheet_id}/summary")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/summary")
 async def get_spreadsheet_summary(
     spreadsheet_id: str,
     sheet_name: Optional[str] = None
@@ -356,7 +359,7 @@ async def get_spreadsheet_summary(
             detail=f"Error analyzing spreadsheet: {str(e)}"
         )
 
-@router.delete("/{spreadsheet_id}")
+@router.delete("/api/workbench/spreadsheets/{spreadsheet_id}")
 async def delete_spreadsheet(spreadsheet_id: str):
     """
     Delete a spreadsheet and its metadata.
@@ -388,7 +391,117 @@ async def delete_spreadsheet(spreadsheet_id: str):
             detail=f"Error deleting spreadsheet: {str(e)}"
         )
 
-@router.get("/{spreadsheet_id}/download")
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/context")
+async def get_spreadsheet_context(spreadsheet_id: str):
+    """
+    Get the context of a spreadsheet.
+    """
+    logger.info(f"Get spreadsheet context endpoint called for ID: {spreadsheet_id}")
+
+    try:
+        # Get spreadsheet info and path
+        info = spreadsheet_manager.get_spreadsheet_info(spreadsheet_id)
+        file_path = spreadsheet_manager.get_spreadsheet_path(spreadsheet_id)
+        
+        # Determine the sheet to analyze (use the first sheet if available)
+        sheet_name = None
+        if info.get("sheets"):
+            sheet_name = info["sheets"][0]
+        
+        if not sheet_name:
+            raise HTTPException(status_code=404, detail="Spreadsheet contains no sheets")
+            
+        logger.info(f"Analyzing context for sheet: {sheet_name} in file: {file_path}")
+
+        # Read the spreadsheet data using pandas
+        try:
+            file_path_str = str(file_path) # Convert Path to string
+            if file_path_str.lower().endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+            elif file_path_str.lower().endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported file format for context extraction")
+        except Exception as read_err:
+            logger.error(f"Error reading spreadsheet file {file_path}: {read_err}")
+            raise HTTPException(status_code=500, detail=f"Failed to read spreadsheet file: {read_err}")
+
+        # Prepare DataContext components
+        column_schema_list: List[ColumnSchema] = []
+        statistics_dict: Dict[str, Statistics] = {}
+        
+        # Analyze columns
+        for col_name in df.columns:
+            col_data = df[col_name]
+            col_type = 'other'
+            missing = col_data.isnull().any()
+
+            # Infer type (simplified example)
+            if pd.api.types.is_numeric_dtype(col_data):
+                col_type = 'numeric'
+                # Calculate statistics for numeric columns
+                stats = col_data.describe()
+                statistics_dict[col_name] = Statistics(
+                    min=stats.get('min'),
+                    max=stats.get('max'),
+                    mean=stats.get('mean'),
+                    median=stats.get('50%'), # describe() uses '50%' for median
+                    std=stats.get('std')
+                )
+            elif pd.api.types.is_string_dtype(col_data) or pd.api.types.is_categorical_dtype(col_data):
+                 # Check distinct count for categorical potential
+                 if col_data.nunique() < 50: # Arbitrary threshold for 'categorical'
+                     col_type = 'categorical'
+                 else:
+                     col_type = 'string'
+            elif pd.api.types.is_datetime64_any_dtype(col_data):
+                col_type = 'datetime'
+            elif pd.api.types.is_bool_dtype(col_data):
+                col_type = 'boolean'
+                
+            column_schema_list.append(ColumnSchema(
+                name=str(col_name),  # Ensure name is string
+                type=col_type,
+                missing=bool(missing)
+            ))
+
+        # Get sample rows (e.g., first 5), handle potential NaNs for JSON serialization
+        sample_rows_df = df.head(5).replace({np.nan: None})
+        sample_rows_list = sample_rows_df.values.tolist()
+        
+        # Get row count
+        row_count = len(df)
+        
+        # Get file info
+        file_info = FileInfo(
+            name=info.get("original_filename", info.get("filename", "Unknown")),
+            sheets=info.get("sheets", [])
+        )
+        
+        # Create and return DataContext
+        data_context = DataContext(
+            column_schema=column_schema_list,
+            statistics=statistics_dict,
+            sample_rows=sample_rows_list,
+            row_count=row_count,
+            file_info=file_info
+        )
+        
+        logger.info(f"Successfully extracted context for spreadsheet {spreadsheet_id}")
+        return data_context
+
+    except HTTPException as e:
+        # Re-raise known HTTP errors
+        raise e
+    except Exception as e:
+        logger.exception(f"Unexpected error getting spreadsheet context for {spreadsheet_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error extracting context: {str(e)}"
+        )
+
+
+@router.get("/api/workbench/spreadsheets/{spreadsheet_id}/download")
 async def download_spreadsheet(spreadsheet_id: str):
     """
     Download a spreadsheet file.
@@ -435,7 +548,7 @@ async def download_spreadsheet(spreadsheet_id: str):
             detail=f"Error downloading spreadsheet: {str(e)}"
         )
 
-@router.patch("/{spreadsheet_id}")
+@router.patch("/api/workbench/spreadsheets/{spreadsheet_id}")
 async def update_spreadsheet(spreadsheet_id: str, request: SpreadsheetUpdateRequest):
     """
     Update spreadsheet metadata.
@@ -499,7 +612,7 @@ async def update_spreadsheet(spreadsheet_id: str, request: SpreadsheetUpdateRequ
             detail=f"Error updating spreadsheet: {str(e)}"
         )
 
-@router.post("/{spreadsheet_id}/transform", response_model=TransformationResult)
+@router.post("/api/workbench/spreadsheets/{spreadsheet_id}/transform", response_model=TransformationResult)
 async def transform_spreadsheet(
     spreadsheet_id: str,
     request: TransformationRequest,

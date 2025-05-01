@@ -1,15 +1,13 @@
 import React, { useContext } from 'react';
 import {
-  Container,
   Grid,
-  Paper,
   Typography,
   makeStyles,
   Button,
-  Card,
-  CardContent,
   CardActions,
   Box,
+  useTheme,
+  alpha,
 } from '@material-ui/core';
 import { useHistory } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
@@ -17,91 +15,113 @@ import GroupWorkIcon from '@material-ui/icons/GroupWork';
 import TuneIcon from '@material-ui/icons/Tune';
 import LibraryBooksIcon from '@material-ui/icons/LibraryBooks';
 import FolderIcon from '@material-ui/icons/Folder';
+import PublicIcon from '@material-ui/icons/Public';
+import { 
+  GradientBorderPaper, 
+  GradientBorderCard, 
+  AnimatedGradientPaper,
+  StyledContainer,
+  GradientText
+} from '../styles/StyledComponents';
+import mageCoiImage from '../assets/AFWI_MAGE_COIN.png';
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    padding: theme.spacing(3),
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    paddingTop: theme.spacing(70),
   },
-  mainContainer: {
-    backgroundColor: 'white',
-    borderRadius: theme.shape.borderRadius,
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(3),
+  coinImage: {
+    width: 300,
+    height: 300,
+    marginBottom: theme.spacing(2),
+    filter: 'drop-shadow(0px 10px 20px rgba(0, 0, 0, 0.4))',
   },
-  welcome: {
-    marginBottom: theme.spacing(4),
+  welcomeText: {
+    textAlign: 'center',
+    marginBottom: theme.spacing(0),
+    fontSize: '3.5rem',
   },
-  welcomeTitle: {
+  transparentPaper: {
+    backgroundColor: 'transparent',
+    boxShadow: 'none',
+    marginTop: theme.spacing(0),
+  },
+  iconContainer: {
+    display: 'flex', 
+    justifyContent: 'center',
+    marginBottom: theme.spacing(2),
+  },
+  cardIcon: {
+    fontSize: '2.5rem',
     color: theme.palette.primary.main,
-    fontWeight: 500,
   },
-  welcomeSubtitle: {
-    color: theme.palette.text.secondary,
-    marginTop: theme.spacing(1),
+  actionButton: {
+    fontWeight: 500,
+    transition: theme.custom.transition,
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      boxShadow: theme.custom.boxShadow,
+    }
+  },
+  adminSection: {
+    marginTop: theme.spacing(4),
   },
   card: {
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    '&:hover': {
-      transform: 'translateY(-5px)',
-      boxShadow: theme.shadows[4],
-    },
   },
   cardContent: {
     flexGrow: 1,
     padding: theme.spacing(3),
   },
-  cardIcon: {
-    fontSize: '2.5rem',
-    color: theme.palette.primary.main,
-    marginBottom: theme.spacing(2),
+  featuresContainer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    margin: theme.spacing(0, -1.5),
+  },
+  featureItem: {
+    width: 'calc(20% - 24px)',
+    margin: theme.spacing(0, 1.5, 3, 1.5),
+    [theme.breakpoints.down('md')]: {
+      width: 'calc(33.333% - 24px)',
+    },
+    [theme.breakpoints.down('sm')]: {
+      width: 'calc(50% - 24px)',
+    },
+    [theme.breakpoints.down('xs')]: {
+      width: '100%',
+    },
   },
   cardTitle: {
-    marginBottom: theme.spacing(2),
-    color: theme.palette.primary.main,
-    fontWeight: 500,
-  },
-  cardDescription: {
-    marginBottom: theme.spacing(2),
-    color: theme.palette.text.secondary,
-  },
-  section: {
-    marginBottom: theme.spacing(4),
-  },
-  actionButton: {
-    marginTop: 'auto',
-    fontWeight: 500,
-  },
-  adminSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: theme.shape.borderRadius,
-    marginTop: theme.spacing(4),
-  },
-  adminContent: {
-    padding: theme.spacing(3),
-  },
-  description: {
-    color: theme.palette.text.secondary,
-    marginBottom: theme.spacing(3),
-  },
-  iconContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginBottom: theme.spacing(2),
-  },
+    fontSize: '1.4rem',
+    fontWeight: 600,
+    marginBottom: theme.spacing(1.5),
+    lineHeight: 1.3,
+    letterSpacing: '0.02em',
+  }
 }));
 
 function Home() {
   const classes = useStyles();
   const history = useHistory();
   const { user } = useContext(AuthContext);
+  const theme = useTheme();
 
   const features = [
     {
-      title: 'Multi-Agent Portal',
+      title: 'Build a Wargame (Pre-Alpha)',
+      description: 'Execute and analyze geopolitical wargame simulations using multi-agent systems, the DIME framework, and integrated cross-domain warfare.',
+      path: '/wargame-builder',
+      buttonText: 'Build a Wargame',
+      icon: <PublicIcon className={classes.cardIcon} />
+    },
+    {
+      title: 'Agent Portal',
       description: 'Build, manage, and chat with multi-agent systems for complex problem-solving and decision-making.',
       path: '/multi-agent',
       buttonText: 'Access Portal',
@@ -131,80 +151,69 @@ function Home() {
   ];
 
   return (
-    <Container className={classes.root}>
-      <Paper className={classes.mainContainer}>
-        <Box className={classes.welcome}>
-          <Typography variant="h4" className={classes.welcomeTitle} gutterBottom>
-            Welcome to MAGE
-          </Typography>
-          <Typography variant="h6" className={classes.welcomeSubtitle}>
-            Multi-Agent Generative Engine
-          </Typography>
-        </Box>
+    <Box className={classes.root}>
+      <img src={mageCoiImage} alt="AFWI MAGE Coin" className={classes.coinImage} />
+      
+      <GradientText variant="h1" fontWeight="600" fontSize={'4rem'} className={classes.welcomeText}>
+        Welcome to MAGE
+      </GradientText>
+      
+      <StyledContainer maxWidth="xl">
+        <AnimatedGradientPaper elevation={3} className={classes.transparentPaper}>
+          <Box className={classes.featuresContainer}>
+            {features.map((feature) => (
+              <Box key={feature.title} className={classes.featureItem}>
+                <GradientBorderCard elevation={2} className={classes.card}>
+                  <Box className={classes.cardContent}>
+                    <Box className={classes.iconContainer}>
+                      {feature.icon}
+                    </Box>
+                    <Typography variant="h6" color="primary" gutterBottom fontWeight={500} className={classes.cardTitle}>
+                      {feature.title}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" paragraph>
+                      {feature.description}
+                    </Typography>
+                  </Box>
+                  <CardActions>
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      onClick={() => history.push(feature.path)}
+                      className={classes.actionButton}
+                      fullWidth
+                    >
+                      {feature.buttonText}
+                    </Button>
+                  </CardActions>
+                </GradientBorderCard>
+              </Box>
+            ))}
+          </Box>
 
-        <Box className={classes.section}>
-          <Typography variant="body1" className={classes.description}>
-            MAGE is a versatile platform that empowers wargame designers, participants, and analysts to build multi-agent systems that use fine-tuned Large Language Models (LLMs) in local secure environments and air-gapped systems. 
-            It offers a suite of tools for building AI multi-agent teams, fine-tune LLMs, build retrieval systems for AI agents, and manage a critical knowledge bases. 
-            Select a portal below to explore MAGE's capabilities.
-
-
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          {features.map((feature) => (
-            <Grid item xs={12} sm={6} md={3} key={feature.title}>
-              <Card className={classes.card}>
-                <CardContent className={classes.cardContent}>
-                  <div className={classes.iconContainer}>
-                    {feature.icon}
-                  </div>
-                  <Typography variant="h6" className={classes.cardTitle}>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" className={classes.cardDescription}>
-                    {feature.description}
-                  </Typography>
-                </CardContent>
-                <CardActions>
-                  <Button
-                    color="primary"
-                    variant="contained"
-                    onClick={() => history.push(feature.path)}
-                    className={classes.actionButton}
-                    fullWidth
-                  >
-                    {feature.buttonText}
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-
-        {user?.permission === 'admin' && (
-          <Paper elevation={1} className={classes.adminSection}>
-            <Box className={classes.adminContent}>
-              <Typography variant="h6" gutterBottom color="primary">
-                Administrator Tools
-              </Typography>
-              <Typography variant="body2" className={classes.description}>
-                Access administrative functions to manage users and monitor system status.
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => history.push('/admin')}
-                className={classes.actionButton}
-              >
-                Access Admin Dashboard
-              </Button>
-            </Box>
-          </Paper>
-        )}
-      </Paper>
-    </Container>
+          {user?.permission === 'admin' && (
+            <GradientBorderPaper elevation={2} className={classes.adminSection}>
+              <Box p={3}>
+                <Typography variant="h6" color="primary" gutterBottom>
+                  Administrator Tools
+                </Typography>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Access administrative functions to manage users and monitor system status.
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => history.push('/admin')}
+                  className={classes.actionButton}
+                >
+                  Access Admin Dashboard
+                </Button>
+              </Box>
+            </GradientBorderPaper>
+          )}
+        </AnimatedGradientPaper>
+      </StyledContainer>
+    </Box>
   );
 }
 

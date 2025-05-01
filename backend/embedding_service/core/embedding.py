@@ -15,7 +15,7 @@ from langchain_ollama.embeddings import OllamaEmbeddings
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
-def get_embedding_model(model_id: str = "nomic-embed-text") -> Embeddings:
+def get_embedding_model(model_id: str = "nomic-embed-text:latest") -> Embeddings:
     """
     Get an embedding model instance.
     
@@ -34,10 +34,7 @@ def get_embedding_model(model_id: str = "nomic-embed-text") -> Embeddings:
         logger.info(f"Using Ollama embeddings with model: {model_id} at {base_url}")
         return OllamaEmbeddings(
             model=model_id,
-            base_url=base_url,
-            num_ctx=512,  # Context window size
-            num_thread=8,  # Number of CPU threads to use
-            keep_alive=300  # Keep model loaded for 5 minutes
+            base_url=base_url
         )
     except Exception as e:
         logger.error(f"Error initializing embedding model: {e}")

@@ -14,50 +14,84 @@ import {
 import { Visibility, VisibilityOff } from '@material-ui/icons';
 import { AuthContext } from '../contexts/AuthContext';
 import backgroundImage from '../assets/background.jpg';
+import lemayCenterShield from '../assets/LeMay_Center_Shield.png';
 import afwiLogo from '../assets/afwi_logo.png';
+import mageCoin from '../assets/AFWI_MAGE_COIN.png';
+import usafLogo from '../assets/1200px-USAF_logo.png';
+import { AnimatedGradientPaper } from '../styles/StyledComponents';
+import { ActionButton } from '../styles/ActionButtons';
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    minHeight: '100vh',
+    minHeight: '90vh ',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundImage: `url(${backgroundImage})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
+    position: 'relative',
+    zIndex: 0,
+    backgroundColor: '#222',
+    border: 'none',
+    borderRadius: '20px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+  },
+  cornerImage: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    '&::before': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      backdropFilter: 'blur(3px)',
-    }
+    width: 90,
+    height: 'auto',
+    zIndex: 10,
+    background: 'none',
+    border: 'none',
+  },
+  leftCorner: {
+    top: 24,
+    left: 24,
+  },
+  rightCorner: {
+    top: 24,
+    right: 24,
+  },
+  logoRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
+    marginBottom: theme.spacing(1),
+    marginTop: theme.spacing(1),
+    position: 'relative',
+  },
+  afwiLogo: {
+    width: 200,
+    height: 'auto',
+    position: 'relative',
+    zIndex: 2,
+    marginRight: -48,
+    filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.45))',
+  },
+  mageCoin: {
+    width: 200,
+    height: 'auto',
+    position: 'relative',
+    zIndex: 1,
+    filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.45))',
   },
   loginPaper: {
-    padding: theme.spacing(8),
+    padding: theme.spacing(4),
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 30, 1)',
+    backgroundColor: '#181830',
     borderRadius: '10px',
-    border: '2px solid white',  // Add this line for the white border
-    boxShadow: theme.shadows[5],
+    border: '4px solid #00ffff',
     position: 'relative',
+    zIndex: 2,
     color: '#ffffff',
     width: '100%',
     maxWidth: '800px',
-  },
-  logo: {
-    width: '175px', // Adjust this value to resize the logo
-    marginBottom: theme.spacing(4),
+    boxSizing: 'border-box',
   },
   loginForm: {
     width: '100%',
@@ -85,21 +119,24 @@ const useStyles = makeStyles((theme) => ({
   loginTextField: {
     marginBottom: theme.spacing(2),
     '& .MuiOutlinedInput-root': {
+      backgroundColor: '#181830 !important',
       '& fieldset': {
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        borderColor: `${theme.palette.primary.main} !important`,
+        borderWidth: '1.5px !important',
       },
       '&:hover fieldset': {
-        borderColor: 'rgba(255, 255, 255, 0.7)',
+        borderColor: `${theme.palette.primary.light} !important`,
       },
       '&.Mui-focused fieldset': {
-        borderColor: '#ffffff',
+        borderColor: `${theme.palette.primary.main} !important`,
       },
     },
     '& .MuiInputLabel-root': {
-      color: 'rgba(255, 255, 255, 0.7)',
+      color: '#ffffff !important',
+      opacity: '0.85 !important',
     },
     '& .MuiInputBase-input': {
-      color: '#ffffff',
+      color: '#ffffff !important',
     },
   },
   form: {
@@ -160,86 +197,113 @@ function Login() {
 
   return (
     <div className={classes.root}>
-      <Container component="main" maxWidth="md">
-        <Paper className={classes.loginPaper} elevation={6}>
-          <img src={afwiLogo} alt="AFWI Logo" className={classes.logo} />
-          <Typography component="h3" variant="h5" className={classes.loginSubtitle}>
-            Air Force Wargaming Institute
-          </Typography>
-          <Typography component="h1" variant="h3" className={classes.loginTitle}>
-            Multi-Agent Generative Engine
-          </Typography>
-          <Typography component="h2" variant="h4" className={classes.loginSubtitle}>
-            Login
-          </Typography>
+      {/* Corner Images */}
+      <img src={lemayCenterShield} alt="LeMay Center Shield" className={`${classes.cornerImage} ${classes.leftCorner}`} />
+      <img src={usafLogo} alt="USAF Logo" className={`${classes.cornerImage} ${classes.rightCorner}`} />
+      <AnimatedGradientPaper>
+        <Typography component="h3" variant="h5" className={classes.loginSubtitle} style={{ marginBottom: 0, marginTop: 0, fontWeight: 700, fontSize: '1.3rem' }}>
+          Air Force Wargaming Institute
+        </Typography>
+        <div className={classes.logoRow}>
+          <img src={afwiLogo} alt="AFWI Logo" className={classes.afwiLogo} />
+          <img src={mageCoin} alt="MAGE Coin" className={classes.mageCoin} />
+        </div>
+        <Typography component="h1" variant="h3" className={classes.loginTitle}>
+          Multi-Agent Generative Engine
+        </Typography>
+        <Typography component="h2" variant="h4" className={classes.loginSubtitle}>
+          Login
+        </Typography>
+        
+        <form className={classes.form} onSubmit={handleSubmit}>
+          <TextField
+            className={classes.loginTextField}
+            required
+            fullWidth
+            id="username"
+            label="Username"
+            name="username"
+            autoComplete="username"
+            variant="outlined"
+            value={credentials.username}
+            onChange={handleInputChange}
+            disabled={isLoading}
+            InputProps={{
+              style: {
+                backgroundColor: '#181830',
+                color: '#fff',
+              },
+            }}
+            InputLabelProps={{
+              style: {
+                color: '#fff',
+                opacity: 0.85,
+              },
+            }}
+          />
+          <TextField
+            className={classes.loginTextField}
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            id="password"
+            autoComplete="current-password"
+            variant="outlined"
+            value={credentials.password}
+            onChange={handleInputChange}
+            disabled={isLoading}
+            InputProps={{
+              style: {
+                backgroundColor: '#181830',
+                color: '#fff',
+              },
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleTogglePasswordVisibility}
+                    edge="end"
+                    style={{ color: 'white' }}
+                  >
+                    {showPassword ? <Visibility /> : <VisibilityOff />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            InputLabelProps={{
+              style: {
+                color: '#fff',
+                opacity: 0.85,
+              },
+            }}
+          />
           
-          <form className={classes.form} onSubmit={handleSubmit}>
-            <TextField
-              className={classes.loginTextField}
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              variant="outlined"
-              value={credentials.username}
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-            <TextField
-              className={classes.loginTextField}
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              id="password"
-              autoComplete="current-password"
-              variant="outlined"
-              value={credentials.password}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleTogglePasswordVisibility}
-                      edge="end"
-                      style={{ color: 'white' }}
-                    >
-                      {showPassword ? <Visibility /> : <VisibilityOff />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            
-            {error && (
-              <Typography className={classes.error}>
-                {error}
-              </Typography>
+          {error && (
+            <Typography className={classes.error}>
+              {error}
+            </Typography>
+          )}
+          
+          <ActionButton
+            type="submit"
+            fullWidth
+            variant="contained"
+            color="primary"
+            className={classes.submit}
+            size="large"
+            disabled={isLoading}
+            style={{ marginTop: 24 }}
+          >
+            {isLoading ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              'Login'
             )}
-            
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              color="primary"
-              className={classes.submit}
-              size="large"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : (
-                'Login'
-              )}
-            </Button>
-          </form>
-        </Paper>
-      </Container>
+          </ActionButton>
+        </form>
+      </AnimatedGradientPaper>
     </div>
   );
 }

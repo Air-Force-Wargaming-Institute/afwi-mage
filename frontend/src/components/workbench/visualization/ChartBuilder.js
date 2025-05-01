@@ -3,7 +3,6 @@ import { WorkbenchContext } from '../../../contexts/WorkbenchContext';
 import { 
   Box, 
   Typography, 
-  Paper,
   Grid,
   FormControl,
   InputLabel,
@@ -33,6 +32,26 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import FakePlotImage from '../../../assets/FakePlot.png'; // Import the fake plot image
 import '../../../App.css'; // Import App.css for styling
+
+// Import styled components
+import {
+  GradientBorderPaper,
+  AnimatedGradientPaper,
+  SubtleGlowPaper,
+  GradientBorderCard,
+  GradientText,
+  HighContrastGradientPaper,
+  useContainerStyles
+} from '../../../styles/StyledComponents';
+
+// Import action buttons
+import {
+  ViewButton,
+  AddButton,
+  EditButton,
+  DownloadButton,
+  CopyButton
+} from '../../../styles/ActionButtons';
 
 // Sample mock visualization for development mode
 const SAMPLE_VISUALIZATION_CODE = `import matplotlib.pyplot as plt
@@ -76,10 +95,30 @@ const CodeEditor = ({ code, setCode, readOnly }) => {
         style: { 
           fontFamily: 'monospace', 
           fontSize: '0.9rem',
-          backgroundColor: '#f5f5f5'
+          backgroundColor: '#1A1A1A',
+          color: '#f0f0f0',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
         }
       }}
       variant="outlined"
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          borderRadius: theme => theme.shape?.borderRadius || 10,
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'primary.main',
+            borderWidth: '1px',
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'primary.main',
+            borderWidth: '2px',
+          },
+          '& fieldset': {
+            borderColor: 'transparent',
+          }
+        }
+      }}
     />
   );
 };
@@ -98,6 +137,7 @@ const ChartBuilder = () => {
     executeVisualizationCode
   } = useContext(WorkbenchContext);
   
+  const containerClasses = useContainerStyles();
   const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState('');
   const [selectedChartType, setSelectedChartType] = useState('line');
@@ -155,12 +195,11 @@ const ChartBuilder = () => {
     const request = {
       spreadsheet_id: selectedFile,
       visualization_type: selectedChartType,
-      description: vizRequest,
-      preferences: {
-        use_seaborn: useSeaborn,
-        style: selectedStyle,
-        color_palette: selectedPalette
-      }
+      prompt: vizRequest,
+      use_seaborn: useSeaborn,
+      style: selectedStyle,
+      color_palette: selectedPalette,
+      data_context: dataContext
     };
     
     try {
@@ -172,7 +211,7 @@ const ChartBuilder = () => {
       });
     } catch (err) {
       console.error('Error generating visualization:', err);
-      setLocalError('Failed to generate visualization: ' + err.message);
+      setLocalError('Failed to generate visualization: try generating again:' + err.message);
       setCodeResult({status: 'error', data: null});
     }
   };
@@ -199,28 +238,62 @@ const ChartBuilder = () => {
     } catch (err) {
       console.error('Error executing code:', err);
       setLocalError('Failed to execute code: ' + err.message);
-      setCodeResult({...codeResult, status: 'error'});
+      // Keep the existing image URL/data if execution fails
+      setCodeResult(prevResult => ({...prevResult, status: 'error'}));
     }
+  };
+  
+  // Handle exporting the visualization
+  const handleExportVisualization = () => {
+    if (!codeResult.data?.data_url) {
+      alert("No visualization available to export.");
+      return;
+    }
+    
+    const link = document.createElement('a');
+    link.href = codeResult.data.data_url;
+    // Suggest a filename - you could make this more dynamic using the title or prompt
+    link.download = codeResult.data.title ? `${codeResult.data.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png` : 'visualization.png';
+    document.body.appendChild(link); // Required for Firefox
+    link.click();
+    document.body.removeChild(link);
   };
   
   // Render data context information
   const renderDataContext = () => {
     if (!dataContext) return null;
+    // Add a check for column_schema before accessing its length
     if (dataContext.loading) return <CircularProgress size={20} />;
     if (dataContext.error) return <Alert severity="error">{dataContext.error}</Alert>;
     
+    // Ensure dataContext.column_schema exists and is an array before rendering details
+    if (!dataContext.column_schema || !Array.isArray(dataContext.column_schema)) {
+        // Optionally return null or a loading/error indicator if schema is not ready
+        // console.warn("DataContext received without column_schema array.");
+        return (
+            <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                  File Analysis Summary
+                </Typography>
+                 <Typography variant="body2" color="text.secondary">
+                     {dataContext.file_info?.name || 'Loading...'}: Analyzing columns...
+                 </Typography>
+            </SubtleGlowPaper>
+        );
+    }
+
     return (
-      <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-        <Typography variant="subtitle2" gutterBottom>
+      <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+        <Typography variant="subtitle2" fontWeight="600" gutterBottom>
           File Analysis Summary
         </Typography>
-        <Typography variant="body2" className="text-secondary">
-          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.schema.length} columns
+        <Typography variant="body2" color="text.secondary">
+          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.column_schema.length} columns
         </Typography>
-        <Typography variant="body2" className="text-secondary">
-          Columns: {dataContext.schema.map(col => col.name).join(', ')}
+        <Typography variant="body2" color="text.secondary">
+          Columns: {dataContext.column_schema.map(col => col.name).join(', ')}
         </Typography>
-      </div>
+      </SubtleGlowPaper>
     );
   };
 
@@ -229,30 +302,31 @@ const ChartBuilder = () => {
     if (!connectionError) return null;
     
     return (
-      <Alert 
-        severity="warning" 
-        variant="outlined"
-        icon={<ErrorOutlineIcon />}
-        style={{ marginBottom: '24px' }}
-      >
-        <AlertTitle>Backend Connection Error</AlertTitle>
-        <Typography variant="body2" paragraph>
-          Unable to connect to backend services. The visualization features require the backend to be running.
-        </Typography>
-        <Typography variant="body2">
-          You can still explore the interface, but visualization generation will not work until the backend is available.
-        </Typography>
-      </Alert>
+      <HighContrastGradientPaper sx={{ mb: 3 }}>
+        <Alert 
+          severity="warning" 
+          variant="outlined"
+          icon={<ErrorOutlineIcon />}
+        >
+          <AlertTitle>Backend Connection Error</AlertTitle>
+          <Typography variant="body2" paragraph>
+            Unable to connect to backend services. The visualization features require the backend to be running.
+          </Typography>
+          <Typography variant="body2">
+            You can still explore the interface, but visualization generation will not work until the backend is available.
+          </Typography>
+        </Alert>
+      </HighContrastGradientPaper>
     );
   };
 
   return (
-    <div>
-      <Typography variant="h5" component="h1" gutterBottom className="section-title">
+    <div style={{ marginTop: '-10px' }}>
+      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
         Data Visualization
-      </Typography>
+      </GradientText>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
         Create visualizations from Excel data using natural language requests.
       </Typography>
       
@@ -261,27 +335,85 @@ const ChartBuilder = () => {
       <Grid container spacing={3}>
         {/* Left panel - Input */}
         <Grid item xs={12} md={5}>
-          <Paper elevation={1} style={{ padding: '24px', height: '100%' }}>
-            <Typography variant="h6" gutterBottom className="section-subtitle">
+          <GradientBorderPaper elevation={3} sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom className="section-subtitle" fontWeight="600" color="primary.main">
               Visualization Request
             </Typography>
             
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Data Source</InputLabel>
                   <Select
                     value={selectedFile}
                     label="Data Source"
                     onChange={(e) => handleFileSelected(e.target.value)}
                     disabled={connectionError}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="">
                       <em>Select a file</em>
                     </MenuItem>
                     {/* Actual spreadsheets would be populated here */}
-                    <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem>
-                    <MenuItem value="upload">Upload New Data</MenuItem>
+                    {/* <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem> */}
+                    {spreadsheets && spreadsheets.length > 0 ? (
+                      spreadsheets.map((sheet) => (
+                        <MenuItem key={sheet.id} value={sheet.id}>
+                          {sheet.filename || sheet.original_filename || sheet.id} {/* Display name, fallback to ID */}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>
+                        {isLoading ? 'Loading spreadsheets...' : (connectionError ? 'Backend unavailable' : 'No spreadsheets uploaded')}
+                      </MenuItem>
+                    )}
                   </Select>
                 </FormControl>
                 {renderDataContext()}
@@ -299,17 +431,91 @@ const ChartBuilder = () => {
                   value={vizRequest}
                   onChange={(e) => setVizRequest(e.target.value)}
                   disabled={connectionError}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: theme => theme.shape?.borderRadius || 10,
+                      backgroundColor: '#121212',
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '1px',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '2px',
+                      },
+                      '& fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      }
+                    },
+                    '& .MuiInputBase-input': {
+                      color: 'white',
+                    },
+                  }}
                 />
               </Grid>
               
               <Grid item xs={12}>
-                <FormControl fullWidth style={{ marginBottom: '16px' }}>
+                <FormControl fullWidth style={{ marginBottom: '16px' }} sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-focused': {
+                      color: 'primary.main',
+                    }
+                  }
+                }}>
                   <InputLabel>Chart Type</InputLabel>
                   <Select
                     value={selectedChartType}
                     label="Chart Type"
                     onChange={(e) => setSelectedChartType(e.target.value)}
                     disabled={connectionError}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)'
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      },
+                      bgcolor: '#121212',
+                      color: 'white',
+                      '& .MuiSelect-icon': {
+                        color: 'white',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#121212',
+                          color: 'white',
+                          borderRadius: '0 0 20px 20px',
+                          boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            backgroundColor: '#121212',
+                            '&:hover': {
+                              bgcolor: 'rgba(66, 133, 244, 0.1)',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="line">Line Chart</MenuItem>
                     <MenuItem value="bar">Bar Chart</MenuItem>
@@ -327,6 +533,7 @@ const ChartBuilder = () => {
                       checked={useSeaborn}
                       onChange={(e) => setUseSeaborn(e.target.checked)}
                       disabled={connectionError}
+                      color="primary"
                     />
                   }
                   label="Use Seaborn (enhanced styling)"
@@ -336,13 +543,61 @@ const ChartBuilder = () => {
               {useSeaborn && (
                 <>
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Style</InputLabel>
                       <Select
                         value={selectedStyle}
                         label="Style"
                         onChange={(e) => setSelectedStyle(e.target.value)}
                         disabled={connectionError}
+                        sx={{
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)'
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
                         <MenuItem value="default">Default</MenuItem>
                         <MenuItem value="whitegrid">White Grid</MenuItem>
@@ -353,13 +608,61 @@ const ChartBuilder = () => {
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        '&.Mui-focused': {
+                          color: 'primary.main',
+                        }
+                      }
+                    }}>
                       <InputLabel>Color Palette</InputLabel>
                       <Select
                         value={selectedPalette}
                         label="Color Palette"
                         onChange={(e) => setSelectedPalette(e.target.value)}
                         disabled={connectionError}
+                        sx={{
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)'
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'primary.main'
+                          },
+                          bgcolor: '#121212',
+                          color: 'white',
+                          '& .MuiSelect-icon': {
+                            color: 'white',
+                          }
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: '#121212',
+                              color: 'white',
+                              borderRadius: '0 0 20px 20px',
+                              boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                backgroundColor: '#121212',
+                                '&:hover': {
+                                  bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  '&:hover': {
+                                    bgcolor: 'primary.dark',
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
                         <MenuItem value="Set1">Set1</MenuItem>
                         <MenuItem value="Set2">Set2</MenuItem>
@@ -376,63 +679,122 @@ const ChartBuilder = () => {
                 <Button
                   variant="contained"
                   fullWidth
-                  className="upload-button"
+                  color="primary"
                   disabled={!selectedFile || !vizRequest || isLoading || codeResult.status === 'loading'}
                   onClick={handleGenerateVisualization}
+                  sx={{ 
+                    mt: 1, 
+                    mb: 1,
+                    py: 1.5,
+                    boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                    transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                    '&:hover': {
+                      boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
                 >
                   {isLoading || codeResult.status === 'loading' ? (
-                    <CircularProgress size={24} />
+                    <CircularProgress size={24} color="inherit" />
                   ) : (
                     'Generate Visualization'
                   )}
                 </Button>
               </Grid>
             </Grid>
-          </Paper>
+          </GradientBorderPaper>
         </Grid>
         
         {/* Right panel - Output */}
         <Grid item xs={12} md={7}>
-          <Paper elevation={1} style={{ padding: '24px', height: '100%' }}>
+          <GradientBorderPaper elevation={3} sx={{ 
+            p: 3, 
+            height: '100%',
+            borderWidth: theme => `${theme.custom?.borderWidth?.thin}px`,
+            borderRadius: 2,
+            background: theme => theme.custom?.gradients?.horizontal || 'linear-gradient(to right, #4285f4,rgb(126, 139, 255),rgb(209, 234, 255))',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
+            '&::before': {
+              background: '#121212',
+              borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
+            }
+          }}>
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
               aria-label="visualization tabs"
-              style={{ marginBottom: '16px' }}
+              sx={{ 
+                mb: 2,
+                '& .MuiTab-root': {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                  },
+                  fontWeight: 500
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'primary.main',
+                  height: '3px'
+                }
+              }}
             >
               <Tab icon={<CodeIcon />} label="Code" />
               <Tab icon={<VisibilityIcon />} label="Visualization" />
             </Tabs>
             
             {localError && (
-              <Alert severity="error" style={{ marginBottom: '16px' }} onClose={() => setLocalError(null)}>
+              <Alert 
+                severity="error" 
+                style={{ marginBottom: '16px' }} 
+                onClose={() => setLocalError(null)}
+                variant="filled"
+                sx={{
+                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                }}
+              >
                 {localError}
               </Alert>
             )}
             
             {codeResult && codeResult.error && (
-              <Alert severity="error" style={{ marginBottom: '16px' }}>
+              <Alert 
+                severity="error" 
+                style={{ marginBottom: '16px' }}
+                variant="filled"
+                sx={{
+                  borderRadius: theme => theme.shape?.borderRadius || 10,
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)'
+                }}
+              >
                 {codeResult.error}
               </Alert>
             )}
             
             {tabValue === 0 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <Typography variant="subtitle1">
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
                     Python Visualization Code
                   </Typography>
                   <Button 
-                    variant="outlined" 
-                    size="small" 
+                    variant="contained" 
+                    size="small"
                     startIcon={<RefreshIcon />}
-                    className="action-button"
                     onClick={handleRunCode}
                     disabled={!visualizationCode || codeResult.status === 'loading'}
+                    sx={{ 
+                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
                   >
                     Run Code
                   </Button>
-                </div>
+                </Box>
                 <CodeEditor 
                   code={visualizationCode || (connectionError ? 
                     "# Backend connection required to generate visualization code\n# Please start the backend services and reload this page" : 
@@ -440,65 +802,77 @@ const ChartBuilder = () => {
                   setCode={setVisualizationCode}
                   readOnly={connectionError}
                 />
-              </div>
+              </Box>
             )}
             
             {tabValue === 1 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <Typography variant="subtitle1">
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
                     Visualization Preview
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<SaveAltIcon />}
-                    size="small"
-                    className="action-button"
-                    disabled={(!dataContext || connectionError)}
-                  >
-                    Export
-                  </Button>
-                </div>
+                  <DownloadButton
+                    onClick={handleExportVisualization}
+                    tooltip="Export Visualization as PNG"
+                    disabled={!codeResult.data?.data_url || connectionError}
+                  />
+                </Box>
                 
                 {/* Visualization Output */}
-                <div style={{ marginTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <Typography variant="subtitle1">
-                      Visualization Output
-                    </Typography>
-                    <Button 
-                      variant="outlined" 
-                      size="small" 
-                      startIcon={<SaveAltIcon />}
-                      className="action-button"
-                      disabled={(!dataContext || connectionError)}
-                    >
-                      Export
-                    </Button>
-                  </div>
-                  
-                  {dataContext && dataContext.loading ? (
-                    <CircularProgress size={20} />
-                  ) : dataContext && dataContext.error ? (
-                    <Alert severity="error">{dataContext.error}</Alert>
-                  ) : (
-                    <Card>
+                <SubtleGlowPaper sx={{ 
+                  mt: 3, 
+                  p: 0, 
+                  overflow: 'hidden',
+                  backgroundColor: '#1A1A1A',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px',
+                  minHeight: '300px', // Ensure minimum height
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  {codeResult.status === 'loading' ? (
+                    <CircularProgress size={40} />
+                  ) : codeResult.status === 'error' ? (
+                    <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
+                      {localError || "Failed to generate or execute visualization."}
+                    </Alert>
+                  ) : codeResult.data?.data_url ? (
+                    <Box sx={{ width: '100%' }}>
                       <img
-                        src={FakePlotImage}
-                        alt="Generated visualization"
-                        style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain' }}
+                        // Use the data_url directly from the codeResult state
+                        src={codeResult.data.data_url} 
+                        alt={codeResult.data.title || "Generated Visualization"} // Use title for alt text if available
+                        style={{ 
+                          display: 'block', // Prevents extra space below image
+                          width: '100%', 
+                          height: 'auto', 
+                          maxHeight: '500px', 
+                          objectFit: 'contain' 
+                        }}
+                        // Add error handling for the image itself
+                        onError={(e) => {
+                          e.target.onerror = null; // Prevent infinite loop if placeholder also fails
+                          setLocalError("Failed to load visualization image from the server.");
+                        }}
                       />
-                      <CardContent>
-                        <Typography variant="body2" className="text-secondary">
-                          {vizRequest || "Sales data across different products showing monthly trends"}
+                      <Box sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {/* You might want to display the actual title/prompt used if available */}
+                          {vizRequest || "Generated visualization based on your request."} 
                         </Typography>
-                      </CardContent>
-                    </Card>
+                      </Box>
+                    </Box>
+                  ) : (
+                     // Default state before generation or if no image URL is present
+                    <Typography variant="body2" color="text.secondary">
+                      {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
+                    </Typography>
                   )}
-                </div>
-              </div>
+                </SubtleGlowPaper>
+              </Box>
             )}
-          </Paper>
+          </GradientBorderPaper>
         </Grid>
       </Grid>
     </div>

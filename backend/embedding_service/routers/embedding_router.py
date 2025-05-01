@@ -80,7 +80,7 @@ class CreateVectorStoreRequest(BaseModel):
     name: str
     description: str = ""
     files: List[str]
-    embedding_model: str = "nomic-embed-text"
+    embedding_model: str = "nomic-embed-text:latest"
     chunk_size: int = 1000
     chunk_overlap: int = 100
     

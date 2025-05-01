@@ -662,6 +662,10 @@ class SpreadsheetManager:
         """
         logger.info(f"Creating duplicate of spreadsheet with ID: {original_spreadsheet_id}")
         
+        # --- Added Fix: Reload metadata to ensure it's fresh ---
+        self.metadata = self._load_metadata() 
+        logger.info(f"Refreshed metadata before duplication, found {len(self.metadata)} entries.")
+
         # Check if original spreadsheet exists
         if original_spreadsheet_id not in self.metadata:
             raise HTTPException(status_code=404, detail=f"Spreadsheet with ID {original_spreadsheet_id} not found")

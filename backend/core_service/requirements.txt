@@ -13,3 +13,6 @@ passlib[bcrypt]>=1.7.4
 # System and file operations
 # pathlib removed - part of Python standard library since 3.4
 python-dotenv==1.0.1
+httpx>=0.24.0
+redis
+apscheduler

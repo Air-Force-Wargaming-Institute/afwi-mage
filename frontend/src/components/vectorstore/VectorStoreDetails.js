@@ -50,6 +50,8 @@ const useStyles = makeStyles((theme) => ({
   dialogContent: {
     padding: theme.spacing(2),
     paddingTop: 0, // Remove top padding as tabs will be sticky
+    maxHeight: 'calc(90vh - 64px - 64px)', // Adjust for header and footer
+    overflow: 'auto'
   },
   tabPanel: {
     marginTop: theme.spacing(2),
@@ -140,11 +142,11 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(3),
   },
   overviewDetailsPanel: {
-    flex: '0 0 30%',
-    minWidth: '250px',
+    flex: '0 0 15%',
+    minWidth: '200px',
   },
   overviewDocumentsPanel: {
-    flex: '1 1 70%',
+    flex: '1 1 85%',
     borderLeft: `1px solid ${theme.palette.divider}`,
     paddingLeft: theme.spacing(3),
   },
@@ -674,36 +676,33 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
 
                   <div className={classes.documentOperationsContainer}>
                     {isAddingDocs ? (
-                      <Box className={classes.progressContainer}>
-                        <Typography variant="h6" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
-                          <CircularProgress size={20} style={{ marginRight: 12 }} /> 
-                          Updating Vector Store...
-                        </Typography>
-                        <Box display="flex" alignItems="center" mb={1}>
-                          <Box width="100%" mr={1}>
-                            <LinearProgress 
-                              variant={getAddDocsProgressPercentage() === 0 ? "indeterminate" : "determinate"} 
-                              value={getAddDocsProgressPercentage()} 
-                              color="primary"
-                            />
-                          </Box>
-                          <Box minWidth={35}>
-                            <Typography variant="body2" color="textSecondary">
-                              {getAddDocsProgressPercentage()}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Paper 
-                          variant="outlined" 
-                          style={{ 
-                            padding: '16px', 
-                            marginTop: 12, 
-                            backgroundColor: 'rgba(240, 247, 255, 0.5)',
-                            border: '1px solid rgba(25, 118, 210, 0.12)',
+                      <Box p={3}>
+                        <Paper
+                          elevation={2}
+                          style={{
+                            padding: 24,
+                            marginBottom: 16,
+                            backgroundColor: '#1a2027', // Dark background
+                            color: '#e0e0e0', // Light text
+                            border: '1px solid rgba(65, 90, 115, 0.5)', // Subtle border
                             position: 'relative',
                             overflow: 'hidden'
                           }}
                         >
+                          {/* Progress bar at the top */}
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={getAddDocsProgressPercentage()} 
+                            style={{ 
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: '4px',
+                              backgroundColor: 'rgba(65, 90, 115, 0.3)',
+                            }}
+                          />
+                          
                           {/* Animated background for visual activity indicator */}
                           <Box
                             style={{
@@ -712,25 +711,35 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                               left: 0,
                               right: 0,
                               bottom: 0,
-                              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%)',
+                              background: 'linear-gradient(90deg, rgba(65, 90, 115, 0) 0%, rgba(65, 90, 115, 0.2) 50%, rgba(65, 90, 115, 0) 100%)',
                               backgroundSize: '200% 100%',
                               animation: 'moveGradient 1.5s linear infinite',
                               opacity: 0.5,
                             }}
                           />
-                          <Typography variant="body1" style={{ fontWeight: 500, marginBottom: 12, color: theme.palette.primary.main }}>
+                          <Typography variant="body1" style={{ fontWeight: 500, marginBottom: 12, color: '#4285f4' }}>
                             Processing {addDocsProgress?.processed || 0} of {addDocsProgress?.total || 0} operations
                           </Typography>
                           
                           {/* Status section with icon */}
                           {addDocsProgress?.status && (
-                            <Box display="flex" alignItems="flex-start" mb={1} style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)', padding: '8px 12px', borderRadius: 4 }}>
-                              <InfoIcon style={{ color: theme.palette.info.main, marginRight: 8, marginTop: 2 }} fontSize="small" />
+                            <Box 
+                              display="flex" 
+                              alignItems="flex-start" 
+                              mb={1} 
+                              style={{ 
+                                backgroundColor: '#212b36', // Dark card background
+                                padding: '8px 12px', 
+                                borderRadius: 4,
+                                border: '1px solid rgba(65, 90, 115, 0.5)' 
+                              }}
+                            >
+                              <InfoIcon style={{ color: '#4285f4', marginRight: 8, marginTop: 2 }} fontSize="small" />
                               <Box>
-                                <Typography variant="subtitle2" style={{ color: theme.palette.text.primary }}>
-                                  Status
+                                <Typography variant="subtitle2" style={{ color: '#e0e0e0' }}>
+                                  Setup
                                 </Typography>
-                                <Typography variant="body2" style={{ color: theme.palette.text.secondary, wordBreak: 'break-word' }}>
+                                <Typography variant="body2" style={{ color: '#b0b0b0', wordBreak: 'break-word' }}>
                                   {addDocsProgress.status}
                                 </Typography>
                               </Box>
@@ -739,21 +748,26 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                           
                           {/* Current operation section with icon */}
                           {addDocsProgress?.currentOperation && (
-                            <Box display="flex" alignItems="flex-start" mb={1} style={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.7)', 
-                              padding: '8px 12px', 
-                              borderRadius: 4,
-                              border: '1px solid rgba(25, 118, 210, 0.12)',
-                              boxShadow: '0 0 8px rgba(25, 118, 210, 0.15)',
-                              animation: addDocsProgress.status === 'completed' ? 'none' : 'pulse 2s infinite'
-                            }}>
-                              <CircularProgress size={16} style={{ marginRight: 8, marginTop: 2, color: theme.palette.primary.main }} />
+                            <Box 
+                              display="flex" 
+                              alignItems="flex-start" 
+                              mb={1} 
+                              style={{ 
+                                backgroundColor: '#212b36', // Dark card background
+                                padding: '8px 12px', 
+                                borderRadius: 4,
+                                border: '1px solid rgba(65, 90, 115, 0.5)',
+                                boxShadow: '0 0 8px rgba(66, 133, 244, 0.15)',
+                                animation: addDocsProgress.status === 'completed' ? 'none' : 'pulse 2s infinite'
+                              }}
+                            >
+                              <CircularProgress size={16} style={{ marginRight: 8, marginTop: 2, color: '#4285f4' }} />
                               <Box>
-                                <Typography variant="subtitle2" style={{ color: theme.palette.text.primary }}>
+                                <Typography variant="subtitle2" style={{ color: '#e0e0e0' }}>
                                   Current Operation
                                 </Typography>
                                 <Typography variant="body2" style={{ 
-                                  color: theme.palette.primary.dark,
+                                  color: '#4285f4',
                                   fontWeight: 500
                                 }}>
                                   {addDocsProgress.currentOperation}
@@ -764,24 +778,30 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                           
                           {/* Current file section with code-style display */}
                           {addDocsProgress?.currentFile && (
-                            <Box display="flex" alignItems="flex-start" style={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.7)', 
-                              padding: '8px 12px', 
-                              borderRadius: 4,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Description style={{ color: theme.palette.text.secondary, marginRight: 8, marginTop: 2 }} fontSize="small" />
+                            <Box 
+                              display="flex" 
+                              alignItems="flex-start" 
+                              style={{ 
+                                backgroundColor: '#212b36', // Dark card background
+                                padding: '8px 12px', 
+                                borderRadius: 4,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(65, 90, 115, 0.5)'
+                              }}
+                            >
+                              <Description style={{ color: '#b0b0b0', marginRight: 8, marginTop: 2 }} fontSize="small" />
                               <Box width="100%">
-                                <Typography variant="subtitle2" style={{ color: theme.palette.text.primary }}>
+                                <Typography variant="subtitle2" style={{ color: '#e0e0e0' }}>
                                   Processing File
                                 </Typography>
                                 <Box style={{ 
-                                  backgroundColor: 'rgba(0, 0, 0, 0.03)', 
+                                  backgroundColor: '#1a2027', // Darker background
                                   padding: '6px 8px', 
                                   borderRadius: 4,
                                   position: 'relative',
-                                  overflow: 'hidden'
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(65, 90, 115, 0.3)'
                                 }}>
                                   {/* Shimmer effect for active processing */}
                                   {addDocsProgress.status !== 'completed' && (
@@ -792,7 +812,7 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                                         left: 0,
                                         right: 0,
                                         bottom: 0,
-                                        background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 100%)',
+                                        background: 'linear-gradient(90deg, rgba(65, 90, 115, 0) 0%, rgba(65, 90, 115, 0.3) 50%, rgba(65, 90, 115, 0) 100%)',
                                         backgroundSize: '200% 100%',
                                         animation: 'moveGradient 1.5s linear infinite',
                                       }}
@@ -806,7 +826,8 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                                     textOverflow: 'ellipsis',
                                     wordBreak: 'break-all',
                                     position: 'relative', // Keep text above the shimmer
-                                    zIndex: 1
+                                    zIndex: 1,
+                                    color: '#e0e0e0'
                                   }}>
                                     {addDocsProgress.currentFile}
                                   </Typography>
@@ -816,7 +837,7 @@ const VectorStoreDetails = ({ vectorStore, onClose, onSave, onDelete, onRefresh 
                           )}
                           
                           {/* Help text at bottom with more detail */}
-                          <Typography variant="caption" style={{ display: 'block', marginTop: 12, color: theme.palette.text.hint, fontStyle: 'italic' }}>
+                          <Typography variant="caption" style={{ display: 'block', marginTop: 12, color: '#b0b0b0', fontStyle: 'italic' }}>
                             The backend is processing your documents. Large files may take several minutes to process and embed.
                             {getAddDocsProgressPercentage() >= 40 && getAddDocsProgressPercentage() < 90 && (
                               <span> The embedding process is CPU and memory intensive - please be patient.</span>
