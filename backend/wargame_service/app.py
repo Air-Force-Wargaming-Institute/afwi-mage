@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.middleware.cors import CORSMiddleware # Example if CORS needed at app level
 
 # Potentially import settings from config
@@ -10,10 +11,8 @@ from api.v1.api import api_router
 # Create FastAPI instance
 app = FastAPI(
     title="MAGE Wargame Builder Service",
-    description="Manages the creation, configuration, and persistence of wargame builds.",
-    version="0.1.0",
-    # Add other FastAPI parameters like openapi_url if needed
-    # openapi_url=f"/api/v1/openapi.json"
+    description="API for creating, managing, and retrieving wargame build configurations.",
+    version="0.1.0"
 )
 
 # --- Middleware --- (Optional: Add CORS, etc., if not handled by gateway)
@@ -29,12 +28,21 @@ app = FastAPI(
 #     allow_headers=["*"],
 # )
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost","http://localhost:3000","*"],  # Add your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Routers ---
 # Include the API router with a prefix
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router)
 
 # --- Health Check --- (Can be kept in main.py or moved here)
-@app.get("/health", tags=["Health"])
+@app.get("/api/wargame/health", tags=["Health"])
 async def health_check():
     return {"status": "ok"}
 

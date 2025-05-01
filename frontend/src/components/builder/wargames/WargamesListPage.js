@@ -22,7 +22,7 @@ import CalendarTodayIcon from '@material-ui/icons/CalendarToday';
 import UpdateIcon from '@material-ui/icons/Update';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import AddIcon from '@material-ui/icons/Add';
-import { listWargames, createWargame, deleteWargame, getWargame } from '../../../services/wargameService';
+import { useWargameService } from '../../../services/wargameService';
 import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@material-ui/core';
 
 const useStyles = makeStyles((theme) => ({
@@ -103,24 +103,25 @@ function WargamesListPage() {
   const [wargameBuilds, setWargameBuilds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { listWargames, deleteWargame, getWargame, createWargame } = useWargameService();
 
   useEffect(() => {
     const fetchWargames = async () => {
-      setLoading(true);
-      setError(null);
       try {
+        setLoading(true);
+        setError(null);
         const data = await listWargames();
         setWargameBuilds(data || []);
       } catch (err) {
         console.error("Error fetching wargame list:", err);
         setError(err.message || "Failed to load wargames.");
         setWargameBuilds([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-
     fetchWargames();
-  }, []);
+  }, [listWargames]);
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);

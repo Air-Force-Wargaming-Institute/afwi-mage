@@ -183,11 +183,13 @@ services:
   # New Wargame Builder Service
   wargame_service:
     build: ./wargame_service
-    container_name: mage_wargame_service
+    container_name: wargame_service
     volumes:
       - ../data:/app/data:rw
       # Optional: Mount code for development hot-reloading if uvicorn --reload is used
       # - ./wargame_service:/app 
+    ports:
+      - "8012:8012"
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8012 # Internal port
@@ -197,9 +199,6 @@ services:
       init-data:
         condition: service_completed_successfully
     restart: unless-stopped
-    # Expose port only if direct access needed for testing, Traefik handles external access
-    # ports:
-    #   - "8012:8012"
 
   db:
    image: postgres:13

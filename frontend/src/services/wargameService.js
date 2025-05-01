@@ -1,87 +1,101 @@
-// Attempt to get token from localStorage - Adjust key if needed based on AuthContext implementation
-const getAuthToken = () => {
-    return localStorage.getItem('authToken'); // Common key for storing JWT
-};
+import { useContext, useCallback } from 'react';
+import axios from 'axios';
+import {getGatewayUrl } from '../config';
+import { AuthContext } from '../contexts/AuthContext';
 
-const API_BASE_URL = '/api/wargame'; // Traefik routes this
+export const useWargameService = () => {
+    const { token } = useContext(AuthContext);
 
-// Helper function to handle API requests
-const request = async (endpoint, options = {}) => {
-    const token = getAuthToken(); // Use the function defined above
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+    // Helper function to handle API requests
+    const request = useCallback(async (endpoint, options = {}) => {
+        const url = getGatewayUrl(`${endpoint}`);
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
 
-    try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`,
-            {
+        // Add authentication if token is available
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        } else {
+            console.warn('No token found for API request; API requests will likely fail');
+        }
+            
+        try {
+            const response = await fetch(url, {
                 ...options,
                 headers,
+            });
+
+            if (!response.ok) {
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { detail: response.statusText };
+                }
+                console.error("API Error:", response.status, errorData);
+                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
             }
-        );
 
-        if (!response.ok) {
-            let errorData;
-            try {
-                 errorData = await response.json();
-            } catch (e) {
-                 errorData = { detail: response.statusText };
+            // Handle 204 No Content explicitly for DELETE
+            if (response.status === 204) {
+                return null; // Or return { success: true }
             }
-            console.error("API Error:", response.status, errorData);
-            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-        }
 
-        // Handle 204 No Content explicitly for DELETE
-        if (response.status === 204) {
-            return null; // Or return { success: true }
+            return await response.json();
+        } catch (error) {
+            console.error("API Request Failed:", url, error);
+            throw error; // Re-throw the error to be caught by the caller
         }
-
-        return await response.json();
-    } catch (error) {
-        console.error("API Request Failed:", error);
-        throw error; // Re-throw the error to be caught by the caller
-    }
-};
+    }, [token]);
 
 // --- API Functions ---
 
-export const listWargames = async () => {
-    return await request('/', { method: 'GET' });
+    const listWargames = useCallback(async () => {
+        return await request('/api/wargame', { method: 'GET' });
+    }, [request]);
+
+    const getWargame = useCallback(async (id) => {
+        if (!id) throw new Error("Wargame ID is required.");
+        return await request(`/api/wargame/${id}`, { method: 'GET' });
+    }, [request]);
+
+    const createWargame = useCallback(async (wargameData) => {
+        // Expects { name: string, description?: string }
+        return await request('/api/wargame', {
+            method: 'POST',
+            body: JSON.stringify(wargameData),
+        });
+    }, [request]);
+
+    const updateWargame = useCallback(async (id, wargameData) => {
+        if (!id) throw new Error("Wargame ID is required for update.");
+        // Sends the full wargame object structure
+        return await request(`/api/wargame/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(wargameData),
+        });
+    }, [request]);
+
+    const deleteWargame = useCallback(async (id) => {
+        if (!id) throw new Error("Wargame ID is required for delete.");
+        return await request(`/api/wargame/${id}`, { method: 'DELETE' });
+    }, [request]);
+
+    // Placeholder for file uploads - requires backend implementation
+    const uploadWargameDocument = useCallback(async (wargameId, file, section, entityId = null) => {
+        console.warn("uploadWargameDocument is not implemented yet.");
+        return Promise.resolve({ message: "File upload placeholder" }); // Mock response
+    }, []);
+
+    return {
+        listWargames,
+        getWargame,
+        createWargame,
+        updateWargame,
+        deleteWargame,
+        uploadWargameDocument,
+    };
 };
 
-export const getWargame = async (id) => {
-    if (!id) throw new Error("Wargame ID is required.");
-    return await request(`/${id}`, { method: 'GET' });
-};
-
-export const createWargame = async (wargameData) => {
-    // Expects { name: string, description?: string }
-    return await request('/', {
-        method: 'POST',
-        body: JSON.stringify(wargameData),
-    });
-};
-
-export const updateWargame = async (id, wargameData) => {
-    if (!id) throw new Error("Wargame ID is required for update.");
-    // Sends the full wargame object structure
-    return await request(`/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(wargameData),
-    });
-};
-
-export const deleteWargame = async (id) => {
-    if (!id) throw new Error("Wargame ID is required for delete.");
-    return await request(`/${id}`, { method: 'DELETE' });
-};
-
-// Placeholder for file uploads - requires backend implementation
-export const uploadWargameDocument = async (wargameId, file, section, entityId = null) => {
-    console.warn("uploadWargameDocument is not implemented yet.");
-    return Promise.resolve({ message: "File upload placeholder" }); // Mock response
-}; 

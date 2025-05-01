@@ -96,26 +96,14 @@ http:
         attempts: 3
         initialInterval: "500ms"
     
-    # Circuit breaker middleware
-    circuit-breaker:
-      circuitBreaker:
-        expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
+    # # Circuit breaker middleware
+    # circuit-breaker:
+    #   circuitBreaker:
+    #     expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
     
     # Compress middleware
     compress:
       compress: {}
-      
-    # New middleware to strip /api/wargame prefix
-    # strip-api-wargame-prefix:
-    #   stripPrefix:
-    #     prefixes:
-    #       - "/api/wargame"
-    replace-wargame-path:
-      replacePathRegex:
-        # Make the trailing slash optional in the match, capture only what's after
-        regex: "^/api/wargame/?(.*)$"
-        # Keep the replacement the same, ${1} will now be empty or the subpath like /{id}
-        replacement: "/api/v1/wargames${1}"
     
   # Routers with corrected path patterns
   routers:
@@ -152,7 +140,7 @@ http:
         - "rate-limit-chat"
         - "compress"
         - "retry-middleware"
-        - "circuit-breaker"
+        # - "circuit-breaker"
     
     # Upload Service Router
     upload-router:
@@ -256,15 +244,14 @@ http:
       
     # New Router for Wargame Service
     wargame-router:
+      rule: "PathPrefix(`/api/wargame`) || Path(`/api/wargame/health`)"
+      service: wargame-service
       entryPoints:
         - web
-      rule: "PathPrefix(`/api/wargame`)"
-      service: wargame-service
       middlewares:
         - cors-headers
-        # - auth-middleware # Temporarily commented out for debugging
+        - auth-middleware
         - security-headers
-        - replace-wargame-path
 
   # Services with consistent health check paths
   services:
@@ -384,12 +371,12 @@ http:
           timeout: "5s"
           followRedirects: true
 
-    # New Service for Wargame Builder
     wargame-service:
       loadBalancer:
         servers:
           - url: "http://wargame_service:8012"
         healthCheck:
-          path: "/health"
-          interval: "100s"
-          timeout: "10s"
+          path: "/api/wargame/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true

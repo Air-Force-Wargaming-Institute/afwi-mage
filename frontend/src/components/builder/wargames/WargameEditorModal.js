@@ -26,7 +26,7 @@ import ExecutionChecklist from './ExecutionChecklist';
 import WargameReportsAnalysis from './WargameReportsAnalysis';
 import NationConfigPane from './NationConfigPane';
 import NationPosturePanel from './NationPosturePanel';
-import { updateWargame } from '../../../services/wargameService';
+import { useWargameService } from '../../../services/wargameService';
 
 // Create styles for the modal and tabs
 const useStyles = makeStyles((theme) => ({
@@ -310,7 +310,8 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  
+  const { updateWargame } = useWargameService();
+
   // Initialize wargame data when modal opens or data changes
   useEffect(() => {
     if (initialWargameData) {

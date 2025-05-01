@@ -8,12 +8,12 @@ import crud
 
 router = APIRouter()
 
-@router.get("/", response_model=List[WargameBuildListItem])
+@router.get("/api/wargame", response_model=List[WargameBuildListItem])
 async def list_wargames_endpoint():
     """Lists basic information for all saved wargame builds."""
     return crud.get_all_wargames_list()
 
-@router.post("", response_model=WargameBuild, status_code=status.HTTP_201_CREATED)
+@router.post("/api/wargame", response_model=WargameBuild, status_code=status.HTTP_201_CREATED)
 async def create_wargame_endpoint(payload: WargameCreatePayload = Body(...)):
     """Creates a new wargame build with a unique ID."""
     print(f"Received create request payload via router: {payload.model_dump()}")
@@ -21,7 +21,7 @@ async def create_wargame_endpoint(payload: WargameCreatePayload = Body(...)):
     print(f"Created wargame via router: {new_wargame.id}")
     return new_wargame
 
-@router.get("/{wargame_id}", response_model=WargameBuild)
+@router.get("/api/wargame/{wargame_id}", response_model=WargameBuild)
 async def get_wargame_endpoint(wargame_id: str):
     """Retrieves the full configuration data for a specific wargame build."""
     wargame = crud.get_wargame(wargame_id)
@@ -29,7 +29,7 @@ async def get_wargame_endpoint(wargame_id: str):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wargame build not found")
     return wargame
 
-@router.put("/{wargame_id}", response_model=WargameBuild)
+@router.put("/api/wargame/{wargame_id}", response_model=WargameBuild)
 async def update_wargame_endpoint(wargame_id: str, wargame_update: WargameBuild):
     """Updates the full configuration data for a specific wargame build."""
     if wargame_id != wargame_update.id:
@@ -47,7 +47,7 @@ async def update_wargame_endpoint(wargame_id: str, wargame_update: WargameBuild)
     crud.save_existing_wargame(wargame_update)
     return wargame_update
 
-@router.delete("/{wargame_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/wargame/{wargame_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_wargame_endpoint(wargame_id: str):
     """Deletes a specific wargame build."""
     deleted = crud.delete_existing_wargame(wargame_id)
