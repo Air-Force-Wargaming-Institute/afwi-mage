@@ -25,7 +25,7 @@ export const getApiUrl = (service, endpoint) => {
   // Special handling for WORKBENCH service to ensure proper URL formation
   if (service === 'WORKBENCH') {
     // For local development, ensure we point to the correct port
-    const localWorkbenchUrl = `http://10.11.45.216:${process.env.REACT_APP_WORKBENCH_SERVICE_PORT || '8020'}`;
+    const localWorkbenchUrl = `http://localhost:${process.env.REACT_APP_WORKBENCH_SERVICE_PORT || '8020'}`;
     
     // Only use baseUrl if it's properly defined, otherwise fallback to local
     const workbenchBaseUrl = (API_BASE_URL && process.env.REACT_APP_WORKBENCH_SERVICE_PORT) 
@@ -55,7 +55,7 @@ export const getGatewayUrl = (endpoint) => {
   // Ensure endpoint starts with / if it doesn't already
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   // Use the base URL without service-specific port
-  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://10.11.45.216';
+  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost';
   return `${apiBaseUrl}${formattedEndpoint}`;
 };
 
