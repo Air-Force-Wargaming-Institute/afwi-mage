@@ -34,3 +34,38 @@ AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://agent:8001")
 REVIEW_SERVICE_URL = os.getenv("REVIEW_SERVICE_URL", "http://review:8004")
 EMBEDDING_SERVICE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding:8006")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8010")
+
+# Redis Configuration
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+
+# LLM Service Discovery Endpoints
+def parse_url_list(env_var_name):
+    urls = os.getenv(env_var_name, "")
+    return [url.strip() for url in urls.split(',') if url.strip()]
+
+def parse_instance_list(env_var_name):
+    """Parses comma-separated 'url=task' strings into a list of (url, task) tuples."""
+    instances_str = os.getenv(env_var_name, "")
+    instances = []
+    for item in instances_str.split(','):
+        if '=' in item:
+            url, task = item.split('=', 1)
+            url = url.strip()
+            task = task.strip().lower() # Normalize task to lowercase
+            if url and task:
+                instances.append((url, task))
+        elif item.strip(): # Handle case where only URL is provided, assume default task
+            url = item.strip()
+            # Decide a default task (e.g., 'generate') if not specified
+            # logger.warning(f"No task specified for VLLM instance {url}, assuming 'generate'.")
+            instances.append((url, 'generate'))
+    return instances
+
+# VLLM_API_BASES = parse_url_list("VLLM_API_BASES") # Old format
+VLLM_INSTANCES = parse_instance_list("VLLM_INSTANCES") # New format: list of (url, task)
+OLLAMA_BASE_URLS = parse_url_list("OLLAMA_BASE_URLS")
+
+# Redis keys for discovered models
+REDIS_CHAT_MODELS_KEY = "available_chat_models"
+REDIS_EMBEDDING_MODELS_KEY = "available_embedding_models"

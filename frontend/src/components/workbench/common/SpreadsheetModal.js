@@ -51,6 +51,11 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import EditIcon from '@mui/icons-material/Edit';
 import { WorkbenchContext } from '../../../contexts/WorkbenchContext';
 import '../../../App.css';
+import { 
+  GradientBorderPaper, 
+  SubtleGlowPaper,
+  AnimatedGradientPaper
+} from '../../../styles/StyledComponents';
 
 /**
  * SpreadsheetModal Component
@@ -660,13 +665,13 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     
     try {
       // Construct the download URL
-      let baseUrl = '/api/workbench/spreadsheets';
+      let baseUrl = 'http://localhost:8020/api/workbench/spreadsheets'; //TODO: Implement the proper authentication for a download
       // If we have a context with apiBaseUrl, use it
-      if (apiBaseUrl) {
-        baseUrl = apiBaseUrl.endsWith('/') 
-          ? `${apiBaseUrl}api/workbench/spreadsheets` 
-          : `${apiBaseUrl}/api/workbench/spreadsheets`;
-      }
+      // if (apiBaseUrl) {
+      //   baseUrl = apiBaseUrl.endsWith('/') 
+      //     ? `${apiBaseUrl}api/workbench/spreadsheets` 
+      //     : `${apiBaseUrl}/api/workbench/spreadsheets`;
+      // }
       
       const downloadUrl = `${baseUrl}/${spreadsheetId}/download`;
       
@@ -1116,9 +1121,13 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     // Calculate cell padding based on zoom level
     const cellPadding = getCellPadding();
     
-    // Render the data table
+    // Render the data table - update the styling here
     return (
-      <Paper elevation={0} variant="outlined">
+      <GradientBorderPaper elevation={2} sx={{ 
+        borderRadius: '8px',
+        overflow: 'hidden',
+        backgroundColor: 'rgba(18, 18, 18, 0.95)'
+      }}>
         <TableContainer 
           id="spreadsheet-table-container" 
           ref={tableContainerRef}
@@ -1126,9 +1135,9 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
             maxHeight: `calc(100vh - 375px)`, 
             overflow: 'auto',
             minHeight: '300px',
-            // Ensure consistent stacking context for sticky elements
             position: 'relative',
-            zIndex: 0
+            zIndex: 0,
+            backgroundColor: 'rgba(30, 30, 30, 0.9)'
           }}
         >
           <Table 
@@ -1136,7 +1145,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
             size="small" 
             style={{ 
               fontSize: `${getFontSize(DEFAULT_FONT_SIZES.cellText)}px`,
-              tableLayout: 'fixed', // Always use fixed layout for consistent column resizing
+              tableLayout: 'fixed',
               width: '100%'
             }}
           >
@@ -1144,26 +1153,28 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
               <TableRow
                 sx={{
                   '& th': {
-                    borderBottom: `2px solid ${theme.palette.primary.dark}`,
-                    boxShadow: `0 2px 2px -1px rgba(0,0,0,0.2)`,
-                    backgroundColor: '#0d47a1', // Rich dark blue
-                    color: 'white'
+                    borderBottom: `1px solid rgba(255, 255, 255, 0.1)`,
+                    boxShadow: `0 2px 2px -1px rgba(0,0,0,0.4)`,
+                    backgroundColor: '#0d47a1', // Rich dark blue header background
+                    color: 'white',
+                    fontWeight: 'bold'
                   }
                 }}
               >
                 {/* Row number header cell */}
                 <TableCell 
                   style={{ 
-                    backgroundColor: '#0d47a1', // Rich dark blue
+                    backgroundColor: '#0d47a1', // Match header blue
                     color: 'white',
                     width: '50px',
                     maxWidth: '50px',
                     position: 'sticky',
                     top: 0,
                     left: 0,
-                    zIndex: 3, // Higher z-index to appear above other header cells
+                    zIndex: 3,
                     fontSize: `${getFontSize(DEFAULT_FONT_SIZES.headerText)}px`,
-                    padding: `${cellPadding}px`
+                    padding: `${cellPadding}px`,
+                    fontWeight: 'bold'
                   }}
                 >
                   #
@@ -1186,7 +1197,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       position: 'sticky',
                       top: 0,
                       zIndex: 2,
-                      padding: `${cellPadding}px ${cellPadding + 8}px ${cellPadding}px ${cellPadding}px`, // Extra padding on right for resize handle
+                      padding: `${cellPadding}px ${cellPadding + 8}px ${cellPadding}px ${cellPadding}px`,
                       fontSize: `${getFontSize(DEFAULT_FONT_SIZES.headerText)}px`,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -1212,14 +1223,14 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        width: '8px', // Slightly narrower but still easy to grab
+                        width: '8px',
                         cursor: 'col-resize',
-                        zIndex: 4, // Higher z-index to ensure it's above sticky header
+                        zIndex: 4,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         '&:hover': {
-                          backgroundColor: '#64b5f6', // Light blue for hover state
+                          backgroundColor: '#64b5f6',
                           opacity: 0.8,
                           '&::after': {
                             backgroundColor: '#bbdefb',
@@ -1236,7 +1247,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                           opacity: 0.5
                         },
                         ...(resizingColumn === index && {
-                          backgroundColor: '#64b5f6', // Light blue when resizing
+                          backgroundColor: '#64b5f6',
                           opacity: 0.9,
                           width: '8px',
                           '&::after': {
@@ -1247,8 +1258,8 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       }}
                       onMouseDown={(e) => handleResizeStart(e, index)}
                       onDoubleClick={(e) => handleDoubleClickResize(e, index)}
-                      onClick={(e) => e.stopPropagation()} // Prevent sorting when clicking resize handle
-                      data-column-index={index} // Add data attribute for easier selection
+                      onClick={(e) => e.stopPropagation()}
+                      data-column-index={index}
                     />
                   </TableCell>
                 ))}
@@ -1269,17 +1280,21 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       '&:nth-of-type(odd)': { 
                         backgroundColor: isHighlighted 
                           ? (isCurrentMatch ? theme.palette.warning.light : theme.palette.warning.lighter)
-                          : theme.palette.action.hover 
+                          : 'rgba(40, 40, 40, 0.9)' 
                       },
                       '&:nth-of-type(even)': { 
                         backgroundColor: isHighlighted 
                           ? (isCurrentMatch ? theme.palette.warning.light : theme.palette.warning.lighter)
-                          : 'inherit' 
+                          : 'rgba(48, 48, 48, 0.9)' 
+                      },
+                      '&:hover': {
+                        backgroundColor: isHighlighted 
+                          ? (isCurrentMatch ? theme.palette.warning.light : 'rgba(255, 152, 0, 0.2)')
+                          : 'rgba(60, 60, 60, 0.95)'
                       },
                       ...(isCurrentMatch && { 
                         borderLeft: `4px solid ${theme.palette.warning.main}`,
                       }),
-                      // Add styles for text wrapping mode
                       ...(textWrapEnabled && {
                         height: 'auto',
                         '& td': { 
@@ -1293,8 +1308,8 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                       style={{ 
                         backgroundColor: isHighlighted
                           ? (isCurrentMatch ? theme.palette.warning.main : theme.palette.warning.light)
-                          : '#e3f2fd', // Light blue background for row numbers
-                        color: '#0d47a1', // Match the header blue for text color
+                          : '#1a237e', // Dark blue background for row numbers
+                        color: 'white',
                         position: 'sticky',
                         left: 0,
                         zIndex: 1,
@@ -1303,7 +1318,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                         fontWeight: isHighlighted ? 'bold' : 'normal',
                         fontSize: `${getFontSize(DEFAULT_FONT_SIZES.rowNumber)}px`,
                         padding: `${cellPadding}px`,
-                        borderRight: '1px solid #bbdefb' // Light blue border
+                        borderRight: '1px solid rgba(255, 255, 255, 0.1)'
                       }}
                     >
                       {displayRowNumber}
@@ -1323,15 +1338,13 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                             padding: `${cellPadding}px`,
                             width: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : undefined,
                             minWidth: columnWidths[cellIndex] ? `${columnWidths[cellIndex]}px` : '80px',
-                            // Remove maxWidth to prevent constraining resizing
-                            // Improved text wrapping styles
                             whiteSpace: textWrapEnabled ? 'normal' : 'nowrap',
                             wordWrap: textWrapEnabled ? 'break-word' : 'normal',
                             wordBreak: textWrapEnabled ? 'break-word' : 'normal',
                             overflow: textWrapEnabled ? 'visible' : 'hidden',
                             textOverflow: textWrapEnabled ? 'clip' : 'ellipsis',
                             height: textWrapEnabled ? 'auto' : undefined,
-                            // Add a max-height when wrapping is enabled to prevent extremely tall cells
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                             ...(textWrapEnabled && {
                               maxHeight: '200px',
                               overflow: 'auto'
@@ -1340,7 +1353,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                               borderLeft: `2px solid ${theme.palette.info.light}`,
                             })
                           }}
-                          title={isLongContent && !textWrapEnabled ? String(cell) : undefined} // Add tooltip only when not wrapping
+                          title={isLongContent && !textWrapEnabled ? String(cell) : undefined}
                         >
                           {searchText && cell !== null && cell !== undefined && 
                             typeof String(cell).toLowerCase === 'function' && 
@@ -1368,15 +1381,21 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
             borderTop: `1px solid ${theme.palette.divider}` 
           }}
         >
-          {/* Rows per page selector */}
+          {/* Rows per page selector - update to blue */}
           <FormControl variant="standard" size="small" sx={{ minWidth: 120, mr: 2 }}>
-            <InputLabel id="rows-per-page-label">Rows per page</InputLabel>
+            <InputLabel id="rows-per-page-label" sx={{ color: '#4285f4' }}>Rows per page</InputLabel>
             <Select
               labelId="rows-per-page-label"
               id="rows-per-page"
               value={rowsPerPage}
               onChange={handleRowsPerPageChange}
               label="Rows per page"
+              sx={{ 
+                color: '#4285f4',
+                '& .MuiSelect-icon': {
+                  color: '#4285f4'
+                }
+              }}
             >
               <MenuItem value={50}>50</MenuItem>
               <MenuItem value={100}>100</MenuItem>
@@ -1431,13 +1450,14 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
               {textWrapEnabled ? "Wrap: On" : "Wrap: Off"}
             </Button>
             
-            {/* Zoom controls - global zoom applied to all sheets */}
+            {/* Zoom controls - global zoom applied to all sheets - update to blue */}
             <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
               <Tooltip title="Zoom Out">
                 <IconButton 
                   size="small" 
                   onClick={handleZoomOut}
                   disabled={zoomLevel <= 50}
+                  sx={{ color: '#4285f4' }}
                 >
                   <ZoomOutIcon fontSize="small" />
                 </IconButton>
@@ -1447,7 +1467,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                 size="small"
                 onClick={handleZoomClick}
                 ref={zoomButtonRef}
-                sx={{ mx: 0.5 }}
+                sx={{ mx: 0.5, color: '#4285f4' }}
               >
                 {zoomLevel}%
               </Button>
@@ -1457,82 +1477,83 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                   size="small" 
                   onClick={handleZoomIn}
                   disabled={zoomLevel >= 200}
+                  sx={{ color: '#4285f4' }}
                 >
                   <ZoomInIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              
-              <Popover
-                open={zoomPopoverOpen}
-                anchorEl={zoomAnchorEl}
-                onClose={handleZoomClose}
-                anchorOrigin={{
-                  vertical: 'top',
-                  horizontal: 'center',
-                }}
-                transformOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'center',
-                }}
-              >
-                <Box sx={{ p: 2, width: 250 }}>
-                  <Typography id="zoom-slider" gutterBottom>
-                    Zoom Level (applies to all sheets)
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <ZoomOutIcon fontSize="small" sx={{ mr: 1 }} />
-                    <Slider
-                      value={zoomLevel}
-                      onChange={handleZoomChange}
-                      aria-labelledby="zoom-slider"
-                      step={10}
-                      marks
-                      min={50}
-                      max={200}
-                      valueLabelDisplay="auto"
-                    />
-                    <ZoomInIcon fontSize="small" sx={{ ml: 1 }} />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
-                    <Button 
-                      size="small" 
-                      onClick={handleZoomReset}
-                      color="primary"
-                    >
-                      Reset to 100%
-                    </Button>
-                  </Box>
-                </Box>
-              </Popover>
             </Box>
           </Box>
           
-          {/* Page navigation */}
+          {/* Page navigation - update to blue */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
+            <Typography variant="body2" color="#4285f4" sx={{ mr: 2 }}>
               Page {currentPage} of {Math.max(1, Math.ceil(totalRows / rowsPerPage))}
             </Typography>
-            <Button
-              size="small"
+            
+            {/* Previous button with more explicit styling */}
+            <Box 
+              component="button"
               onClick={handlePreviousPage}
               disabled={currentPage === 1}
-              startIcon={<NavigateBeforeIcon />}
-              sx={{ minWidth: 'unset', mr: 1 }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: currentPage === 1 ? 'default' : 'pointer',
+                padding: '4px 8px',
+                marginRight: 1,
+                color: '#4285f4',
+                fontSize: '0.875rem',
+                fontFamily: theme.typography.fontFamily,
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                opacity: currentPage === 1 ? 0.5 : 1,
+                '&:focus': {
+                  outline: 'none'
+                },
+                '&:hover': {
+                  backgroundColor: currentPage === 1 ? 'transparent' : 'rgba(66, 133, 244, 0.08)'
+                }
+              }}
             >
-              Previous
-            </Button>
-            <Button
-              size="small"
+              <NavigateBeforeIcon style={{ color: '#4285f4', marginRight: '4px', fontSize: '1rem' }} />
+              <span style={{ color: '#4285f4' }}>PREVIOUS</span>
+            </Box>
+            
+            {/* Next button with more explicit styling */}
+            <Box 
+              component="button"
               onClick={handleNextPage}
               disabled={currentPage >= Math.ceil(totalRows / rowsPerPage)}
-              endIcon={<NavigateNextIcon />}
-              sx={{ minWidth: 'unset' }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: currentPage >= Math.ceil(totalRows / rowsPerPage) ? 'default' : 'pointer',
+                padding: '4px 8px',
+                color: '#4285f4',
+                fontSize: '0.875rem',
+                fontFamily: theme.typography.fontFamily,
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                opacity: currentPage >= Math.ceil(totalRows / rowsPerPage) ? 0.5 : 1,
+                '&:focus': {
+                  outline: 'none'
+                },
+                '&:hover': {
+                  backgroundColor: currentPage >= Math.ceil(totalRows / rowsPerPage) ? 'transparent' : 'rgba(66, 133, 244, 0.08)'
+                }
+              }}
             >
-              Next
-            </Button>
+              <span style={{ color: '#4285f4' }}>NEXT</span>
+              <NavigateNextIcon style={{ color: '#4285f4', marginLeft: '4px', fontSize: '1rem' }} />
+            </Box>
           </Box>
         </Box>
-      </Paper>
+      </GradientBorderPaper>
     );
   };
   
@@ -1634,9 +1655,21 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
       fullScreen={isFullscreen || fullScreen}
       maxWidth="xl"
       fullWidth
+      PaperProps={{
+        style: {
+          backgroundColor: 'rgba(18, 18, 18, 0.98)',
+          backgroundImage: 'linear-gradient(rgba(30, 30, 30, 0.8), rgba(20, 20, 20, 0.9))',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          overflow: 'hidden'
+        }
+      }}
     >
       {/* Custom dialog title with controls */}
-      <AppBar position="static" color="default" elevation={0}>
+      <AppBar position="static" sx={{ 
+        backgroundColor: 'rgba(13, 71, 161, 0.9)', // Rich dark blue app bar
+        color: 'white',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
+      }}>
         <Toolbar>
           {isRenaming ? (
             <Box sx={{ display: 'flex', flexGrow: 1, alignItems: 'center' }}>
@@ -1729,7 +1762,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
         </Toolbar>
         
         {/* Search Bar - always visible */}
-        <Box sx={{ p: 1, backgroundColor: theme.palette.background.paper }}>
+        <Box sx={{ p: 1, backgroundColor: 'rgba(25, 25, 30, 0.9)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {/* Search match count - displayed on the left */}
             {searchText && (
@@ -1783,6 +1816,19 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
                   navigateToPreviousMatch();
                 }
               }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'rgba(40, 40, 45, 0.8)',
+                '&:hover': {
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: theme.palette.primary.main
+                    }
+                  },
+                  '& input': {
+                    color: 'white'  // Make search text white
+                  }
+                }
+              }}
             />
           </Box>
           
@@ -1812,22 +1858,46 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
       
       {/* Sheet tabs */}
       {sheets.length > 0 && (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ 
+          borderBottom: 1, 
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+          backgroundColor: 'rgba(30, 30, 35, 0.9)'
+        }}>
           <Tabs 
             value={activeSheetIndex}
             onChange={handleSheetChange}
             variant="scrollable"
             scrollButtons="auto"
+              sx={{
+              '& .MuiTab-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
+                '&.Mui-selected': {
+                  color: 'white',
+                  fontWeight: 'bold'
+                }
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: theme.palette.primary.main
+              }
+            }}
           >
             {sheets.map((sheet, index) => (
               <Tab key={index} label={sheet} />
             ))}
           </Tabs>
-        </Box>
+            </Box>
       )}
       
       {/* Dialog content */}
-      <DialogContent dividers>
+      <DialogContent 
+        dividers 
+        sx={{ 
+          p: 2, 
+          backgroundColor: 'rgba(18, 18, 18, 0.95)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
+        }}
+      >
         {/* Sheet count indicator */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="caption" color="textSecondary">

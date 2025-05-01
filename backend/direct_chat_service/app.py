@@ -496,8 +496,7 @@ async def chat(request: ChatRequest, user_id: str = DEFAULT_USER):
                 try:
                     embeddings = OllamaEmbeddings(
                         model=config.ollama.embedding_model,
-                        base_url=config.ollama.embedding_url,
-                        num_ctx=512, num_thread=8, keep_alive=300
+                        base_url=config.ollama.embedding_url
                     )
                     vectorstore = await load_vectorstore_async(vectorstore_path, embeddings)
                     k = metadata.get("retriever_k", 20)

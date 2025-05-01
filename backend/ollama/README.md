@@ -9,7 +9,7 @@ ollama/
 ├── Modelfile              # Ollama model configuration
 ├── docker-compose.ollama.yml  # Service orchestration
 ├── entrypoint.sh          # Container startup script
-├── nomic-embed-text-v1.5.f32.gguf  # GGUF model file (522MB)
+├── nomic-embed-text-v1.5-GGUF  # GGUF model file (522MB)
 └── README.md              # This file
 ```
 
@@ -20,7 +20,7 @@ ollama/
 - NVIDIA drivers installed on the host
 - At least 2GB of free GPU memory
 - The following files must be present:
-  - `nomic-embed-text-v1.5.f32.gguf` (522MB)
+  - `nomic-embed-text-v1.5-GGUF` (522MB)
   - All files listed in the directory structure above
 
 ### Step 1: Prepare Base Image
@@ -235,7 +235,7 @@ curl http://localhost:11434/api/embeddings -d '{
 
 ### Backup
 Important files to backup:
-- `nomic-embed-text-v1.5.f32.gguf`
+- `nomic-embed-text-v1.5-GGUF`
 - `Modelfile`
 - Configuration files
 

@@ -173,3 +173,26 @@ Additional models that work well in airgapped environments:
 - `TheBloke/Llama-3-8B-AWQ`
 
 Download these in the same way as the default model and update the paths accordingly. 
+
+
+### Parker Start Here
+
+1. Clone an llm from HuggingFace
+- ```git clone https://huggingface.co/huihui-ai/DeepHermes-3-Llama-3-8B-Preview-abliterated```
+
+2. Move the cloned folder into the top level of teh vLLM service
+- eg. ```backend/vLLM/DeepHermes-3-Llama-3-8B-Preview-abliterated```
+
+3. Clone the embedding model from HuggingFace
+- ```git clone https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF```
+
+4. Move the nomic-embed-text-v1.5-GGUF file into the ollama service
+- ```backend/ollama/nomic-embed-text-v1.5-GGUF```
+- It might have to go in the backend's models folder: ```backend/models/base models```
+
+5. Update the docker compose and entrypoint.sh in vLLM and ollama
+- Unless you have multiple GPUs, you should not need to touch the ollama files
+- For vLLM, change the docker compose to match the model you grabbed and scale up or down the `--max-model-len` based on how much free VRAM you have
+- Only change vLLM/entrypoint.sh if you have multiple GPUs
+
+## Hopefully that get's everything up and running for you!

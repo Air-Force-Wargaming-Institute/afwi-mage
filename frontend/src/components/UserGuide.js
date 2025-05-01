@@ -1,39 +1,40 @@
 import React from 'react';
-import { Container, Paper, Typography, Box, Divider } from '@material-ui/core';
+import { Typography, Box, Divider } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
+import { 
+  StyledContainer, 
+  GradientBorderPaper, 
+  AnimatedGradientPaper,
+  SubtleGlowPaper, 
+  GradientText
+} from '../styles/StyledComponents';
 
 const useStyles = makeStyles((theme) => ({
   root: {
     width: '100%',
     maxWidth: '1600px',
     margin: '0 auto',
-  },
-  mainContent: {
-    backgroundColor: 'var(--container-bg-color)',
-    borderRadius: 'var(--border-radius)',
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(3),
-    boxShadow: 'var(--box-shadow)',
+    paddingTop: theme.spacing(10), // Add padding to prevent content from being hidden under the header
   },
   section: {
     marginBottom: theme.spacing(6),
   },
   title: {
-    color: 'var(--primary-color)',
+    color: theme.palette.primary.main,
     marginBottom: theme.spacing(3),
     textShadow: '1px 1px 2px rgba(0, 0, 0, 0.1)',
   },
   subtitle: {
-    color: 'var(--primary-color)',
+    color: theme.palette.primary.main,
     marginTop: theme.spacing(3),
     marginBottom: theme.spacing(2),
   },
   content: {
     marginBottom: theme.spacing(2),
     textAlign: 'left',
-    color: 'var(--text-color-dark)',
+    color: theme.palette.text.primary,
     '& strong': {
-      color: 'var(--primary-color)',
+      color: theme.palette.primary.main,
     },
   },
   list: {
@@ -43,19 +44,12 @@ const useStyles = makeStyles((theme) => ({
     '& li': {
       marginBottom: theme.spacing(1.5),
       textAlign: 'left',
-      color: 'var(--text-color-dark)',
+      color: theme.palette.text.primary,
     },
   },
   divider: {
     margin: theme.spacing(4, 0),
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  paper: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: theme.spacing(3),
-    marginBottom: theme.spacing(3),
-    borderRadius: 'var(--border-radius)',
-    boxShadow: 'var(--box-shadow)',
   },
 }));
 
@@ -63,14 +57,16 @@ function UserGuide() {
   const classes = useStyles();
 
   return (
-    <Container className={classes.root}>
-      <Paper className={classes.mainContent}>
-        <Typography variant="h4" className={classes.title}>
-          Multi-Agent Portal Guide
-        </Typography>
+    <StyledContainer maxWidth="lg">
+      <AnimatedGradientPaper elevation={3} className={classes.root}>
+        <Box mb={3}>
+          <GradientText variant="h1" fontWeight="600" fontSize={'4rem'} gutterBottom>
+            Agent Portal Guide
+          </GradientText>
+        </Box>
 
         <Box className={classes.section}>
-          <Paper className={classes.paper}>
+          <SubtleGlowPaper elevation={2}>
             <Typography variant="h5" className={classes.subtitle}>
               Understanding the LLM Library
             </Typography>
@@ -99,11 +95,11 @@ function UserGuide() {
             <Typography variant="body1" className={classes.content}>
               If you have an idea about an LLM that could be tuned for a specific role or task, speak with wargaming institute personnel so that we evaluate fine-tuning an LLM for your use case.
             </Typography>
-          </Paper>
+          </SubtleGlowPaper>
         </Box>
 
         <Box className={classes.section}>
-          <Paper className={classes.paper}>
+          <GradientBorderPaper elevation={2}>
             <Typography variant="h5" className={classes.subtitle}>
               Building Agents
             </Typography>
@@ -145,11 +141,11 @@ function UserGuide() {
             <Typography variant="body1" className={classes.content}>
               Remember, the key to creating an effective wargaming agent lies in the details of its configuration. Take time to refine the instructions and test the agent's responses to ensure it behaves realistically and contributes meaningfully to the wargame scenarios.
             </Typography>
-          </Paper>
+          </GradientBorderPaper>
         </Box>
 
         <Box className={classes.section}>
-          <Paper className={classes.paper}>
+          <SubtleGlowPaper elevation={2}>
             <Typography variant="h5" className={classes.subtitle}>
               Creating Multi-Agent Teams
             </Typography>
@@ -165,11 +161,11 @@ function UserGuide() {
             <Typography variant="body1" className={classes.content}>
               When creating a team, consider how each agent's role complements the others and how they can work together to achieve complex military objectives within the wargame. You can go back into individual agent system instructions and edit them by clicking on the agent's card in the team builder. This can have drastic effects on overall agent performance and behavior.
             </Typography>
-          </Paper>
+          </SubtleGlowPaper>
         </Box>
 
         <Box className={classes.section}>
-          <Paper className={classes.paper}>
+          <GradientBorderPaper elevation={2}>
             <Typography variant="h5" className={classes.subtitle}>
               Additional Resources for Multi-Agent Wargaming Design
             </Typography>
@@ -189,11 +185,11 @@ function UserGuide() {
             <Typography variant="body1" className={classes.content}>
               Regularly update your agents and teams based on the outcomes of wargaming sessions, emerging technologies, and evolving military strategies to ensure your simulations remain cutting-edge and relevant.
             </Typography>
-          </Paper>
+          </GradientBorderPaper>
         </Box>
 
         <Box className={classes.section}>
-          <Paper className={classes.paper}>
+          <AnimatedGradientPaper elevation={3}>
             <Typography variant="h5" className={classes.subtitle}>
               Understanding Generative AI Concepts
             </Typography>
@@ -249,10 +245,12 @@ function UserGuide() {
             <Typography variant="body1" className={classes.content}>
               By understanding these concepts, you'll be better equipped to create sophisticated, effective, and responsible AI agents for your wargaming simulations. Remember, the key to mastering these concepts is practice and experimentation within the MAGE system.
             </Typography>
-          </Paper>
+          </AnimatedGradientPaper>
         </Box>
-      </Paper>
-    </Container>
+
+        <Divider className={classes.divider} />
+      </AnimatedGradientPaper>
+    </StyledContainer>
   );
 }
 

@@ -8,7 +8,7 @@ class OllamaConfig(BaseModel):
     base_url: str
     ollama_model: str
     embedding_url: str = None  # URL for embedding service
-    embedding_model: str = "nomic-embed"  # Model to use for embeddings
+    embedding_model: str = "nomic-embed-text:latest"  # Model to use for embeddings
     temperature: float = Field(ge=0.0, le=1.0)
     context_window: int = Field(gt=0)
     top_p: float = Field(ge=0.0, le=1.0)

@@ -39,7 +39,7 @@ class LLMManager:
         # Get vLLM configuration from environment variables
         vllm_base_url = os.getenv('VLLM_API_BASE', config.get('BASE_URL', 'http://host.docker.internal:8007/v1'))
         vllm_api_key = os.getenv('VLLM_API_KEY', config.get('API_KEY', 'None'))
-        vllm_model_name = os.getenv('VLLM_MODEL_NAME', config.get('LOCAL_LLM', '/models/DeepHermes-3-Llama-3-8B-Preview'))
+        vllm_model_name = os.getenv('VLLM_MODEL_NAME', config.get('LOCAL_LLM', '/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2'))
         
         # Remove /v1 from base_url for model list endpoint if present
         vllm_api_base = vllm_base_url
@@ -113,7 +113,7 @@ class LLMManager:
                     
             # As a last resort, check if the configured model exists
             config = load_config()
-            default_model = os.getenv('VLLM_MODEL_NAME', config.get('LOCAL_LLM', '/models/DeepHermes-3-Llama-3-8B-Preview'))
+            default_model = os.getenv('VLLM_MODEL_NAME', config.get('LOCAL_LLM', '/models/DeepSeek-R1-Distill-Llama-8B-abliterated'))
             if default_model:
                 return [default_model]
                 

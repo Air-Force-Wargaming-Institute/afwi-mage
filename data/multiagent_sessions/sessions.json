@@ -1,10 +1,10 @@
 [
   {
-    "session_id": "dc2cf67e-ecd7-4d76-b0a5-3257a15760ee",
-    "team_id": "4201d5c7-b002-4123-8d86-64142eaacd75",
-    "session_name": "PRC Test Chat",
-    "created_at": "2025-04-02T16:45:51.873838+00:00",
-    "updated_at": "2025-04-02T16:45:51.873838+00:00",
+    "session_id": "91dcad16-7299-442f-8182-3c206377a8d7",
+    "team_id": "2e6d95bf-f6b8-4b31-aa05-7f7bc8ad33db",
+    "session_name": "Example Chat Session",
+    "created_at": "2025-04-15T13:26:40.049965+00:00",
+    "updated_at": "2025-04-15T13:26:40.049965+00:00",
     "conversation_history": []
   }
 ]

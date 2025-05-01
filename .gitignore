@@ -39,6 +39,7 @@ Thumbs.db
 /backend/extraction_service/nltk_data/*
 /backend/chat_service/chat_teams/*
 /data/vectorstores/*
+/backend/vLLM/models/*
 /models/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
@@ -67,6 +68,9 @@ Thumbs.db
 *.docx
 *.txt
 *.gguf
+*.csv
+*.xlsx
+*.xls
 !requirements.txt
 !README.md
 
@@ -74,7 +78,7 @@ Thumbs.db
 !data/
 !models/
 !data/**/
-
+!backend/vLLM/models/
 # Critical files that must be included
 !entrypoint.sh
 !init_db.py

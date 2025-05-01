@@ -1,20 +1,30 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import axios from 'axios';
 import { 
   Typography, Button, Box, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, Grid, Card, CardContent, CardActions, CardHeader, IconButton, 
-  Tooltip, Snackbar, Select, MenuItem, FormControl, InputLabel
+  Tooltip, Snackbar, Select, MenuItem, FormControl, InputLabel,
+  InputAdornment, Checkbox
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
+import SearchIcon from '@material-ui/icons/Search';
 import MuiAlert from '@material-ui/lab/Alert';
 import robotIcon from '../../assets/robot-icon.png'; // Import the custom icon
 import agentTeamIcon from '../../assets/agent-team.png';
 import { getApiUrl, getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
+import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
+import { DeleteButton, DeleteIconButton } from '../../styles/ActionButtons';
+import { 
+  GradientText as GradientTextStyled, 
+  SubtleGlowPaper, 
+  GradientCornersPaper, 
+  AnimatedGradientPaper 
+} from '../../styles/StyledComponents'; // Import styled components for section distinction
 
 function Alert(props) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -30,6 +40,32 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     marginBottom: theme.spacing(3),
   },
+  controlsContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing(2),
+    gap: theme.spacing(2),
+    flexWrap: 'wrap',
+  },
+  searchField: {
+    flexGrow: 1,
+    minWidth: '200px',
+  },
+  formControl: {
+    minWidth: 150,
+  },
+  colorFilterItem: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  colorFilterSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    marginRight: theme.spacing(1),
+    border: '1px solid #ccc',
+  },
   card: {
     height: '100%',
     display: 'flex',
@@ -39,8 +75,8 @@ const useStyles = makeStyles((theme) => ({
       transform: 'translateY(-5px)',
       boxShadow: theme.shadows[4],
     },
-    borderWidth: 2,  // Add this line
-    borderStyle: 'solid',  // Add this line
+    borderWidth: 2,
+    borderStyle: 'solid',
     cursor: 'pointer',
   },
   cardHeader: {
@@ -50,10 +86,11 @@ const useStyles = makeStyles((theme) => ({
   },
   cardContent: {
     flexGrow: 1,
+    paddingBottom: 0,
   },
   colorSquare: {
-    width: 48, // Increased from 36
-    height: 48, // Increased from 36
+    width: 48,
+    height: 48,
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -61,13 +98,13 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.shape.borderRadius,
   },
   teamIcon: {
-    width: 42, // Slightly reduced to fit better in the larger square
-    height: 42, // Slightly reduced to fit better in the larger square
-    filter: 'invert(1)', // This line inverts the color of the icon
+    width: 42,
+    height: 42,
+    filter: 'invert(1)',
   },
   colorOption: {
-    width: 24,  // Reduced from 30
-    height: 24, // Reduced from 30
+    width: 24,
+    height: 24,
     margin: 2,
     cursor: 'pointer',
     border: '1px solid #ccc',
@@ -82,7 +119,7 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    width: '100%', // Ensure color grid takes full width
+    width: '100%',
     marginTop: theme.spacing(1),
     marginBottom: theme.spacing(1),
   },
@@ -98,14 +135,15 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     paddingBottom: 0,
   },
-  formControl: {
+  formControlDialog: {
     marginBottom: theme.spacing(2),
     minWidth: 120,
     width: '100%',
   },
   dialogContent: {
-    width: '100%',  // Changed from fixed width to 100%
+    width: '100%',
     padding: theme.spacing(2, 3),
+    backgroundColor: theme.palette.background.paper,
   },
   characterCount: {
     fontSize: '0.75rem',
@@ -128,9 +166,23 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   sectionTitle: {
-    marginTop: theme.spacing(2),
+    marginTop: theme.spacing(3),
     marginBottom: theme.spacing(1),
     fontWeight: 'bold',
+    color: theme.palette.primary.main,
+    display: 'flex',
+    alignItems: 'center',
+    '&::before, &::after': {
+      content: '""',
+      flex: 1,
+      borderBottom: `1px solid ${theme.palette.divider}`,
+    },
+    '&::before': {
+      marginRight: theme.spacing(1),
+    },
+    '&::after': {
+      marginLeft: theme.spacing(1),
+    },
   },
   teamInfoBlurb: {
     marginBottom: theme.spacing(2),
@@ -140,7 +192,7 @@ const useStyles = makeStyles((theme) => ({
     '& ul': {
       paddingLeft: theme.spacing(2),
       marginBottom: 0,
-      listStyleType: 'none', // Remove default bullet points
+      listStyleType: 'none',
     },
     '& li': {
       display: 'flex',
@@ -152,17 +204,23 @@ const useStyles = makeStyles((theme) => ({
     width: 35,
     height: 40,
     marginRight: theme.spacing(1),
-    filter: 'invert(.8)', // This line inverts the color of the icon
+    filter: 'brightness(0) invert(.8)',
   },
   agentName: {
     textDecoration: 'underline',
     fontWeight: 'bold',
   },
+  teamName: {
+    fontSize: '1.2rem',
+    textDecoration: 'underline',
+    fontWeight: 'bold',
+    color: theme.palette.text.primary, 
+  },
   deleteIcon: {
-    color: theme.palette.error.main, // This will make the delete icon red
+    color: theme.palette.error.main,
   },
   duplicateIcon: {
-    color: theme.palette.info.main, // This will make the duplicate icon blue
+    color: theme.palette.info.main,
   },
   cardActions: {
     justifyContent: 'flex-end',
@@ -172,6 +230,96 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(1),
     fontSize: '0.875rem',
     color: theme.palette.text.secondary,
+  },
+  agentListText: {
+    marginTop: theme.spacing(1),
+    fontSize: '0.8rem',
+    color: theme.palette.text.secondary,
+    fontStyle: 'italic',
+  },
+  agentListContainer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: theme.spacing(0, 1),
+    paddingLeft: 0,
+    listStyle: 'none',
+    marginTop: theme.spacing(0.5), 
+  },
+  agentListItem: {
+    fontSize: '1rem',
+    color: theme.palette.text.secondary,
+    display: 'flex',
+    alignItems: 'center',
+    '&::before': {
+      content: '"•"',
+      marginRight: theme.spacing(0.5),
+      color: theme.palette.text.secondary,
+    },
+  },
+  sectionContainer: {
+    marginBottom: theme.spacing(3),
+    padding: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius,
+    position: 'relative',
+  },
+  teamInfoSection: {
+    backgroundColor: 'rgba(66, 133, 244, 0.08)',
+    border: `1px solid ${theme.palette.divider}`,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '30%',
+      height: '30%',
+      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, transparent 60%)`,
+      borderTopLeftRadius: theme.shape.borderRadius,
+      opacity: 0.2,
+      zIndex: 0,
+    },
+  },
+  resourcesSection: {
+    backgroundColor: 'rgba(52, 168, 83, 0.08)',
+    border: `1px solid ${theme.palette.divider}`,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: '30%',
+      height: '30%',
+      background: `linear-gradient(225deg, ${theme.palette.secondary.main} 0%, transparent 60%)`,
+      borderTopRightRadius: theme.shape.borderRadius,
+      opacity: 0.2,
+      zIndex: 0,
+    },
+  },
+  agentTeamSection: {
+    backgroundColor: 'rgba(251, 188, 5, 0.08)',
+    border: `1px solid ${theme.palette.divider}`,
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: '30%',
+      height: '30%',
+      background: `linear-gradient(315deg, ${theme.palette.warning.main} 0%, transparent 60%)`,
+      borderBottomRightRadius: theme.shape.borderRadius,
+      opacity: 0.2,
+      zIndex: 0,
+    },
+  },
+  sectionIcon: {
+    marginRight: theme.spacing(1),
+    color: theme.palette.text.secondary,
+  },
+  headerRobotIcon: {
+    width: 20,
+    height: 24,
+    marginRight: theme.spacing(1),
+    filter: 'brightness(0) invert(.8)',
+    verticalAlign: 'middle',
   },
 }));
 
@@ -197,7 +345,8 @@ function AgentTeams() {
     color: colorOptions[0],
     agents: Array(4).fill(''),
     team_instructions: '',
-    vectorstore: []
+    vectorstore: [],
+    database: ''
   });
   const [editingTeam, setEditingTeam] = useState(null);
   const [snackbar, setSnackbar] = useState({
@@ -213,6 +362,11 @@ function AgentTeams() {
   const [nameErrorMessage, setNameErrorMessage] = useState('');
   const [agentMapping, setAgentMapping] = useState({});
   const [vectorstores, setVectorstores] = useState([]);
+
+  // --- State for Search, Filter, Sort ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterColors, setFilterColors] = useState([]);
+  const [sortOrder, setSortOrder] = useState('name_asc');
 
   useEffect(() => {
     fetchTeams();
@@ -231,7 +385,13 @@ function AgentTeams() {
       }
       );
       console.log("Teams received from backend:", response.data.teams);
-      setTeams(response.data.teams);
+      // Ensure createdAt and modifiedAt exist for sorting
+      const teamsWithDates = response.data.teams.map(team => ({
+        ...team,
+        createdAt: team.createdAt || new Date(0).toISOString(), // Fallback
+        modifiedAt: team.modifiedAt || team.createdAt || new Date(0).toISOString() // Fallback
+      }));
+      setTeams(teamsWithDates);
     } catch (error) {
       console.error('Error fetching teams:', error);
       setSnackbar({
@@ -299,7 +459,8 @@ function AgentTeams() {
       ...team,
       agents: [...team.agents, ...Array(4 - team.agents.length).fill('')],
       // Ensure vectorstore is initialized as an array
-      vectorstore: team.vectorstore || []
+      vectorstore: team.vectorstore || [],
+      database: team.database || ''
     };
     console.log("Opening team for editing:", fullTeam);
     setEditingTeam(fullTeam);
@@ -452,7 +613,8 @@ function AgentTeams() {
       const submissionData = {
         ...editingTeam,
         agents: compactAgents,
-        vectorstore: editingTeam.vectorstore || []
+        vectorstore: editingTeam.vectorstore || [],
+        database: editingTeam.database || ''
       };
 
       console.log("Submitting team update with data:", submissionData);
@@ -566,7 +728,8 @@ function AgentTeams() {
         description: team.description,
         color: team.color,
         agents: agentIds,
-        vectorstore: team.vectorstore || []
+        vectorstore: team.vectorstore || [],
+        database: team.database || ''
       };
 
       const response = await axios.post(getGatewayUrl('/api/agent/create_team/'),
@@ -620,10 +783,96 @@ function AgentTeams() {
     }
   };
 
+  // --- Handlers for Search, Filter, Sort ---
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  const handleFilterColorsChange = (event) => {
+    const { value } = event.target;
+    // On autofill we get a stringified value.
+    setFilterColors(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const handleSortOrderChange = (event) => {
+    setSortOrder(event.target.value);
+  };
+
+  // --- Memoized calculation for displayed teams ---
+  const displayedTeams = useMemo(() => {
+    let filteredTeams = [...teams];
+
+    // 1. Search Filter (by name and description)
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      filteredTeams = filteredTeams.filter(team =>
+        (team.name && team.name.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (team.description && team.description.toLowerCase().includes(lowerCaseSearchTerm))
+      );
+    }
+
+    // 2. Color Filter (multi-select)
+    if (filterColors.length > 0) {
+      filteredTeams = filteredTeams.filter(team => filterColors.includes(team.color));
+    }
+
+    // 3. Sorting
+    filteredTeams.sort((a, b) => {
+        // Ensure dates are valid Date objects for comparison
+        const dateA_created = new Date(a.createdAt);
+        const dateB_created = new Date(b.createdAt);
+        const dateA_modified = new Date(a.modifiedAt);
+        const dateB_modified = new Date(b.modifiedAt);
+
+      switch (sortOrder) {
+        case 'name_asc':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'name_desc':
+          return (b.name || '').localeCompare(a.name || '');
+         case 'created_asc':
+           return (isNaN(dateA_created) || isNaN(dateB_created)) ? 0 : dateA_created - dateB_created;
+         case 'created_desc':
+           return (isNaN(dateA_created) || isNaN(dateB_created)) ? 0 : dateB_created - dateA_created;
+         case 'modified_asc':
+            return (isNaN(dateA_modified) || isNaN(dateB_modified)) ? 0 : dateA_modified - dateB_modified;
+         case 'modified_desc':
+            return (isNaN(dateA_modified) || isNaN(dateB_modified)) ? 0 : dateB_modified - dateA_modified;
+        default:
+           return (a.name || '').localeCompare(b.name || ''); // Fallback to name_asc
+      }
+    });
+
+    return filteredTeams;
+  }, [teams, searchTerm, filterColors, sortOrder]);
+
+  // --- Get unique colors present in the current teams list ---
+  const uniqueTeamColors = useMemo(() => {
+    const colors = new Set(teams.map(team => team.color).filter(color => !!color));
+    return Array.from(colors).sort();
+  }, [teams]);
+
+  // Add handler for database change
+  const handleDatabaseChange = (event, isEditing = false) => {
+    const { value } = event.target;
+    if (isEditing) {
+      setEditingTeam(prevState => ({
+        ...prevState,
+        database: value
+      }));
+    } else {
+      setNewTeam(prevState => ({
+        ...prevState,
+        database: value
+      }));
+    }
+  };
+
   return (
     <div className={classes.root}>
       <Box className={classes.header}>
-        <Typography variant="h4">Agent Teams</Typography>
+        <GradientText component="div">
+          <Typography variant="h2">Agent Teams</Typography>
+        </GradientText>
         <Button
           variant="contained"
           color="primary"
@@ -634,40 +883,143 @@ function AgentTeams() {
         </Button>
       </Box>
 
+      {/* --- Search, Filter, Sort Controls --- */}
+      <Box className={classes.controlsContainer}>
+         <TextField
+          label="Search Teams"
+          variant="outlined"
+          size="small"
+          className={classes.searchField}
+          value={searchTerm}
+          onChange={handleSearchChange}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        {/* Color Filter with Clear Button */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FormControl variant="outlined" size="small" className={classes.formControl}>
+            <InputLabel id="filter-color-label-teams">Filter by Color</InputLabel>
+            <Select
+              labelId="filter-color-label-teams"
+              multiple
+              value={filterColors}
+              onChange={handleFilterColorsChange}
+              label="Filter by Color"
+              renderValue={(selected) => {
+                if (selected.length === 0) {
+                  return <em>All Colors</em>;
+                }
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                       <Box 
+                         key={value} 
+                         className={classes.colorFilterSwatch} 
+                        />
+                    ))}
+                  </Box>
+                );
+              }}
+              MenuProps={{
+              }}
+            >
+              {uniqueTeamColors.map((color) => (
+                <MenuItem key={color} value={color} className={classes.colorFilterItem}>
+                   <Checkbox checked={filterColors.indexOf(color) > -1} size="small" />
+                   <Box className={classes.colorFilterSwatch} style={{ backgroundColor: color }} />
+                   {color}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {/* Clear Filter Button - Rendered Conditionally */} 
+          {filterColors.length > 0 && (
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => setFilterColors([])}
+              sx={{ 
+                padding: '4px 8px', // Smaller padding
+                minWidth: 'auto', // Allow button to shrink
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </Box>
+        <FormControl variant="outlined" size="small" className={classes.formControl}>
+          <InputLabel id="sort-order-label-teams">Sort By</InputLabel>
+          <Select
+            labelId="sort-order-label-teams"
+            value={sortOrder}
+            onChange={handleSortOrderChange}
+            label="Sort By"
+          >
+            <MenuItem value="name_asc">Name (A-Z)</MenuItem>
+            <MenuItem value="name_desc">Name (Z-A)</MenuItem>
+            <MenuItem value="created_desc">Date Created (Newest)</MenuItem>
+            <MenuItem value="created_asc">Date Created (Oldest)</MenuItem>
+            <MenuItem value="modified_desc">Date Modified (Newest)</MenuItem>
+            <MenuItem value="modified_asc">Date Modified (Oldest)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
       <Grid container spacing={3}>
-        {teams.map((team, index) => {
-          // Ensure team.agents is an array at the start of the mapping
-          team.agents = Array.isArray(team.agents) 
-            ? team.agents 
-            : typeof team.agents === 'string' 
-              ? [team.agents]
-              : [];
-              
-          return (
-            <Grid item xs={12} sm={6} md={4} key={index}>
-              <Card 
-                className={classes.card} 
-                style={{ borderColor: team.color }}
-                onClick={(event) => handleCardClick(event, team)}
-              >
-                <CardHeader
-                  className={classes.cardHeader}
-                  avatar={
-                    <Box display="flex" alignItems="center">
-                      <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
-                        <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
-                      </div>
-                    </Box>
-                  }
-                  title={team.name}
-                />
-                <CardContent className={classes.cardContent}>
-                  <Typography variant="body2" color="textSecondary" component="p">
-                    {team.description}
-                  </Typography>
-                </CardContent>
-                <CardActions className={classes.cardActions}>
-                  <Tooltip title="Duplicate Team">
+        {/* Map over displayedTeams instead of teams */}
+         {displayedTeams.length === 0 ? (
+          <Grid item xs={12}>
+             <Typography variant="subtitle1" align="center" color="textSecondary" style={{ marginTop: '20px' }}>
+                {teams.length > 0 ? 'No teams found matching your criteria.' : 'No teams created yet.'}
+             </Typography>
+          </Grid>
+         ) : (
+           displayedTeams.map((team) => (
+             <Grid item xs={12} sm={6} md={4} key={team.unique_id}>
+               <Card 
+                 className={classes.card} 
+                 style={{ borderColor: team.color }}
+                 onClick={(event) => handleCardClick(event, team)}
+               >
+                 <CardHeader
+                   className={classes.cardHeader}
+                   avatar={
+                     <Box display="flex" alignItems="center">
+                       <div className={classes.colorSquare} style={{ backgroundColor: team.color }}>
+                         <img src={agentTeamIcon} alt="Team" className={classes.teamIcon} />
+                       </div>
+                     </Box>
+                   }
+                   title={<Typography className={classes.teamName}>{team.name || 'Unnamed Team'}</Typography>}
+                 />
+                 <CardContent className={classes.cardContent}>
+                   <Typography variant="body2" color="textSecondary" component="p">
+                     {team.description || ''}
+                   </Typography>
+                   {/* Display Agent List */}
+                   {Array.isArray(team.agents) && team.agents.filter(agentName => agentName).length > 0 && (
+                     <Box mt={1}> {/* Add some margin top */}
+                       <Typography variant="caption" display="block" style={{ fontWeight: 'bold' , textDecoration: 'underline'}}>
+                         Agents:
+                       </Typography>
+                       {/* Use Box as a grid container for the two-column list */}
+                       <Box component="ul" className={classes.agentListContainer}>
+                         {team.agents.filter(agentName => agentName).map((agentName, idx) => (
+                           <Typography component="li" key={idx} className={classes.agentListItem}>
+                             {agentName}
+                           </Typography>
+                         ))}
+                       </Box>
+                     </Box>
+                   )}
+                 </CardContent>
+                 <CardActions className={classes.cardActions}>
+                   <Tooltip title="Duplicate Team">
                     <IconButton 
                       aria-label="duplicate" 
                       onClick={(e) => {
@@ -679,7 +1031,7 @@ function AgentTeams() {
                       <FileCopyIcon />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Delete Team">
+                   <Tooltip title="Delete Team">
                     <IconButton 
                       aria-label="delete" 
                       onClick={(e) => {
@@ -691,11 +1043,11 @@ function AgentTeams() {
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>
-                </CardActions>
-              </Card>
-            </Grid>
-          );
-        })}
+                 </CardActions>
+               </Card>
+             </Grid>
+           ))
+         )}
       </Grid>
 
       <Dialog 
@@ -723,129 +1075,176 @@ function AgentTeams() {
           </Typography>
         </DialogTitle>
         <DialogContent className={classes.dialogContent}>
-          <TextField
-            autoFocus
-            margin="dense"
-            name="name"
-            label="Team Name"
-            type="text"
-            fullWidth
-            value={newTeam.name}
-            onChange={handleChange}
-            className={classes.formControl}
-            error={nameError}
-            helperText={nameErrorMessage}
-          />
-          <Box display="flex" flexDirection="column">
+          {/* Section 1: Team Information */}
+          <Box className={`${classes.sectionContainer} ${classes.teamInfoSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <span role="img" aria-label="info" className={classes.sectionIcon}>📝</span>
+              Team Information
+            </Typography>
             <TextField
+              autoFocus
               margin="dense"
-              name="description"
-              label="Team Description"
+              name="name"
+              label="Team Name"
               type="text"
               fullWidth
-              multiline
-              rows={3}
-              value={newTeam.description}
+              value={newTeam.name}
               onChange={handleChange}
-              className={classes.formControl}
-              error={descriptionError}
-              helperText={descriptionError ? "Description must be 140 characters or less" : ""}
+              className={classes.formControlDialog}
+              required
+              error={nameError}
+              helperText={nameErrorMessage || ' '}
             />
-            <Typography className={classes.characterCount}>
-              {newTeam.description.length}/140 characters
-            </Typography>
+            <Box display="flex" flexDirection="column">
+              <TextField
+                margin="dense"
+                name="description"
+                label="Team Description"
+                type="text"
+                fullWidth
+                multiline
+                rows={3}
+                value={newTeam.description}
+                onChange={handleChange}
+                className={classes.formControlDialog}
+                required
+                error={descriptionError}
+                helperText={descriptionError ? "Description must be 140 characters or less" : " "}
+              />
+              <Typography className={classes.characterCount}>
+                {(newTeam.description || '').length}/140 characters
+              </Typography>
+            </Box>
           </Box>
-          <Typography className={classes.sectionTitle}>
-            Select Document Vectorstore
-          </Typography>
-          <FormControl fullWidth className={classes.formControl}>
-            <InputLabel id="documents-select-label">Store</InputLabel>
-            <Select
-              labelId="documents-select-label"
-              value={newTeam.vectorstore}
-              onChange={(e) => {
-                setNewTeam(prev => ({
-                  ...prev,
-                  vectorstore: e.target.value || []
-                }));
-              }}
-              multiple
-              renderValue={(selected) => {
-                if (selected.length === 0) {
-                  return <em>Select vectorstores</em>;
-                }
-                return selected.map(id => 
-                  vectorstores.find(vs => vs.unique_id === id)?.name || id
-                ).join(', ');
-              }}
-              MenuProps={{
-                getContentAnchorEl: null,
-                anchorOrigin: {
-                  vertical: 'bottom',
-                  horizontal: 'left',
-                }
-              }}
-            >
-              {vectorstores.map((vs) => (
-                <MenuItem key={vs.unique_id} value={vs.unique_id}>
-                  {vs.name}
+
+          {/* Section 2: Resources */}
+          <Box className={`${classes.sectionContainer} ${classes.resourcesSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <span role="img" aria-label="database" className={classes.sectionIcon}>🔗</span>
+              Connect Team to Resources
+            </Typography>
+            <FormControl fullWidth className={classes.formControlDialog}>
+              <InputLabel id="documents-select-label">Select Vectorstores Created from Library Documents</InputLabel>
+              <Select
+                labelId="documents-select-label"
+                value={newTeam.vectorstore}
+                onChange={(e) => {
+                  setNewTeam(prev => ({
+                    ...prev,
+                    vectorstore: Array.isArray(e.target.value) ? e.target.value : [e.target.value]
+                  }));
+                }}
+                multiple
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) {
+                    return <em>Select vectorstores (optional)</em>;
+                  }
+                  return selected.map(id => 
+                    vectorstores.find(vs => vs.unique_id === id)?.name || id
+                  ).join(', ');
+                }}
+                MenuProps={{
+                  getContentAnchorEl: null,
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  }
+                }}
+              >
+                <MenuItem value={[]} style={{ fontStyle: 'italic' }}>
+                  None
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Typography className={classes.sectionTitle}>
-            Assemble Agent Team
-          </Typography>
-          <Typography variant="body2" className={classes.teamInfoBlurb}>
-            All multi-agent teams come with the following system agents:
-            <ul>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>Agent Moderator</span> - Identifies which agents are needed and creates tailored guidance to help agents think more deeply to address the user's query</span>
-              </li>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>The Librarian</span> - Runs advanced database information retrieval at the request of agents to help find the most relevant information to address the user's query</span>
-              </li>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>Synthesis Agent</span> - Consolidates agent collaborations, reports, and research results for final output to the user</span>
-              </li>
-            </ul>
-          </Typography>
-          <Box className={classes.agentSelectGrid}>
-            {[...Array(4)].map((_, index) => (
-              <FormControl key={index} className={classes.agentSelect}>
-                <InputLabel id={`agent-select-label-${index}`}>Agent {index + 1}</InputLabel>
-                <Select
-                  labelId={`agent-select-label-${index}`}
-                  value={newTeam.agents[index]}
-                  onChange={(e) => handleAgentChange(index, e.target.value)}
-                  fullWidth
-                >
-                  <MenuItem value="">
-                    <em>None</em>
+                {vectorstores.map((vs) => (
+                  <MenuItem key={vs.unique_id} value={vs.unique_id}>
+                    {vs.name}
                   </MenuItem>
-                  {getAvailableAgentsForDropdown(index, newTeam).map((agent) => (
-                    <MenuItem key={agent.unique_id} value={agent.name}>
-                      {agent.name}
+                ))}
+              </Select>
+            </FormControl>
+            {/* Placeholder Database Dropdown */}
+            <FormControl fullWidth className={classes.formControlDialog}>
+              <InputLabel id="database-select-label">Select Local System Database Connection</InputLabel>
+              <Select
+                labelId="database-select-label"
+                value={newTeam.database}
+                onChange={(e) => handleDatabaseChange(e, false)} // Use the new handler
+                name="database" // Add name attribute
+              >
+                <MenuItem value=""><em>None</em></MenuItem>
+                {/* Add placeholder options here later if needed */}
+                <MenuItem value="placeholder_db_1">Placeholder DB 1</MenuItem>
+                <MenuItem value="placeholder_db_2">Placeholder DB 2</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* Section 3: Agent Team */}
+          <Box className={`${classes.sectionContainer} ${classes.agentTeamSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <img src={robotIcon} alt="Robot" className={classes.headerRobotIcon} />
+              Build Your Multi-Agent Team
+            </Typography>
+            <Typography variant="body2" className={classes.teamInfoBlurb}>
+              All multi-agent teams come with the following system agents:
+              <ul>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>Agent Moderator</span> - Identifies which agents are needed and creates tailored guidance to help agents think more deeply to address the user's query</span>
+                </li>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>The Librarian</span> - Runs advanced database information retrieval at the request of agents to help find the most relevant information to address the user's query</span>
+                </li>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>Synthesis Agent</span> - Consolidates agent collaborations, reports, and research results for final output to the user</span>
+                </li>
+              </ul>
+            </Typography>
+            <Box className={classes.agentSelectGrid}>
+              {[...Array(4)].map((_, index) => (
+                <FormControl key={index} className={classes.agentSelect}>
+                  <InputLabel id={`agent-select-label-${index}`}>Agent {index + 1}</InputLabel>
+                  <Select
+                    labelId={`agent-select-label-${index}`}
+                    value={newTeam.agents[index]}
+                    onChange={(e) => handleAgentChange(index, e.target.value)}
+                    fullWidth
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>None</em>
                     </MenuItem>
-                  ))}
-                </Select>
-                {newTeam.agents[index] && (
-                  <Typography className={classes.agentDescription}>
-                    {allAgents.find(agent => agent.name === newTeam.agents[index])?.description}
-                  </Typography>
-                )}
-              </FormControl>
-            ))}
+                    {getAvailableAgentsForDropdown(index, newTeam).map((agent) => (
+                      <MenuItem key={agent.unique_id} value={agent.name}>
+                        {agent.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {newTeam.agents[index] && (
+                    <Typography className={classes.agentDescription}>
+                      {allAgents.find(agent => agent.name === newTeam.agents[index])?.description || 'No description available.'}
+                    </Typography>
+                  )}
+                </FormControl>
+              ))}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} color="primary">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} color="primary" disabled={descriptionError}>
+          <Button 
+             onClick={handleSubmit} 
+             color="primary" 
+             disabled={
+                nameError || 
+                descriptionError ||
+                !newTeam.name || newTeam.name.length < 3 ||
+                !newTeam.description || newTeam.description.length > 140
+             }
+           >
             Create Team
           </Button>
         </DialogActions>
@@ -865,7 +1264,7 @@ function AgentTeams() {
               <Tooltip title={color} key={color}>
                 <Box
                   className={`${classes.colorOption} ${editingTeam && editingTeam.color === color ? classes.selectedColor : ''}`}
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: color, cursor: 'pointer' }}
                   onClick={() => handleColorChange(color, true)}
                 />
               </Tooltip>
@@ -876,131 +1275,179 @@ function AgentTeams() {
           </Typography>
         </DialogTitle>
         <DialogContent className={classes.dialogContent}>
-          <TextField
-            autoFocus
-            margin="dense"
-            name="name"
-            label="Team Name"
-            type="text"
-            fullWidth
-            value={editingTeam ? editingTeam.name : ''}
-            onChange={(e) => handleChange(e, true)}
-            className={classes.formControl}
-            error={nameError}
-            helperText={nameErrorMessage}
-          />
-          <Box display="flex" flexDirection="column">
+          {/* Section 1: Team Information */}
+          <Box className={`${classes.sectionContainer} ${classes.teamInfoSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <span role="img" aria-label="info" className={classes.sectionIcon}>📝</span>
+              Team Information
+            </Typography>
             <TextField
+              autoFocus
               margin="dense"
-              name="description"
-              label="Team Description"
+              name="name"
+              label="Team Name"
               type="text"
               fullWidth
-              multiline
-              rows={3}
-              value={editingTeam ? editingTeam.description : ''}
+              value={editingTeam ? editingTeam.name : ''}
               onChange={(e) => handleChange(e, true)}
-              className={classes.formControl}
-              error={descriptionError}
-              helperText={descriptionError ? "Description must be 140 characters or less" : ""}
+              className={classes.formControlDialog}
+              required
+              error={nameError}
+              helperText={nameErrorMessage || ' '}
             />
-            <Typography className={classes.characterCount}>
-              {editingTeam ? editingTeam.description.length : 0}/140 characters
-            </Typography>
+            <Box display="flex" flexDirection="column">
+              <TextField
+                margin="dense"
+                name="description"
+                label="Team Description"
+                type="text"
+                fullWidth
+                multiline
+                rows={3}
+                value={editingTeam ? editingTeam.description : ''}
+                onChange={(e) => handleChange(e, true)}
+                className={classes.formControlDialog}
+                required
+                error={descriptionError}
+                helperText={descriptionError ? "Description must be 140 characters or less" : " "}
+              />
+              <Typography className={classes.characterCount}>
+                {(editingTeam?.description || '').length}/140 characters
+              </Typography>
+            </Box>
           </Box>
-          <Typography className={classes.sectionTitle}>
-            Select Document Vectorstore
-          </Typography>
-          <FormControl fullWidth className={classes.formControl}>
-            <InputLabel id="documents-select-label">Store</InputLabel>
-            <Select
-              labelId="documents-select-label"
-              value={editingTeam?.vectorstore || []}
-              onChange={(e) => {
-                console.log("Selected vectorstore:", e.target.value);
-                setEditingTeam(prev => ({
-                  ...prev,
-                  vectorstore: e.target.value || []
-                }));
-              }}
-              multiple
-              renderValue={(selected) => {
-                if (!selected || selected.length === 0) {
-                  return <em>Select vectorstores</em>;
-                }
-                return selected.map(id => 
-                  vectorstores.find(vs => vs.unique_id === id)?.name || id
-                ).join(', ');
-              }}
-              MenuProps={{
-                getContentAnchorEl: null,
-                anchorOrigin: {
-                  vertical: 'bottom',
-                  horizontal: 'left',
-                }
-              }}
-            >
-              {vectorstores.map((vs) => (
-                <MenuItem key={vs.unique_id} value={vs.unique_id}>
-                  {vs.name}
+
+          {/* Section 2: Resources */}
+          <Box className={`${classes.sectionContainer} ${classes.resourcesSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <span role="img" aria-label="database" className={classes.sectionIcon}>🔗</span>
+              Connect Team to Resources
+            </Typography>
+            <FormControl fullWidth className={classes.formControlDialog}>
+              <InputLabel id="edit-documents-select-label">Select Vectorstores Created from Library Documents</InputLabel>
+              <Select
+                labelId="edit-documents-select-label"
+                value={editingTeam?.vectorstore || []}
+                onChange={(e) => {
+                  console.log("Selected vectorstore:", e.target.value);
+                  setEditingTeam(prev => ({
+                    ...prev,
+                    vectorstore: Array.isArray(e.target.value) ? e.target.value : (e.target.value ? [e.target.value] : []) 
+                  }));
+                }}
+                multiple
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) {
+                    return <em>Select vectorstores (optional)</em>;
+                  }
+                  return selected.map(id => 
+                    vectorstores.find(vs => vs.unique_id === id)?.name || id
+                  ).join(', ');
+                }}
+                MenuProps={{
+                  getContentAnchorEl: null,
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  }
+                }}
+              >
+                <MenuItem value={[]} style={{ fontStyle: 'italic' }}>
+                  None
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Typography className={classes.sectionTitle}>
-            Build Your Multi-Agent Team
-          </Typography>
-          <Typography variant="body2" className={classes.teamInfoBlurb}>
-            All multi-agent teams come with the following system agents:
-            <ul>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>Agent Moderator</span> - Identifies which agents are needed and creates tailored guidance to help agents think more deeply to address the user's query</span>
-              </li>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>The Librarian</span> - Runs advanced database information retrieval at the request of agents to help find the most relevant information to address the user's query</span>
-              </li>
-              <li>
-                <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
-                <span><span className={classes.agentName}>Synthesis Agent</span> - Consolidates agent collaborations, reports, and research results for final output to the user</span>
-              </li>
-            </ul>
-          </Typography>
-          <Box className={classes.agentSelectGrid}>
-            {editingTeam && editingTeam.agents.map((agentFileName, index) => (
-              <FormControl key={index} className={classes.agentSelect}>
-                <InputLabel id={`edit-agent-select-label-${index}`}>Agent {index + 1}</InputLabel>
-                <Select
-                  labelId={`edit-agent-select-label-${index}`}
-                  value={agentFileName}
-                  onChange={(e) => handleAgentChange(index, e.target.value, true)}
-                  fullWidth
-                >
-                  <MenuItem value="">
-                    <em>None</em>
+                {vectorstores.map((vs) => (
+                  <MenuItem key={vs.unique_id} value={vs.unique_id}>
+                    {vs.name}
                   </MenuItem>
-                  {getAvailableAgentsForDropdown(index, editingTeam).map((agent) => (
-                    <MenuItem key={agent.name} value={agent.name}>
-                      {agent.name}
+                ))}
+              </Select>
+            </FormControl>
+            
+            {/* Placeholder Database Dropdown */}
+            <FormControl fullWidth className={classes.formControlDialog}>
+              <InputLabel id="edit-database-select-label">Select Local System Database Connection</InputLabel>
+              <Select
+                labelId="edit-database-select-label"
+                value={editingTeam?.database || ''}
+                onChange={(e) => handleDatabaseChange(e, true)} // Use the new handler for editing
+                name="database" // Add name attribute
+              >
+                <MenuItem value=""><em>None</em></MenuItem>
+                {/* Add placeholder options here later if needed */}
+                <MenuItem value="placeholder_db_1">Placeholder DB 1</MenuItem>
+                <MenuItem value="placeholder_db_2">Placeholder DB 2</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* Section 3: Agent Team */}
+          <Box className={`${classes.sectionContainer} ${classes.agentTeamSection}`}>
+            <Typography variant="h6" gutterBottom>
+              <img src={robotIcon} alt="Robot" className={classes.headerRobotIcon} />
+              Build Your Multi-Agent Team
+            </Typography>
+            <Typography variant="body2" className={classes.teamInfoBlurb}>
+              All multi-agent teams come with the following system agents:
+              <ul>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>Agent Moderator</span> - Identifies which agents are needed and creates tailored guidance to help agents think more deeply to address the user's query</span>
+                </li>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>The Librarian</span> - Runs advanced database information retrieval at the request of agents to help find the most relevant information to address the user's query</span>
+                </li>
+                <li>
+                  <img src={robotIcon} alt="Robot" className={classes.robotIcon} />
+                  <span><span className={classes.agentName}>Synthesis Agent</span> - Consolidates agent collaborations, reports, and research results for final output to the user</span>
+                </li>
+              </ul>
+            </Typography>
+            <Box className={classes.agentSelectGrid}>
+              {editingTeam && editingTeam.agents.slice(0, 4).map((agentName, index) => (
+                <FormControl key={index} className={classes.agentSelect}>
+                  <InputLabel id={`edit-agent-select-label-${index}`}>Agent {index + 1}</InputLabel>
+                  <Select
+                    labelId={`edit-agent-select-label-${index}`}
+                    value={agentName || ''}
+                    onChange={(e) => handleAgentChange(index, e.target.value, true)}
+                    fullWidth
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>None</em>
                     </MenuItem>
-                  ))}
-                </Select>
-                {agentFileName && (
-                  <Typography className={classes.agentDescription}>
-                    {allAgents.find(agent => agent.name === agentFileName)?.description}
-                  </Typography>
-                )}
-              </FormControl>
-            )).slice(0, 4)}
+                    {getAvailableAgentsForDropdown(index, editingTeam).map((agent) => (
+                      <MenuItem key={agent.unique_id} value={agent.name}>
+                        {agent.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {agentName && (
+                    <Typography className={classes.agentDescription}>
+                      {allAgents.find(agent => agent.name === agentName)?.description || 'No description available.'}
+                    </Typography>
+                  )}
+                </FormControl>
+              ))}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleEditClose} color="primary">
             Cancel
           </Button>
-          <Button onClick={handleEditSubmit} color="primary" disabled={descriptionError}>
-            Save Changes
+          <Button 
+             onClick={handleEditSubmit} 
+             color="primary" 
+             disabled={
+                 nameError || 
+                 descriptionError ||
+                 !editingTeam?.name || editingTeam.name.length < 3 ||
+                 !editingTeam?.description || editingTeam.description.length > 140
+             }
+           >
+             Save Changes
           </Button>
         </DialogActions>
       </Dialog>
@@ -1014,7 +1461,7 @@ function AgentTeams() {
         <DialogTitle id="delete-confirm-title">Confirm Deletion</DialogTitle>
         <DialogContent>
           <Typography id="delete-confirm-description">
-            Are you sure you want to delete the team "{teamToDelete?.name}"? This action cannot be undone.
+            Are you sure you want to delete the team "{teamToDelete?.name || 'this team'}"? This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1027,7 +1474,12 @@ function AgentTeams() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose}>
+      <Snackbar 
+          open={snackbar.open} 
+          autoHideDuration={6000} 
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
         <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
           {snackbar.message}
         </Alert>

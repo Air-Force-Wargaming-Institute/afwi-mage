@@ -66,7 +66,7 @@ def load_local_vectorstore(
     
     if embeddings is None:
         embeddings = OllamaEmbeddings(
-            model="nomic-embed",
+            model="nomic-embed-text:latest",
             base_url="http://ollama:11434",
             keep_alive=300  # Keep model loaded for 5 minutes
         )

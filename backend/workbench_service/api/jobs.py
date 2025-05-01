@@ -105,11 +105,7 @@ class Job(BaseModel):
     parameters: Optional[JobParameters] = Field(None, description="Parameters used for the job")
     result: Optional[JobResult] = Field(None, description="Result of the completed job")
     
-    class Config:
-        # Allow datetime serialization
-        json_encoders = {
-            datetime: lambda v: v.isoformat() if v else None
-        }
+    model_config = {}
         # Handle potential NaT values from pandas during loading if needed
         # This might require custom parsing logic if loading directly into Pydantic
         # For now, we assume clean data in the store
@@ -180,7 +176,7 @@ def save_jobs_to_store(jobs_data: Dict[str, Dict]):
                 # Use Pydantic's dict method for proper serialization, including datetimes
                 # We need to convert our dictionary of Job models back to serializable dicts
                 serializable_data = {
-                    job_id: Job(**job_dict).dict(exclude_none=True) 
+                    job_id: Job(**job_dict).model_dump(mode='json', exclude_none=True)
                     for job_id, job_dict in jobs_data.items()
                 }
                 json.dump(serializable_data, f, indent=2, cls=DateTimeEncoder)
@@ -208,7 +204,7 @@ def create_job_entry(job_id: str, job_type: str, parameters: Optional[Dict] = No
     )
     
     # Store the dictionary representation
-    jobs[job_id] = new_job.dict()
+    jobs[job_id] = new_job.model_dump(mode='json')
     save_jobs_to_store(jobs)
     logger.info(f"Created new job entry: ID={job_id}, Type={job_type}")
     return new_job # Return the Pydantic model instance
@@ -316,7 +312,7 @@ def update_job_in_store(job_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
 
 # --- API Endpoints ---
 
-@router.get("/list", response_model=List[Job])
+@router.get("/api/workbench/jobs/list", response_model=List[Job])
 async def list_jobs(
     status: Optional[str] = Query(None, description="Filter jobs by status"),
     job_type: Optional[str] = Query(None, description="Filter jobs by type"),
@@ -358,7 +354,7 @@ async def list_jobs(
     logger.info(f"Returning {len(paginated_jobs)} jobs out of {len(all_jobs)} total ({len(filtered_jobs)} filtered).")
     return paginated_jobs
 
-@router.get("/{job_id}", response_model=Job)
+@router.get("/api/workbench/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str):
     """
     Get the status and details of a specific job.
@@ -380,7 +376,7 @@ async def get_job(job_id: str):
         logger.error(f"Error parsing job data for ID {job_id} from store: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error retrieving job details")
 
-@router.post("/{job_id}/cancel", response_model=Job)
+@router.post("/api/workbench/jobs/{job_id}/cancel", response_model=Job)
 async def cancel_job(job_id: str):
     """
     Request cancellation of a running job.

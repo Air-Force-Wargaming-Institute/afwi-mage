@@ -42,7 +42,7 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate a filename for this visualization output
-    output_filename = f"{visualization_id}_{uuid.uuid4().hex[:8]}.png"
+    output_filename = f"{visualization_id}.png"
     output_path = output_dir / output_filename
     
     # Clear any existing plots
@@ -83,13 +83,18 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
             # Generate URL for accessing the file
             # Note: In a real application, you'd need to configure the web server
             # to serve files from the output directory
-            public_url = f"/api/workbench/visualizations/{visualization_id}/image/{output_filename}"
-            
+            # Instead of a public URL served by FastAPI, we'll use the filename for reference
+            # public_url = f"/api/workbench/visualizations/{visualization_id}/image/{output_filename}"
+            file_reference_path = f"/app/data/workbench/spreadsheets/visualizations/{output_filename}"
+
             return {
                 "success": True,
-                "image_url": public_url,
-                "data_url": data_url,
-                "file_path": str(output_path)
+                # "image_url": public_url, # Removed direct serving URL
+                "data_url": data_url, # Added data URL
+                # "image_data": img_data, # Keep base64 data if needed separately, but data_url is more common
+                "output_filename": output_filename,
+                "file_path": str(output_path.parent), # Return the directory path
+                "file_reference_path": file_reference_path # Added reference path
             }
         else:
             return {
