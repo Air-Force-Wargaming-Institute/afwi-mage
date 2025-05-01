@@ -385,7 +385,7 @@ export const MetadataDisplay = ({ metadata }) => {
   return (
     <Box className={classes.metadataSection}>
       <Box display="flex" flexWrap="wrap" alignItems="center" mb={1}>
-        <SecurityClassification classification={docSecurity} labelPrefix="Document:" />
+        <SecurityClassification classification={docSecurity} labelPrefix="Chunk:" />
         
         {showChunkSecurity && (
           <ChunkSecurityClassification classification={chunkSecurity} labelPrefix="Chunk:" />
