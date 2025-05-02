@@ -342,40 +342,19 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
         ...initialWargameData,
         // Initialize fields if they don't exist
         roadToWar: initialWargameData.roadToWar || '',
-        researchObjectives: initialWargameData.researchObjectives || [],
+        researchObjectives: initialWargameData.researchObjectives || '',
         numberOfIterations: initialWargameData.numberOfIterations || 5,
-        numberOfMoves: initialWargameData.numberOfMoves || 10,
         activatedEntities: updatedActivatedEntities,
         customEntities: customEntities,
         nationRelationships: initialWargameData.nationRelationships || {},
-        conflictTheaters: initialWargameData.conflictTheaters || [],
-        // Ensure configData structure exists within entities
-        activatedEntities: (initialWargameData.activatedEntities || []).map(entity => ({
-           ...entity,
-           configData: {
-               generalConfig: { supportingDocuments: [], ...(entity.configData?.generalConfig || {}) },
-               diplomacy: { objectives: [], posture: '', /*...*/ ...(entity.configData?.diplomacy || {}) },
-               information: { objectives: [], propagandaThemes: '', /*...*/ ...(entity.configData?.information || {}) },
-               military: { objectives: [], alertLevel: '', /*...*/ domainPosture: { land: '', /*...*/ }, ...(entity.configData?.military || {}) },
-               economic: { objectives: [], tradeFocus: '', /*...*/ ...(entity.configData?.economic || {}) },
-               approvedFields: { ...(entity.configData?.approvedFields || {}) },
-               enabledFields: { 
-                 generalConfig: { supportingDocuments: true, ...(entity.configData?.enabledFields?.generalConfig || {}) },
-                 diplomacy: { objectives: true, posture: true, /*...*/ ...(entity.configData?.enabledFields?.diplomacy || {}) },
-                 information: { objectives: true, propagandaThemes: true, /*...*/ ...(entity.configData?.enabledFields?.information || {}) },
-                 military: { objectives: true, alertLevel: true, /*...*/ domainPosture: { land: true, /*...*/ }, ...(entity.configData?.enabledFields?.military || {}) },
-                 economic: { objectives: true, tradeFocus: true, /*...*/ ...(entity.configData?.enabledFields?.economic || {}) },
-               }
-           }
-        })),
-        approvedFields: initialWargameData.approvedFields || {},
-        // Ensure top-level enabledFields isn't carried over if structure changed
+        conflictTheaters: initialWargameData.conflictTheaters || []
       });
     }
   }, [initialWargameData]);
 
   const handleTopTabChange = (event, newValue) => {
     setTopTabValue(newValue);
+    // Reset bottom tab when changing top tab
     setBottomTabValue(0);
   };
   
@@ -384,26 +363,37 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
   };
   
   // Handle updates to wargame data from any tab
-  const handleWargameDataChange = async (updatedData) => {
-    console.log("Updating wargame data in editor:", updatedData);
+  const handleWargameDataChange = (updatedData) => {
+    console.log("Updating wargame data:", updatedData);
     setWargameData(updatedData);
-    setSaveError(null);
-
+    
+    // TODO: Replace with actual API call to save changes
+    // For now, simulate saving with localStorage
     try {
-      await updateWargame(updatedData.id, updatedData);
-      setShowSaveNotification(true);
-    } catch (err) {
-      console.error("Error saving wargame updates:", err);
-      setSaveError(err.message || "Failed to save changes.");
+      // Get current wargame builds
+      const savedWargames = localStorage.getItem('wargameBuilds');
+      if (savedWargames) {
+        let wargameBuilds = JSON.parse(savedWargames);
+        
+        // Find and update the current wargame
+        const updatedWargameBuilds = wargameBuilds.map(wargame => 
+          wargame.id === updatedData.id ? {...wargame, ...updatedData} : wargame
+        );
+        
+        // Save back to localStorage
+        localStorage.setItem('wargameBuilds', JSON.stringify(updatedWargameBuilds));
+        
+        // Show save notification
+        setShowSaveNotification(true);
+      }
+    } catch (error) {
+      console.error("Error saving wargame updates to localStorage:", error);
     }
   };
   
-  const handleCloseNotification = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
+  // Close save notification
+  const handleCloseNotification = () => {
     setShowSaveNotification(false);
-    setSaveError(null);
   };
 
   // Handle toggling fullscreen mode
@@ -429,8 +419,8 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
           <ScenarioTab 
             wargameData={wargameData} 
             onChange={handleWargameDataChange} 
-            showExecutionChecklist={false}
-            moveRoadToWarToRight={true}
+            showExecutionChecklist={false} // Don't show ExecutionChecklist on this tab
+            moveRoadToWarToRight={true} // Move road to war to right side
           />
         );
       }
@@ -631,19 +621,14 @@ function WargameEditorModal({ open, onClose, wargameData: initialWargameData }) 
       </DialogContent>
       
       {/* Auto-save notification */}
-      <Snackbar
-        open={showSaveNotification || !!saveError}
-        autoHideDuration={4000}
+      <Snackbar 
+        open={showSaveNotification} 
+        autoHideDuration={3000}
         onClose={handleCloseNotification}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert
-           onClose={handleCloseNotification} 
-           severity={saveError ? "error" : "success"}
-           elevation={6}
-           variant="filled"
-         >
-          {saveError ? saveError : "Changes saved successfully"}
+        <Alert onClose={handleCloseNotification} severity="success">
+          Changes saved successfully
         </Alert>
       </Snackbar>
     </Dialog>

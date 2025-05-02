@@ -27,8 +27,9 @@ from core.embedding import get_embedding_model
 from core.vectorstore import load_metadata, save_metadata, VectorStoreManager
 import traceback
 from core.llm import generate_with_best_model
-from api.llm import generate_query_prompt, get_llm_response
-from helpers import get_vectorstore_manager
+from .helpers import get_vectorstore_manager
+# Import the standalone load_metadata function
+from core.vectorstore import load_metadata as load_vs_metadata
 # Set up logging
 logger = logging.getLogger("embedding_service")
 
@@ -189,6 +190,7 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
     score_threshold: float = 0.5
+    allowed_classifications: Optional[List[str]] = None
     
     model_config = {
         "extra": "ignore"
@@ -481,7 +483,7 @@ async def query_vectorstore(
     
     Args:
         vectorstore_id: ID of the vector store to query
-        query_request: Query parameters
+        query_request: Query parameters including optional classification filter
         manager: Vector store manager dependency
         
     Returns:
@@ -493,14 +495,15 @@ async def query_vectorstore(
         if not vs_info:
             raise HTTPException(status_code=404, detail=f"Vector store {vectorstore_id} not found")
         
-        logger.info(f"DEBUGGING: Querying vector store '{vectorstore_id}' with query: '{query_request.query}', top_k={query_request.top_k}")
+        logger.info(f"DEBUGGING: Querying vector store '{vectorstore_id}' with query: '{query_request.query}', top_k={query_request.top_k}, filter={query_request.allowed_classifications}")
         
         # Query the vector store using the enhanced method
         results = manager.query_vector_store(
             vectorstore_id,
             query_request.query,
             top_k=query_request.top_k,
-            score_threshold=query_request.score_threshold
+            score_threshold=query_request.score_threshold,
+            allowed_classifications=query_request.allowed_classifications
         )
         
         # Debug log the results to verify metadata enrichment
@@ -526,7 +529,7 @@ async def query_vectorstore(
                 
                 # Final security classification for display
                 sec_class = result['metadata'].get('security_classification', 'UNCLASSIFIED')
-                logger.info(f"DEBUGGING: Final security classification: {sec_class}")
+                # logger.info(f"DEBUGGING: Final security classification: {sec_class}") # Reduce verbosity
                 
                 # For the first result, format the entire metadata structure as we'll send to frontend
                 if i == 0:
@@ -871,8 +874,6 @@ async def process_batch_update(
                 current_file=f"Processing {len(staging_file_paths)} files for chunking"
             )
             
-
-            
             # Get chunking parameters from vector store metadata
             chunk_size = vs_info.get("chunk_size", 1000)
             chunk_overlap = vs_info.get("chunk_overlap", 100)
@@ -880,6 +881,7 @@ async def process_batch_update(
             # Load documents with progress updates for individual files
             documents = []
             skipped = []
+            skipped_files = []
             
             for idx, file_path in enumerate(staging_file_paths):
                 try:
@@ -896,8 +898,8 @@ async def process_batch_update(
                     # Load documents for this file
                     file_docs, file_skipped = load_documents(
                         [file_path],
-                        chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap
+                        max_block_size=request.max_paragraph_length if request.use_paragraph_chunking else request.chunk_size,
+                        min_block_size=request.min_paragraph_length if request.use_paragraph_chunking else 50
                     )
                     
                     if file_docs:
@@ -1171,14 +1173,16 @@ async def analyze_vectorstore(
             raise HTTPException(status_code=400, detail="Vector store is empty")
         
         # Get metadata
-        metadata_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "vectorstores", f"{vectorstore_id}", "metadata.json")
-        vs_metadata = None
-        
-        with open(metadata_path, "r") as f:
-            vs_metadata = json.load(f)
+        metadata_path = manager.get_metadata_path(vectorstore_id) # Use manager method
+        vs_metadata = load_vs_metadata(metadata_path) # Use standalone function
         
         if not vs_metadata:
             raise HTTPException(status_code=500, detail="Could not load vector store metadata")
+        
+        # --- FIX: Get correct embedding dimension --- 
+        embedding_dimension = vs_metadata.get("embedding_dimension", 768) # Get from metadata, fallback to default
+        logger.info(f"Using embedding dimension {embedding_dimension} for random sampling.")
+        # ------------------------------------------
             
         # Create a mapping of document_id to file info for metadata enrichment
         doc_metadata_map = {}
@@ -1187,30 +1191,35 @@ async def analyze_vectorstore(
                 doc_metadata_map[file_info["document_id"]] = file_info
         
         # Get sample chunks from the vector store
-        # Use the query method that has metadata enrichment
-        sample_size = min(request.sample_size, 50)  # Limit sample size for analysis
+        # --- REMOVE INCORRECT CALL ---
+        # chunk_sample = manager.get_content_sample(
+        #     vectorstore_id,
+        #     sample_size=request.sample_size,
+        #     strategy=request.sampling_strategy
+        # )
+        # --- Sampling logic is implemented below using query_vector_store ---
         
         # Get random embeddings to retrieve diverse chunks
-        random_embeddings = [np.random.rand(128).tolist() for _ in range(10)]
+        random_embeddings = [np.random.rand(embedding_dimension).tolist() for _ in range(10)]
         
         # Collect chunks from different random queries
         all_chunks = []
         for embedding in random_embeddings:
-            if len(all_chunks) >= sample_size:
+            if len(all_chunks) >= request.sample_size:
                 break
                 
             # Query with the random embedding
             chunks = manager.query_vector_store(
                 vectorstore_id,
                 embedding,
-                top_k=min(10, sample_size - len(all_chunks)),
+                top_k=min(10, request.sample_size - len(all_chunks)),
                 score_threshold=0.0  # No threshold for samples
             )
             
             # Add chunks to our collection, avoiding duplicates
             existing_texts = {chunk["text"] for chunk in all_chunks}
             for chunk in chunks:
-                if chunk["text"] not in existing_texts and len(all_chunks) < sample_size:
+                if chunk["text"] not in existing_texts and len(all_chunks) < request.sample_size:
                     all_chunks.append(chunk)
                     existing_texts.add(chunk["text"])
         
@@ -1299,7 +1308,7 @@ async def analyze_vectorstore(
         prompt = generate_analysis_prompt(chunks_for_llm, vs_metadata["name"], context_headers)
         
         # Get LLM response
-        llm_response = get_llm_analysis(prompt)
+        llm_response = get_llm_response(prompt)
         
         # Parse the response to extract structured information
         parsed_response = parse_llm_analysis(llm_response)
@@ -1367,11 +1376,11 @@ def generate_analysis_prompt(chunks: List[Dict[str, Any]], vectorstore_name: str
     return prompt
 
 
-def get_llm_analysis(prompt: str) -> str:
+def get_llm_response(prompt: str) -> str:
     """
-    Get LLM analysis using the provided prompt.
+    Get LLM response using the provided prompt.
     
-    This function interfaces with an LLM to generate an analysis of vector store content.
+    This function interfaces with an LLM to generate a response to the provided prompt.
     In a production system, this would call an external API or a local model.
     
     Args:
@@ -1384,7 +1393,7 @@ def get_llm_analysis(prompt: str) -> str:
         # Log the LLM request
         logger.info("Sending analysis request to LLM")
         
-            # Use the LLM module to generate a response
+        # Use the LLM module to generate a response
         options = {
             "temperature": 0.7,
             "max_tokens": 1500,
@@ -1396,13 +1405,13 @@ def get_llm_analysis(prompt: str) -> str:
     
     except Exception as e:
         # Log the error and return an error message
-        logger.error(f"Error getting LLM analysis: {str(e)}", exc_info=True)
+        logger.error(f"Error getting LLM response: {str(e)}", exc_info=True)
         return f"""
         CONTENT ANALYSIS:
-        Error generating analysis: {str(e)}
+        Error generating response: {str(e)}
         
         EXAMPLE QUERIES:
-        1. What error occurred during analysis?
+        1. What error occurred during response generation?
         2. How can I fix this error?
         """
 
@@ -1500,6 +1509,8 @@ async def process_vectorstore_creation(
         request: Vector store creation request
         manager: Vector store manager instance
     """
+    logger.info(f"JOB {job_id}: Starting background task process_vectorstore_creation for '{request.name}'")
+    
     try:
         # Update job progress
         update_job_progress(job_id, 0, "Preparing files", "copying_files")
@@ -1533,6 +1544,7 @@ async def process_vectorstore_creation(
         # Load documents with progress updates for individual files
         documents = []
         skipped = []
+        skipped_files = []
         
         for idx, file_path in enumerate(staging_file_paths):
             try:
@@ -1549,8 +1561,8 @@ async def process_vectorstore_creation(
                 # Load documents for this file
                 file_docs, file_skipped = load_documents(
                     [file_path],
-                    chunk_size=request.chunk_size,
-                    chunk_overlap=request.chunk_overlap
+                    max_block_size=request.max_paragraph_length if request.use_paragraph_chunking else request.chunk_size,
+                    min_block_size=request.min_paragraph_length if request.use_paragraph_chunking else 50
                 )
                 
                 if file_docs:
@@ -1817,11 +1829,30 @@ async def llm_query_vectorstore(
         
         # Generate a response using the LLM
         if query_request.use_llm:
-            # Import LLM-related functions
-
+            # Define a function specific to generating prompts from already fetched chunks
+            def _generate_llm_prompt_from_chunks(query: str, chunks: List[str], metadatas: List[Dict[str, Any]]) -> str:
+                """
+                Generate a prompt for the LLM based on a query and retrieved document chunks.
+                """
+                prompt = f"""
+                You are an expert analyst tasked with examining content from a vector store.
+                Below are sample text chunks from the vector store. Analyze them carefully to understand what type of information is contained in this collection.
+                
+                """
+                
+                # Include chunks with their context headers, if available
+                for i, (chunk, metadata) in enumerate(zip(chunks, metadatas)):
+                    prompt += f"CHUNK {i+1} CONTEXT: {metadata.get('source', 'unknown')} | Page: {metadata.get('page', 'N/A')} | Classification: {metadata.get('security_classification', 'UNCLASSIFIED')}\n"
+                    prompt += f"CHUNK {i+1} CONTENT:\n{chunk}\n\n"
+                
+                prompt += f"""
+                Based on these samples, please provide a detailed analysis of the content in this vector store.
+                """
+                
+                return prompt
             
-            # Generate prompt for the LLM
-            prompt = generate_query_prompt(
+            # Generate prompt for the LLM using the *local* helper
+            prompt = _generate_llm_prompt_from_chunks(
                 query_request.query,
                 chunks,
                 [result.get("metadata", {}) for result in results]

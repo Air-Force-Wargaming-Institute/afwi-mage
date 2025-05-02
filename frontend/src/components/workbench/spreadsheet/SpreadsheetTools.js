@@ -923,6 +923,7 @@ const SpreadsheetTools = () => {
                         color: 'white',
                         borderRadius: '0 0 20px 20px', // Fixed value to match other dropdowns
                         overflow: 'hidden', // Ensure content doesn't overflow the border radius
+                        overflowY: 'scroll', // <--- FORCE SCROLLING
                         boxShadow: '0 8px 16px rgba(0, 0, 0, 0.7)',
                         border: '1px solid rgba(66, 133, 244, 0.3)',
                         '& .MuiMenuItem-root': {

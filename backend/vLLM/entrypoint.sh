@@ -13,7 +13,7 @@ nvidia-smi --query-gpu=memory.total,memory.free,memory.used --format=csv
 echo "Environment variables:"
 env | grep -E "CUDA|GPU|MODEL|TENSOR"
 
-echo "Starting vLLM server with tensor parallelism across 2 GPUs..."
+echo "Starting vLLM server with tensor parallelism across 1 GPUs..."
 
 # Force tensor parallelism to 2 regardless of arguments
 ARGS=()

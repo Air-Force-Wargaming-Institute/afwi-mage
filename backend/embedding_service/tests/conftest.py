@@ -10,8 +10,12 @@ import logging
 import pytest
 from pathlib import Path
 
-# Add the parent directory to the path to allow importing from the embedding_service package
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Add the parent directory (embedding_service) to the Python path
+# This allows tests to import modules like 'core', 'api', etc.
+embedding_service_dir = str(Path(__file__).parent.parent)
+if embedding_service_dir not in sys.path:
+    print(f"Adding {embedding_service_dir} to sys.path for testing")
+    sys.path.insert(0, embedding_service_dir)
 
 # Configure logging for tests
 @pytest.fixture(autouse=True)

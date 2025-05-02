@@ -180,26 +180,6 @@ services:
       retries: 3
       start_period: 5s
 
-  # New Wargame Builder Service
-  wargame_service:
-    build: ./wargame_service
-    container_name: wargame_service
-    volumes:
-      - ../data:/app/data:rw
-      # Optional: Mount code for development hot-reloading if uvicorn --reload is used
-      # - ./wargame_service:/app 
-    ports:
-      - "8012:8012"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PORT=8012 # Internal port
-    networks:
-      - app-network
-    depends_on:
-      init-data:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
   db:
    image: postgres:13
    environment:

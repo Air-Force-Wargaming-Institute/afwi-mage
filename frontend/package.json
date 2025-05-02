@@ -2,7 +2,6 @@
   "name": "afwi-mage-finetune-frontend",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:80",
   "dependencies": {
     "@date-io/date-fns": "^3.2.1",
     "@emotion/react": "^11.11.3",
