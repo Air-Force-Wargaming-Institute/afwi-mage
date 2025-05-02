@@ -74,8 +74,8 @@ $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolu
 
 $dockerArgs = @(
     "run", "--rm",
-    "-v", "$normalizedWheelsPath:/wheels",
-    "-v", "$normalizedRequirementsPath:/reqs/requirements.txt:ro",
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
     'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt'

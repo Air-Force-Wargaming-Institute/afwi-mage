@@ -72,32 +72,48 @@ Function Normalize-DockerPath ($path) {
 $normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
 $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
 
-# Unstructured dependencies might be complex, allow pip to handle or fail
+# First try to get wheels where possible
 $dockerArgs = @(
     "run", "--rm",
-    "-v", "$normalizedWheelsPath:/wheels",
-    "-v", "$normalizedRequirementsPath:/reqs/requirements.txt:ro",
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, potential source-only packages ignored."'
+    'pip download --no-deps --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Wheel download completed with some issues, will try source packages next."'
 )
 & docker @dockerArgs
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "[$ServiceName] Docker command finished with non-zero exit code ($LASTEXITCODE). This might be okay if source packages were downloaded, check Docker logs."
-} else {
-    Write-Host "[$ServiceName] Docker wheel download command finished." -ForegroundColor Green
-}
+# Regardless of result, try downloading source packages for any packages that couldn't be found as wheels
+Write-Host "[$ServiceName] Downloading source packages for dependencies that don't have wheels..." -ForegroundColor Yellow
+$sourceDockerArgs = @(
+    "run", "--rm", 
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
+    "python:3.12-slim",
+    "bash", "-c",
+    'cd /wheels && pip download --no-deps --no-binary=:all: -r /reqs/requirements.txt || echo "Source package download completed with some issues."'
+)
+& docker @sourceDockerArgs
+
+# Don't worry about exit codes - we're just collecting whatever we can get
+Write-Host "[$ServiceName] Docker commands finished." -ForegroundColor Green
 
 # --- List Downloaded Wheels & Save List ---
-Write-Host "[$ServiceName] Listing downloaded wheels from $wheelsDirAbsolute..." -ForegroundColor Cyan
+Write-Host "[$ServiceName] Listing downloaded packages from $wheelsDirAbsolute..." -ForegroundColor Cyan
 $wheels = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl"
+$sourcePackages = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.tar.gz"
+if (-not $sourcePackages) {
+    $sourcePackages = @()
+}
+$zipPackages = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.zip"
+if ($zipPackages) {
+    $sourcePackages += $zipPackages
+}
 
-if ($wheels.Count -eq 0) {
-     Write-Warning "[$ServiceName] No wheel files found in $wheelsDirAbsolute. Check Docker output for errors."
+if ($wheels.Count -eq 0 -and $sourcePackages.Count -eq 0) {
+     Write-Warning "[$ServiceName] No wheel or source package files found in $wheelsDirAbsolute. Check Docker output for errors."
 } else {
-    Write-Host "[$ServiceName] Found $($wheels.Count) Linux-compatible wheel files in $wheelsDirAbsolute." -ForegroundColor Green
-    # foreach ($wheel in $wheels) { Write-Host "  - $($wheel.Name)" -ForegroundColor DarkGray } # Verbose
+    Write-Host "[$ServiceName] Found $($wheels.Count) Linux-compatible wheel files and $($sourcePackages.Count) source packages in $wheelsDirAbsolute." -ForegroundColor Green
 }
 
 Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
@@ -106,18 +122,63 @@ try {
     $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { ($_ -split '[<>=!~\[\]]')[0].Trim() }
     
     $foundWheels = @()
+    $foundSourcePackages = @()
+    
     foreach ($req in $requiredPackages) {
-        # Simple match - might need refinement for complex version specs or extras
-        $matchingWheel = $wheels | Where-Object { $_.Name -match "^$([regex]::Escape($req))(-|_)" }
+        # Normalize the package name (convert hyphens to underscores for comparison)
+        $normalizedReq = $req.ToLower().Replace("-", "_")
+        
+        # Try different matching patterns for wheel files
+        $matchingWheel = $wheels | Where-Object { 
+            $wheelName = $_.Name.ToLower()
+            # Match package name at the start, followed by hyphen or underscore
+            $wheelName -match "^$([regex]::Escape($normalizedReq))[-_]" -or 
+            # Also try with original name (some packages maintain hyphens)
+            $wheelName -match "^$([regex]::Escape($req.ToLower()))[-_]"
+        }
+        
         if ($matchingWheel) {
+            Write-Host "[$ServiceName] Found wheel for '$req': $($matchingWheel.Name)" -ForegroundColor Green
             $foundWheels += $matchingWheel.Name
         } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$req' in $wheelsDirAbsolute"
+            # Check for source packages (.tar.gz, .zip, etc.)
+            $matchingSource = $sourcePackages | Where-Object {
+                $sourceName = $_.Name.ToLower()
+                $sourceName -match "^$([regex]::Escape($normalizedReq))[-_]" -or
+                $sourceName -match "^$([regex]::Escape($req.ToLower()))[-_]"
+            }
+            
+            if ($matchingSource) {
+                Write-Host "[$ServiceName] Found source package for '$req': $($matchingSource.Name)" -ForegroundColor Yellow
+                $foundSourcePackages += $req
+            } else {
+                Write-Warning "[$ServiceName] No downloaded wheel or source package found for requirement '$req' in $wheelsDirAbsolute"
+                
+                # Debug output - show similar files that might be a match
+                $similarFiles = $wheels + $sourcePackages | Where-Object { 
+                    $_.Name.ToLower().Contains($normalizedReq.ToLower()) -or
+                    $_.Name.ToLower().Contains($req.ToLower())
+                }
+                if ($similarFiles) {
+                    Write-Host "[$ServiceName] Possible matches for '$req' in packages directory:" -ForegroundColor Yellow
+                    foreach ($file in $similarFiles) {
+                        Write-Host "   - $($file.Name)" -ForegroundColor Yellow
+                    }
+                }
+            }
         }
     }
 
     $foundWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
+    
+    if ($foundSourcePackages.Count -gt 0) {
+        Write-Host "[$ServiceName] The following packages were found as source packages and will need build dependencies in Dockerfile:" -ForegroundColor Yellow
+        foreach ($pkg in $foundSourcePackages) {
+            Write-Host "  - $pkg" -ForegroundColor Yellow
+        }
+        Write-Host "[$ServiceName] Ensure your Dockerfile includes necessary build tools (gcc, python-dev, etc.)" -ForegroundColor Yellow
+    }
 
 } catch {
     Write-Error "[$ServiceName] Error saving wheel list to file '$listFilePath': $_"
@@ -172,13 +233,18 @@ if ($nltkRequired) {
 
 # --- Final Instructions --- 
 Write-Host ""
-Write-Host "[$ServiceName] Wheels are downloaded to central location: $wheelsDirAbsolute" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Wheels and source packages are downloaded to central location: $wheelsDirAbsolute" -ForegroundColor Cyan
 Write-Host "[$ServiceName] Required wheels copied to local location: $localWheelsDirAbsolute" -ForegroundColor Cyan
 Write-Host "[$ServiceName] To use in airgapped environment:" -ForegroundColor Cyan
 Write-Host "   1. Copy the '$ServiceName' directory (containing the local '$localWheelsDirRelative' folder) to the target machine." -ForegroundColor White
-# Write-Host "   2. If NLTK is used, ensure the '$nltkDataDirRelative' folder is populated and copied."
-Write-Host "   3. Update Dockerfile build process if necessary to use '$localWheelsDirRelative'." -ForegroundColor Yellow
-Write-Host "   4. Run deployment scripts (e.g., airgapped_deploy.ps1) which should use the local wheels." -ForegroundColor White
+Write-Host "   2. Copy the entire '$wheelsDirAbsolute' directory which contains both wheels AND source packages" -ForegroundColor White
+Write-Host "   3. In your Dockerfile, add build dependencies and install from the wheels/source packages:" -ForegroundColor Yellow
+Write-Host "      - FROM python:3.12-slim" -ForegroundColor Yellow
+Write-Host "      - COPY requirements.txt /app/" -ForegroundColor Yellow
+Write-Host "      - COPY $wheelsDirRelative /wheels/" -ForegroundColor Yellow 
+Write-Host "      - RUN apt-get update && apt-get install -y build-essential gcc python3-dev cmake" -ForegroundColor Yellow
+Write-Host "      - RUN pip install --no-cache-dir --find-links=/wheels -r /app/requirements.txt" -ForegroundColor Yellow
+Write-Host "   4. Source packages will be built at install time with the build dependencies you installed" -ForegroundColor White
 
 # Create a package.zip file for easy transfer
 $doZip = $false

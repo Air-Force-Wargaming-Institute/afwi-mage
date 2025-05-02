@@ -75,8 +75,8 @@ $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolu
 # Note: PyPDF4 might be problematic as it often lacks wheels. Pip download might only get source.
 $dockerArgs = @(
     "run", "--rm",
-    "-v", "$normalizedWheelsPath:/wheels",
-    "-v", "$normalizedRequirementsPath:/reqs/requirements.txt:ro",
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
     'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, potential source-only packages ignored."'

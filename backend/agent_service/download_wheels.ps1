@@ -6,6 +6,9 @@ param(
     [switch]$AutoZip
 )
 
+# Define the service name based on the directory name
+$ServiceName = "agent_service"
+
 Write-Host "Downloading Linux-compatible wheels for airgapped installation..." -ForegroundColor Cyan
 
 # Check if Docker is available
@@ -17,6 +20,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 
 # Define the target wheels directory relative to the script location
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptDirAbsolute = (Resolve-Path -Path $scriptDir).Path # Get the full canonical path of script directory
 $wheelsDirRelative = "../backend_wheels"
 $wheelsDirAbsolute = Join-Path -Path $scriptDir -ChildPath $wheelsDirRelative
 $wheelsDirAbsolute = (Resolve-Path -Path $wheelsDirAbsolute).Path # Get the full canonical path

@@ -10,7 +10,9 @@ __pycache__/
 env/
 venv/
 *.so
-
+*.whl
+*.zip
+*.tar.gz
 # React
 node_modules/
 /build

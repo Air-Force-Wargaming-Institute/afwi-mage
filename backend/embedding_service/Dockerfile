@@ -3,27 +3,23 @@ FROM afwi-mage-base:3.12-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies for source packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    python3-dev \
-    cmake \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements and wheel files for installation
 COPY requirements.txt /build/
 COPY wheels/ /build/wheels/
 
-# Install dependencies from local wheels
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+# Install dependencies from local wheels with special handling for problematic packages
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels $(grep -v "unstructured-inference" requirements.txt | grep -v "faiss-gpu-cu12" | grep -v "^#") && \
+    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps unstructured-inference && \
+    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps faiss-gpu-cu12
 
 # Create a new virtual environment
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
-# Install dependencies into the virtual environment
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+# Install dependencies into the virtual environment with special handling
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels $(grep -v "unstructured-inference" requirements.txt | grep -v "faiss-gpu-cu12" | grep -v "^#") && \
+    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps unstructured-inference && \
+    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps faiss-gpu-cu12
 
 # Second stage: Create the final image
 FROM afwi-mage-base:3.12-slim
