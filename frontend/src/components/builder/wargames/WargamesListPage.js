@@ -9,6 +9,8 @@ import CalendarTodayIcon from '@material-ui/icons/CalendarToday';
 import UpdateIcon from '@material-ui/icons/Update';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import AddIcon from '@material-ui/icons/Add';
+import { useWargameService } from '../../../services/wargameService';
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@material-ui/core';
 
 const useStyles = makeStyles((theme) => ({
   card: {
@@ -79,60 +81,28 @@ function WargamesListPage() {
   const [selectedWargame, setSelectedWargame] = useState(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [wargameToDelete, setWargameToDelete] = useState(null);
-  
-  // Initialize with mock data - we'll use localStorage to persist wargames
-  const [wargameBuilds, setWargameBuilds] = useState(() => {
-    try {
-      // Try to load wargames from localStorage
-      const savedWargames = localStorage.getItem('wargameBuilds');
-      if (savedWargames) {
-        return JSON.parse(savedWargames);
-      }
-      
-      // Default mock data if no saved wargames
-      return [
-        { 
-          id: '1', 
-          name: 'East Asia Confrontation', 
-          description: 'Analysis of potential conflicts in the South China Sea',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'UNCLASSIFIED'
-        },
-        { 
-          id: '2', 
-          name: 'European Energy Crisis', 
-          description: 'Experimentation of European responses to energy infrastructure disruption',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'CONFIDENTIAL'
-        },
-        { 
-          id: '3', 
-          name: 'EUCOM & PACOM Dual Theater Wargame', 
-          description: 'Experimentation of a global crisis, dual theater wargame in European and Pacific theaters',
-          createdAt: null,
-          modifiedAt: null,
-          lastExecuted: null,
-          securityClassification: 'CONFIDENTIAL'
-        },
-      ];
-    } catch (error) {
-      console.error("Error loading wargame builds from localStorage:", error);
-      return [];
-    }
-  });
+  const [wargameBuilds, setWargameBuilds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { listWargames, deleteWargame, getWargame, createWargame } = useWargameService();
 
-  // Save wargames to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem('wargameBuilds', JSON.stringify(wargameBuilds));
-    } catch (error) {
-      console.error("Error saving wargame builds to localStorage:", error);
-    }
-  }, [wargameBuilds]);
+    const fetchWargames = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await listWargames();
+        setWargameBuilds(data || []);
+      } catch (err) {
+        console.error("Error fetching wargame list:", err);
+        setError(err.message || "Failed to load wargames.");
+        setWargameBuilds([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWargames();
+  }, [listWargames]);
 
   const handleOpenCreateModal = () => {
     setIsCreateModalOpen(true);
