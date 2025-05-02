@@ -12,17 +12,31 @@ import os # Import os
 import pathlib # Import pathlib
 from typing import Optional
 
-from .websocket_manager import manager # Import the manager instance
-from .model_loader import get_models, are_models_loaded # Import model loading utilities
-from .config import (DEVICE, BATCH_SIZE, HF_TOKEN, 
-                     WEBSOCKET_BUFFER_SECONDS, DIARIZATION_MIN_CHUNK_MS,
-                     ARTIFACT_STORAGE_BASE_PATH)
-from .session_manager import session_manager # Import Session Manager
+from websocket_manager import manager # Import the manager instance
+from model_loader import get_models, are_models_loaded # Import model loading utilities
+from config import (
+    DEVICE, BATCH_SIZE, HF_TOKEN, 
+    WEBSOCKET_BUFFER_SECONDS, DIARIZATION_MIN_CHUNK_MS,
+    ARTIFACT_STORAGE_BASE_PATH
+)
+from session_manager import session_manager # Import Session Manager
 from database import get_db_session, TranscriptionSession 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# --- START EDIT ---
+# Placeholder function for token validation (replace with actual logic)
+async def validate_token(token: str) -> bool:
+    """Placeholder for actual token validation logic."""
+    if not token:
+        return False
+    # In a real scenario, decode JWT, call auth service, etc.
+    logger.debug(f"Validating token (length: {len(token)})...") # Basic check
+    # For now, just check if it's not empty
+    return len(token) > 10 # Example: Simple length check
+# --- END EDIT ---
 
 # Constants
 TARGET_SAMPLE_RATE = 16000
@@ -249,6 +263,18 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """
     # --- Validation and Setup ---
     db: AsyncSession = None # Initialize db variable
+    # --- START EDIT ---
+    # Extract token from query parameters
+    token = websocket.query_params.get("token")
+    logger.debug(f"[{session_id}] WebSocket connection attempt. Token provided: {'Yes' if token else 'No'}")
+
+    # Validate token
+    if not await validate_token(token):
+        logger.warning(f"[{session_id}] WebSocket connection rejected due to invalid/missing token.")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
+        return
+    # --- END EDIT ---
+
     try:
         # Manually get a DB session for the WebSocket connection lifespan
         # Cannot use Depends() directly in WebSocket route

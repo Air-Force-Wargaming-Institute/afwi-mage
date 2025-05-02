@@ -9,20 +9,21 @@
 **Current Status**: Frontend UI components and structure are largely complete and integrated with the live backend via the API gateway. Backend service structure includes database integration (PostgreSQL) for session persistence, automatic table creation, WebSocket endpoint for streaming/processing/storage, core session management endpoints, and artifact saving logic in `/stop` (TXT/WEBM). Docker configuration (`Dockerfile`, `docker-compose.yml`) is complete.
 
 **Key Outstanding Issues**
-1. [ ] WebSocket Authentication: This is a significant gap. The current implementation in RecordingControlPanel.js connects to the WebSocket URL (/api/transcription/stream/{session_id}) provided by the /start-session endpoint without passing any authentication token. Standard browser WebSocket APIs don't support custom headers. The backend websocket_routes.py endpoint also does not appear to perform any authentication checks upon connection. The API gateway's auth-middleware typically doesn't intercept WebSocket upgrade requests in the same way as standard HTTP requests. This means the WebSocket connection is likely unauthenticated. This needs to be addressed. Common solutions involve passing the token as a query parameter in the WebSocket URL (requires backend modification to read and validate) or sending an authentication message immediately after connection (requires both frontend and backend changes). Decide on a robust strategy (query parameter or post-connection message) and implement it in both RecordingControlPanel.js and websocket_routes.py.
-2. [ ] Utility Endpoint Auth: The plan notes the /transcribe-file utility endpoint bypasses auth in the gateway config. This should be reviewed and likely secured if it poses a risk or is intended for use beyond simple testing.
-3. [ ] Frontend Auth Handling (REST): Frontend components (SessionBrowserPanel, RecordingControlPanel, RealtimeTaggingPanel, RecordTranscribe, TranscriptionDisplay) correctly import AuthContext to get the token and getGatewayUrl to construct API endpoints. The pattern of including the Authorization: Bearer <token> header in fetch calls seems to be followed where implemented (e.g., SessionBrowserPanel, TranscriptionDisplay, RecordTranscribe save). Crucially, end-to-end testing must verify this header is present and correct on all authenticated API calls.
-4. [ ] Audio Serving: The backend currently returns a placeholder URL (/placeholder/audio/...) for audio playback (GET /sessions/{id}). A proper mechanism to serve the stored audio files (e.g., via a dedicated FastAPI route serving static files or using pre-signed URLs if applicable) needs to be implemented. Replace the placeholder audio URL logic in GET /sessions/{id} (transcribe_routes.py) with a functional way to serve the concatenated audio files stored in the ARTIFACT_STORAGE_BASE_PATH.
-5. [ ] Missing Feature: As noted, PDF/DOCX generation is not implemented in the /stop endpoint (transcribe_routes.py).
-6. [ ] Potential Issue: The backend currently uses hardcoded or placeholder user IDs (e.g., "current-user" in list_sessions, taking user_id from request body in add_marker and start_session). This needs modification to properly integrate with the authentication system, likely by extracting the X-User-ID header passed by the API gateway's auth-middleware within the FastAPI request context/dependencies.
-7. [ ] Potential Memory Issue: The most likely source of high memory usage would be the transcriptionText state variable if a transcription (either live or loaded) becomes extremely long (e.g., hours of audio). The current implementation loads the entire text into this variable. While likely acceptable for moderate use, be mindful of this for very long sessions. Techniques like virtual scrolling or pagination within TranscriptionDisplay could mitigate this if it becomes a practical problem.
-8. [ ] Secure Utility Endpoint: Review if the /transcribe-file endpoint needs authentication via the API gateway.
+1. [ ] WebSocket Authentication: ✅ **Implemented (Query Parameter Method).** Uses placeholder validation.
+2. [ ] Utility Endpoint Auth: ❓ Needs review/decision.
+3. [ ] Frontend Auth Handling (REST): ✅ Seems implemented. Needs end-to-end testing.
+4. [ ] Audio Serving: ✅ **Implemented.** Added `GET /sessions/{session_id}/audio` endpoint using `FileResponse` in `transcribe_routes.py`. The `GET /sessions/{session_id}` endpoint now returns the correct relative URL for audio playback.
+5. [ ] Missing Feature (PDF/DOCX): ❗ Not implemented in `/stop`.
+6. [ ] Backend User ID Handling: ✅ **Implemented.** Uses gateway header.
+7. [ ] Potential Memory Issue (Long Transcripts): ✅ Acknowledged. Monitor in testing.
+8. [ ] Secure Utility Endpoint: ❓ Needs review/decision.
 9. [ ] 
 
 **Next Priorities**:
-1.  **Testing:** Conduct thorough end-to-end testing of the fully integrated system.
-2.  **Backend - Implement Other Output Formats:** Add logic to `/stop` to generate PDF/DOCX based on request. (Lower Priority)
-3.  Refine WebSocket segment info (e.g., enhance confidence reporting). (Lower Priority)
+1.  **Testing:** Conduct thorough end-to-end testing (including audio playback, user-specific session listing, and save changes logic).
+2.  **Backend - Implement Other Output Formats:** Add PDF/DOCX generation to `/stop`. (Lower Priority)
+3.  **Robust WS Token Validation:** Implement actual token validation in `websocket_routes.py` (Lower Priority for now).
+4.  Refine WebSocket segment info (e.g., enhance confidence reporting). (Lower Priority)
 
 ## Frontend-Backend Integration Guide
 
@@ -43,9 +44,9 @@ This guide outlines what's been prepared on the frontend and what backend develo
 
 ### Integration Steps for Frontend Developers
 
-1.  **End-to-End Testing:** Thoroughly test all interactions (recording, playback, editing, saving, markers, tags), refine error messages, loading states, and UI feedback based on live API/WebSocket behavior.
+1.  **End-to-End Testing:** Thoroughly test all interactions (recording, playback, editing, saving, markers, tags), refine error messages, loading states, and UI feedback based on live API/WebSocket behavior. Verify audio playback for loaded sessions and test the "Save Changes" button logic.
 2.  **State Management & Context Review:**
-    - Implement logic to track/compare initial loaded data vs. current state to enable/disable the "Save Changes" button accurately.
+    - Logic to track/compare initial loaded data vs. current state for enabling "Save Changes" is implemented via `initialLoadedData` and `isDirty` state in context. Verify in testing.
     - Ensure state updates are consistent after saving changes.
 3.  **Reconnection Logic:** Test WebSocket reconnection logic under various scenarios (server restart, temporary network loss).
 4.  **Backend - Implement Other Output Formats (Optional):** If needed, implement PDF/DOCX generation on backend.
@@ -396,6 +397,8 @@ The WebSocket connection at `/api/transcription/stream/{session_id}` is used for
 2. Receiving processed transcription segments (including text, speaker, timestamps, confidence) from the server.
 3. Sending speaker tag events from the client to the server.
 
+**Authentication:** The connection MUST include a valid authentication token passed as a query parameter (e.g., `/api/transcription/stream/{session_id}?token=YOUR_AUTH_TOKEN`). The backend validates this token upon connection.
+
 The WebSocket messages are expected in these formats:
 
 **Client to Server (Audio Chunks)**:
@@ -445,7 +448,11 @@ The WebSocket messages are expected in these formats:
 ```
 
 ### Authentication
-All API endpoints should require standard authentication through the API gateway service `backend\api_gateway\dynamic-conf.yaml`. Review the API-gateway to understand the necessary flow from frontend to backend and vice versa via the API gateway. **Frontend developers must ensure the Authorization header with the bearer token is included in requests routed through the gateway.** The existing `/transcribe-file` utility endpoint currently bypasses auth in the gateway config - this should likely be reviewed for production use.
+All REST API endpoints should require standard authentication through the API gateway service `backend\api_gateway\dynamic-conf.yaml`. Review the API-gateway to understand the necessary flow from frontend to backend and vice versa via the API gateway. Frontend developers must ensure the Authorization header with the bearer token is included in requests routed through the gateway.
+
+**WebSocket connections now require authentication via a token passed as a query parameter (`?token=...`).**
+
+The existing `/transcribe-file` utility endpoint currently bypasses auth in the gateway config - this should likely be reviewed for production use.
 
 ### Error Handling
 The frontend is designed to handle HTTP status codes and error messages with proper user feedback. Backend endpoints should:

@@ -61,6 +61,16 @@ import ParticipantManager from './ParticipantManager';
 import RealtimeTaggingPanel from './RealtimeTaggingPanel';
 import TranscriptionDisplay from './TranscriptionDisplay';
 
+// Utility for basic deep comparison (replace with lodash.isEqual if available/preferred)
+const deepCompare = (obj1, obj2) => {
+    try {
+        return JSON.stringify(obj1) === JSON.stringify(obj2);
+    } catch (e) {
+        console.error("Comparison error:", e);
+        return false; // Treat comparison error as unequal
+    }
+};
+
 // Styling for the RecordTranscribe component
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -283,6 +293,12 @@ const useStyles = makeStyles((theme) => ({
   fullHeight: {
     height: '100%',
   },
+  isDirty: {
+    // Add isDirty from context state
+  },
+  initialLoadedData: {
+    // Add initial data from context state
+  },
 }));
 
 // Helper function to format time in HH:MM:SS
@@ -374,8 +390,41 @@ const RecordTranscribe = () => {
     // Assume context tracks initial loaded data for comparison
     // initialSessionData // We'll check for existence/changes later
     // Assume context tracks if changes were made
-    // isDirty 
+    isDirty, // Add isDirty from context state
+    initialLoadedData // Add initial data from context state
   } = state;
+
+  // --- START EDIT ---
+  // Effect to check for changes and update isDirty state
+  useEffect(() => {
+    if (loadedSessionId && initialLoadedData) {
+      // Fields to compare
+      const currentDataToCompare = {
+        audioFilename: audioFilename,
+        transcriptionText: transcriptionText,
+        participants: participants,
+        eventMetadata: eventMetadata,
+        classification: selectedClassification,
+        caveatType: caveatType,
+        customCaveat: customCaveat,
+      };
+      
+      // Compare current state with the initial loaded state
+      const areEqual = deepCompare(currentDataToCompare, initialLoadedData);
+      
+      // Dispatch action only if dirty state needs to change
+      if (!areEqual && !isDirty) {
+          dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: true });
+      } else if (areEqual && isDirty) {
+          dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: false });
+      }
+    }
+    // Dependencies: Include all state variables being compared + loadedSessionId + initialLoadedData
+  }, [
+      loadedSessionId, initialLoadedData, audioFilename, transcriptionText, participants, 
+      eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch
+  ]);
+  // --- END EDIT ---
 
   // --- Helper function to check for unsaved form data ---
   // This logic might need adjustment based on which component handles saving changes for loaded sessions
@@ -542,6 +591,10 @@ const RecordTranscribe = () => {
           setSnackbarOpen(true);
           // Optionally: Dispatch an action to reset the 'isDirty' state or update 'initialSessionData' in context
           // dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
+          // --- START EDIT ---
+          // Dispatch action to mark session as saved (resets isDirty and updates initialLoadedData)
+          dispatch({ type: ACTIONS.MARK_SESSION_SAVED });
+          // --- END EDIT ---
           console.log("Save successful:", result);
 
       } catch (error) {
@@ -608,7 +661,7 @@ const RecordTranscribe = () => {
                          startIcon={<SaveIcon />} 
                          onClick={handleSaveChanges} 
                          // disabled={!isDirty || isFormDisabled} // Enable button based on changes
-                         disabled={isFormDisabled} // Temporarily disable only if recording/paused
+                         disabled={isFormDisabled || !isDirty}
                          style={{ marginTop: '8px' }}
                      >
                           Save Changes

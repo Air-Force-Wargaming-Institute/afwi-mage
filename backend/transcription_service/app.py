@@ -54,8 +54,10 @@ async def health_check():
     model_status = "loaded" if are_models_loaded() else "not loaded"
     return {"status": "healthy", "service": SERVICE_NAME, "models": model_status}
 
-if __name__ == "__main__":
-    # Note: Model loading is now handled by the lifespan manager
-    logger.info(f"Starting {SERVICE_NAME} on port {SERVICE_PORT}")
-    # Set reload=False when running in production or relying solely on lifespan for loading
-    uvicorn.run("app:app", host="0.0.0.0", port=SERVICE_PORT, log_level=LOG_LEVEL.lower(), reload=True) 
+# --- REMOVED ---
+# if __name__ == "__main__":
+#     # Note: Model loading is now handled by the lifespan manager
+#     logger.info(f"Starting {SERVICE_NAME} on port {SERVICE_PORT}")
+#     # Set reload=False when running in production or relying solely on lifespan for loading
+#     uvicorn.run("app:app", host="0.0.0.0", port=SERVICE_PORT, log_level=LOG_LEVEL.lower(), reload=True)
+# --- END REMOVED --- 

@@ -5,7 +5,10 @@ from sqlalchemy import Column, String, DateTime, JSON, Text, UUID as SQLAlchemyU
 import uuid # Import uuid for default factory
 from datetime import datetime
 
-from .config import DATABASE_URL
+# --- START EDIT ---
+# Use relative import for config
+from config import DATABASE_URL
+# --- END EDIT ---
 
 logger = logging.getLogger(__name__)
 

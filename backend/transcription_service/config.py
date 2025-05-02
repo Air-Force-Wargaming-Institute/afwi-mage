@@ -23,7 +23,7 @@ WEBSOCKET_BUFFER_SECONDS = int(os.getenv("WEBSOCKET_BUFFER_SECONDS", 5))
 DIARIZATION_MIN_CHUNK_MS = int(os.getenv("DIARIZATION_MIN_CHUNK_MS", 100))
 
 # Database URL
-DATABASE_URL = os.getenv("TRANSCRIPTION_DB_URL", "postgresql+asyncpg://user:password@postgres:5432/transcriptiondb")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@db:5432/transcriptiondb")
 
 # Artifact Storage Path (Local within container)
 # Base path where session data (audio, transcripts) will be stored.

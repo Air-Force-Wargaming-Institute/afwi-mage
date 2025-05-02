@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Request, Body, Depends, Query
+from fastapi.responses import FileResponse # Import FileResponse
 import whisperx
 import os
 import tempfile
@@ -7,14 +8,15 @@ import time
 from datetime import datetime
 from typing import List, Optional # Add List, Optional
 from uuid import UUID # Import UUID for path parameter validation
+from pydantic import BaseModel # Add BaseModel import
 import traceback # For detailed error logging
 import pathlib # For path manipulation
 import subprocess # For running ffmpeg
 import shutil # For cleaning up chunk directory
 
-# Import config constants directly
+# Import config constants directly using relative path
 from config import DEVICE, BATCH_SIZE, ARTIFACT_STORAGE_BASE_PATH # Import new config
-# Import session management and schemas
+# Import session management and schemas using relative paths
 from session_manager import session_manager # Use the refactored session manager instance
 from schemas import (
      StartSessionRequest, StartSessionResponse, 
@@ -23,14 +25,29 @@ from schemas import (
      AddMarkerRequest, AddMarkerResponse, # Import marker schemas
      GetTranscriptionResponse # Import new response model
 )
-# Import the centralized model loader and getter
+# Import the centralized model loader and getter using relative path
 from model_loader import get_models, are_models_loaded
-# Import DB session dependency and model
+# Import DB session dependency and model using relative path
 from database import get_db_session, TranscriptionSession 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# --- START EDIT ---
+# Dependency to get authenticated user ID from header
+async def get_current_user_id(request: Request) -> str:
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        # This should technically not happen if auth-middleware is effective
+        logger.error("X-User-ID header missing from authenticated request!")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Could not validate credentials (User ID missing)"
+        )
+    logger.debug(f"Authenticated User ID: {user_id}")
+    return user_id
+# --- END EDIT ---
 
 # --- Remove Model Loading Logic --- 
 # # NOTE: Models are loaded lazily by whisperx on first use or explicitly.
@@ -57,21 +74,27 @@ logger = logging.getLogger(__name__)
 async def start_session(
     request: Request, 
     session_data: StartSessionRequest = Body(...),
-    db: AsyncSession = Depends(get_db_session) # Inject DB session
+    db: AsyncSession = Depends(get_db_session), # Inject DB session
+    current_user_id: str = Depends(get_current_user_id) # Inject user ID
 ):
     """
     Initializes a new recording session in the database.
     Generates a unique session ID and stores initial metadata.
     """
+    # Use the injected user ID
     # TODO: Get user_id from auth middleware instead of request body
-    user_id = session_data.user_id # Assuming from body for now
-    if not user_id:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not provided.")
+    # user_id = session_data.user_id # Assuming from body for now
+    # if not user_id:
+    #      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not provided.")
          
-    session_data.user_id = user_id 
+    # session_data.user_id = user_id 
+    # We need to pass the user ID to the session manager
+    # Create a dict from the Pydantic model and add the user_id
+    # session_data_dict = session_data.dict()
+    # session_data_dict['user_id'] = current_user_id
 
-    # Pass db session to session_manager method
-    session_id = await session_manager.create_session(db, session_data)
+    # Pass db session and augmented data to session_manager method
+    session_id = await session_manager.create_session(db, session_data, current_user_id)
     if not session_id:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create session.")
 
@@ -389,11 +412,14 @@ async def list_sessions(
     request: Request, # To get user ID from headers/auth later
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id) # Inject user ID
 ):
     """Retrieves a list of past recording sessions for the authenticated user."""
+    # Use the injected user ID
     # TODO: Get user_id from authenticated request (e.g., request.state.user_id)
-    user_id = "current-user" # Placeholder
+    # user_id = "current-user" # Placeholder
+    user_id = current_user_id
     
     sessions_data = await session_manager.list_sessions(db, user_id, limit, offset)
     # Pydantic will automatically validate the structure based on SessionListItem
@@ -424,6 +450,7 @@ class SessionDetailsResponse(BaseModel):
             summary="Get full details for a specific session")
 async def get_session_details(
     session_id: UUID, 
+    request: Request, # Add request to construct full URL
     db: AsyncSession = Depends(get_db_session)
 ):
     """Retrieves the full details for a specific recording session."""
@@ -431,8 +458,16 @@ async def get_session_details(
     if not session_dict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
         
-    # TODO: Construct audio_url based on storage path and base URL/service
-    session_dict["audio_url"] = f"/placeholder/audio/{session_dict['audio_storage_path']}" if session_dict.get("audio_storage_path") else None
+    # Construct the audio URL relative to the gateway base path
+    if session_dict.get("audio_storage_path"):
+        # Assuming gateway path is /api/transcription
+        # request.url.path gives the full path requested to *this* service
+        # We want the path to the *new* audio endpoint
+        audio_endpoint_path = f"/api/transcription/sessions/{session_id}/audio"
+        session_dict["audio_url"] = audio_endpoint_path
+        logger.debug(f"Constructed audio_url: {session_dict['audio_url']}")
+    else:
+        session_dict["audio_url"] = None
         
     # Pydantic will validate the dictionary against SessionDetailsResponse
     return session_dict
@@ -488,7 +523,8 @@ async def add_marker(
     session_id: UUID,
     marker_request: AddMarkerRequest,
     request: Request, # To get user ID from auth later
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user_id: str = Depends(get_current_user_id) # Inject user ID
 ):
     """Adds a marker to the specified session's timeline."""
     session = await session_manager.get_session(db, str(session_id))
@@ -502,18 +538,11 @@ async def add_marker(
              status_code=status.HTTP_409_CONFLICT, 
              detail=f"Markers can only be added during an active (recording/paused) session. Current status: {session.status}"
          )
-    
-    # TODO: Get user_id from authenticated request instead of body
-    # For now, we use the one from the request body
-    user_id = marker_request.user_id
-    if not user_id:
-         # This case might indicate an issue if auth is expected
-         logger.warning(f"User ID missing in marker request for session {session_id}")
-         # Fallback or raise error?
-         # user_id = "unknown_marker_adder"
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID required for marker.")
-
+     
+    # Use the injected user ID and add it to the marker data
+    user_id = current_user_id
     marker_dict = marker_request.dict()
+    marker_dict['user_id'] = user_id
     
     marker_id = await session_manager.add_marker_to_session(db, str(session_id), marker_dict)
     
@@ -676,3 +705,47 @@ async def transcribe_audio_diarized_util(
         "language": result.get("language"),
         "segments": output_segments
         } 
+
+@router.get("/sessions/{session_id}/audio",
+            summary="Get the audio file for a session",
+            response_class=FileResponse # Use FileResponse directly
+           )
+async def get_session_audio(
+    session_id: UUID,
+    request: Request, # Can be used for auth checks if needed
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Retrieves the concatenated audio file for a completed session."""
+    logger.info(f"Request received for audio for session: {session_id}")
+    session = await session_manager.get_session(db, str(session_id))
+
+    if not session:
+        logger.warning(f"Audio request failed: Session {session_id} not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+    if not session.audio_storage_path:
+        logger.warning(f"Audio request failed: No audio file path stored for session {session_id}.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found for this session.")
+
+    audio_path = pathlib.Path(session.audio_storage_path)
+    
+    if not audio_path.is_file():
+        logger.error(f"Audio request failed: Audio file not found at stored path: {audio_path}")
+        # Maybe update DB state here if file is missing?
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing or inaccessible.")
+        
+    # TODO: Add permission check - does the requesting user own this session?
+    # user_id_from_auth = request.state.user_id # Assuming auth middleware sets this
+    # if session.user_id != user_id_from_auth:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    # Determine filename for download
+    # Use session name if available, fallback to session_id
+    filename_base = session.session_name or str(session_id)
+    download_filename = f"{filename_base}{audio_path.suffix}"
+    
+    # Determine media type based on suffix (simple check)
+    media_type = "audio/webm" if audio_path.suffix.lower() == ".webm" else "application/octet-stream"
+    
+    logger.info(f"Serving audio file: {audio_path} as {download_filename} (type: {media_type})")
+    return FileResponse(path=audio_path, media_type=media_type, filename=download_filename) 

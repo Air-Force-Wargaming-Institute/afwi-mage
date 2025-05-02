@@ -29,7 +29,7 @@ class EventMetadataSchema(BaseModel):
     # custom_caveat: Optional[str] = None
 
 class StartSessionRequest(BaseModel):
-    user_id: str # Provided by auth middleware later
+    # user_id: str # Provided by auth middleware later - REMOVED
     session_name: str
     output_format_preferences: Optional[OutputFormatPreferencesSchema] = None
     event_metadata: Optional[EventMetadataSchema] = None
@@ -51,7 +51,7 @@ class AddMarkerRequest(BaseModel):
     timestamp: float # Recording time in seconds
     description: Optional[str] = None # Optional description
     classification: Optional[str] = None # Classification of the marker itself
-    user_id: str # User who added the marker (TODO: Get from auth context)
+    # user_id: str # User who added the marker (TODO: Get from auth context) - REMOVED
 
 class AddMarkerResponse(BaseModel):
     marker_id: str

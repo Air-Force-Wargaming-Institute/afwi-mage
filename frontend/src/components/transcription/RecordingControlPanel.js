@@ -343,6 +343,19 @@ const RecordingControlPanel = () => {
   const connectWebSocket = useCallback((streamingUrl) => {
     if (!streamingUrl || loadedSessionId) return null;
     
+    // Check for token before attempting connection
+    if (!token) {
+        setApiError("WebSocket connection failed: Authentication token not found.");
+        setNetworkStatus('offline');
+        setSnackbarMessage("Cannot connect: Auth token missing.");
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        return null;
+    }
+
+    // Append token as query parameter
+    const wsUrlWithToken = `${streamingUrl}?token=${token}`;
+
     try {
       // Close existing WebSocket if any
       if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
@@ -350,13 +363,13 @@ const RecordingControlPanel = () => {
         wsRef.current.close(1000, "Client initiated reconnect"); 
       }
       
-      console.log(`[WebSocket] Attempting to connect to: ${streamingUrl}`);
+      console.log(`[WebSocket] Attempting to connect to: ${wsUrlWithToken}`);
       setNetworkStatus('connecting'); // Update status
       setSnackbarMessage('Connecting to transcription service...');
       setSnackbarSeverity('info');
       setSnackbarOpen(true);
 
-      const ws = new WebSocket(streamingUrl); 
+      const ws = new WebSocket(wsUrlWithToken); 
       wsRef.current = ws; // Assign early to allow cleanup
       
       ws.onopen = () => {
@@ -493,7 +506,7 @@ const RecordingControlPanel = () => {
       }
       return null;
     }
-  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState]);
+  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState, token]);
   
   // Function to stream audio chunks to server
   const streamAudioChunk = useCallback((audioChunk) => {
@@ -689,7 +702,7 @@ const RecordingControlPanel = () => {
     } else {
       console.log("Initialization failed, cannot start recording.");
     }
-  }, [loadedSessionId, initializeRecording, dispatch]);
+  }, [loadedSessionId, initializeRecording, dispatch, token]);
 
   const pauseRecording = useCallback(async () => {
     if (loadedSessionId || !mediaRecorder || recordingState !== RECORDING_STATES.RECORDING) return;

@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert # For upsert if needed
 
-from .schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema, OutputFormatPreferencesSchema
+from schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema, OutputFormatPreferencesSchema
 # Import the DB model and session getter
-from .database import TranscriptionSession, get_db_session 
+from database import TranscriptionSession, get_db_session 
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class SessionManager:
         # self.sessions: Dict[str, dict] = active_sessions
         pass # Initialization logic can go here if needed
 
-    async def create_session(self, db: AsyncSession, request: StartSessionRequest) -> Optional[str]:
+    async def create_session(self, db: AsyncSession, request: StartSessionRequest, user_id: str) -> Optional[str]:
         """Creates a new session in the database and returns its ID."""
         session_id = uuid.uuid4()
         now = datetime.utcnow() # Use UTC for database consistency
@@ -38,7 +38,7 @@ class SessionManager:
 
         new_session = TranscriptionSession(
             session_id=session_id,
-            user_id=request.user_id,
+            user_id=user_id,
             session_name=request.session_name,
             status="initialized",
             start_time=now,
@@ -56,7 +56,7 @@ class SessionManager:
             db.add(new_session)
             await db.commit()
             await db.refresh(new_session) # Refresh to get DB defaults if any
-            logger.info(f"Created new session in DB: {session_id} for user {request.user_id}")
+            logger.info(f"Created new session in DB: {session_id} for user {user_id}")
             return str(session_id) # Return as string
         except Exception as e:
             await db.rollback()

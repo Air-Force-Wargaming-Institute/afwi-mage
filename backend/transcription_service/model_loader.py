@@ -1,7 +1,7 @@
 import logging
 import whisperx
 import os
-from .config import (
+from config import (
     DEFAULT_MODEL,
     DEVICE,
     COMPUTE_TYPE,

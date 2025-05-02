@@ -185,14 +185,19 @@ services:
       start_period: 5s
 
   db:
-   image: postgres:13
+   # Build the custom image instead of using the official one directly
+   # Specify the build context (current dir '.' relative to compose file)
+   # and the Dockerfile path relative to the context.
+   build:
+     context: .
+     dockerfile: db/Dockerfile
+   # image: postgres:13 # Removed: We are building instead
    environment:
      POSTGRES_USER: ${POSTGRES_USER:-postgres}
      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
      POSTGRES_MULTIPLE_DATABASES: dbname,authdb,transcriptiondb
    volumes:
      - postgres_data:/var/lib/postgresql/data
-     - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
    networks:
      - app-network
    healthcheck:
