@@ -289,8 +289,16 @@ const ExecutionChecklist = ({ wargameData }) => {
     if (data?.activatedEntities && data.activatedEntities.length > 0) {
       if (data.activatedEntities.length < 2) {
         results.entities.message = 'At least 2 nations/organizations required';
+        results.entities.status = 'incomplete';
       } else {
+        // Calculate required relationships
+        const numEntities = data.activatedEntities.length;
+        const requiredRelationships = (numEntities * (numEntities - 1)) / 2;
+        const definedRelationships = Object.values(data.nationRelationships || {}).filter(rel => rel?.type).length;
+        const relationshipsComplete = definedRelationships >= requiredRelationships;
+
         // For each entity, check DIME configuration
+        let allDimeConfigsComplete = true;
         data.activatedEntities.forEach(entity => {
           const entityResults = {
             status: 'incomplete',
@@ -298,7 +306,6 @@ const ExecutionChecklist = ({ wargameData }) => {
             information: entity.configData?.information?.objectives ? 'complete' : 'incomplete',
             military: entity.configData?.military?.objectives ? 'complete' : 'incomplete',
             economic: entity.configData?.economic?.objectives ? 'complete' : 'incomplete',
-            relationships: Object.keys(entity.configData?.relationships || {}).length > 0 ? 'complete' : 'incomplete',
             message: ''
           };
           
@@ -308,10 +315,10 @@ const ExecutionChecklist = ({ wargameData }) => {
           if (entityResults.information === 'incomplete') incompleteSections.push('Information');
           if (entityResults.military === 'incomplete') incompleteSections.push('Military');
           if (entityResults.economic === 'incomplete') incompleteSections.push('Economic');
-          if (entityResults.relationships === 'incomplete') incompleteSections.push('Relationships');
           
           if (incompleteSections.length > 0) {
             entityResults.message = `Incomplete sections: ${incompleteSections.join(', ')}`;
+            allDimeConfigsComplete = false;
           } else {
             entityResults.status = 'complete';
           }
@@ -320,19 +327,19 @@ const ExecutionChecklist = ({ wargameData }) => {
           results.entities.items[entity.entityId] = entityResults;
         });
         
-        // Check if all entities are complete
-        const allEntitiesComplete = Object.values(results.entities.items).every(
-          entity => entity.status === 'complete'
-        );
-        
-        if (allEntitiesComplete) {
+        // Check if overall entity section is complete (all DIME + all relationships)
+        if (allDimeConfigsComplete && relationshipsComplete) {
           results.entities.status = 'complete';
         } else {
           results.entities.status = 'incomplete';
-          results.entities.message = 'Some entities have incomplete configuration';
+          const messages = [];
+          if (!allDimeConfigsComplete) messages.push('Some entities have incomplete DIME configuration');
+          if (!relationshipsComplete) messages.push(`${requiredRelationships - definedRelationships} relationships need definition`);
+          results.entities.message = messages.join('. ');
         }
       }
     } else {
+      results.entities.status = 'incomplete';
       results.entities.message = 'No nations/organizations selected';
     }
     
@@ -612,8 +619,8 @@ const ExecutionChecklist = ({ wargameData }) => {
             primary="Nations & Organizations" 
             secondary={
               validationResults.entities.status === 'complete'
-                ? 'All nations and organizations are fully configured'
-                : validationResults.entities.message || 'Some nations or organizations need configuration'
+                ? `All ${Object.keys(validationResults.entities.items).length} entities configured & relationships defined`
+                : validationResults.entities.message || 'Configuration incomplete'
             }
           />
           <ListItemSecondaryAction>
@@ -703,20 +710,6 @@ const ExecutionChecklist = ({ wargameData }) => {
                           }`}
                         >
                           {entity.economic === 'complete' ? 'Complete' : 'Incomplete'}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Box className={classes.dimeItem}>
-                        <Typography className={classes.dimeLabel}>Relationships:</Typography>
-                        <Typography 
-                          className={`${classes.dimeStatus} ${
-                            entity.relationships === 'complete' 
-                              ? classes.dimeComplete 
-                              : classes.dimeIncomplete
-                          }`}
-                        >
-                          {entity.relationships === 'complete' ? 'Complete' : 'Incomplete'}
                         </Typography>
                       </Box>
                     </Grid>
