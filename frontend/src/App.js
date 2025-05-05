@@ -36,6 +36,8 @@ import { Box, CssBaseline } from '@material-ui/core';
 import { StyledContainer } from './styles/StyledComponents';
 import backgroundImage from './assets/background.jpg';
 import WargameBuilder from './components/builder/wargames/WargameBuilder';
+import ReportBuilderMain from './components/Report Builder/ReportBuilderMain';
+import ReportDesignerPage from './components/Report Builder/ReportDesignerPage';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -132,6 +134,15 @@ const AuthenticatedRoutes = () => {
           </Route>
           <Route path="/wargame-builder">
             {user ? <WargameBuilder /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/report-builder">
+            {user ? <ReportBuilderMain /> : <Redirect to="/login" />}
+          </Route>
+          <Route exact path="/report-designer">
+            {user ? <ReportDesignerPage /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/report-designer/:reportId">
+            {user ? <ReportDesignerPage /> : <Redirect to="/login" />}
           </Route>
           
           {/* Root path redirects to login if not authenticated, home if authenticated */}

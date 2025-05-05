@@ -38,6 +38,7 @@ import agentTeamIcon from '../assets/agent-team.png';
 import BarChartIcon from '@material-ui/icons/BarChart';
 import PaletteIcon from '@material-ui/icons/Palette';
 import PublicIcon from '@material-ui/icons/Public';
+import DescriptionIcon from '@material-ui/icons/Description';
 
 // Styled components using Material-UI's styled API
 const HeaderRoot = styled('header')(({ theme }) => ({
@@ -243,6 +244,9 @@ const useStyles = makeStyles((theme) => ({
     '&:hover': {
       backgroundColor: alpha(theme.palette.primary.main, 0.1),
     }
+  },
+  reportBuilderIcon: {
+    marginRight: 5,
   }
 }));
 
@@ -522,6 +526,16 @@ function HeaderStyled() {
               >
                 <Box component="span" className="link-content">
                   <BarChartIcon /*style={{marginRight: 5}}*/ /> Analysis Workbench
+                </Box>
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/report-builder" 
+                className={`${classes.workflowLink} ${isActive('/report-builder')}`}
+              >
+                <Box component="span" className="link-content">
+                  <DescriptionIcon className={classes.reportBuilderIcon} /> Report Builder
                 </Box>
               </Link>
             </li>
