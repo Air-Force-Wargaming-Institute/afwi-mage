@@ -39,7 +39,6 @@ import WarningIcon from '@material-ui/icons/Warning';
 import SettingsIcon from '@material-ui/icons/Settings';
 import { GradientText } from '../../../styles/StyledComponents';
 import WargameMap from './WargameMap';
-import NationConfigPane from './NationConfigPane';
 import NationPostureModal from './NationPostureModal';
 import ConflictTheatersPane from './ConflictTheatersPane';
 import RelationshipMatrix from './RelationshipMatrix';
@@ -322,7 +321,6 @@ const ORGANIZATIONS = [
 
 function CrafterTab({ wargameData, onChange }) {
   const classes = useStyles();
-  const [selectedNations, setSelectedNations] = useState(wargameData?.activatedEntities || []);
   const [configureModalOpen, setConfigureModalOpen] = useState(false);
   const [selectedNation, setSelectedNation] = useState(null);
   const [recentlyAdded, setRecentlyAdded] = useState(null);
@@ -363,17 +361,15 @@ function CrafterTab({ wargameData, onChange }) {
   const [relationshipsComplete, setRelationshipsComplete] = useState(false);
   
   // Initialize activatedEntities if it doesn't exist
-  if (!wargameData.activatedEntities) {
-    wargameData.activatedEntities = [];
-  }
+  const activatedEntities = wargameData?.activatedEntities || [];
 
   // Ensure all custom entities are included in activatedEntities when loading
   useEffect(() => {
     // Only run this check on initial load or when customEntities changes externally
-    if (customEntities.length > 0) {
+    if (wargameData?.customEntities?.length > 0) {
       // Find custom entities that aren't in activatedEntities
-      const missingEntities = customEntities.filter(
-        customEntity => !selectedNations.some(
+      const missingEntities = wargameData.customEntities.filter(
+        customEntity => !activatedEntities.some(
           entity => entity.entityId === customEntity.entityId
         )
       );
@@ -391,33 +387,34 @@ function CrafterTab({ wargameData, onChange }) {
         }));
         
         // Update local state
-        const updatedNations = [...selectedNations, ...entitiesToAdd];
-        setSelectedNations(updatedNations);
+        const updatedNations = [...activatedEntities, ...entitiesToAdd];
+        setCustomEntities(entitiesToAdd);
         
         // Update parent component state
         onChange({
           ...wargameData,
-          activatedEntities: updatedNations
+          activatedEntities: updatedNations,
+          customEntities: entitiesToAdd
         });
       }
     }
-  }, []);  // Empty dependency array means it only runs once on mount
+  }, [wargameData?.customEntities, activatedEntities, onChange]);
 
   // Check if all nation relationships are defined
   useEffect(() => {
-    if (selectedNations.length < 2) {
+    if (activatedEntities.length < 2) {
       setRelationshipsComplete(false);
       return;
     }
     
     // Count how many relationships we should have
-    const totalPairsNeeded = (selectedNations.length * (selectedNations.length - 1)) / 2;
+    const totalPairsNeeded = (activatedEntities.length * (activatedEntities.length - 1)) / 2;
     
     // Count defined relationships
     const definedRelationships = Object.values(nationRelationships).filter(rel => rel.type).length;
     
     setRelationshipsComplete(definedRelationships >= totalPairsNeeded);
-  }, [selectedNations, nationRelationships]);
+  }, [activatedEntities, nationRelationships]);
 
   // Clear recently added effect after a delay
   useEffect(() => {
@@ -432,7 +429,7 @@ function CrafterTab({ wargameData, onChange }) {
 
   const handleNationSelect = (countryCode, countryName) => {
     // Check if nation is already selected
-    if (!selectedNations.some(nation => nation.entityId === countryCode)) {
+    if (!activatedEntities.some(nation => nation.entityId === countryCode)) {
       const newNation = {
         entityId: countryCode,
         entityName: countryName,
@@ -444,12 +441,13 @@ function CrafterTab({ wargameData, onChange }) {
       setRecentlyAdded(newNation);
       
       // Add to local state
-      setSelectedNations([...selectedNations, newNation]);
+      // No longer setting local state
       
       // Update parent component state
+      const updatedActivatedEntities = [...activatedEntities, newNation];
       onChange({
         ...wargameData,
-        activatedEntities: [...wargameData.activatedEntities, newNation]
+        activatedEntities: updatedActivatedEntities
       });
       
       // Show notification
@@ -462,7 +460,7 @@ function CrafterTab({ wargameData, onChange }) {
   
   const handleOrganizationSelect = (orgId, orgName) => {
     // Check if organization is already selected
-    if (!selectedNations.some(entity => entity.entityId === orgId)) {
+    if (!activatedEntities.some(entity => entity.entityId === orgId)) {
       const newOrganization = {
         entityId: orgId,
         entityName: orgName,
@@ -474,12 +472,13 @@ function CrafterTab({ wargameData, onChange }) {
       setRecentlyAdded(newOrganization);
       
       // Add to local state
-      setSelectedNations([...selectedNations, newOrganization]);
+      // No longer setting local state
       
       // Update parent component state
+      const updatedActivatedEntities = [...activatedEntities, newOrganization];
       onChange({
         ...wargameData,
-        activatedEntities: [...wargameData.activatedEntities, newOrganization]
+        activatedEntities: updatedActivatedEntities
       });
       
       // Show notification
@@ -498,11 +497,11 @@ function CrafterTab({ wargameData, onChange }) {
 
   const handleRemoveNation = (entityId) => {
     // Find the nation being removed for the notification
-    const removedNation = selectedNations.find(entity => entity.entityId === entityId);
+    const removedNation = activatedEntities.find(entity => entity.entityId === entityId);
     
     // Remove from activated entities
-    const updatedNations = selectedNations.filter(entity => entity.entityId !== entityId);
-    setSelectedNations(updatedNations);
+    const updatedActivatedEntities = activatedEntities.filter(entity => entity.entityId !== entityId);
+    // No longer setting local state
     
     // Clean up theaters - remove the entity from all theater sides
     const updatedTheaters = theaters.map(theater => {
@@ -529,7 +528,7 @@ function CrafterTab({ wargameData, onChange }) {
     // Update parent component state with all changes
     onChange({
       ...wargameData,
-      activatedEntities: updatedNations,
+      activatedEntities: updatedActivatedEntities,
       conflictTheaters: updatedTheaters,
       nationRelationships: updatedRelationships
     });
@@ -560,16 +559,15 @@ function CrafterTab({ wargameData, onChange }) {
   
   const handleSaveNationConfig = (updatedEntity) => {
     // Update in local state
-    const updatedEntities = selectedNations.map(entity => 
-      entity.entityId === updatedEntity.entityId ? updatedEntity : entity
-    );
-    
-    setSelectedNations(updatedEntities);
+    // No longer setting local state
     
     // Update parent component state
+    const updatedActivatedEntities = activatedEntities.map(entity => 
+      entity.entityId === updatedEntity.entityId ? updatedEntity : entity
+    );
     onChange({
       ...wargameData,
-      activatedEntities: updatedEntities
+      activatedEntities: updatedActivatedEntities
     });
     
     // Show notification
@@ -640,7 +638,7 @@ function CrafterTab({ wargameData, onChange }) {
     // Check if the entity already exists in custom entities or activated entities
     const entityExists = 
       customEntities.some(entity => entity.entityId === entityToAdd.entityId) ||
-      selectedNations.some(entity => entity.entityId === entityToAdd.entityId);
+      activatedEntities.some(entity => entity.entityId === entityToAdd.entityId);
     
     if (entityExists) {
       setNotification({
@@ -654,11 +652,10 @@ function CrafterTab({ wargameData, onChange }) {
     const updatedCustomEntities = [...customEntities, entityToAdd];
     
     // Update activatedEntities list
-    const updatedActivatedEntities = [...selectedNations, entityToAdd];
+    const updatedActivatedEntities = [...activatedEntities, entityToAdd];
     
     // Update local state
     setCustomEntities(updatedCustomEntities);
-    setSelectedNations(updatedActivatedEntities);
     setRecentlyAdded(entityToAdd); // Set as recently added for visual feedback
     
     // Update parent component state with both lists in a single update
@@ -708,10 +705,10 @@ function CrafterTab({ wargameData, onChange }) {
     setCustomEntities(updatedCustomEntities);
     
     // Always remove from activated entities
-    const updatedActivatedEntities = selectedNations.filter(
+    const updatedActivatedEntities = activatedEntities.filter(
       entity => entity.entityId !== entityToDelete.entityId
     );
-    setSelectedNations(updatedActivatedEntities);
+    // No longer setting local state
     
     // Clean up theaters - remove the entity from all theater sides
     const updatedTheaters = theaters.map(theater => {
@@ -863,9 +860,9 @@ function CrafterTab({ wargameData, onChange }) {
                   </>
                 ) : (
                   <>
-                    {selectedNations.length < 2 ? 
+                    {activatedEntities.length < 2 ? 
                       "Add nations" : 
-                      `${Object.values(nationRelationships).filter(rel => rel.type).length} of ${(selectedNations.length * (selectedNations.length - 1)) / 2} defined`
+                      `${Object.values(nationRelationships).filter(rel => rel.type).length} of ${(activatedEntities.length * (activatedEntities.length - 1)) / 2} defined`
                     }
                   </>
                 )}
@@ -873,7 +870,7 @@ function CrafterTab({ wargameData, onChange }) {
             </Box>
 
             <Typography variant="body2" color="textSecondary" paragraph>
-              {selectedNations.length < 2 ? 
+              {activatedEntities.length < 2 ? 
                 "Add at least two nations or organizations to define relationships." : 
                 relationshipsComplete ? 
                   "All relationships defined. You can now configure theaters of conflict." : 
@@ -883,7 +880,7 @@ function CrafterTab({ wargameData, onChange }) {
             
             <Box className={classes.matrixWrapper}>
               <RelationshipMatrix
-                nations={selectedNations}
+                nations={activatedEntities}
                 relationships={nationRelationships}
                 onChange={handleUpdateRelationships}
               />
@@ -911,7 +908,7 @@ function CrafterTab({ wargameData, onChange }) {
             </Box>
             
             <WargameMap 
-              selectedNations={selectedNations.map(n => n.entityId)} 
+              selectedNations={activatedEntities.map(n => n.entityId)} 
               onSelectNation={handleNationSelect}
               onSelectOrganization={handleOrganizationSelect}
               onRemoveNation={handleRemoveNation}
@@ -934,7 +931,7 @@ function CrafterTab({ wargameData, onChange }) {
         open={configureModalOpen}
         onClose={handleCloseConfigureModal}
         nation={selectedNation}
-        otherNations={selectedNations.filter(n => n.entityId !== selectedNation?.entityId)}
+        otherNations={activatedEntities.filter(n => n.entityId !== selectedNation?.entityId)}
         onSave={handleSaveNationConfig}
         nationRelationships={nationRelationships}
       />
@@ -1126,7 +1123,7 @@ function CrafterTab({ wargameData, onChange }) {
           </Typography>
           <Box component="ul" mt={1} ml={2}>
             <Typography component="li">Delete this custom entity from your wargame</Typography>
-            <Typography component="li">Remove all its configuration data if activated</Typography>
+            <Typography component="li">Remove all configuration data if activated</Typography>
             <Typography component="li">Delete any relationships with other nations</Typography>
             <Typography component="li">Remove it from all theaters of conflict</Typography>
           </Box>
@@ -1159,13 +1156,11 @@ function CrafterTab({ wargameData, onChange }) {
             
             <Box className={classes.stepIndicator}>
               <Box 
-                className={`${classes.step} ${relationshipsComplete ? classes.stepComplete : classes.stepActive}`}
-              >
+                className={`${classes.step} ${relationshipsComplete ? classes.stepComplete : classes.stepActive}`}>
                 Step 1: Define Relationships
               </Box>
               <Box 
-                className={`${classes.step} ${relationshipsComplete ? classes.stepActive : classes.stepPending}`}
-              >
+                className={`${classes.step} ${relationshipsComplete ? classes.stepActive : classes.stepPending}`}>
                 Step 2: Configure Theaters
               </Box>
             </Box>
@@ -1189,7 +1184,7 @@ function CrafterTab({ wargameData, onChange }) {
                 </Typography>
                 <Box className={classes.disabledSection}>
                   <ConflictTheatersPane 
-                    nations={selectedNations}
+                    nations={activatedEntities}
                     theaters={theaters}
                     onChange={handleUpdateTheaters}
                   />
