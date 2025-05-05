@@ -184,6 +184,7 @@ const ExecutionChecklist = ({ wargameData }) => {
   // Validate the wargame data whenever it changes
   useEffect(() => {
     if (wargameData) {
+      // Rerun validation to get the structured results
       const results = validateWargameData(wargameData);
       setValidationResults(results);
       
@@ -209,17 +210,30 @@ const ExecutionChecklist = ({ wargameData }) => {
         if (item.status === 'complete') completedItems++;
       });
       
-      // Count entity items (with multiplier for DIME sections)
-      if (results.entities.items) {
+      // Count entity items (DIME per entity) + 1 for overall relationships
+      if (results.entities.items && Object.keys(results.entities.items).length > 0) {
+        const numEntities = Object.keys(results.entities.items).length;
+        // Count DIME for each entity
+        totalItems += numEntities * 4; // 4 DIME sections per entity
         Object.values(results.entities.items).forEach(entity => {
-          // Count each DIME section plus relationships
-          totalItems += 5; // D, I, M, E, relationships
           if (entity.diplomacy === 'complete') completedItems++;
           if (entity.information === 'complete') completedItems++;
           if (entity.military === 'complete') completedItems++;
           if (entity.economic === 'complete') completedItems++;
-          if (entity.relationships === 'complete') completedItems++;
         });
+        
+        // Add 1 item for the overall relationship check
+        totalItems += 1;
+        // Check if relationships were determined complete by validateWargameData
+        // Infer this by checking if the entities section is complete OR
+        // if the entities message specifically mentions relationships being needed.
+        // A cleaner way might involve recalculating, but this uses the validation result.
+        const relationshipsAreComplete = results.entities.status === 'complete' || 
+             (results.entities.status === 'incomplete' && !results.entities.message?.includes('relationships need definition'));
+        
+        if (relationshipsAreComplete) {
+          completedItems++;
+        }
       }
       
       const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
