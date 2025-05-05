@@ -30,8 +30,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
+              #count: 1
               count: 1
-              #count: 2
               capabilities: [gpu]
     networks:
       - app-network
