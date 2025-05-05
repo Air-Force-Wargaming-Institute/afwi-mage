@@ -61,7 +61,7 @@ const useStyles = makeStyles((theme) => ({
 
 // Placeholder for generated content - replace with actual API call result
 const generateMockContent = (instructions) => {
-  return `<!-- AI Generated Content -->\nBased on your instruction: "${instructions}", here is some generated content.\n\n*   This is point one.\n*   This is point two.\n\n\`\`\`javascript\nconsole.log("Mock generated code block");\n\`\`\`\n<!-- End AI Generated Content -->`;
+  return `<!-- START MAGE GENERATED CONTENT -->\nInstructions for MAGE: "${instructions}"\n<!-- END MAGE GENERATED CONTENT -->`;
 };
 
 // Updated function to format explicit content
