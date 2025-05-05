@@ -59,8 +59,10 @@
         ],
         "color": "#32CD32",
         "created_at": "2025-04-22T17:49:05.078243Z",
-        "last_modified": "2025-04-22T17:49:05.078279Z",
-        "vectorstore": []
+        "last_modified": "2025-05-05T15:55:42.487213Z",
+        "vectorstore": [
+            "9fa7eb8c-ccde-4432-8e21-75c25829caa4"
+        ]
     },
     {
         "name": "Analysis Team",

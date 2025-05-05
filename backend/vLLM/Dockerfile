@@ -7,7 +7,7 @@ ENV TP_SIZE=$GPU_COUNT
 # Create an entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-RUN mkdir -p /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
-ADD ./models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2 /models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2
+RUN mkdir -p /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
+ADD ./models/DeepHermes-3-Llama-3-8B-Preview-abliterated /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
 
 ENTRYPOINT ["/entrypoint.sh"]

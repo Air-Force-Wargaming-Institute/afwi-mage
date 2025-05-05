@@ -2,24 +2,426 @@
   "id": "72fd68e3-70b0-40b4-a45a-38366a9cddfd",
   "name": "dfgdfgdf",
   "description": "sfddfsdfdf",
-  "designer": "dfdfg",
-  "securityClassification": "SECRET",
-  "roadToWar": "",
+  "designer": "dfdfgdfgdfgdfgdfdd",
+  "securityClassification": "UNCLASSIFIED",
+  "roadToWar": "hello\nasdfsd",
   "researchObjectives": [
-    "dfgdfgdfgdfgd"
+    "sdfsdfsdfsdf",
+    "yyyyyydf",
+    "tyutyutyutyutyu",
+    "ddfgdfgd",
+    "dfgdfgdfg",
+    "werwerw",
+    "qweqweq"
   ],
   "numberOfIterations": 8,
   "numberOfMoves": 10,
-  "timeHorizon": null,
+  "timeHorizon": "5 months",
   "wargameStartDate": null,
   "selectedVectorstore": "vectorstore_2",
   "selectedDatabase": null,
-  "approvedFields": {},
-  "activatedEntities": [],
+  "approvedFields": {
+    "researchObjectives": true,
+    "roadToWar": false
+  },
+  "activatedEntities": [
+    {
+      "entityId": "US",
+      "entityName": "United States of America",
+      "entityType": "nation",
+      "isConfigured": true,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "uuuuuu"
+          ],
+          "posture": "",
+          "keyInitiatives": "",
+          "prioritiesMatrix": "",
+          "redLines": "",
+          "treatyObligations": "",
+          "diplomaticResources": "",
+          "specialConsiderations": ""
+        },
+        "information": {
+          "objectives": [],
+          "propagandaThemes": "",
+          "cyberTargets": "",
+          "strategicCommunicationFramework": "",
+          "intelCollectionPriorities": "",
+          "disinformationResilience": "",
+          "mediaLandscapeControl": "",
+          "specialConsiderations": ""
+        },
+        "military": {
+          "objectives": [],
+          "alertLevel": "",
+          "doctrine": "",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "",
+          "escalationLadder": "",
+          "decisionMakingProtocol": "",
+          "forceProjectionCapabilities": "",
+          "defenseIndustrialCapacity": "",
+          "domainPosture": {
+            "land": "",
+            "sea": "",
+            "air": "",
+            "cyber": "",
+            "space": ""
+          },
+          "specialConsiderations": ""
+        },
+        "economic": {
+          "objectives": [],
+          "tradeFocus": "",
+          "resourceDeps": "",
+          "sanctionsPolicy": "",
+          "economicWarfareTools": "",
+          "criticalInfrastructureResilience": "",
+          "strategicResourceAccess": "",
+          "financialSystemLeverage": "",
+          "technologyTransferControls": "",
+          "specialConsiderations": ""
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "DZ",
+      "entityName": "Algeria",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [],
+          "posture": "",
+          "keyInitiatives": "",
+          "prioritiesMatrix": "",
+          "redLines": "",
+          "treatyObligations": "",
+          "diplomaticResources": "",
+          "specialConsiderations": ""
+        },
+        "information": {
+          "objectives": [],
+          "propagandaThemes": "",
+          "cyberTargets": "",
+          "strategicCommunicationFramework": "",
+          "intelCollectionPriorities": "",
+          "disinformationResilience": "",
+          "mediaLandscapeControl": "",
+          "specialConsiderations": ""
+        },
+        "military": {
+          "objectives": [],
+          "alertLevel": "",
+          "doctrine": "",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "",
+          "escalationLadder": "",
+          "decisionMakingProtocol": "",
+          "forceProjectionCapabilities": "",
+          "defenseIndustrialCapacity": "",
+          "domainPosture": {
+            "land": "",
+            "sea": "",
+            "air": "",
+            "cyber": "",
+            "space": ""
+          },
+          "specialConsiderations": ""
+        },
+        "economic": {
+          "objectives": [],
+          "tradeFocus": "",
+          "resourceDeps": "",
+          "sanctionsPolicy": "",
+          "economicWarfareTools": "",
+          "criticalInfrastructureResilience": "",
+          "strategicResourceAccess": "",
+          "financialSystemLeverage": "",
+          "technologyTransferControls": "",
+          "specialConsiderations": ""
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "SA",
+      "entityName": "Saudi Arabia",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [],
+          "posture": "",
+          "keyInitiatives": "",
+          "prioritiesMatrix": "",
+          "redLines": "",
+          "treatyObligations": "",
+          "diplomaticResources": "",
+          "specialConsiderations": ""
+        },
+        "information": {
+          "objectives": [],
+          "propagandaThemes": "",
+          "cyberTargets": "",
+          "strategicCommunicationFramework": "",
+          "intelCollectionPriorities": "",
+          "disinformationResilience": "",
+          "mediaLandscapeControl": "",
+          "specialConsiderations": ""
+        },
+        "military": {
+          "objectives": [],
+          "alertLevel": "",
+          "doctrine": "",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "",
+          "escalationLadder": "",
+          "decisionMakingProtocol": "",
+          "forceProjectionCapabilities": "",
+          "defenseIndustrialCapacity": "",
+          "domainPosture": {
+            "land": "",
+            "sea": "",
+            "air": "",
+            "cyber": "",
+            "space": ""
+          },
+          "specialConsiderations": ""
+        },
+        "economic": {
+          "objectives": [],
+          "tradeFocus": "",
+          "resourceDeps": "",
+          "sanctionsPolicy": "",
+          "economicWarfareTools": "",
+          "criticalInfrastructureResilience": "",
+          "strategicResourceAccess": "",
+          "financialSystemLeverage": "",
+          "technologyTransferControls": "",
+          "specialConsiderations": ""
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    }
+  ],
   "customEntities": [],
-  "nationRelationships": {},
-  "conflictTheaters": [],
+  "nationRelationships": {
+    "DZ_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "SA_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DZ_SA": {
+      "type": "enemy",
+      "notes": ""
+    }
+  },
+  "conflictTheaters": [
+    {
+      "id": "theater-1746463841789",
+      "name": "New Theater",
+      "description": "",
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#4285F4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#EA4335"
+        }
+      ]
+    }
+  ],
   "createdAt": "2025-05-02T22:37:01.010806",
-  "modifiedAt": "2025-05-02T22:37:21.125911",
+  "modifiedAt": "2025-05-05T16:50:54.501061",
   "lastExecuted": null
 }
