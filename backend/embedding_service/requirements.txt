@@ -35,8 +35,8 @@ requests>=2.31.0
 # Environment and configuration
 python-dotenv==1.0.1
 
-# Vector store - CPU version
-faiss-cpu>=1.7.0
-
+# Vector store - GPU version (CUDA 12)
+#faiss-cpu>=1.7.0
+faiss-gpu-cu12>=1.7.2
 # System monitoring
 psutil==5.9.5

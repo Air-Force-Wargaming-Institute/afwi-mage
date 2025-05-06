@@ -6,6 +6,9 @@ param(
     [switch]$AutoZip
 )
 
+# Define the service name based on the directory name
+$ServiceName = "agent_service"
+
 Write-Host "Downloading Linux-compatible wheels for airgapped installation..." -ForegroundColor Cyan
 
 # Check if Docker is available
