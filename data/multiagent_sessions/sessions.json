@@ -1,13 +1,5 @@
 [
   {
-    "session_id": "91dcad16-7299-442f-8182-3c206377a8d7",
-    "team_id": "2e6d95bf-f6b8-4b31-aa05-7f7bc8ad33db",
-    "session_name": "Example Chat Session",
-    "created_at": "2025-04-15T13:26:40.049965+00:00",
-    "updated_at": "2025-04-15T13:26:40.049965+00:00",
-    "conversation_history": []
-  },
-  {
     "session_id": "2fcdead5-3944-48a4-9fff-77dca077a948",
     "team_id": "649a21c8-3553-46a0-b12d-3821a8aada34",
     "session_name": "NATO",

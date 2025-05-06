@@ -623,8 +623,17 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
                      }
                   });
                 } else if (nation.configData[sectionKey]?.[fieldKey] !== undefined) {
-                   if (fieldKey === 'objectives' && !Array.isArray(nation.configData[sectionKey][fieldKey])) {
-                     baseData[sectionKey][fieldKey] = nation.configData[sectionKey][fieldKey] ? [nation.configData[sectionKey][fieldKey]] : [];
+                   // Fix for objectives array handling
+                   if (fieldKey === 'objectives') {
+                     // Always ensure objectives is a properly initialized array
+                     if (!nation.configData[sectionKey][fieldKey]) {
+                       baseData[sectionKey][fieldKey] = [];
+                     } else if (Array.isArray(nation.configData[sectionKey][fieldKey])) {
+                       baseData[sectionKey][fieldKey] = [...nation.configData[sectionKey][fieldKey]];
+                     } else {
+                       // If it's a single value, convert to array with that value
+                       baseData[sectionKey][fieldKey] = [nation.configData[sectionKey][fieldKey]];
+                     }
                    } else {
                      baseData[sectionKey][fieldKey] = nation.configData[sectionKey][fieldKey];
                    }
@@ -659,6 +668,14 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
             mergeEnabledFields(baseData.enabledFields, nation.configData.enabledFields, initialNationData.enabledFields);
         }
       }
+      
+      // Final validation to ensure all objectives are arrays
+      ['diplomacy', 'information', 'military', 'economic'].forEach(section => {
+        if (!Array.isArray(baseData[section].objectives)) {
+          baseData[section].objectives = baseData[section].objectives ? [baseData[section].objectives] : [];
+        }
+      });
+      
       setNationData(baseData);
     } else {
       setNationData(initialNationData);
