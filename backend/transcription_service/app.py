@@ -28,6 +28,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=SERVICE_NAME, lifespan=lifespan)
 
+@app.get("/api/transcription/health") # Simpler health check endpoint path
+async def health_check():
+    """Health check endpoint for the transcription service."""
+    logger.info("Health check endpoint called.")
+    # Check model status
+    model_status = "loaded" if are_models_loaded() else "not loaded"
+    # return {"status": "healthy", "service": SERVICE_NAME, "models": model_status}
+    return {"status": "healthy"}
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -38,21 +47,13 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(transcribe_router, prefix="/api/transcription", tags=["Transcription (File Upload)"])
-app.include_router(websocket_router, prefix="/api/transcription", tags=["Transcription (WebSocket)"])
+app.include_router(transcribe_router, tags=["Transcription (File Upload)"])
+app.include_router(websocket_router, tags=["Transcription (WebSocket)"])
 
 
 @app.get("/")
 async def root():
     return {"message": f"Welcome to the {SERVICE_NAME} API"}
-
-@app.get("/health") # Simpler health check endpoint path
-async def health_check():
-    """Health check endpoint for the transcription service."""
-    logger.info("Health check endpoint called.")
-    # Check model status
-    model_status = "loaded" if are_models_loaded() else "not loaded"
-    return {"status": "healthy", "service": SERVICE_NAME, "models": model_status}
 
 # --- REMOVED ---
 # if __name__ == "__main__":

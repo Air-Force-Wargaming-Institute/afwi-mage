@@ -107,15 +107,13 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
         # --- Preprocessing --- 
         audio_segment = audio_segment.set_frame_rate(TARGET_SAMPLE_RATE)
         samples = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-        audio_np = samples # WhisperX uses numpy array
+        audio_np = samples
 
-        # --- Model Inference --- 
-        current_language = session.detected_language or "en" # Get language from session
-        whisper_model, diarize_model, align_model_tuple = get_models(language_code=current_language)
+        current_language = session.detected_language or "en"
+        whisper_model, _, align_model_tuple = get_models(language_code=current_language) # diarize_model is None
 
-        if not whisper_model or not diarize_model:
-             logger.error(f"[{session_id}] Core models not loaded. Cannot process buffer.")
-             # Send error status back to client
+        if not whisper_model: # Removed check for diarize_model
+             logger.error(f"[{session_id}] Whisper model not loaded. Cannot process buffer.")
              error_message = json.dumps({"type": "status_update", "status": "error", "message": "Core models unavailable."}) 
              await manager.send_personal_message(error_message, session_id)
              return
@@ -126,8 +124,8 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
         detected_language = transcription_result.get("language", current_language)
         # Update session language if changed
         if detected_language != current_language:
-             await session_manager.set_detected_language(db, session_id, detected_language) # Update DB
-             current_language = detected_language # Update local var for alignment
+             await session_manager.set_detected_language(db, session_id, detected_language)
+             current_language = detected_language
         
         logger.debug(f"[{session_id}] Transcription complete. Detected language: {detected_language}")
 
@@ -136,24 +134,33 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
             logger.info(f"[{session_id}] No segments transcribed from buffer.")
             return # Nothing more to do
 
-        # 2. Alignment (Reload align model if language changed)
-        if detected_language != current_language:
-             logger.info(f"[{session_id}] Language changed from {current_language} to {detected_language}. Reloading alignment model.")
-             _, _, align_model_tuple = get_models(language_code=detected_language)
+        if detected_language != current_language: # This condition might be redundant due to above update
+             logger.info(f"[{session_id}] Language changed. Getting correct alignment model for {detected_language}.")
+             _, _, align_model_tuple = get_models(language_code=detected_language) # diarize_model is None
              
         if align_model_tuple is None:
-            logger.error(f"[{session_id}] Alignment model for {detected_language} failed to load. Skipping alignment and diarization.")
-            # Send only raw transcription back?
+            logger.error(f"[{session_id}] Alignment model for {detected_language} failed to load. Skipping alignment.") # Removed diarization from msg
             raw_text = " ".join([seg.get('text', '').strip() for seg in segments])
             message = json.dumps({
                 "type": "transcription_update", 
-                "text": raw_text, # Send raw text
-                "segments": segments, # Send original segments without speaker
+                "text": raw_text, 
+                "segments": segments, 
                 "is_final": False, 
                 "status": "warning",
-                "message": "Alignment/Diarization skipped."
+                "message": "Alignment skipped." # Removed Diarization
             })
             await manager.send_personal_message(message, session_id)
+            # Still store raw segments if alignment fails but transcription worked
+            if segments:
+                try:
+                    if session.transcription_segments is None: session.transcription_segments = []
+                    session.transcription_segments.extend(segments) # Store raw segments
+                    session.last_update = datetime.utcnow()
+                    await db.commit()
+                    logger.info(f"[{session_id}] Stored {len(segments)} RAW segments in DB due to alignment failure.")
+                except Exception as e_db:
+                    await db.rollback()
+                    logger.error(f"[{session_id}] Failed to store RAW segments in DB: {e_db}", exc_info=True)
             return
             
         align_model, align_metadata = align_model_tuple
@@ -161,43 +168,45 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
         aligned_result = whisperx.align(segments, align_model, align_metadata, audio_np, DEVICE, return_char_alignments=False)
         logger.debug(f"[{session_id}] Alignment complete.")
 
-        # 3. Diarization
-        # Only run diarization if audio is long enough
-        if duration_ms < DIARIZATION_MIN_CHUNK_MS: # Use config variable
-             logger.info(f"[{session_id}] Audio chunk too short ({duration_ms}ms) for diarization, assigning UNKNOWN speaker.")
-             processed_segments_list = aligned_result["segments"]
-             for seg in processed_segments_list:
-                 seg['speaker'] = 'UNKNOWN'
-        else:
-             logger.debug(f"[{session_id}] Performing diarization...")
-             # Ensure diarize_model is loaded
-             if not diarize_model:
-                 logger.error(f"[{session_id}] Diarization model not loaded. Skipping.")
-                 processed_segments_list = aligned_result["segments"]
-                 for seg in processed_segments_list:
-                     seg['speaker'] = 'UNKNOWN'
-             else:
-                 diarize_segments = diarize_model(audio_np)
-                 diarized_result = whisperx.assign_word_speakers(diarize_segments, aligned_result["segments"])
-                 
-                 if isinstance(diarized_result, dict) and "segments" in diarized_result:
-                     processed_segments_list = diarized_result["segments"]
-                 elif isinstance(diarized_result, list):
-                     processed_segments_list = diarized_result
-                 else:
-                     logger.error(f"[{session_id}] Unexpected result format from assign_word_speakers. Skipping assignment.")
-                     processed_segments_list = aligned_result["segments"] # Fallback
-                     for seg in processed_segments_list:
-                         seg['speaker'] = 'UNKNOWN'
+        # Diarization SKIPPED
+        logger.debug(f"[{session_id}] Diarization (SKIPPED)...")
+        # if duration_ms < DIARIZATION_MIN_CHUNK_MS: 
+        #      logger.info(f"[{session_id}] Audio chunk too short ({duration_ms}ms) for diarization, assigning UNKNOWN speaker.")
+        #      processed_segments_list = aligned_result["segments"]
+        #      for seg in processed_segments_list:
+        #          seg['speaker'] = 'UNKNOWN'
+        # else:
+        #      logger.debug(f"[{session_id}] Performing diarization...")
+        #      # diarize_model is None
+        #      # if not diarize_model:
+        #      #     logger.error(f"[{session_id}] Diarization model not loaded. Skipping.")
+        #      #     processed_segments_list = aligned_result["segments"]
+        #      #     for seg in processed_segments_list:
+        #      #         seg['speaker'] = 'UNKNOWN'
+        #      # else:
+        #      #     diarize_segments = diarize_model(audio_np)
+        #      #     diarized_result = whisperx.assign_word_speakers(diarize_segments, aligned_result["segments"])
+        #      #     
+        #      #     if isinstance(diarized_result, dict) and "segments" in diarized_result:
+        #      #         processed_segments_list = diarized_result["segments"]
+        #      #     elif isinstance(diarized_result, list):
+        #      #         processed_segments_list = diarized_result
+        #      #     else:
+        #      #         logger.error(f"[{session_id}] Unexpected result format from assign_word_speakers. Skipping assignment.")
+        #      #         processed_segments_list = aligned_result["segments"] # Fallback
+        #      #         for seg in processed_segments_list:
+        #      #             seg['speaker'] = 'UNKNOWN'
+        #      logger.debug(f"[{session_id}] Diarization complete.")
+        logger.warning(f"[{session_id}] Diarization has been SKIPPED. Assigning UNKNOWN to speakers.")
+        processed_segments_list = aligned_result.get("segments", []) if isinstance(aligned_result, dict) else aligned_result if isinstance(aligned_result, list) else []
+        for seg in processed_segments_list:
+            seg['speaker'] = 'UNKNOWN'
 
-                 logger.debug(f"[{session_id}] Diarization complete.")
-
-        # --- Format and Send Result --- 
         output_segments = []
         # combined_text = "" # We will generate combined text at the end in /stop
         # Use the correctly identified list of processed segments
         for segment in processed_segments_list: 
-             speaker = segment.get("speaker", "UNKNOWN")
+             speaker = segment.get("speaker", "UNKNOWN") # Will be UNKNOWN
              text = segment.get("text", "").strip()
              start = segment.get("start")
              end = segment.get("end")

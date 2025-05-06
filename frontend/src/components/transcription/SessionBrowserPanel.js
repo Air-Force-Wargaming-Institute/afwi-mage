@@ -79,9 +79,7 @@ const SessionBrowserPanel = () => {
         setIsLoading(true);
         setError(null);
         
-        const sessionApiUrl = getGatewayUrl('/api/transcription/sessions');
-        
-        const response = await fetch(sessionApiUrl, {
+        const response = await fetch(getGatewayUrl('/api/transcription/sessions'), {
           headers: {
             'Authorization': `Bearer ${token}`
           }

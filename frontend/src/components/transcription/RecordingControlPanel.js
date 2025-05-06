@@ -605,17 +605,15 @@ const RecordingControlPanel = () => {
         event_metadata: {
           ...eventMetadata,
           classification: fullClassification,
-          datetime: new Date().toISOString()
         },
         participants: currentParticipants
       };
       
       // Start API session
       try {
-        const sessionApiUrl = getGatewayUrl('/api/transcription/start-session');
         console.log('[API] Would start session with payload:', apiPayload);
         
-        const response = await fetch(sessionApiUrl, {
+        const response = await fetch(getGatewayUrl('/api/transcription/start-session'), {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

@@ -51,28 +51,29 @@ def load_all_models(language_code: str = "en"):
         )
         logger.info("WhisperX model loaded successfully.")
 
-        # 2. Load Diarization Model
-        logger.info("Loading Diarization model...")
+        # 2. Load Diarization Model - SKIPPED
+        logger.info("Loading Diarization model (SKIPPED)...")
         # Requires HF_TOKEN if model is gated and not cached
-        models["diarize"] = whisperx.DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
-        logger.info("Diarization model loaded successfully.")
+        # models["diarize"] = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+        # logger.info("Diarization model loaded successfully.")
+        logger.warning("Diarization model loading has been SKIPPED.")
 
         # 3. Load Alignment Model (for the default language initially)
         _load_alignment_model(language_code)
 
         models_loaded = True # Set flag on successful load
-        logger.info("--- Model Loading Complete ---")
+        logger.info("--- Model Loading Complete (Diarization SKIPPED) ---")
 
     except ImportError as e:
-        logger.error(f"ImportError during model loading: {e}. Ensure all dependencies (like pyannote.audio) are installed.", exc_info=True)
+        logger.error(f"ImportError during model loading: {e}. Ensure all dependencies are installed.", exc_info=True)
         reset_models()
     except Exception as e:
         logger.error(f"Failed to load models: {e}", exc_info=True)
         logger.error("Ensure models are pre-downloaded into the correct cache directories for air-gapped environments.")
         logger.error(f"WhisperX cache expected: {MODEL_CACHE_DIR}")
         logger.error(f"HuggingFace cache expected: {HF_HOME}")
-        if "requires you to agree" in str(e) or "401 Client Error" in str(e):
-            logger.error("Pyannote diarization model might require HuggingFace authentication (HF_TOKEN) and agreeing to terms.")
+        # if "requires you to agree" in str(e) or "401 Client Error" in str(e):
+            # logger.error("Pyannote diarization model might require HuggingFace authentication (HF_TOKEN) and agreeing to terms.")
         reset_models()
 
 def _load_alignment_model(language_code: str):
@@ -109,7 +110,8 @@ def get_models(language_code: str = "en"):
     if language_code not in models["align"]:
         _load_alignment_model(language_code)
 
-    return models["whisper"], models["diarize"], models["align"].get(language_code) # Returns (model, metadata) or None
+    # Return None for diarize model as it's skipped
+    return models["whisper"], None, models["align"].get(language_code) # diarize model is None
 
 def reset_models():
     """Resets the model state."""
@@ -121,5 +123,7 @@ def reset_models():
     logger.warning("Models have been reset due to loading errors.")
 
 def are_models_loaded() -> bool:
-     """Checks if the core models (Whisper, Diarize) are loaded."""
-     return models_loaded and models["whisper"] is not None and models["diarize"] is not None 
+     """Checks if the core models (Whisper, Align) are loaded.""" # Removed Diarize from docstring
+     # Diarization model is no longer considered critical for "loaded" state
+     return models_loaded and models["whisper"] is not None
+ 

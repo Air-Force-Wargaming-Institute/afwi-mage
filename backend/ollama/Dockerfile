@@ -6,7 +6,7 @@ RUN mkdir -p /root/.ollama/models && \
 
 # Copy the GGUF model and configuration files
 COPY nomic-embed-text-v1.5.f32.gguf /root/.ollama/models/
-COPY Modelfile /root/.ollama/models/Modelfile
+# COPY Modelfile /root/.ollama/models/Modelfile
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

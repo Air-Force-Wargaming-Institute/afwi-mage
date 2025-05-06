@@ -68,7 +68,7 @@ async def get_current_user_id(request: Request) -> str:
 
 # --- Session Management Endpoints ---
 
-@router.post("/start-session", 
+@router.post("/api/transcription/start-session", 
             response_model=StartSessionResponse, 
             summary="Start a new recording session")
 async def start_session(
@@ -112,7 +112,7 @@ async def start_session(
         streaming_url=ws_url
     )
 
-@router.post("/sessions/{session_id}/stop",
+@router.post("/api/transcription/sessions/{session_id}/stop",
             response_model=StopSessionResponse,
             summary="Stop and finalize a recording session")
 async def stop_session(
@@ -306,7 +306,7 @@ async def stop_session(
         completion_timestamp=datetime.utcnow() 
     )
 
-@router.post("/sessions/{session_id}/pause", 
+@router.post("/api/transcription/sessions/{session_id}/pause", 
             status_code=status.HTTP_200_OK,
             summary="Pause a recording session")
 async def pause_session(
@@ -331,7 +331,7 @@ async def pause_session(
     else:
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update session status.")
 
-@router.post("/sessions/{session_id}/resume", 
+@router.post("/api/transcription/sessions/{session_id}/resume", 
             status_code=status.HTTP_200_OK,
             summary="Resume a paused recording session")
 async def resume_session(
@@ -356,7 +356,7 @@ async def resume_session(
     else:
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update session status.")
 
-@router.post("/sessions/{session_id}/cancel", 
+@router.post("/api/transcription/sessions/{session_id}/cancel", 
             status_code=status.HTTP_200_OK,
             summary="Cancel a recording session and discard data")
 async def cancel_session(
@@ -405,7 +405,7 @@ class SessionListItem(BaseModel):
 class ListSessionsResponse(BaseModel):
      sessions: List[SessionListItem]
 
-@router.get("/sessions", 
+@router.get("/api/transcription/sessions", 
             response_model=ListSessionsResponse, 
             summary="List previous sessions for the user")
 async def list_sessions(
@@ -445,7 +445,7 @@ class SessionDetailsResponse(BaseModel):
      # Add derived fields if needed, e.g., audio_url from audio_storage_path
      audio_url: Optional[str] = None 
 
-@router.get("/sessions/{session_id}", 
+@router.get("/api/transcription/sessions/{session_id}", 
             response_model=SessionDetailsResponse, 
             summary="Get full details for a specific session")
 async def get_session_details(
@@ -485,7 +485,7 @@ class UpdateSessionResponse(BaseModel):
      status: str = "updated"
      updated_at: datetime
 
-@router.put("/sessions/{session_id}", 
+@router.put("/api/transcription/sessions/{session_id}", 
             response_model=UpdateSessionResponse, 
             summary="Update details of a session")
 async def update_session_details(
@@ -515,7 +515,7 @@ async def update_session_details(
 
 # --- Marker Endpoint --- 
 
-@router.post("/sessions/{session_id}/markers",
+@router.post("/api/transcription/sessions/{session_id}/markers",
             response_model=AddMarkerResponse,
             status_code=status.HTTP_201_CREATED,
             summary="Add a timeline marker to a session")
@@ -553,7 +553,7 @@ async def add_marker(
 
 # --- Endpoint to Retrieve Final Transcription --- 
 
-@router.get("/sessions/{session_id}/transcription",
+@router.get("/api/transcription/sessions/{session_id}/transcription",
             response_model=GetTranscriptionResponse,
             summary="Get final transcription for a session")
 async def get_transcription(
@@ -585,9 +585,9 @@ async def get_transcription(
 
 # --- Existing File Upload Endpoint (Renamed for Clarity) ---
 
-@router.post("/transcribe-file", 
-             summary="(Util) Transcribe a single audio file with diarization",
-             tags=["Utility"]) # Add tag
+@router.post("/api/transcription/transcribe-file", 
+             summary="(Util) Transcribe a single audio file (NO DIARIZATION)",
+             tags=["Utility"]) 
 async def transcribe_audio_diarized_util(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db_session) # Inject DB session even if not directly used
@@ -604,7 +604,7 @@ async def transcribe_audio_diarized_util(
         logger.error("Models were not loaded successfully during application startup.")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Transcription/Diarization models are not available. Check service logs."
+            detail="Transcription/Alignment models are not available. Check service logs."
         )
 
     logger.info(f"Received file for utility transcription: {file.filename}, content type: {file.content_type}")
@@ -619,7 +619,6 @@ async def transcribe_audio_diarized_util(
     temp_audio_path = None
     try:
         start_time = time.time()
-        # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_audio_file:
             content = await file.read()
             temp_audio_file.write(content)
@@ -637,19 +636,18 @@ async def transcribe_audio_diarized_util(
         
         # 2. Transcribe
         logger.info(f"Starting transcription (batch: {BATCH_SIZE})...")
-        whisper_model, diarize_model, _ = get_models() # Get whisper and diarize models
+        whisper_model, _, _ = get_models() # Diarize model is None
         if not whisper_model:
              raise RuntimeError("Whisper model is not loaded.")
              
         result = whisper_model.transcribe(audio, batch_size=BATCH_SIZE)
         transcribe_time = time.time()
-        detected_language = result.get("language", "en") # Default to 'en' if not detected
+        detected_language = result.get("language", "en")
         logger.info(f"Transcription finished in {transcribe_time - start_time:.2f}s. Detected language: {detected_language}")
 
         # 3. Align Whisper output
         logger.info(f"Loading/getting alignment model for '{detected_language}' and aligning...")
-        # Get the specific alignment model for the detected language
-        _ , _, align_model_tuple = get_models(language_code=detected_language)
+        _ , _, align_model_tuple = get_models(language_code=detected_language) # Diarize model is None
         if align_model_tuple is None:
              logger.error(f"Alignment model for language '{detected_language}' could not be loaded.")
              raise HTTPException(
@@ -663,29 +661,30 @@ async def transcribe_audio_diarized_util(
         align_time = time.time()
         logger.info(f"Alignment finished in {align_time - transcribe_time:.2f}s.")
 
-        # 4. Diarize
-        logger.info("Starting diarization...")
-        if not diarize_model:
-             raise RuntimeError("Diarization model is not loaded.")
-             
-        diarize_segments = diarize_model(audio)
-        # Assign speaker labels
-        result = whisperx.assign_word_speakers(diarize_segments, result)
-        diarize_assign_time = time.time()
-        logger.info(f"Diarization and speaker assignment finished in {diarize_assign_time - align_time:.2f}s.")
+        # Diarization SKIPPED
+        logger.info("Diarization and speaker assignment (SKIPPED)...")
+        # diarize_model will be None from get_models()
+        # if not diarize_model:
+             # logger.warning("Diarization model not available. Skipping diarization.")
+        # else:
+            # diarize_segments = diarize_model(audio)
+            # result = whisperx.assign_word_speakers(diarize_segments, result)
+            # diarize_assign_time = time.time()
+            # logger.info(f"Diarization and speaker assignment finished in {diarize_assign_time - align_time:.2f}s.")
+        logger.warning("Diarization and speaker assignment have been SKIPPED.")
 
-        # Prepare response
         output_segments = []
-        for segment in result["segments"]:
+        segments_to_process = result.get("segments", []) if isinstance(result, dict) else result if isinstance(result, list) else []
+        for segment in segments_to_process:
             output_segments.append({
                 "start": segment.get("start"),
                 "end": segment.get("end"),
                 "text": segment.get("text", "").strip(),
-                "speaker": segment.get("speaker", "UNKNOWN")
+                "speaker": "UNKNOWN" # Speaker is UNKNOWN as diarization is skipped
             })
 
         total_time = time.time() - start_time
-        logger.info(f"Processing completed for {file.filename} in {total_time:.2f}s.")
+        logger.info(f"Processing completed for {file.filename} in {total_time:.2f}s (Diarization SKIPPED).")
 
     except Exception as e:
         logger.error(f"Error during processing for {file.filename}: {e}", exc_info=True)
@@ -706,7 +705,7 @@ async def transcribe_audio_diarized_util(
         "segments": output_segments
         } 
 
-@router.get("/sessions/{session_id}/audio",
+@router.get("/api/transcription/sessions/{session_id}/audio",
             summary="Get the audio file for a session",
             response_class=FileResponse # Use FileResponse directly
            )

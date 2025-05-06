@@ -201,7 +201,7 @@ services:
    networks:
      - app-network
    healthcheck:
-     test: ["CMD-SHELL", "pg_isready -U postgres"]
+     test: ["CMD-SHELL", "pg_isready -U postgres -d transcriptiondb"]
      interval: 5s
      timeout: 5s
      retries: 5
@@ -337,8 +337,10 @@ services:
               count: 1
               capabilities: [gpu]
     depends_on:
-      - init-data
-      - db
+      init-data:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped

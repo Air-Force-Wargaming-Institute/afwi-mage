@@ -1,5 +1,6 @@
 # Use an official NVIDIA CUDA runtime image as a parent image
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
+#FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
+FROM python:3.12-slim AS base
 
 # Set environment variables to prevent interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,7 +20,8 @@ RUN apt-get update && \
 RUN python3 -m venv /opt/venv
 
 # Update pip within the virtual environment
-RUN pip install --no-cache-dir --upgrade pip
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip
 
 # Set the working directory
 WORKDIR /app
@@ -35,7 +37,7 @@ WORKDIR /app
 
 # --- Online Dependency Installation (Comment out for Air-Gapped Build) ---
 COPY requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
 # -----------------------------------------
 
 # Copy the rest of the application code
