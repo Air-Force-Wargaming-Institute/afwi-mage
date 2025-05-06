@@ -248,15 +248,15 @@ def extract_from_pdf(file_path):
                 else:
                     logger.warning(f"Page {page_num}: No text extracted with pdfplumber")
         
-        # If pdfplumber couldn't extract anything useful, try PyPDF4 as fallback
+        # If pdfplumber couldn't extract anything useful, try PyPDF2 as fallback
         if not any(content.strip() for content in extracted_content):
-            logger.info("No content extracted with pdfplumber, trying PyPDF4 as fallback")
+            logger.info("No content extracted with pdfplumber, trying PyPDF2 as fallback")
             extracted_content = []
             
             with open(file_path, 'rb') as file:
-                reader = PdfFileReader(file)
-                for page in range(reader.getNumPages()):
-                    text = reader.getPage(page).extractText()
+                reader = PdfReader(file)
+                for page_num in range(len(reader.pages)):
+                    text = reader.pages[page_num].extract_text()
                     if text and text.strip():
                         # Normalize newlines and spaces
                         text = re.sub(r'\s+', ' ', text)

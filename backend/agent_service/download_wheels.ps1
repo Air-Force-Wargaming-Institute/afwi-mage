@@ -17,7 +17,10 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 
 # Define the target wheels directory relative to the script location
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ServiceName = (Get-Item -Path $scriptDir).Name # Define ServiceName
 $wheelsDirRelative = "../backend_wheels"
+$deploymentZipsDirName = "DeploymentZIPs" # New
+
 $wheelsDirAbsolute = Join-Path -Path $scriptDir -ChildPath $wheelsDirRelative
 $wheelsDirAbsolute = (Resolve-Path -Path $wheelsDirAbsolute).Path # Get the full canonical path
 
@@ -33,6 +36,10 @@ if (-not (Test-Path $wheelsDirAbsolute -PathType Container)) {
 $requirementsFile = "requirements.txt"
 $requirementsFileAbsolute = Join-Path -Path $scriptDir -ChildPath $requirementsFile
 $requirementsFileAbsolute = (Resolve-Path -Path $requirementsFileAbsolute).Path
+
+# Construct the path for DeploymentZIPs directory (one level up from scriptDir)
+$backendRootDir = (Resolve-Path (Join-Path -Path $scriptDir -ChildPath "..")).Path
+$deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 
 # Use Docker to download Linux-compatible wheels
 Write-Host "Running Docker to download Linux-compatible wheels..." -ForegroundColor Yellow
@@ -61,7 +68,7 @@ $dockerArgs = @(
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt'
+    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 & docker @dockerArgs
 
@@ -82,8 +89,34 @@ foreach ($wheel in $wheels) {
 $outputFileName = "downloaded_wheels_list.txt"
 $outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 try {
-    $wheels.Name | Out-File -FilePath $outputFilePath -Encoding utf8
-    Write-Host "List of downloaded wheels saved to: $outputFilePath" -ForegroundColor Green
+    # $wheels.Name | Out-File -FilePath $outputFilePath -Encoding utf8 # Old method: just dump all wheel names
+
+    # Regenerate list based on requirements.txt to include only necessary wheels
+    $requirementsFileForList = Join-Path -Path $scriptDir -ChildPath "requirements.txt"
+    $requiredPackages = Get-Content $requirementsFileForList | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
+        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim()
+        if ($packageName) { $packageName }
+    }
+
+    $foundWheels = @()
+    foreach ($reqItem in $requiredPackages) {
+        $escapedReqHyphen = [regex]::Escape($reqItem)
+        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_'))
+
+        $matchingWheel = $wheels | Where-Object { 
+            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
+            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
+        } | Select-Object -First 1
+
+        if ($matchingWheel) {
+            $foundWheels += $matchingWheel.Name
+        } else {
+            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute (central backend_wheels)"
+        }
+    }
+    $foundWheels | Out-File -FilePath $outputFilePath -Encoding utf8
+    Write-Host "List of required wheels saved to: $outputFilePath" -ForegroundColor Green
+
 } catch {
     Write-Host "Error saving wheel list to file: $_" -ForegroundColor Red
 }
@@ -132,17 +165,33 @@ if ($AutoZip) {
 
 if ($doZip) {
     $zipFileName = "${ServiceName}_airgapped.zip"
-    $zipFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $zipFileName
+    $zipFilePath = Join-Path -Path $scriptDir -ChildPath $zipFileName
     Write-Host "[$ServiceName] Creating archive $zipFileName ..." -ForegroundColor Yellow
     try {
-        # Ensure we are in the script's directory context for relative paths
+        # Ensure we are in the script\'s directory context for relative paths
         # Push-Location $scriptDirAbsolute # No longer needed with explicit path
         # Use explicit path and wildcard within that path
-        Compress-Archive -Path (Join-Path $scriptDirAbsolute '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
+        Compress-Archive -Path (Join-Path $scriptDir \'*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
-        Write-Host "[$ServiceName] Transfer this file to your airgapped environment." -ForegroundColor Cyan
+        
+        # Ensure DeploymentZIPs directory exists
+        if (-not (Test-Path $deploymentZipsDirAbsolute -PathType Container)) {
+            Write-Host "[$ServiceName] Creating deployment zips directory: $deploymentZipsDirAbsolute" -ForegroundColor Yellow
+            try {
+                New-Item -ItemType Directory -Path $deploymentZipsDirAbsolute -ErrorAction Stop | Out-Null
+            } catch {
+                Write-Error "[$ServiceName] Failed to create deployment zips directory '$deploymentZipsDirAbsolute': $_"
+                throw # Re-throw to stop script if dir creation fails
+            }
+        }
+
+        # Move the zip file
+        $finalZipPath = Join-Path -Path $deploymentZipsDirAbsolute -ChildPath $zipFileName
+        Move-Item -Path $zipFilePath -Destination $finalZipPath -Force -ErrorAction Stop
+        Write-Host "[$ServiceName] Moved $zipFileName to $finalZipPath" -ForegroundColor Green
+        Write-Host "[$ServiceName] Transfer this file from $deploymentZipsDirAbsolute for your airgapped environment." -ForegroundColor Cyan
     } catch {
-        Write-Error "[$ServiceName] Failed to create zip archive: $_"
+        Write-Error "[$ServiceName] Failed to create or move zip archive: $_"
     } # Removed finally Pop-Location as Push-Location is removed
 }
 

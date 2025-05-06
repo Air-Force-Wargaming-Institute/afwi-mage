@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List
-from PyPDF4 import PdfFileReader
+from PyPDF2 import PdfReader
 from docx import Document
 import pdfplumber
 import logging
@@ -30,9 +30,9 @@ def extract_from_pdf(file_path: Path) -> List[str]:
     sentences = []
     try:
         with open(file_path, 'rb') as file:
-            reader = PdfFileReader(file)
-            for page in range(reader.getNumPages()):
-                text = reader.getPage(page).extractText()
+            reader = PdfReader(file)
+            for page_num in range(len(reader.pages)):
+                text = reader.pages[page_num].extract_text()
                 if text:
                     sentences.extend([s.strip() for s in text.split('.') if s.strip()])
         

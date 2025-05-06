@@ -205,3 +205,99 @@ When building the application for the first time:
 - [Node.js Documentation](https://nodejs.org/docs)
 - [React Documentation](https://reactjs.org/)
 - [NLTK Documentation](https://www.nltk.org/)
+
+# AFWI Multi-Agent Generative Engine - Airgapped Deployment
+
+This document describes how to prepare and deploy the AFWI MAGE backend services in an airgapped (offline) environment.
+
+## Prerequisites
+
+### On the Preparation Machine (Internet-Connected):
+
+*   PowerShell (for running the preparation script).
+*   Docker Desktop (or Docker Engine) installed and running.
+*   Git (to clone this repository).
+*   The source code of this repository.
+
+### On the Airgapped Machine (Offline):
+
+*   Docker Engine installed and running.
+*   If deploying on Windows: PowerShell.
+*   If deploying on Linux: Bash (and standard utilities like `unzip`).
+
+## Step 1: Prepare the Airgap Deployment Package (Online Environment)
+
+This step bundles all necessary backend service code, Python dependencies (wheels), base Docker images, and deployment scripts into a single package.
+
+1.  **Open PowerShell** in the root directory of this repository.
+2.  **Run the preparation script:**
+    ```powershell
+    .\prepare_airgap_package.ps1
+    ```
+    *   You can specify an output directory using the `-OutputDirectory` parameter. By default, it creates a folder named `AirgapDeploymentPackage` in the current directory.
+    *   Example: `.\prepare_airgap_package.ps1 -OutputDirectory .\MyAirgapFiles`
+3.  **Locate the package:** Once the script completes, you will find a directory (e.g., `AirgapDeploymentPackage` or your custom name). This directory contains everything needed for the airgapped deployment.
+    The structure of this package will be similar to:
+    ```
+    AirgapDeploymentPackage/
+    ├── backend_services/     # Zipped Python wheels and code for each service
+    ├── backend_support/      # docker-compose.yml, DB init scripts etc.
+    ├── docker_images/        # Saved base Docker images as .tar files
+    ├── deployment_scripts/   # airgapped_deploy.ps1 & airgapped_deploy.sh
+    ├── frontend_app/         # Placeholder for frontend application (if configured)
+    └── README_AirgapPackage.txt # README specific to the package contents
+    ```
+
+## Step 2: Transfer the Package to the Airgapped Machine
+
+1.  Copy the entire output directory (e.g., `AirgapDeploymentPackage`) from the preparation machine to the airgapped machine using a USB drive, secure network transfer, or other suitable method.
+
+## Step 3: Deploy Services on the Airgapped Machine
+
+Once the package is on the airgapped machine:
+
+1.  **Navigate to the `deployment_scripts` folder** within the transferred package:
+    ```bash
+    # On Linux (example)
+    cd /path/to/your/AirgapDeploymentPackage/deployment_scripts
+    
+    # On Windows (example, in PowerShell)
+    cd C:\path\to\your\AirgapDeploymentPackage\deployment_scripts
+    ```
+
+2.  **Make the deployment script executable (Linux only):**
+    ```bash
+    chmod +x airgapped_deploy.sh
+    ```
+
+3.  **Run the appropriate deployment script:**
+
+    *   **For Windows (using PowerShell):**
+        ```powershell
+        .\airgapped_deploy.ps1
+        ```
+    *   **For Linux (using Bash):**
+        ```bash
+        ./airgapped_deploy.sh
+        ```
+
+4.  **Follow the script prompts:**
+    *   The script will first attempt to load all base Docker images found in the `../docker_images` directory.
+    *   It will then list available backend services.
+    *   You can choose to deploy a specific service, all services, or list services only.
+        *   To deploy a specific service by name: `.\airgapped_deploy.ps1 -ServiceName auth_service` or `./airgapped_deploy.sh -s auth_service`
+        *   To deploy all services: `.\airgapped_deploy.ps1 -DeployAllServices` or `./airgapped_deploy.sh -a`
+        *   To only list services: `.\airgapped_deploy.ps1 -ListServicesOnly` or `./airgapped_deploy.sh -l`
+    *   For each selected service, the script will:
+        1.  Extract the service's zip package.
+        2.  Build the service-specific Docker image using the local Dockerfile and the pre-loaded base images/wheels.
+        3.  Provide an example `docker run` command. You will need to consult the service's specific documentation (if available) or standard practices for required ports, volumes, and environment variables.
+
+## Important Notes
+
+*   **Docker Must Be Running:** Ensure Docker is running on the airgapped machine before executing the deployment scripts.
+*   **Service Configuration:** The deployment scripts build the Docker images. Running and configuring the services (e.g., setting environment variables, mapping ports, mounting volumes) is typically done via `docker run` commands or `docker-compose` (if you adapt the `docker-compose.yml` in `backend_support` for airgapped use). The scripts provide a *sample* `docker run` command; actual parameters will vary.
+*   **`README_AirgapPackage.txt`:** Inside the transferred package, there is a `README_AirgapPackage.txt` file which provides a brief overview of the package contents. This root-level `README.md` you are reading now focuses on the end-to-end process.
+*   **Frontend:** This guide primarily focuses on backend services. Frontend deployment is handled separately and the `prepare_airgap_package.ps1` script currently includes placeholder steps for it.
+
+This README provides a general guide. Refer to individual service documentation and the `Airgap-Plan.md` and `Airgap-TODO.md` files in the `Plans/` directory for more detailed design and ongoing tasks related to airgapped deployment.

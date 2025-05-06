@@ -22,6 +22,7 @@ $localWheelsDirRelative = "./wheels"
 $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
 $listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
+$deploymentZipsDirName = "DeploymentZIPs" # New
 
 # Resolve absolute paths
 try {
@@ -31,6 +32,9 @@ try {
     $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
     $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
     $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
+    # Construct the path for DeploymentZIPs directory (one level up from scriptDir)
+    $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
+    $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 } catch {
     Write-Error "[$ServiceName] Error resolving initial paths: $_"
     exit 1
@@ -72,14 +76,13 @@ Function Normalize-DockerPath ($path) {
 $normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
 $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
 
-# Note: PyPDF4 might be problematic as it often lacks wheels. Pip download might only get source.
 $dockerArgs = @(
     "run", "--rm",
-    "-v", "$normalizedWheelsPath:/wheels",
-    "-v", "$normalizedRequirementsPath:/reqs/requirements.txt:ro",
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, potential source-only packages ignored."'
+    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 & docker @dockerArgs
 
@@ -103,21 +106,26 @@ if ($wheels.Count -eq 0) {
 Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
 try {
     # Regenerate list based on requirements.txt, not just directory contents
-    # Exclude commented lines, specifically handling the PyPDF4 case if needed
-    $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' -and $_ -notmatch '^#.*PyPDF4' } | ForEach-Object { ($_ -split '[<>=!~\[\]]')[0].Trim() }
+    $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object {
+        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim() # Get base name, split by more delimiters
+        if ($packageName) { $packageName } # Ensure we don't add empty strings
+    }
     
     $foundWheels = @()
-    foreach ($req in $requiredPackages) {
-        # Simple match - might need refinement for complex version specs or extras
-        $matchingWheel = $wheels | Where-Object { $_.Name -match "^$([regex]::Escape($req))(-|_)" }
+    foreach ($reqItem in $requiredPackages) {
+        # Normalize current requirement name from list to underscores for matching against wheel names
+        $escapedReqHyphen = [regex]::Escape($reqItem) # Original form (e.g., python-dotenv)
+        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_')) # Underscore form (e.g., python_dotenv)
+
+        $matchingWheel = $wheels | Where-Object { 
+            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
+            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
+        } | Select-Object -First 1 # Select first match if multiple (e.g. due to different wheel tags but same version)
+
         if ($matchingWheel) {
             $foundWheels += $matchingWheel.Name
         } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$req' in $wheelsDirAbsolute"
-            # Add special note for PyPDF4 if it was expected
-            if ($req -eq 'PyPDF4') {
-                 Write-Warning "[$ServiceName] Note: PyPDF4 often only downloads as a source package (.tar.gz), not a wheel. It might need separate handling during Docker build."
-            }
+            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute"
         }
     }
 
@@ -179,7 +187,7 @@ if ($nltkRequired) {
         # Mount to /usr/share/nltk_data which is a common place nltk looks
         $nltkDockerArgs = @(
             "run", "--rm",
-            "-v", "$normalizedNltkDataPath:/usr/share/nltk_data",
+            "-v", "$normalizedNltkDataPath`:/usr/share/nltk_data",
             "python:3.12-slim",
             "bash", "-c",
             ('pip install --no-cache-dir nltk && python -m nltk.downloader -d /usr/share/nltk_data ' + $nltkPackagesString)
@@ -221,7 +229,7 @@ if ($nltkRequired) {
     $stepNumDeployScript = 4
 }
 
-Write-Host "   $stepNumDockerfile. Update Dockerfile build process if necessary to use '$localWheelsDirRelative'. (Note: May need extra steps for source packages like PyPDF4)" -ForegroundColor Yellow
+Write-Host "   $stepNumDockerfile. Update Dockerfile build process if necessary to use '$localWheelsDirRelative'. (Note: May need extra steps for source packages)" -ForegroundColor Yellow
 Write-Host "   $stepNumDeployScript. Run deployment scripts (e.g., airgapped_deploy.ps1) which should use the local wheels/data." -ForegroundColor White
 
 # Create a package.zip file for easy transfer
@@ -246,9 +254,25 @@ if ($doZip) {
         # Use explicit path and wildcard within that path
         Compress-Archive -Path (Join-Path $scriptDirAbsolute '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
-        Write-Host "[$ServiceName] Transfer this file to your airgapped environment." -ForegroundColor Cyan
+
+        # Ensure DeploymentZIPs directory exists
+        if (-not (Test-Path $deploymentZipsDirAbsolute -PathType Container)) {
+            Write-Host "[$ServiceName] Creating deployment zips directory: $deploymentZipsDirAbsolute" -ForegroundColor Yellow
+            try {
+                New-Item -ItemType Directory -Path $deploymentZipsDirAbsolute -ErrorAction Stop | Out-Null
+            } catch {
+                Write-Error "[$ServiceName] Failed to create deployment zips directory '$deploymentZipsDirAbsolute': $_"
+                throw # Re-throw to stop script if dir creation fails
+            }
+        }
+
+        # Move the zip file
+        $finalZipPath = Join-Path -Path $deploymentZipsDirAbsolute -ChildPath $zipFileName
+        Move-Item -Path $zipFilePath -Destination $finalZipPath -Force -ErrorAction Stop
+        Write-Host "[$ServiceName] Moved $zipFileName to $finalZipPath" -ForegroundColor Green
+        Write-Host "[$ServiceName] Transfer this file from $deploymentZipsDirAbsolute for your airgapped environment." -ForegroundColor Cyan
     } catch {
-        Write-Error "[$ServiceName] Failed to create zip archive: $_"
+        Write-Error "[$ServiceName] Failed to create or move zip archive: $_"
     }
 }
 

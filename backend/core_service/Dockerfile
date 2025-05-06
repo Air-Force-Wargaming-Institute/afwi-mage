@@ -10,12 +10,8 @@ WORKDIR /build
 COPY requirements.txt /build/
 COPY wheels/ /build/wheels/
 
-# First install from requirements.txt (which excludes PyPDF4)
+# First install from requirements.txt
 RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
-
-# Install any PyPDF4 package that might be in the wheels directory
-# (This won't try to download from the internet because of --no-index)
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels PyPDF4 || echo "PyPDF4 not found in wheels directory, skipping"
 
 # Create a new virtual environment
 RUN python -m venv /venv
@@ -23,7 +19,6 @@ ENV PATH="/venv/bin:$PATH"
 
 # Install dependencies into the virtual environment
 RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels PyPDF4 || echo "PyPDF4 not found in wheels directory, skipping"
 
 # Second stage: Create the final image
 FROM afwi-mage-base:3.12-slim

@@ -22,6 +22,7 @@ $localWheelsDirRelative = "./wheels"
 $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
 $listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
+$deploymentZipsDirName = "DeploymentZIPs" # New
 
 # Resolve absolute paths
 try {
@@ -31,6 +32,9 @@ try {
     $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
     $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
     $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
+    # Construct the path for DeploymentZIPs directory (one level up from scriptDir)
+    $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
+    $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 } catch {
     Write-Error "[$ServiceName] Error resolving initial paths: $_"
     exit 1
@@ -72,10 +76,18 @@ Function Normalize-DockerPath ($path) {
 $normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
 $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
 
-$dockerCmd = "docker run --rm -v \"$normalizedWheelsPath\":/wheels -v \"$normalizedRequirementsPath\":/reqs/requirements.txt:ro python:3.12-slim bash -c 'pip download --dest /wheels --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt'"
+# Refactored to use argument array for robustness
+$dockerArgs = @(
+    "run", "--rm",
+    "-v", "$normalizedWheelsPath`:/wheels",
+    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
+    "python:3.12-slim",
+    "bash", "-c",
+    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+)
 
-# Write-Host "[$ServiceName] Executing Docker command: $dockerCmd" -ForegroundColor DarkGray
-Invoke-Expression $dockerCmd
+# Write-Host "[$ServiceName] Executing Docker command: docker $($dockerArgs -join ' ' )" -ForegroundColor DarkGray
+& docker @dockerArgs
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "[$ServiceName] Error downloading wheels using Docker. Exit code: $LASTEXITCODE"
@@ -195,15 +207,29 @@ if ($doZip) {
     Write-Host "[$ServiceName] Creating archive $zipFileName ..." -ForegroundColor Yellow
     try {
         # Ensure we are in the script's directory context for relative paths
-        Push-Location $scriptDirAbsolute
-        Compress-Archive -Path ./* -DestinationPath $zipFilePath -Force -ErrorAction Stop
+        # Push-Location $scriptDirAbsolute # Removed for safety, path is explicit below
+        Compress-Archive -Path (Join-Path $scriptDirAbsolute '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
-        Write-Host "[$ServiceName] Transfer this file to your airgapped environment." -ForegroundColor Cyan
+
+        # Ensure DeploymentZIPs directory exists
+        if (-not (Test-Path $deploymentZipsDirAbsolute -PathType Container)) {
+            Write-Host "[$ServiceName] Creating deployment zips directory: $deploymentZipsDirAbsolute" -ForegroundColor Yellow
+            try {
+                New-Item -ItemType Directory -Path $deploymentZipsDirAbsolute -ErrorAction Stop | Out-Null
+            } catch {
+                Write-Error "[$ServiceName] Failed to create deployment zips directory '$deploymentZipsDirAbsolute': $_"
+                throw # Re-throw to stop script if dir creation fails
+            }
+        }
+
+        # Move the zip file
+        $finalZipPath = Join-Path -Path $deploymentZipsDirAbsolute -ChildPath $zipFileName
+        Move-Item -Path $zipFilePath -Destination $finalZipPath -Force -ErrorAction Stop
+        Write-Host "[$ServiceName] Moved $zipFileName to $finalZipPath" -ForegroundColor Green
+        Write-Host "[$ServiceName] Transfer this file from $deploymentZipsDirAbsolute for your airgapped environment." -ForegroundColor Cyan
     } catch {
-        Write-Error "[$ServiceName] Failed to create zip archive: $_"
-    } finally {
-        Pop-Location
-    }
+        Write-Error "[$ServiceName] Failed to create or move zip archive: $_"
+    } # Removed finally Pop-Location as Push-Location was removed
 }
 
 Write-Host "[$ServiceName] Script finished." -ForegroundColor Cyan 
