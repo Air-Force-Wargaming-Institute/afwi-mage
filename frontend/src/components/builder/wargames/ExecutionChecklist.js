@@ -243,6 +243,20 @@ const ExecutionChecklist = ({ wargameData }) => {
 
   // Helper function to validate wargame data
   const validateWargameData = (data) => {
+    // Define DIME fields that require enabled/approved checks
+    const dimeFieldsConfig = {
+      diplomacy: ['objectives', 'posture', 'keyInitiatives', 'prioritiesMatrix', 'redLines', 'treatyObligations', 'diplomaticResources', 'specialConsiderations'],
+      information: ['objectives', 'propagandaThemes', 'cyberTargets', 'strategicCommunicationFramework', 'intelCollectionPriorities', 'disinformationResilience', 'mediaLandscapeControl', 'specialConsiderations'],
+      military: [
+        'objectives', 'alertLevel', 'doctrine', 'forceStructureReadiness', 
+        'escalationLadder', 'decisionMakingProtocol', 'forceProjectionCapabilities', 
+        'defenseIndustrialCapacity', 'specialConsiderations',
+      ],
+      economic: ['objectives', 'tradeFocus', 'resourceDeps', 'sanctionsPolicy', 'economicWarfareTools', 'criticalInfrastructureResilience', 'strategicResourceAccess', 'financialSystemLeverage', 'technologyTransferControls', 'specialConsiderations']
+    };
+
+    const militaryDomainFields = ['land', 'sea', 'air', 'cyber', 'space'];
+
     // Initialize results structure
     const results = {
       overallStatus: 'incomplete',
@@ -312,42 +326,89 @@ const ExecutionChecklist = ({ wargameData }) => {
         const relationshipsComplete = definedRelationships >= requiredRelationships;
 
         // For each entity, check DIME configuration
-        let allDimeConfigsComplete = true;
+        let allEntitiesFullyConfigured = true; // Tracks if all entities meet the new criteria
+
         data.activatedEntities.forEach(entity => {
           const entityResults = {
-            status: 'incomplete',
-            diplomacy: entity.configData?.diplomacy?.objectives ? 'complete' : 'incomplete',
-            information: entity.configData?.information?.objectives ? 'complete' : 'incomplete',
-            military: entity.configData?.military?.objectives ? 'complete' : 'incomplete',
-            economic: entity.configData?.economic?.objectives ? 'complete' : 'incomplete',
+            status: 'incomplete', // Default to incomplete for the entity
+            diplomacy: 'incomplete',
+            information: 'incomplete',
+            military: 'incomplete',
+            economic: 'incomplete',
             message: ''
           };
-          
-          // Build message for incomplete sections
-          const incompleteSections = [];
-          if (entityResults.diplomacy === 'incomplete') incompleteSections.push('Diplomacy');
-          if (entityResults.information === 'incomplete') incompleteSections.push('Information');
-          if (entityResults.military === 'incomplete') incompleteSections.push('Military');
-          if (entityResults.economic === 'incomplete') incompleteSections.push('Economic');
-          
-          if (incompleteSections.length > 0) {
-            entityResults.message = `Incomplete sections: ${incompleteSections.join(', ')}`;
-            allDimeConfigsComplete = false;
-          } else {
-            entityResults.status = 'complete';
+
+          const entityConfigData = entity.configData || {};
+          const entityEnabledFields = entityConfigData.enabledFields || {};
+          const entityApprovedFields = entityConfigData.approvedFields || {};
+
+          let currentEntityDimeComplete = true;
+          const entityIncompleteDimeCategories = [];
+
+
+          for (const section of ['diplomacy', 'information', 'military', 'economic']) {
+            let sectionCategoryComplete = true;
+            const fieldsToCheck = dimeFieldsConfig[section];
+            const sectionEnabledFields = entityEnabledFields[section] || {};
+
+            for (const field of fieldsToCheck) {
+              const fieldEnabled = sectionEnabledFields[field] === undefined ? true : sectionEnabledFields[field];
+
+              if (fieldEnabled) {
+                const fieldApproved = entityApprovedFields[`${section}.${field}`] === true;
+                if (!fieldApproved) {
+                  sectionCategoryComplete = false;
+                  break; 
+                }
+              }
+            }
+
+            // Special handling for military.domainPosture
+            if (section === 'military' && sectionCategoryComplete) {
+              const militaryEnabledFields = entityEnabledFields.military || {};
+              const domainPostureGroupEnabled = militaryEnabledFields.domainPosture === undefined ? true : militaryEnabledFields.domainPosture;
+              
+              if (domainPostureGroupEnabled) { // Check if the whole domainPosture group is considered enabled
+                const domainPostureEnabledFields = militaryEnabledFields.domainPosture || {};
+                for (const domainField of militaryDomainFields) {
+                  const specificDomainFieldIsEnabled = domainPostureEnabledFields[domainField] === undefined ? true : domainPostureEnabledFields[domainField];
+                  if (specificDomainFieldIsEnabled) {
+                    const domainFieldApproved = entityApprovedFields[`military.domainPosture.${domainField}`] === true;
+                    if (!domainFieldApproved) {
+                      sectionCategoryComplete = false;
+                      break; 
+                    }
+                  }
+                }
+              }
+            }
+            
+            entityResults[section] = sectionCategoryComplete ? 'complete' : 'incomplete';
+            if (!sectionCategoryComplete) {
+              entityIncompleteDimeCategories.push(section.charAt(0).toUpperCase() + section.slice(1));
+              currentEntityDimeComplete = false; 
+            }
           }
           
-          // Add to results
+          if (currentEntityDimeComplete) {
+            entityResults.status = 'complete';
+          } else {
+            entityResults.status = 'incomplete';
+            // Ensure message reflects only DIME issues if relationships are separate
+            const dimeMessage = `Incomplete DIME sections: ${entityIncompleteDimeCategories.join(', ')}`;
+            entityResults.message = dimeMessage;
+            allEntitiesFullyConfigured = false; 
+          }
+          
           results.entities.items[entity.entityId] = entityResults;
         });
         
-        // Check if overall entity section is complete (all DIME + all relationships)
-        if (allDimeConfigsComplete && relationshipsComplete) {
+        if (allEntitiesFullyConfigured && relationshipsComplete) {
           results.entities.status = 'complete';
         } else {
           results.entities.status = 'incomplete';
           const messages = [];
-          if (!allDimeConfigsComplete) messages.push('Some entities have incomplete DIME configuration');
+          if (!allEntitiesFullyConfigured) messages.push('Some entities have incomplete DIME configurations (enabled elements must be approved and committed)');
           if (!relationshipsComplete) messages.push(`${requiredRelationships - definedRelationships} relationships need definition`);
           results.entities.message = messages.join('. ');
         }
