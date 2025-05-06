@@ -670,38 +670,52 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   };
   
   const handleInputChange = (section, field, value) => {
-    // Mark field as unapproved when changed
     const fieldKey = `${section}.${field}`;
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
-    setNationData(prev => ({
-      ...prev,
-      [section]: {
+    setNationData(prev => {
+      const newSectionData = {
         ...prev[section],
         [field]: value
-      },
-      approvedFields: updatedApprovedFields
-    }));
+      };
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey]; // Mark as unapproved on change
+      
+      const newState = {
+        ...prev,
+        [section]: newSectionData,
+        approvedFields: newApprovedFields
+      };
+      // Direct save on text change, like ScenarioTab
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
+    });
   };
   
   const handleMilitaryDomainChange = (domain, value) => {
-    // Mark field as unapproved when changed
     const fieldKey = `military.domainPosture.${domain}`;
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
-    setNationData(prev => ({
-      ...prev,
-      military: {
+    setNationData(prev => {
+      const newMilitaryData = {
         ...prev.military,
         domainPosture: {
           ...prev.military.domainPosture,
           [domain]: value
         }
-      },
-      approvedFields: updatedApprovedFields
-    }));
+      };
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey]; // Mark as unapproved on change
+
+      const newState = {
+        ...prev,
+        military: newMilitaryData,
+        approvedFields: newApprovedFields
+      };
+       // Direct save on text change, like ScenarioTab
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
+    });
   };
   
   const handleRelationshipTypeChange = (entityId, value) => {
@@ -730,24 +744,27 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
     }));
   };
   
-  // New handler to toggle field approval status
   const handleToggleApproval = (fieldKey) => {
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    
-    if (updatedApprovedFields[fieldKey]) {
-      delete updatedApprovedFields[fieldKey];
-    } else {
-      updatedApprovedFields[fieldKey] = true;
-    }
-    
-    setNationData(prev => ({
-      ...prev,
-      approvedFields: updatedApprovedFields
-    }));
+    setNationData(prev => {
+      const updatedApprovedFields = { ...prev.approvedFields };
+      if (updatedApprovedFields[fieldKey]) {
+        delete updatedApprovedFields[fieldKey];
+      } else {
+        updatedApprovedFields[fieldKey] = true;
+      }
+      const newState = {
+        ...prev,
+        approvedFields: updatedApprovedFields
+      };
+      // Direct save for approval changes (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true }); 
+      }
+      return newState;
+    });
   };
   
-  const handleSave = () => {
-    // Ensure objectives are arrays before saving
+  const handleSave = () => { // Manual save button action
      const saveData = {
          ...nationData,
          diplomacy: { ...nationData.diplomacy, objectives: Array.isArray(nationData.diplomacy.objectives) ? nationData.diplomacy.objectives : [] },
@@ -819,7 +836,6 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   
   // Process uploaded files
   const handleFileUpload = (files) => {
-    // Create file objects with metadata
     const newFiles = files.map(file => ({
       id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: file.name,
@@ -832,64 +848,73 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
       // For this example, we'll just store metadata
     }));
     
-    // Update state with new files
-    setNationData(prev => ({
-      ...prev,
-      military: {
-        ...prev.military,
-        doctrineFiles: [...prev.military.doctrineFiles, ...newFiles]
+    setNationData(prev => {
+      const fieldKey = 'military.doctrineFiles'; // Assuming this is for military doctrine
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey]; // Mark as unapproved on change
+
+      const newState = {
+        ...prev,
+        military: {
+          ...prev.military,
+          doctrineFiles: [...(prev.military?.doctrineFiles || []), ...newFiles]
+        },
+        approvedFields: newApprovedFields
+      };
+      // Direct save on file upload (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
       }
-    }));
-    
-    // Mark as unapproved when files are added
-    const fieldKey = 'military.doctrine';
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
-    setNationData(prev => ({
-      ...prev,
-      approvedFields: updatedApprovedFields
-    }));
+      return newState;
+    });
   };
   
   // Remove a file
   const handleRemoveFile = (fileId) => {
-    setNationData(prev => ({
-      ...prev,
-      military: {
-        ...prev.military,
-        doctrineFiles: prev.military.doctrineFiles.filter(file => file.id !== fileId)
+    setNationData(prev => {
+      const fieldKey = 'military.doctrineFiles'; // Assuming this is for military doctrine
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey]; // Mark as unapproved on change
+
+      const newState = {
+        ...prev,
+        military: {
+          ...prev.military,
+          doctrineFiles: (prev.military?.doctrineFiles || []).filter(file => file.id !== fileId)
+        },
+        approvedFields: newApprovedFields
+      };
+       // Direct save on file removal (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
       }
-    }));
-    
-    // Mark as unapproved when files are removed
-    const fieldKey = 'military.doctrine';
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
-    setNationData(prev => ({
-      ...prev,
-      approvedFields: updatedApprovedFields
-    }));
+      return newState;
+    });
   };
   
   // Generic handler for adding objectives to any DIME section
   const handleAddObjective = (section, objective) => {
     if (!objective.trim()) return;
-    
-    // Mark field as unapproved when changed
     const fieldKey = `${section}.objectives`;
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
     
-    setNationData(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        objectives: [...prev[section].objectives, objective.trim()]
-      },
-      approvedFields: updatedApprovedFields
-    }));
+    setNationData(prev => {
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey];
+      
+      const newState = {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          objectives: [...(prev[section]?.objectives || []), objective.trim()]
+        },
+        approvedFields: newApprovedFields
+      };
+      // Direct save (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
+    });
     
     // Clear the input field
     switch(section) {
@@ -911,24 +936,27 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   // Generic handler for editing objectives in any DIME section
   const handleEditObjective = (section, index, newValue) => {
     if (!newValue.trim()) return;
-    
-    // Mark field as unapproved when changed
     const fieldKey = `${section}.objectives`;
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
+
     setNationData(prev => {
-      const updatedObjectives = [...prev[section].objectives];
+      const updatedObjectives = [...(prev[section]?.objectives || [])];
       updatedObjectives[index] = newValue.trim();
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey];
       
-      return {
+      const newState = {
         ...prev,
         [section]: {
           ...prev[section],
           objectives: updatedObjectives
         },
-        approvedFields: updatedApprovedFields
+        approvedFields: newApprovedFields
       };
+      // Direct save (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
     });
     
     setEditingObjective(null);
@@ -936,55 +964,60 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   
   // Generic handler for deleting objectives in any DIME section
   const handleDeleteObjective = (section, index) => {
-    // Mark field as unapproved when changed
     const fieldKey = `${section}.objectives`;
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-    
     setNationData(prev => {
-      const updatedObjectives = [...prev[section].objectives];
+      const updatedObjectives = [...(prev[section]?.objectives || [])];
       updatedObjectives.splice(index, 1);
+      const newApprovedFields = { ...prev.approvedFields };
+      delete newApprovedFields[fieldKey];
       
-      return {
+      const newState = {
         ...prev,
         [section]: {
           ...prev[section],
           objectives: updatedObjectives
         },
-        approvedFields: updatedApprovedFields
+        approvedFields: newApprovedFields
       };
+      // Direct save (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
     });
   };
   
   // New handler to toggle field enable/disable status
   const handleToggleEnableField = (fieldKey) => {
-    const keys = fieldKey.split('.');
-    const section = keys[0];
-    let currentLevel = nationData.enabledFields[section];
-    let dataLevel = nationData[section];
+    setNationData(prev => {
+      const keys = fieldKey.split('.');
+      const section = keys[0];
+      const currentEnabledLevel = JSON.parse(JSON.stringify(prev.enabledFields)); // Deep copy to ensure nested objects are mutable
+      let pathObject = currentEnabledLevel;
 
-    for (let i = 1; i < keys.length - 1; i++) {
-      if (!currentLevel[keys[i]]) currentLevel[keys[i]] = {}; // Create intermediate objects if they don't exist
-      if (!dataLevel[keys[i]]) dataLevel[keys[i]] = {};
-      currentLevel = currentLevel[keys[i]];
-      dataLevel = dataLevel[keys[i]];
-    }
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!pathObject[keys[i]]) pathObject[keys[i]] = {};
+        pathObject = pathObject[keys[i]];
+      }
+      const finalKey = keys[keys.length - 1];
+      // Check if the key exists before trying to negate it
+      const currentKeyState = pathObject[finalKey] === undefined ? true : pathObject[finalKey]; // Default to true if undefined
+      pathObject[finalKey] = !currentKeyState;
 
-    const finalKey = keys[keys.length - 1];
-    const currentEnabledState = currentLevel[finalKey];
-    const newEnabledState = !currentEnabledState;
+      const updatedApprovedFields = { ...prev.approvedFields };
+      delete updatedApprovedFields[fieldKey];
 
-    // Update the enabled state
-    currentLevel[finalKey] = newEnabledState;
-
-    // Clear approval when enabling/disabling
-    const updatedApprovedFields = { ...nationData.approvedFields };
-    delete updatedApprovedFields[fieldKey];
-
-    setNationData(prev => ({
-      ...prev,
-      approvedFields: updatedApprovedFields
-    }));
+      const newState = {
+        ...prev,
+        enabledFields: currentEnabledLevel,
+        approvedFields: updatedApprovedFields
+      };
+      // Direct save on toggle (already correct)
+      if (nation && onSave) {
+        onSave({ ...nation, configData: newState, isConfigured: true });
+      }
+      return newState;
+    });
   };
 
   // Check if a field is enabled
@@ -1012,19 +1045,35 @@ function NationPosturePanel({ nation, otherNations, onSave, nationRelationships 
   
   // Handler for saving text from editor modal
   const handleTextEditorSave = (newValue) => {
-    const { section, field } = textEditorConfig;
+    const { section, field, fieldName } = textEditorConfig; // fieldName is like section.field
     
     if (section && field) {
-      // Handle special case for military domain posture fields
-      if (section === 'military' && field.includes('domainPosture.')) {
+      const currentNationData = { ...nationData }; // Get a mutable copy
+      const newApprovedFields = { ...currentNationData.approvedFields };
+      delete newApprovedFields[fieldName]; // Unapprove on edit
+
+      if (section === 'military' && field.startsWith('domainPosture.')) {
         const domain = field.split('.')[1];
-        handleMilitaryDomainChange(domain, newValue);
+        currentNationData.military = {
+          ...currentNationData.military,
+          domainPosture: {
+            ...currentNationData.military.domainPosture,
+            [domain]: newValue
+          }
+        };
       } else {
-        // Standard field update
-        handleInputChange(section, field, newValue);
+        currentNationData[section] = {
+          ...currentNationData[section],
+          [field]: newValue
+        };
+      }
+      currentNationData.approvedFields = newApprovedFields;
+      setNationData(currentNationData); // Update local state first
+      // Direct save after updating local state
+      if (nation && onSave) {
+        onSave({ ...nation, configData: currentNationData, isConfigured: true });
       }
     }
-    
     setTextEditorOpen(false);
   };
   
