@@ -30,7 +30,6 @@ import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import FakePlotImage from '../../../assets/FakePlot.png'; // Import the fake plot image
 import '../../../App.css'; // Import App.css for styling
 
 // Import styled components
@@ -52,34 +51,6 @@ import {
   DownloadButton,
   CopyButton
 } from '../../../styles/ActionButtons';
-
-// Sample mock visualization for development mode
-const SAMPLE_VISUALIZATION_CODE = `import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import numpy as np
-
-# Create sample data
-months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-product_a = [1000, 1500, 1200, 2000, 1800, 2200, 1500, 1800, 2000, 2300, 1900, 2100]
-product_b = [800, 1200, 1500, 1800, 2000, 2300, 1600, 1900, 2200, 2500, 1800, 2000]
-product_c = [1200, 1300, 1100, 1400, 1600, 1900, 1300, 1500, 1700, 1900, 1500, 1700]
-
-# Create the visualization
-plt.figure(figsize=(12, 8))
-
-# Create line plots for each product
-plt.plot(months, product_a, marker='o', linewidth=2, color='#223b8f', label='Product A')
-plt.plot(months, product_b, marker='s', linewidth=2, color='#1a8693', label='Product B')
-plt.plot(months, product_c, marker='^', linewidth=2, color='#ff9d9d', label='Product C')
-
-# Add title and labels
-plt.title('Sales Across Different Products', fontsize=16)
-plt.xlabel('Months', fontsize=12)
-plt.ylabel('Sales ($100k)', fontsize=12)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()`;
 
 // Code editor component - can be replaced with a more robust solution
 const CodeEditor = ({ code, setCode, readOnly }) => {
@@ -138,22 +109,17 @@ const ChartBuilder = () => {
   } = useContext(WorkbenchContext);
   
   const containerClasses = useContainerStyles();
-  const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState('');
   const [selectedChartType, setSelectedChartType] = useState('line');
   const [dataContext, setDataContext] = useState(null);
   const [vizRequest, setVizRequest] = useState('');
-  const [visualizationCode, setVisualizationCode] = useState(SAMPLE_VISUALIZATION_CODE);
-  const [codeResult, setCodeResult] = useState({ status: 'idle', error: null });
+  const [visualizationCode, setVisualizationCode] = useState('# Python code will appear here after generation...');
+  const [codeResult, setCodeResult] = useState({ status: 'idle', data: null, error: null });
   const [localError, setLocalError] = useState(null);
   const [useSeaborn, setUseSeaborn] = useState(true);
   const [selectedStyle, setSelectedStyle] = useState('default');
   const [selectedPalette, setSelectedPalette] = useState('Set1');
-  const [sampleFiles, setSampleFiles] = useState([
-    { id: 'sample-1', name: 'sales_data_2023.xlsx', description: 'Q1-Q4 Sales by Region' },
-    { id: 'sample-2', name: 'inventory_2023.csv', description: 'Inventory levels by warehouse' },
-    { id: 'sample-3', name: 'financial_metrics.xlsx', description: 'Financial performance metrics' }
-  ]);
+  const [isExecutingCode, setIsExecutingCode] = useState(false);
   
   // Fetch data on component mount
   useEffect(() => {
@@ -178,19 +144,20 @@ const ChartBuilder = () => {
   // Handle file selection
   const handleFileSelected = async (fileId) => {
     setSelectedFile(fileId);
-    setCodeResult({status: 'idle', data: null});
+    setCodeResult({status: 'idle', data: null, error: null});
     // Data context will be extracted by the useEffect that depends on selectedFile
   };
   
   // Handle tab change
   const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+    // setTabValue(newValue); // Removed tabs, so this function might be unnecessary
   };
   
   // Handle visualization generation
   const handleGenerateVisualization = async () => {
     setLocalError(null);
-    setCodeResult({status: 'loading', data: null});
+    setCodeResult({status: 'loading', data: null, error: null});
+    setIsExecutingCode(false);
     
     const request = {
       spreadsheet_id: selectedFile,
@@ -207,20 +174,26 @@ const ChartBuilder = () => {
       setVisualizationCode(result.code);
       setCodeResult({
         status: 'success',
-        data: result
+        data: result,
+        error: null
       });
     } catch (err) {
       console.error('Error generating visualization:', err);
-      setLocalError('Failed to generate visualization: try generating again:' + err.message);
-      setCodeResult({status: 'error', data: null});
+      const errorMsg = 'Failed to generate visualization: ' + (err.response?.data?.detail || err.message);
+      setLocalError(errorMsg);
+      setCodeResult({status: 'error', data: null, error: errorMsg});
     }
   };
   
   // Handle code execution after manual edits
   const handleRunCode = async () => {
-    if (!codeResult.data || !visualizationCode) return;
+    if (!codeResult.data?.id || !visualizationCode) {
+        setLocalError("Cannot run code: Missing visualization context or code. Please generate first.");
+        return;
+    }
     
-    setCodeResult({...codeResult, status: 'loading'});
+    setLocalError(null);
+    setIsExecutingCode(true);
     
     try {
       const result = await executeVisualizationCode(
@@ -228,18 +201,24 @@ const ChartBuilder = () => {
         visualizationCode
       );
       
-      setCodeResult({
+      setCodeResult(prevResult => ({
+        ...prevResult,
         status: 'success',
+        error: null,
         data: {
-          ...codeResult.data,
-          image_url: result.image_url
+          ...prevResult.data,
+          image_url: result.image_url,
+          data_url: result.data_url,
+          code: visualizationCode
         }
-      });
+      }));
     } catch (err) {
       console.error('Error executing code:', err);
-      setLocalError('Failed to execute code: ' + err.message);
-      // Keep the existing image URL/data if execution fails
-      setCodeResult(prevResult => ({...prevResult, status: 'error'}));
+      const errorMsg = 'Failed to execute code: ' + (err.response?.data?.detail || err.response?.data?.error || err.message);
+      setLocalError(errorMsg);
+      setCodeResult(prevResult => ({ ...prevResult, status: 'error', error: errorMsg }));
+    } finally {
+      setIsExecutingCode(false);
     }
   };
   
@@ -345,6 +324,7 @@ const ChartBuilder = () => {
                 <FormControl fullWidth sx={{
                   '& .MuiInputLabel-root': {
                     color: 'rgba(255, 255, 255, 0.7)',
+                    whiteSpace: 'normal',
                     '&.Mui-focused': {
                       color: 'primary.main',
                     }
@@ -422,10 +402,10 @@ const ChartBuilder = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Describe the visualization you want"
+                  label="Simply describe the visualization you want. Consider the following elements in your prompt: [CHART TYPE] / [COLUMNS OF INTEREST] / [POSSIBLE FILTERS]"
                   placeholder={connectionError ? 
                     "Backend connection required for visualization generation" : 
-                    "E.g., Create a line chart showing sales by product across months"}
+                    "E.g., Create a [CHART TYPE] showing [DATA] by [CATEGORY] across [TIME PERIOD]. "}
                   multiline
                   rows={4}
                   value={vizRequest}
@@ -449,12 +429,14 @@ const ChartBuilder = () => {
                     },
                     '& .MuiInputLabel-root': {
                       color: 'rgba(255, 255, 255, 0.7)',
+                      whiteSpace: 'normal',
                       '&.Mui-focused': {
                         color: 'primary.main',
                       }
                     },
                     '& .MuiInputBase-input': {
                       color: 'white',
+                      whiteSpace: 'pre-wrap',
                     },
                   }}
                 />
@@ -464,6 +446,7 @@ const ChartBuilder = () => {
                 <FormControl fullWidth style={{ marginBottom: '16px' }} sx={{
                   '& .MuiInputLabel-root': {
                     color: 'rgba(255, 255, 255, 0.7)',
+                    whiteSpace: 'normal',
                     '&.Mui-focused': {
                       color: 'primary.main',
                     }
@@ -546,6 +529,7 @@ const ChartBuilder = () => {
                     <FormControl fullWidth sx={{
                       '& .MuiInputLabel-root': {
                         color: 'rgba(255, 255, 255, 0.7)',
+                        whiteSpace: 'normal',
                         '&.Mui-focused': {
                           color: 'primary.main',
                         }
@@ -611,6 +595,7 @@ const ChartBuilder = () => {
                     <FormControl fullWidth sx={{
                       '& .MuiInputLabel-root': {
                         color: 'rgba(255, 255, 255, 0.7)',
+                        whiteSpace: 'normal',
                         '&.Mui-focused': {
                           color: 'primary.main',
                         }
@@ -719,29 +704,6 @@ const ChartBuilder = () => {
               borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
             }
           }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              aria-label="visualization tabs"
-              sx={{ 
-                mb: 2,
-                '& .MuiTab-root': {
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  '&.Mui-selected': {
-                    color: 'primary.main',
-                  },
-                  fontWeight: 500
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: 'primary.main',
-                  height: '3px'
-                }
-              }}
-            >
-              <Tab icon={<CodeIcon />} label="Code" />
-              <Tab icon={<VisibilityIcon />} label="Visualization" />
-            </Tabs>
-            
             {localError && (
               <Alert 
                 severity="error" 
@@ -771,107 +733,101 @@ const ChartBuilder = () => {
               </Alert>
             )}
             
-            {tabValue === 0 && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
-                    Python Visualization Code
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRunCode}
-                    disabled={!visualizationCode || codeResult.status === 'loading'}
-                    sx={{ 
-                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
-                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                      '&:hover': {
-                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                  >
-                    Run Code
-                  </Button>
-                </Box>
-                <CodeEditor 
-                  code={visualizationCode || (connectionError ? 
-                    "# Backend connection required to generate visualization code\n# Please start the backend services and reload this page" : 
-                    "")} 
-                  setCode={setVisualizationCode}
-                  readOnly={connectionError}
+            <Box mb={3}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="600" color="primary.light">
+                  Visualization Preview
+                </Typography>
+                <DownloadButton
+                  onClick={handleExportVisualization}
+                  tooltip="Export Visualization as PNG"
+                  disabled={!codeResult.data?.data_url || connectionError}
                 />
               </Box>
-            )}
-            
-            {tabValue === 1 && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
-                    Visualization Preview
-                  </Typography>
-                  <DownloadButton
-                    onClick={handleExportVisualization}
-                    tooltip="Export Visualization as PNG"
-                    disabled={!codeResult.data?.data_url || connectionError}
-                  />
-                </Box>
-                
-                {/* Visualization Output */}
-                <SubtleGlowPaper sx={{ 
-                  mt: 3, 
-                  p: 0, 
-                  overflow: 'hidden',
-                  backgroundColor: '#1A1A1A',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '8px',
-                  minHeight: '300px', // Ensure minimum height
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  {codeResult.status === 'loading' ? (
-                    <CircularProgress size={40} />
-                  ) : codeResult.status === 'error' ? (
-                    <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
-                      {localError || "Failed to generate or execute visualization."}
-                    </Alert>
-                  ) : codeResult.data?.data_url ? (
-                    <Box sx={{ width: '100%' }}>
-                      <img
-                        // Use the data_url directly from the codeResult state
-                        src={codeResult.data.data_url} 
-                        alt={codeResult.data.title || "Generated Visualization"} // Use title for alt text if available
-                        style={{ 
-                          display: 'block', // Prevents extra space below image
-                          width: '100%', 
-                          height: 'auto', 
-                          maxHeight: '500px', 
-                          objectFit: 'contain' 
-                        }}
-                        // Add error handling for the image itself
-                        onError={(e) => {
-                          e.target.onerror = null; // Prevent infinite loop if placeholder also fails
-                          setLocalError("Failed to load visualization image from the server.");
-                        }}
-                      />
-                      <Box sx={{ p: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {/* You might want to display the actual title/prompt used if available */}
-                          {vizRequest || "Generated visualization based on your request."} 
-                        </Typography>
-                      </Box>
+              
+              <SubtleGlowPaper sx={{ 
+                mt: 1,
+                p: 0, 
+                overflow: 'hidden',
+                backgroundColor: '#1A1A1A',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                minHeight: '300px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {codeResult.status === 'loading' ? (
+                  <CircularProgress size={40} />
+                ) : codeResult.status === 'error' ? (
+                  <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
+                    {localError || "Failed to generate or execute visualization."}
+                  </Alert>
+                ) : codeResult.data?.data_url ? (
+                  <Box sx={{ width: '100%' }}>
+                    <img
+                      src={codeResult.data.data_url} 
+                      alt={codeResult.data.title || "Generated Visualization"}
+                      style={{ 
+                        display: 'block',
+                        width: '100%', 
+                        height: 'auto', 
+                        maxHeight: '500px', 
+                        objectFit: 'contain' 
+                      }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        setLocalError("Failed to load visualization image from the server.");
+                      }}
+                    />
+                    <Box sx={{ p: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {vizRequest || "Generated visualization based on your request."} 
+                      </Typography>
                     </Box>
-                  ) : (
-                     // Default state before generation or if no image URL is present
-                    <Typography variant="body2" color="text.secondary">
-                      {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
-                    </Typography>
-                  )}
-                </SubtleGlowPaper>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
+                  </Typography>
+                )}
+              </SubtleGlowPaper>
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+              <Button 
+                variant="contained" 
+                size="small"
+                startIcon={isExecutingCode ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                onClick={handleRunCode}
+                disabled={!visualizationCode || codeResult.status === 'loading' || isExecutingCode}
+                sx={{ 
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                  transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                  '&:hover': {
+                    boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+              >
+                {isExecutingCode ? 'Running...' : 'Run Code'}
+              </Button>
+            </Box>
+
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="600" color="primary.light">
+                  Python Visualization Code
+                </Typography>
               </Box>
-            )}
+              <CodeEditor 
+                code={visualizationCode || (connectionError ? 
+                  "# Backend connection required to generate visualization code\\n# Please start the backend services and reload this page" : 
+                  "")} 
+                setCode={setVisualizationCode}
+                readOnly={connectionError}
+              />
+            </Box>
           </GradientBorderPaper>
         </Grid>
       </Grid>
