@@ -1,0 +1,104 @@
+{
+  "id": "a087260b-aa52-46f8-a3fa-9c9eb31528ee",
+  "name": "CSIS: Interpret China",
+  "description": "10 CSIS documents",
+  "embedding_model": "nomic-embed-text:latest",
+  "embedding_dimension": 768,
+  "chunk_size": 1000,
+  "chunk_overlap": 100,
+  "file_count": 10,
+  "created_at": "2025-05-06T21:03:46.822538",
+  "updated_at": "2025-05-06T21:03:46.822538",
+  "files": [
+    {
+      "filename": "Deepening-Cross-Mili.pdf",
+      "original_path": "CSIS: Interpret China/Deepening-Cross-Mili.pdf",
+      "staging_path": "/app/doc_staging/Deepening-Cross-Mili.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_f4deb4db-9d31-4d48-955a-cb0973c03833",
+      "size_bytes": 125071,
+      "added_at": "2025-05-06T21:03:40.931614"
+    },
+    {
+      "filename": "Eradicate-the-Breedi.pdf",
+      "original_path": "CSIS: Interpret China/Eradicate-the-Breedi.pdf",
+      "staging_path": "/app/doc_staging/Eradicate-the-Breedi.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_a7b56b66-b11f-4989-88a1-dfcc2c8ab326",
+      "size_bytes": 129102,
+      "added_at": "2025-05-06T21:03:40.933700"
+    },
+    {
+      "filename": "On-China-s-High-leve.pdf",
+      "original_path": "CSIS: Interpret China/On-China-s-High-leve.pdf",
+      "staging_path": "/app/doc_staging/On-China-s-High-leve.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_90b3be6a-8443-45c0-95d6-8ba4039e5bd4",
+      "size_bytes": 145956,
+      "added_at": "2025-05-06T21:03:40.935360"
+    },
+    {
+      "filename": "Analysis-of-the-Impa.pdf",
+      "original_path": "CSIS: Interpret China/Analysis-of-the-Impa.pdf",
+      "staging_path": "/app/doc_staging/Analysis-of-the-Impa.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_66b1d151-0c1e-405e-85bf-19dd343a5062",
+      "size_bytes": 253335,
+      "added_at": "2025-05-06T21:03:40.937388"
+    },
+    {
+      "filename": "Preparing-for-the-Wo.pdf",
+      "original_path": "CSIS: Interpret China/Preparing-for-the-Wo.pdf",
+      "staging_path": "/app/doc_staging/Preparing-for-the-Wo.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_5664162f-9796-4e43-9dda-e7b593b23e0b",
+      "size_bytes": 121032,
+      "added_at": "2025-05-06T21:03:40.939275"
+    },
+    {
+      "filename": "China-s-Foreign-Trad.pdf",
+      "original_path": "CSIS: Interpret China/China-s-Foreign-Trad.pdf",
+      "staging_path": "/app/doc_staging/China-s-Foreign-Trad.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_9c069aa8-33c4-4bd3-8a02-eecd44e6d41a",
+      "size_bytes": 174576,
+      "added_at": "2025-05-06T21:03:40.940933"
+    },
+    {
+      "filename": "Characteristics-Mot.pdf",
+      "original_path": "CSIS: Interpret China/Characteristics-Mot.pdf",
+      "staging_path": "/app/doc_staging/Characteristics-Mot.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_b0c67f79-b22e-4d21-a912-ebb97f16eeeb",
+      "size_bytes": 139050,
+      "added_at": "2025-05-06T21:03:40.942800"
+    },
+    {
+      "filename": "China-and-Latin-Amer.pdf",
+      "original_path": "CSIS: Interpret China/China-and-Latin-Amer.pdf",
+      "staging_path": "/app/doc_staging/China-and-Latin-Amer.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_816425ef-adea-4d95-a00c-0c757aefdff8",
+      "size_bytes": 137346,
+      "added_at": "2025-05-06T21:03:40.944646"
+    },
+    {
+      "filename": "China-Latin-Americ.pdf",
+      "original_path": "CSIS: Interpret China/China-Latin-Americ.pdf",
+      "staging_path": "/app/doc_staging/China-Latin-Americ.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_5b3ebec4-5b8f-44c6-a382-8ac9895ce2f4",
+      "size_bytes": 161089,
+      "added_at": "2025-05-06T21:03:40.946831"
+    },
+    {
+      "filename": "At-the-18th-collecti.pdf",
+      "original_path": "CSIS: Interpret China/At-the-18th-collecti.pdf",
+      "staging_path": "/app/doc_staging/At-the-18th-collecti.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_0219bb28-d4ff-464b-92ef-d267eec0e6c0",
+      "size_bytes": 86721,
+      "added_at": "2025-05-06T21:03:40.948847"
+    }
+  ]
+}

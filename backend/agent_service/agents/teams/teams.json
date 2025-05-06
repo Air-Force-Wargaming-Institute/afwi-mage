@@ -4,16 +4,17 @@
         "unique_id": "ecc68abb-b280-4e34-a541-ace910da6cee",
         "description": "CASI CMSI Research Team",
         "agents": [
-            "f4f60ea7-1e63-4b05-a919-4154a428ea17",
-            "65100e24-0319-4903-86f9-8d491c87a7d7",
-            "11a061dd-ee45-48f2-8cb4-12db32001eef",
-            "c2371707-2910-41bc-8be3-4a69c53edd5b"
+            "39399023-fa6c-4e15-87fb-02d098b071a0",
+            "e6c042a1-d9e3-4856-b7ec-6806c33b783c",
+            "b4d90b5e-2b07-4cb5-9e33-38bff6de405c",
+            "2e3b8990-f86a-42c4-9c70-9e595437d80d"
         ],
         "color": "#FF0000",
         "created_at": "2025-04-17T16:25:30.869002Z",
-        "last_modified": "2025-04-17T16:25:30.869026Z",
+        "last_modified": "2025-05-06T21:13:19.135713Z",
         "vectorstore": [
-            "4cd2e6d6-5af4-4419-b890-33c4cd0e135d"
+            "91384521-389e-417f-996d-7150dd02df38",
+            "a087260b-aa52-46f8-a3fa-9c9eb31528ee"
         ]
     },
     {
@@ -24,11 +25,11 @@
             "f00b6752-c575-4aea-a122-3e3356e95658",
             "b586a3b2-dd44-43b1-a985-9a65f489c660",
             "30c5f080-0764-440a-acae-47addcf445ef",
-            "6aa7aaf9-f61f-48ab-a5e4-d7df9347c770"
+            "13484c71-b2e2-4661-8014-8ef9df0a34fa"
         ],
         "color": "#1E90FF",
         "created_at": "2025-04-22T17:45:29.968747Z",
-        "last_modified": "2025-04-22T17:48:11.744682Z",
+        "last_modified": "2025-05-06T21:09:42.392625Z",
         "vectorstore": []
     },
     {
@@ -36,18 +37,15 @@
         "unique_id": "fb215b42-f934-444d-80a9-41908fb1f2a6",
         "description": "The People's Republic of China 4-member team",
         "agents": [
-            "c2371707-2910-41bc-8be3-4a69c53edd5b",
-            "11a061dd-ee45-48f2-8cb4-12db32001eef",
-            "f4f60ea7-1e63-4b05-a919-4154a428ea17",
-            "6aa7aaf9-f61f-48ab-a5e4-d7df9347c770"
+            "2e3b8990-f86a-42c4-9c70-9e595437d80d",
+            "e6c042a1-d9e3-4856-b7ec-6806c33b783c",
+            "39399023-fa6c-4e15-87fb-02d098b071a0",
+            "b4d90b5e-2b07-4cb5-9e33-38bff6de405c"
         ],
         "color": "#FF0000",
         "created_at": "2025-04-22T17:47:40.969763Z",
-        "last_modified": "2025-04-22T19:54:07.464892Z",
-        "vectorstore": [
-            "4f697641-244a-4d0b-a9f4-607227edb026",
-            "3ad51d9d-e072-40cd-84ab-1a71067badea"
-        ]
+        "last_modified": "2025-05-06T21:13:11.566049Z",
+        "vectorstore": []
     },
     {
         "name": "NATO Team",
@@ -60,9 +58,7 @@
         "color": "#32CD32",
         "created_at": "2025-04-22T17:49:05.078243Z",
         "last_modified": "2025-05-05T15:55:42.487213Z",
-        "vectorstore": [
-            "9fa7eb8c-ccde-4432-8e21-75c25829caa4"
-        ]
+        "vectorstore": []
     },
     {
         "name": "Analysis Team",

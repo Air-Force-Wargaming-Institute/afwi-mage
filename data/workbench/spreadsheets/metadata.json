@@ -141,5 +141,48 @@
       "Internal ID"
     ],
     "size_bytes": 1179559
+  },
+  "8cc22e7f-ba88-4e37-a1a8-dfba5c598715": {
+    "filename": "TSSG Game Data Compiled.xlsx",
+    "size_bytes": 139641,
+    "sheet_count": 1,
+    "sheets": [
+      "Game Observations"
+    ],
+    "columns": [
+      "Observer",
+      "Block",
+      "Section",
+      "Observation",
+      "Speaker",
+      "Timestamp",
+      "Primary Tag",
+      "Secondary Tag",
+      "Free Tag"
+    ],
+    "row_count": 1812,
+    "sheets_metadata": {
+      "Game Observations": {
+        "columns": [
+          "Observer",
+          "Block",
+          "Section",
+          "Observation",
+          "Speaker",
+          "Timestamp",
+          "Primary Tag",
+          "Secondary Tag",
+          "Free Tag"
+        ],
+        "row_count": 1812
+      }
+    },
+    "id": "8cc22e7f-ba88-4e37-a1a8-dfba5c598715",
+    "description": null,
+    "original_filename": "TSSG Game Data Compiled.xlsx",
+    "modified_filename": "TSSG Game Data Compiled.xlsx",
+    "upload_date": "2025-05-06T21:43:29.260455",
+    "modified_date": "2025-05-06T21:43:29.260455",
+    "storage_path": "/app/data/workbench/spreadsheets/8cc22e7f-ba88-4e37-a1a8-dfba5c598715.xlsx"
   }
 }
