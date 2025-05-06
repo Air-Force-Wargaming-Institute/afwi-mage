@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -17,15 +17,47 @@ import {
   FormControl,
   InputLabel,
   Chip,
-  Tooltip
+  Tooltip,
+  Switch,
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
-import EditIcon from '@material-ui/icons/Edit';
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import ExpandLessIcon from '@material-ui/icons/ExpandLess';
+import SaveIcon from '@material-ui/icons/Save';
+import CancelIcon from '@material-ui/icons/Cancel';
 import FlagIcon from './FlagIcon';
+
+const GEOGRAPHIC_COCOMS = [
+  { id: 'AFRICOM', name: 'US Africa Command' },
+  { id: 'CENTCOM', name: 'US Central Command' },
+  { id: 'EUCOM', name: 'US European Command' },
+  { id: 'INDOPACOM', name: 'US Indo-Pacific Command' },
+  { id: 'NORTHCOM', name: 'US Northern Command' },
+  { id: 'SOUTHCOM', name: 'US Southern Command' },
+  { id: 'SPACECOM_GEO', name: 'US Space Command (Geographic)' },
+];
+
+const FUNCTIONAL_COCOMS = [
+  { id: 'CYBERCOM', name: 'US Cyber Command' },
+  { id: 'SOCOM', name: 'US Special Operations Command' },
+  { id: 'STRATCOM', name: 'US Strategic Command' },
+  { id: 'TRANSCOM', name: 'US Transportation Command' },
+];
+
+const THEATER_COLORS = [
+  { side1: '#4285F4', side2: '#EA4335', name: 'Skyline Divide' }, 
+  { side1: '#34A853', side2: '#FBBC05', name: 'Forest Gold' }, 
+  { side1: '#673AB7', side2: '#FF9800', name: 'Twilight Flare' }, 
+  { side1: '#00BCD4', side2: '#FF5722', name: 'Ocean Ember' }, 
+  { side1: '#3F51B5', side2: '#F44336', name: 'Midnight Blaze' }, 
+  { side1: '#9C27B0', side2: '#FFC107', name: 'Regal Sun' }, 
+  { side1: '#009688', side2: '#E91E63', name: 'Jade Bloom' }, 
+];
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -34,12 +66,13 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     height: '100%',
   },
-  description: {
+  descriptionText: {
     marginBottom: theme.spacing(2),
   },
   theatersList: {
     flexGrow: 1,
-    overflow: 'auto',
+    overflowY: 'auto',
+    padding: theme.spacing(1),
     marginBottom: theme.spacing(2),
   },
   theaterCard: {
@@ -48,15 +81,13 @@ const useStyles = makeStyles((theme) => ({
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'visible',
-    '&:hover': {
-      borderColor: theme.palette.primary.main,
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    },
   },
   cardHeader: {
     padding: theme.spacing(1, 2),
     '& .MuiCardHeader-action': {
       margin: 0,
+      display: 'flex',
+      alignItems: 'center',
     },
   },
   cardContent: {
@@ -65,17 +96,17 @@ const useStyles = makeStyles((theme) => ({
   sideColumn: {
     display: 'flex',
     flexDirection: 'column',
-    padding: theme.spacing(1, 2),
+    padding: theme.spacing(2),
+    paddingTop: theme.spacing(3),
     borderRadius: theme.shape.borderRadius,
     border: '1px solid rgba(255, 255, 255, 0.12)',
     position: 'relative',
+    minHeight: 200,
   },
   side1Column: {
-    borderLeft: `4px solid ${theme.palette.primary.main}`,
     backgroundColor: 'rgba(66, 133, 244, 0.05)',
   },
   side2Column: {
-    borderLeft: `4px solid ${theme.palette.error.main}`,
     backgroundColor: 'rgba(234, 67, 53, 0.05)',
   },
   sideLabel: {
@@ -84,16 +115,13 @@ const useStyles = makeStyles((theme) => ({
     left: 10,
     padding: theme.spacing(0, 1),
     backgroundColor: theme.palette.background.paper,
-    fontSize: '0.75rem',
+    fontSize: '0.85rem',
     fontWeight: 'bold',
   },
   formControl: {
     marginTop: theme.spacing(1),
     marginBottom: theme.spacing(2),
     width: '100%',
-  },
-  selectEmpty: {
-    marginTop: theme.spacing(2),
   },
   flagContainer: {
     display: 'flex',
@@ -108,15 +136,6 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: 'wrap',
     marginTop: theme.spacing(1),
   },
-  addButton: {
-    marginTop: theme.spacing(2),
-  },
-  emptyState: {
-    padding: theme.spacing(3),
-    textAlign: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: theme.shape.borderRadius,
-  },
   chip: {
     margin: theme.spacing(0.5),
   },
@@ -128,564 +147,418 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(1),
     border: '1px solid rgba(255, 255, 255, 0.3)',
   },
-  theaterDescription: {
+  theaterDescriptionField: {
     marginTop: theme.spacing(2),
     width: '100%',
   },
   summaryInfo: {
     display: 'flex',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: theme.spacing(1),
+    padding: theme.spacing(0, 1),
   },
   theaterCount: {
     fontWeight: 'bold',
-    color: theme.palette.primary.main,
     marginRight: theme.spacing(1),
-  }
+  },
+  functionalCocomSection: {
+    marginTop: theme.spacing(3),
+    paddingTop: theme.spacing(2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+  },
+  functionalCocomList: {
+    paddingLeft: theme.spacing(1),
+  },
+  cardActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    padding: theme.spacing(1, 2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+  },
 }));
 
-// Predefined color schemes for theaters
-const THEATER_COLORS = [
-  { side1: '#4285F4', side2: '#EA4335' }, // Blue vs Red
-  { side1: '#34A853', side2: '#FBBC05' }, // Green vs Yellow
-  { side1: '#673AB7', side2: '#FF9800' }, // Purple vs Orange
-  { side1: '#00BCD4', side2: '#FF5722' }, // Cyan vs Deep Orange
-  { side1: '#3F51B5', side2: '#F44336' }, // Indigo vs Red
-];
-
-function TheaterCard({ 
-  theater, 
-  nations, 
-  onUpdate, 
-  onDelete,
-  colorScheme
+function GeographicCocomCard({
+  cocom,
+  theaterState,
+  nations,
+  onUpdateTheaterState,
+  colorScheme,
 }) {
   const classes = useStyles();
-  const [expanded, setExpanded] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [theaterName, setTheaterName] = useState(theater.name);
-  const [theaterDescription, setTheaterDescription] = useState(theater.description || '');
-  const [side1Lead, setSide1Lead] = useState(theater.sides[0].leadNationId || '');
-  const [side2Lead, setSide2Lead] = useState(theater.sides[1].leadNationId || '');
-  const [side1Supporting, setSide1Supporting] = useState(theater.sides[0].supportingNationIds || []);
-  const [side2Supporting, setSide2Supporting] = useState(theater.sides[1].supportingNationIds || []);
+  
+  const [editData, setEditData] = useState({
+    name: '',
+    description: '',
+    side1Lead: '',
+    side2Lead: '',
+    side1Supporting: [],
+    side2Supporting: [],
+  });
 
-  // Handler for toggling card expansion
-  const handleToggleExpand = () => {
-    setExpanded(!expanded);
+  const editDataRef = useRef(editData);
+  useEffect(() => {
+    editDataRef.current = editData;
+  }, [editData]);
+
+  useEffect(() => {
+    setEditData({
+      name: theaterState.name || cocom.name,
+      description: theaterState.description || '',
+      side1Lead: theaterState.sides[0]?.leadNationId || '',
+      side2Lead: theaterState.sides[1]?.leadNationId || '',
+      side1Supporting: theaterState.sides[0]?.supportingNationIds || [],
+      side2Supporting: theaterState.sides[1]?.supportingNationIds || [],
+    });
+  }, [theaterState, cocom.name]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof onUpdateTheaterState !== 'function') return;
+
+      const currentEditData = editDataRef.current;
+      const nameChanged = currentEditData.name !== (theaterState.name || cocom.name);
+      const descriptionChanged = currentEditData.description !== theaterState.description;
+
+      if (nameChanged || descriptionChanged) {
+        onUpdateTheaterState({
+          ...theaterState, 
+          name: currentEditData.name, 
+          description: currentEditData.description, 
+          sides: [
+            { ...(theaterState.sides[0] || { id: 'side1' }), leadNationId: currentEditData.side1Lead, supportingNationIds: currentEditData.side1Supporting, colorCode: colorScheme.side1 },
+            { ...(theaterState.sides[1] || { id: 'side2' }), leadNationId: currentEditData.side2Lead, supportingNationIds: currentEditData.side2Supporting, colorCode: colorScheme.side2 }
+          ],
+        });
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [editData.name, editData.description, cocom.name, colorScheme, onUpdateTheaterState, theaterState]);
+
+  const handleInputChange = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handler for starting the edit mode
-  const handleStartEdit = () => {
-    setIsEditing(true);
-    setExpanded(true); // Always expand when editing
-  };
-
-  // Handler for saving changes
-  const handleSave = () => {
-    const updatedTheater = {
-      ...theater,
-      name: theaterName,
-      description: theaterDescription,
+  const createImmediateUpdatePayload = (specificChanges) => {
+    return {
+      ...theaterState,
+      name: editData.name,
+      description: editData.description,
       sides: [
-        {
-          ...theater.sides[0],
-          leadNationId: side1Lead,
-          supportingNationIds: side1Supporting,
-          colorCode: colorScheme.side1
-        },
-        {
-          ...theater.sides[1],
-          leadNationId: side2Lead,
-          supportingNationIds: side2Supporting,
-          colorCode: colorScheme.side2
-        }
-      ]
+        { ...(theaterState.sides[0] || { id: 'side1' }), leadNationId: editData.side1Lead, supportingNationIds: editData.side1Supporting, colorCode: colorScheme.side1 },
+        { ...(theaterState.sides[1] || { id: 'side2' }), leadNationId: editData.side2Lead, supportingNationIds: editData.side2Supporting, colorCode: colorScheme.side2 }
+      ],
+      ...specificChanges,
     };
-    
-    onUpdate(updatedTheater);
-    setIsEditing(false);
   };
 
-  // Handler for canceling edit mode
-  const handleCancelEdit = () => {
-    // Reset to original values
-    setTheaterName(theater.name);
-    setTheaterDescription(theater.description || '');
-    setSide1Lead(theater.sides[0].leadNationId || '');
-    setSide2Lead(theater.sides[1].leadNationId || '');
-    setSide1Supporting(theater.sides[0].supportingNationIds || []);
-    setSide2Supporting(theater.sides[1].supportingNationIds || []);
-    setIsEditing(false);
+  const handleActivationToggle = (event) => {
+    onUpdateTheaterState(createImmediateUpdatePayload({ isActive: event.target.checked }));
   };
 
-  // Handler for side 1 lead nation change
-  const handleSide1LeadChange = (event) => {
-    const nationId = event.target.value;
-    setSide1Lead(nationId);
-    
-    // Remove from supporting nations if selected as lead
-    if (side1Supporting.includes(nationId)) {
-      setSide1Supporting(side1Supporting.filter(id => id !== nationId));
-    }
-    
-    // Remove from side 2 if selected for side 1
-    if (side2Lead === nationId) {
-      setSide2Lead('');
-    }
-    if (side2Supporting.includes(nationId)) {
-      setSide2Supporting(side2Supporting.filter(id => id !== nationId));
-    }
+  const handleFunctionalCocomToggle = (funcCocomId, isActive) => {
+    onUpdateTheaterState(createImmediateUpdatePayload({
+      functionalCocoms: {
+        ...(theaterState.functionalCocoms || {}),
+        [funcCocomId]: isActive,
+      },
+    }));
   };
-
-  // Handler for side 2 lead nation change
-  const handleSide2LeadChange = (event) => {
-    const nationId = event.target.value;
-    setSide2Lead(nationId);
-    
-    // Remove from supporting nations if selected as lead
-    if (side2Supporting.includes(nationId)) {
-      setSide2Supporting(side2Supporting.filter(id => id !== nationId));
-    }
-    
-    // Remove from side 1 if selected for side 2
-    if (side1Lead === nationId) {
-      setSide1Lead('');
-    }
-    if (side1Supporting.includes(nationId)) {
-      setSide1Supporting(side1Supporting.filter(id => id !== nationId));
-    }
-  };
-
-  // Handler for side 1 supporting nations change
-  const handleSide1SupportingToggle = (nationId) => {
-    if (side1Supporting.includes(nationId)) {
-      // Remove nation
-      setSide1Supporting(side1Supporting.filter(id => id !== nationId));
+  
+  const handleSideLeadChange = (sideNum, nationId) => {
+    const newLocalEditData = { ...editData };
+    if (sideNum === 1) {
+      newLocalEditData.side1Lead = nationId;
+      if (newLocalEditData.side1Supporting.includes(nationId)) {
+        newLocalEditData.side1Supporting = newLocalEditData.side1Supporting.filter(id => id !== nationId);
+      }
+      if (newLocalEditData.side2Lead === nationId) newLocalEditData.side2Lead = '';
+      if (newLocalEditData.side2Supporting.includes(nationId)) {
+        newLocalEditData.side2Supporting = newLocalEditData.side2Supporting.filter(id => id !== nationId);
+      }
     } else {
-      // Add nation if not already a lead on either side
-      if (side1Lead !== nationId && side2Lead !== nationId && !side2Supporting.includes(nationId)) {
-        setSide1Supporting([...side1Supporting, nationId]);
+      newLocalEditData.side2Lead = nationId;
+      if (newLocalEditData.side2Supporting.includes(nationId)) {
+        newLocalEditData.side2Supporting = newLocalEditData.side2Supporting.filter(id => id !== nationId);
+      }
+      if (newLocalEditData.side1Lead === nationId) newLocalEditData.side1Lead = '';
+      if (newLocalEditData.side1Supporting.includes(nationId)) {
+        newLocalEditData.side1Supporting = newLocalEditData.side1Supporting.filter(id => id !== nationId);
       }
     }
+    setEditData(newLocalEditData);
+
+    onUpdateTheaterState({
+        ...theaterState,
+        name: newLocalEditData.name,
+        description: newLocalEditData.description,
+        sides: [
+            { ...(theaterState.sides[0] || { id: 'side1' }), leadNationId: newLocalEditData.side1Lead, supportingNationIds: newLocalEditData.side1Supporting, colorCode: colorScheme.side1 },
+            { ...(theaterState.sides[1] || { id: 'side2' }), leadNationId: newLocalEditData.side2Lead, supportingNationIds: newLocalEditData.side2Supporting, colorCode: colorScheme.side2 }
+        ],
+        isActive: theaterState.isActive,
+        functionalCocoms: theaterState.functionalCocoms || {},
+    });
   };
 
-  // Handler for side 2 supporting nations change
-  const handleSide2SupportingToggle = (nationId) => {
-    if (side2Supporting.includes(nationId)) {
-      // Remove nation
-      setSide2Supporting(side2Supporting.filter(id => id !== nationId));
+  const handleSideSupportingToggle = (sideNum, nationId) => {
+    const newLocalEditData = { ...editData };
+    let supportingArray = sideNum === 1 ? [...newLocalEditData.side1Supporting] : [...newLocalEditData.side2Supporting];
+    const otherLead = sideNum === 1 ? newLocalEditData.side2Lead : newLocalEditData.side1Lead;
+    const otherSupporting = sideNum === 1 ? newLocalEditData.side2Supporting : newLocalEditData.side1Supporting;
+    const currentLead = sideNum === 1 ? newLocalEditData.side1Lead : newLocalEditData.side2Lead;
+
+    if (supportingArray.includes(nationId)) {
+      supportingArray = supportingArray.filter(id => id !== nationId);
     } else {
-      // Add nation if not already a lead on either side
-      if (side2Lead !== nationId && side1Lead !== nationId && !side1Supporting.includes(nationId)) {
-        setSide2Supporting([...side2Supporting, nationId]);
+      if (currentLead !== nationId && otherLead !== nationId && !otherSupporting.includes(nationId)) {
+        supportingArray = [...supportingArray, nationId];
       }
     }
-  };
+    if (sideNum === 1) newLocalEditData.side1Supporting = supportingArray;
+    else newLocalEditData.side2Supporting = supportingArray;
+    
+    setEditData(newLocalEditData);
 
-  // Find entity by ID
-  const findEntityById = (entityId) => {
-    return nations.find(nation => nation.entityId === entityId);
+    onUpdateTheaterState({
+        ...theaterState,
+        name: newLocalEditData.name,
+        description: newLocalEditData.description,
+        sides: [
+            { ...(theaterState.sides[0] || { id: 'side1' }), leadNationId: newLocalEditData.side1Lead, supportingNationIds: newLocalEditData.side1Supporting, colorCode: colorScheme.side1 },
+            { ...(theaterState.sides[1] || { id: 'side2' }), leadNationId: newLocalEditData.side2Lead, supportingNationIds: newLocalEditData.side2Supporting, colorCode: colorScheme.side2 }
+        ],
+        isActive: theaterState.isActive,
+        functionalCocoms: theaterState.functionalCocoms || {},
+    });
   };
+  
+  const findEntityById = (entityId) => nations.find(nation => nation.entityId === entityId);
 
-  // Filter nations for selection dropdowns
-  // Side 1 lead can't be side 2 lead, etc.
-  const availableNationsForSide1Lead = nations.filter(nation => 
-    nation.entityId !== side2Lead
+  const availableNationsForSide1Lead = nations.filter(n => n.entityId !== editData.side2Lead);
+  const availableNationsForSide2Lead = nations.filter(n => n.entityId !== editData.side1Lead);
+  const availableNationsForSide1Supporting = nations.filter(n => 
+    n.entityId !== editData.side1Lead && 
+    n.entityId !== editData.side2Lead && 
+    !editData.side2Supporting.includes(n.entityId)
   );
-  
-  const availableNationsForSide2Lead = nations.filter(nation => 
-    nation.entityId !== side1Lead
-  );
-  
-  const availableNationsForSide1Supporting = nations.filter(nation => 
-    nation.entityId !== side1Lead && 
-    nation.entityId !== side2Lead && 
-    !side2Supporting.includes(nation.entityId)
-  );
-  
-  const availableNationsForSide2Supporting = nations.filter(nation => 
-    nation.entityId !== side2Lead && 
-    nation.entityId !== side1Lead && 
-    !side1Supporting.includes(nation.entityId)
+  const availableNationsForSide2Supporting = nations.filter(n => 
+    n.entityId !== editData.side2Lead && 
+    n.entityId !== editData.side1Lead && 
+    !editData.side1Supporting.includes(n.entityId)
   );
 
   return (
-    <Card className={classes.theaterCard}>
+    <Card className={classes.theaterCard} style={{borderColor: theaterState.isActive ? colorScheme.side1 : 'rgba(255, 255, 255, 0.12)'}}>
       <CardHeader
         title={
-          isEditing ? (
-            <TextField
-              value={theaterName}
-              onChange={(e) => setTheaterName(e.target.value)}
-              fullWidth
-              variant="outlined"
-              size="small"
-              placeholder="Theater Name"
-            />
-          ) : (
-            <Box display="flex" alignItems="center">
-              <Box className={classes.colorIndicator} style={{ backgroundColor: colorScheme.side1 }} />
-              <Typography variant="h6">{theater.name}</Typography>
-            </Box>
-          )
+          <Box display="flex" alignItems="center">
+            <Box className={classes.colorIndicator} style={{ backgroundColor: colorScheme.side1 }} />
+            <Typography variant="h6">{theaterState.name || cocom.name}</Typography>
+          </Box>
         }
         action={
-          <Box>
-            {isEditing ? (
-              <>
-                <IconButton size="small" onClick={handleSave} color="primary">
-                  <Tooltip title="Save changes">
-                    <AddIcon />
-                  </Tooltip>
-                </IconButton>
-                <IconButton size="small" onClick={handleCancelEdit}>
-                  <Tooltip title="Cancel">
-                    <DeleteIcon />
-                  </Tooltip>
-                </IconButton>
-              </>
-            ) : (
-              <>
-                <IconButton size="small" onClick={handleStartEdit}>
-                  <Tooltip title="Edit theater">
-                    <EditIcon />
-                  </Tooltip>
-                </IconButton>
-                <IconButton size="small" onClick={() => onDelete(theater.id)}>
-                  <Tooltip title="Delete theater">
-                    <DeleteIcon />
-                  </Tooltip>
-                </IconButton>
-                <IconButton size="small" onClick={handleToggleExpand}>
-                  {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              </>
-            )}
-          </Box>
+          <FormControlLabel
+            control={<Switch checked={theaterState.isActive} onChange={handleActivationToggle} name={`${cocom.id}-activate`} color="primary"/>}
+            label={theaterState.isActive ? "Active" : "Inactive"}
+          />
         }
         className={classes.cardHeader}
       />
-      
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
+      <Collapse in={theaterState.isActive} timeout="auto" unmountOnExit>
         <CardContent className={classes.cardContent}>
-          <Grid container spacing={2}>
-            {/* Side 1 Column */}
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+                 <TextField
+                    label="Theater Display Name"
+                    value={editData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter display name for this theater"
+                    style={{marginBottom: 16}}
+                />
+            </Grid>
             <Grid item xs={12} md={6}>
-              <Box className={`${classes.sideColumn} ${classes.side1Column}`}>
-                <Typography className={classes.sideLabel} style={{ color: colorScheme.side1 }}>
-                  Side 1
-                </Typography>
-                
-                {/* Lead Nation Selection */}
+              <Box className={classes.sideColumn} style={{ borderLeft: `4px solid ${colorScheme.side1}` }}>
+                <Typography className={classes.sideLabel} style={{ color: colorScheme.side1 }}>Side 1</Typography>
                 <FormControl variant="outlined" className={classes.formControl} size="small">
-                  <InputLabel id={`side1-lead-label-${theater.id}`}>Lead Nation or Organization</InputLabel>
-                  <Select
-                    labelId={`side1-lead-label-${theater.id}`}
-                    id={`side1-lead-${theater.id}`}
-                    value={side1Lead}
-                    onChange={handleSide1LeadChange}
-                    label="Lead Nation or Organization"
-                    disabled={!isEditing}
-                  >
-                    <MenuItem value="">
-                      <em>None</em>
-                    </MenuItem>
+                  <InputLabel>Lead Nation/Organization</InputLabel>
+                  <Select value={editData.side1Lead} onChange={(e) => handleSideLeadChange(1, e.target.value)} label="Lead Nation/Organization">
+                    <MenuItem value=""><em>None</em></MenuItem>
                     {availableNationsForSide1Lead.map((nation) => (
                       <MenuItem key={nation.entityId} value={nation.entityId}>
-                        <Box className={classes.flagContainer}>
-                          <Box className={classes.flagIcon}>
-                            <FlagIcon entityId={nation.entityId} entityType={nation.entityType} />
-                          </Box>
-                          <Typography>{nation.entityName}</Typography>
-                        </Box>
+                        <Box className={classes.flagContainer}><FlagIcon entityId={nation.entityId} entityType={nation.entityType} className={classes.flagIcon}/><Typography>{nation.entityName}</Typography></Box>
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-
-                {/* Display Lead Nation */}
-                {side1Lead && !isEditing && (
-                  <Box className={classes.flagContainer}>
-                    <Box className={classes.flagIcon}>
-                      <FlagIcon entityId={side1Lead} entityType={findEntityById(side1Lead)?.entityType} />
-                    </Box>
-                    <Typography variant="body1">
-                      {findEntityById(side1Lead)?.entityName}
-                      <Chip size="small" label="Lead" style={{ marginLeft: 8, backgroundColor: colorScheme.side1, color: '#fff' }} />
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Supporting Nations */}
-                <Typography variant="body2" color="textSecondary" style={{ marginTop: 16 }}>
-                  Supporting:
-                </Typography>
-                
-                {isEditing ? (
-                  <Box className={classes.supportingNations}>
-                    {availableNationsForSide1Supporting.map((nation) => (
-                      <Chip
-                        key={nation.entityId}
-                        icon={<FlagIcon entityId={nation.entityId} entityType={nation.entityType} />}
-                        label={nation.entityName}
-                        onClick={() => handleSide1SupportingToggle(nation.entityId)}
-                        className={classes.chip}
-                        color={side1Supporting.includes(nation.entityId) ? "primary" : "default"}
-                        variant={side1Supporting.includes(nation.entityId) ? "default" : "outlined"}
-                      />
-                    ))}
-                  </Box>
-                ) : (
-                  <Box className={classes.supportingNations}>
-                    {side1Supporting.length > 0 ? (
-                      side1Supporting.map((nationId) => {
-                        const nation = findEntityById(nationId);
-                        return nation ? (
-                          <Chip
-                            key={nationId}
-                            icon={<FlagIcon entityId={nationId} entityType={nation.entityType} />}
-                            label={nation.entityName}
-                            className={classes.chip}
-                            variant="outlined"
-                          />
-                        ) : null;
-                      })
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">
-                        No supporting nations
-                      </Typography>
-                    )}
-                  </Box>
-                )}
+                <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>Supporting:</Typography>
+                <Box className={classes.supportingNations}>
+                  {availableNationsForSide1Supporting.map((nation) => (
+                    <Chip
+                      key={nation.entityId}
+                      icon={<FlagIcon entityId={nation.entityId} entityType={nation.entityType} />}
+                      label={nation.entityName}
+                      onClick={() => handleSideSupportingToggle(1, nation.entityId)}
+                      className={classes.chip}
+                      color={editData.side1Supporting.includes(nation.entityId) ? "primary" : "default"}
+                      variant={editData.side1Supporting.includes(nation.entityId) ? "default" : "outlined"}
+                      clickable
+                    />
+                  ))}
+                </Box>
               </Box>
             </Grid>
 
-            {/* Side 2 Column */}
             <Grid item xs={12} md={6}>
-              <Box className={`${classes.sideColumn} ${classes.side2Column}`}>
-                <Typography className={classes.sideLabel} style={{ color: colorScheme.side2 }}>
-                  Side 2
-                </Typography>
-                
-                {/* Lead Nation Selection */}
-                <FormControl variant="outlined" className={classes.formControl} size="small">
-                  <InputLabel id={`side2-lead-label-${theater.id}`}>Lead Nation or Organization</InputLabel>
-                  <Select
-                    labelId={`side2-lead-label-${theater.id}`}
-                    id={`side2-lead-${theater.id}`}
-                    value={side2Lead}
-                    onChange={handleSide2LeadChange}
-                    label="Lead Nation or Organization"
-                    disabled={!isEditing}
-                  >
-                    <MenuItem value="">
-                      <em>None</em>
-                    </MenuItem>
+              <Box className={classes.sideColumn} style={{ borderLeft: `4px solid ${colorScheme.side2}`}}>
+                <Typography className={classes.sideLabel} style={{ color: colorScheme.side2 }}>Side 2</Typography>
+                 <FormControl variant="outlined" className={classes.formControl} size="small">
+                  <InputLabel>Lead Nation/Organization</InputLabel>
+                  <Select value={editData.side2Lead} onChange={(e) => handleSideLeadChange(2, e.target.value)} label="Lead Nation/Organization">
+                    <MenuItem value=""><em>None</em></MenuItem>
                     {availableNationsForSide2Lead.map((nation) => (
                       <MenuItem key={nation.entityId} value={nation.entityId}>
-                        <Box className={classes.flagContainer}>
-                          <Box className={classes.flagIcon}>
-                            <FlagIcon entityId={nation.entityId} entityType={nation.entityType} />
-                          </Box>
-                          <Typography>{nation.entityName}</Typography>
-                        </Box>
+                        <Box className={classes.flagContainer}><FlagIcon entityId={nation.entityId} entityType={nation.entityType} className={classes.flagIcon}/><Typography>{nation.entityName}</Typography></Box>
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-
-                {/* Display Lead Nation */}
-                {side2Lead && !isEditing && (
-                  <Box className={classes.flagContainer}>
-                    <Box className={classes.flagIcon}>
-                      <FlagIcon entityId={side2Lead} entityType={findEntityById(side2Lead)?.entityType} />
-                    </Box>
-                    <Typography variant="body1">
-                      {findEntityById(side2Lead)?.entityName}
-                      <Chip size="small" label="Lead" style={{ marginLeft: 8, backgroundColor: colorScheme.side2, color: '#fff' }} />
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Supporting Nations */}
-                <Typography variant="body2" color="textSecondary" style={{ marginTop: 16 }}>
-                  Supporting:
-                </Typography>
-                
-                {isEditing ? (
-                  <Box className={classes.supportingNations}>
-                    {availableNationsForSide2Supporting.map((nation) => (
-                      <Chip
-                        key={nation.entityId}
-                        icon={<FlagIcon entityId={nation.entityId} entityType={nation.entityType} />}
-                        label={nation.entityName}
-                        onClick={() => handleSide2SupportingToggle(nation.entityId)}
-                        className={classes.chip}
-                        color={side2Supporting.includes(nation.entityId) ? "primary" : "default"}
-                        variant={side2Supporting.includes(nation.entityId) ? "default" : "outlined"}
-                      />
-                    ))}
-                  </Box>
-                ) : (
-                  <Box className={classes.supportingNations}>
-                    {side2Supporting.length > 0 ? (
-                      side2Supporting.map((nationId) => {
-                        const nation = findEntityById(nationId);
-                        return nation ? (
-                          <Chip
-                            key={nationId}
-                            icon={<FlagIcon entityId={nationId} entityType={nation.entityType} />}
-                            label={nation.entityName}
-                            className={classes.chip}
-                            variant="outlined"
-                          />
-                        ) : null;
-                      })
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">
-                        No supporting nations
-                      </Typography>
-                    )}
-                  </Box>
-                )}
+                <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>Supporting:</Typography>
+                <Box className={classes.supportingNations}>
+                  {availableNationsForSide2Supporting.map((nation) => (
+                    <Chip
+                      key={nation.entityId}
+                      icon={<FlagIcon entityId={nation.entityId} entityType={nation.entityType} />}
+                      label={nation.entityName}
+                      onClick={() => handleSideSupportingToggle(2, nation.entityId)}
+                      className={classes.chip}
+                      color={editData.side2Supporting.includes(nation.entityId) ? "primary" : "default"}
+                       variant={editData.side2Supporting.includes(nation.entityId) ? "default" : "outlined"}
+                      clickable
+                    />
+                  ))}
+                </Box>
               </Box>
             </Grid>
 
-            {/* Theater Description */}
             <Grid item xs={12}>
-              {isEditing ? (
-                <TextField
-                  className={classes.theaterDescription}
-                  label="Theater Description (Rec)"
-                  multiline
-                  rows={2}
-                  value={theaterDescription}
-                  onChange={(e) => setTheaterDescription(e.target.value)}
-                  variant="outlined"
-                  size="small"
-                  placeholder="Describe the theater of conflict..."
-                />
-              ) : (
-                theaterDescription && (
-                  <Box mt={2}>
-                    <Typography variant="body2" color="textSecondary">
-                      {theaterDescription}
-                    </Typography>
-                  </Box>
-                )
-              )}
+              <TextField
+                className={classes.theaterDescriptionField}
+                label="Theater Description (Optional)"
+                multiline
+                rows={3}
+                value={editData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Describe the notional conflict scenario, objectives, or key characteristics of this theater..."
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Box className={classes.functionalCocomSection}>
+                <Typography variant="subtitle1" gutterBottom>Functional COCOM Activation</Typography>
+                <List dense className={classes.functionalCocomList}>
+                  {FUNCTIONAL_COCOMS.map(fcocom => (
+                    <ListItem key={fcocom.id} dense disableGutters>
+                      <ListItemText primary={fcocom.name} />
+                      <ListItemSecondaryAction>
+                        <Switch
+                          edge="end"
+                          checked={theaterState.functionalCocoms[fcocom.id] || false}
+                          onChange={(e) => handleFunctionalCocomToggle(fcocom.id, e.target.checked)}
+                          color="primary"
+                        />
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
             </Grid>
           </Grid>
         </CardContent>
+        <Box className={classes.cardActions}>
+            {/* Manual Save and Cancel buttons are removed */}
+        </Box>
       </Collapse>
     </Card>
   );
 }
 
-function ConflictTheatersPane({ nations = [], theaters = [], onChange }) {
+function ConflictTheatersPane({ nations = [], theaters: initialTheaters = [], onChange }) {
   const classes = useStyles();
-  
-  // Generate a new empty theater
-  const createNewTheater = () => {
-    return {
-      id: `theater-${Date.now()}`,
-      name: `New Theater`,
-      description: '',
-      sides: [
-        {
-          id: 'side1',
-          leadNationId: '',
-          supportingNationIds: [],
-          colorCode: THEATER_COLORS[theaters.length % THEATER_COLORS.length].side1
-        },
-        {
-          id: 'side2',
-          leadNationId: '',
-          supportingNationIds: [],
-          colorCode: THEATER_COLORS[theaters.length % THEATER_COLORS.length].side2
-        }
-      ]
-    };
-  };
+  const [configuredTheaters, setConfiguredTheaters] = useState([]);
 
-  // Add a new theater
-  const handleAddTheater = () => {
-    const newTheater = createNewTheater();
-    const updatedTheaters = [...theaters, newTheater];
-    onChange(updatedTheaters);
-  };
+  useEffect(() => {
+    const updatedTheaters = GEOGRAPHIC_COCOMS.map((geoCocom, index) => {
+      const existingTheaterData = initialTheaters.find(t => t.cocomId === geoCocom.id);
+      const defaultColorScheme = THEATER_COLORS[index % THEATER_COLORS.length];
+      
+      const defaultFunctionalCocoms = FUNCTIONAL_COCOMS.reduce((acc, fc) => {
+        acc[fc.id] = false;
+        return acc;
+      }, {});
 
-  // Update an existing theater
-  const handleUpdateTheater = (updatedTheater) => {
-    const updatedTheaters = theaters.map(theater => 
-      theater.id === updatedTheater.id ? updatedTheater : theater
+      return {
+        cocomId: geoCocom.id,
+        name: existingTheaterData?.name || geoCocom.name,
+        description: existingTheaterData?.description || '',
+        isActive: existingTheaterData?.isActive || false,
+        sides: existingTheaterData?.sides || [
+          { id: 'side1', leadNationId: '', supportingNationIds: [], colorCode: defaultColorScheme.side1 },
+          { id: 'side2', leadNationId: '', supportingNationIds: [], colorCode: defaultColorScheme.side2 }
+        ],
+        functionalCocoms: existingTheaterData?.functionalCocoms || defaultFunctionalCocoms,
+      };
+    });
+    setConfiguredTheaters(updatedTheaters);
+  }, [initialTheaters]);
+
+  const handleUpdateTheaterState = useCallback((updatedTheaterState) => {
+    const newConfiguredTheaters = configuredTheaters.map(theater =>
+      theater.cocomId === updatedTheaterState.cocomId ? updatedTheaterState : theater
     );
-    onChange(updatedTheaters);
-  };
-
-  // Delete a theater
-  const handleDeleteTheater = (theaterId) => {
-    const updatedTheaters = theaters.filter(theater => theater.id !== theaterId);
-    onChange(updatedTheaters);
-  };
+    setConfiguredTheaters(newConfiguredTheaters);
+    onChange(newConfiguredTheaters);
+  }, [configuredTheaters, onChange]);
+  
+  const activeTheatersCount = configuredTheaters.filter(t => t.isActive).length;
 
   return (
     <Box className={classes.root}>
-      <Typography variant="body2" color="textSecondary" paragraph className={classes.description}>
-        Theaters of conflict define distinct geographic areas where opposing forces engage. 
-        Each theater has two sides with lead nations and supporting nations. 
-        This helps organize complex multi-front scenarios like world wars.
+      <Typography variant="body2" color="textSecondary" paragraph className={classes.descriptionText}>
+        Activate and configure Geographic Combatant Commands (COCOMs) as theaters of conflict. 
+        For each active theater, define the opposing sides, their lead and supporting nations, and activate relevant Functional COCOMs.
       </Typography>
       
-      <Paper className={classes.theatersList} elevation={2}>
-        {theaters.length > 0 ? (
-          theaters.map((theater, index) => (
-            <TheaterCard
-              key={theater.id}
-              theater={theater}
+      <Paper className={classes.theatersList} elevation={0} variant="outlined">
+        {configuredTheaters.length > 0 ? (
+          configuredTheaters.map((theaterState, index) => (
+            <GeographicCocomCard
+              key={theaterState.cocomId}
+              cocom={GEOGRAPHIC_COCOMS.find(gc => gc.id === theaterState.cocomId)}
+              theaterState={theaterState}
               nations={nations}
-              onUpdate={handleUpdateTheater}
-              onDelete={handleDeleteTheater}
+              onUpdateTheaterState={handleUpdateTheaterState}
               colorScheme={THEATER_COLORS[index % THEATER_COLORS.length]}
             />
           ))
         ) : (
-          <Box className={classes.emptyState}>
-            <Typography variant="body1" color="textSecondary" gutterBottom>
-              No conflict theaters defined yet
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Add theaters to organize nations into opposing sides
-            </Typography>
+           <Box p={3} textAlign="center">
+            <Typography variant="body1" color="textSecondary">Loading theater configurations...</Typography>
           </Box>
         )}
       </Paper>
       
-      <Box>
-        <Button
-          variant="contained" 
-          color="primary" 
-          startIcon={<AddIcon />} 
-          className={classes.addButton}
-          onClick={handleAddTheater}
-          disabled={nations.length < 2}
-        >
-          Add Theater
-        </Button>
-        
-        {nations.length < 2 && (
-          <Typography variant="caption" color="textSecondary" style={{ marginTop: 8, display: 'block' }}>
-            Add at least 2 nations to create a conflict theater
-          </Typography>
-        )}
-        
-        <Box className={classes.summaryInfo}>
-          <Typography variant="body2">
-            Total theaters: <span className={classes.theaterCount}>{theaters.length}</span>
-          </Typography>
-        </Box>
+      <Box className={classes.summaryInfo}>
+        <Typography variant="body2">
+          Total Active Theaters: <span className={classes.theaterCount} style={{color: activeTheatersCount > 0 ? THEATER_COLORS[0].side1 : 'inherit'}}>{activeTheatersCount}</span> / {GEOGRAPHIC_COCOMS.length}
+        </Typography>
       </Box>
     </Box>
   );
