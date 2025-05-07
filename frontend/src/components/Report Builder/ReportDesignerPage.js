@@ -8,68 +8,58 @@ import {
   Typography, 
   AppBar, 
   Toolbar, 
-  IconButton 
+  IconButton,
+  CircularProgress,
+  Snackbar
 } from '@material-ui/core';
 import SaveIcon from '@material-ui/icons/Save';
-import PublishIcon from '@material-ui/icons/Publish'; // Using Publish as Export
+import PublishIcon from '@material-ui/icons/Publish';
 import CloseIcon from '@material-ui/icons/Close';
 import ReportConfigPanel from './ReportConfigPanel';
 import ReportPreviewPanel from './ReportPreviewPanel';
+import { mockReports } from './mockReports';
 
-// Mock API functions (replace with actual service calls)
-const fetchReportDefinition = async (reportId) => {
-  console.log('Fetching report definition for:', reportId);
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  // Return mock data for editing, or null/default for new
-  if (reportId === '1') {
-    return {
-      id: '1', 
-      title: 'Q1 Threat Assessment', 
-      description: 'Analysis of regional threats for Q1.', 
-      vectorStoreId: 'vs1', 
-      type: 'Custom',
-      sections: [
-        { id: 's1', type: 'explicit', content: '# Section 1: Introduction\nThis is the intro.' },
-        { id: 's2', type: 'generative', instructions: 'Summarize key threats based on intel data.' }
-      ]
-    };
-  }
-  return { id: null, title: 'New Report', description: '', vectorStoreId: '', sections: [] }; // Default for new report
-};
-
-const saveReportDefinition = async (definition) => {
-  console.log('Saving report definition:', definition);
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 700));
-  // Simulate saving - return the definition, possibly with a generated ID if new
-  return { ...definition, id: definition.id || `new-${Date.now()}` }; 
-};
-
-const exportReport = async (definition) => {
-  console.log('Exporting report:', definition);
-  // Simulate API delay and file generation
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  alert('Report export initiated (simulated).');
-};
+// Helper functions
+const getDefaultReport = () => ({
+  id: null,
+  title: 'New Report',
+  description: '',
+  vectorStoreId: '',
+  elements: []
+});
 
 const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh', // Full viewport height
-    width: '100vw', // Full viewport width
-    position: 'fixed', // Fix position to cover everything
+    height: '100vh',
+    width: '100vw',
+    position: 'fixed',
     top: 0,
     left: 0,
-    backgroundColor: theme.palette.background.default, // Use theme background
-    zIndex: 1500, // Ensure it overlays other content
-    padding: 0, // Remove default container padding
-    margin: 0, // Remove default margin
-    overflow: 'hidden', // Prevent scrolling at the root level
+    backgroundColor: theme.palette.background.default,
+    zIndex: 1500,
+    padding: 0,
+    margin: 0,
+    overflow: 'hidden',
+    '& ::-webkit-scrollbar': {
+      width: '8px',
+      height: '8px',
+    },
+    '& ::-webkit-scrollbar-track': {
+      background: theme.palette.background.paper,
+      borderRadius: '4px',
+    },
+    '& ::-webkit-scrollbar-thumb': {
+      background: theme.palette.divider,
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.action.hover,
+      },
+    },
   },
   appBar: {
-    position: 'relative', // Keep AppBar part of the flow
+    position: 'relative',
     backgroundColor: theme.palette.background.paper,
     borderBottom: `1px solid ${theme.palette.divider}`,
   },
@@ -82,47 +72,91 @@ const useStyles = makeStyles((theme) => ({
   contentArea: {
     display: 'flex',
     flexGrow: 1,
-    overflow: 'hidden', // Prevent content area from scrolling itself
+    overflow: 'hidden',
   },
   leftPanel: {
     width: '20%',
     minWidth: '375px',
     borderRight: `1px solid ${theme.palette.divider}`,
-    overflowY: 'auto', // Allow scrolling within this panel
+    overflowY: 'auto',
     padding: theme.spacing(2),
-    height: 'calc(100vh - 64px)', // Adjust height based on AppBar
+    height: 'calc(100vh - 64px)',
+    '& ::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '& ::-webkit-scrollbar-track': {
+      background: theme.palette.background.paper,
+      borderRadius: '4px',
+    },
+    '& ::-webkit-scrollbar-thumb': {
+      background: theme.palette.divider,
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.action.hover,
+      },
+    },
   },
   rightPanel: {
     width: '80%',
-    overflowY: 'auto', // Allow scrolling within this panel
+    overflowY: 'auto',
     padding: theme.spacing(2),
-    height: 'calc(100vh - 64px)', // Adjust height based on AppBar
+    height: 'calc(100vh - 64px)',
+    '& ::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '& ::-webkit-scrollbar-track': {
+      background: theme.palette.background.paper,
+      borderRadius: '4px',
+    },
+    '& ::-webkit-scrollbar-thumb': {
+      background: theme.palette.divider,
+      borderRadius: '4px',
+      '&:hover': {
+        background: theme.palette.action.hover,
+      },
+    },
   },
 }));
 
 function ReportDesignerPage() {
   const classes = useStyles();
-  const { reportId } = useParams(); // Get reportId from URL
   const history = useHistory();
-  const [currentDefinition, setCurrentDefinition] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { reportId } = useParams();
+  const [currentDefinition, setCurrentDefinition] = useState(getDefaultReport());
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    const loadData = async () => {
+    if (reportId) {
       setIsLoading(true);
-      try {
-        const data = await fetchReportDefinition(reportId); 
-        setCurrentDefinition(data);
-      } catch (error) {
-        console.error("Failed to load report data:", error);
-        // Handle error state, maybe redirect or show message
-        setCurrentDefinition({ id: null, title: 'Error Loading Report', description: '', sections: [] });
-      } finally {
-        setIsLoading(false);
+      const report = mockReports.find(r => r.id === reportId);
+      if (report) {
+        const transformedReport = {
+          id: report.id,
+          title: report.name,
+          description: report.description,
+          elements: report.prebuiltElements.map((element, index) => {
+            const baseElementWithId = {
+              ...element,
+              id: `${element.type || 'element'}-${report.id}-${index}-${Date.now()}`
+            };
+
+            if (element.type === 'section' && element.elements) {
+              const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
+                ...subElement,
+                id: `${subElement.type || 'subElement'}-${report.id}-${index}-${subIndex}-${Date.now()}`
+              }));
+              return { ...baseElementWithId, elements: subElementsWithIds };
+            }
+            return baseElementWithId;
+          })
+        };
+        setCurrentDefinition(transformedReport);
       }
-    };
-    loadData();
+      setIsLoading(false);
+    }
   }, [reportId]);
 
   const handleDefinitionChange = (newDefinition) => {
@@ -133,67 +167,69 @@ function ReportDesignerPage() {
     if (!currentDefinition) return;
     setIsSaving(true);
     try {
-      const savedDefinition = await saveReportDefinition(currentDefinition);
-      setCurrentDefinition(savedDefinition); // Update state with saved data (e.g., new ID)
-      alert('Report definition saved!'); 
-      // Optionally close window or navigate
-      // window.close(); 
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 700));
+      console.log('Saving report:', currentDefinition);
+      setSnackbar({
+        open: true,
+        message: 'Report saved successfully',
+        severity: 'success'
+      });
     } catch (error) {
-      console.error("Failed to save report definition:", error);
-      alert('Error saving report definition.');
+      console.error("Failed to save report:", error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to save report',
+        severity: 'error'
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleExport = async () => {
-    if (!currentDefinition) return;
-    await exportReport(currentDefinition);
+  const handleClose = () => {
+    history.push('/reports');
   };
 
-  const handleClose = () => {
-    // Ask for confirmation if there are unsaved changes (basic check)
-    // In a real app, track changes more robustly
-    if (JSON.stringify(currentDefinition) !== JSON.stringify(fetchReportDefinition(reportId))) { // Basic check
-      if (window.confirm("You have unsaved changes. Are you sure you want to close?")) {
-        window.close();
-      }
-    } else {
-      window.close();
-    }
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   if (isLoading) {
-    return <Typography>Loading Report Designer...</Typography>; // Or a loading spinner
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-    <Container className={classes.root} maxWidth={false} disableGutters>
-      <AppBar position="static" className={classes.appBar} elevation={1}>
-        <Toolbar className={classes.toolbar} variant="dense">
+    <Box className={classes.root}>
+      <AppBar className={classes.appBar}>
+        <Toolbar className={classes.toolbar}>
           <Typography variant="h6">
-            {currentDefinition?.id ? `Editing: ${currentDefinition.title}` : 'Create New Report'}
+            {currentDefinition.title || 'New Report'}
           </Typography>
           <Box>
-            <Button 
-              color="secondary" 
-              startIcon={<PublishIcon />} 
-              onClick={handleExport}
-              style={{ marginRight: '8px' }}
-            >
-              Export
-            </Button>
-            <Button 
-              color="primary" 
-              variant="contained" 
-              startIcon={<SaveIcon />} 
+            <Button
+              startIcon={<SaveIcon />}
               onClick={handleSave}
               disabled={isSaving}
-              style={{ marginRight: '8px' }}
+              color="primary"
+              variant="contained"
+              style={{ marginRight: 16 }}
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
-            <IconButton onClick={handleClose} size="small">
+            <Button
+              startIcon={<PublishIcon />}
+              color="primary"
+              variant="outlined"
+              style={{ marginRight: 16 }}
+            >
+              Export
+            </Button>
+            <IconButton edge="end" onClick={handleClose}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -201,19 +237,25 @@ function ReportDesignerPage() {
       </AppBar>
       <Box className={classes.contentArea}>
         <Box className={classes.leftPanel}>
-          <ReportConfigPanel 
-            definition={currentDefinition} 
-            onChange={handleDefinitionChange} 
+          <ReportConfigPanel
+            definition={currentDefinition}
+            onChange={handleDefinitionChange}
           />
         </Box>
         <Box className={classes.rightPanel}>
-          <ReportPreviewPanel 
-            definition={currentDefinition} 
-            onContentChange={handleDefinitionChange} 
+          <ReportPreviewPanel
+            definition={currentDefinition}
+            onContentChange={handleDefinitionChange}
           />
         </Box>
       </Box>
-    </Container>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        message={snackbar.message}
+      />
+    </Box>
   );
 }
 

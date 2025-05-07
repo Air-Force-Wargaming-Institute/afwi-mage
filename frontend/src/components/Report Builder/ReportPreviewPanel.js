@@ -4,7 +4,11 @@ import {
   Typography,
   Paper,
   makeStyles,
-  Button
+  Button,
+  CircularProgress,
+  LinearProgress,
+  TextField,
+  Snackbar
 } from '@material-ui/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -14,6 +18,8 @@ import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // Use a simple textarea or a dedicated editor for direct editing
 import TextareaAutosize from '@material-ui/core/TextareaAutosize';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
+import RefreshIcon from '@material-ui/icons/Refresh';
+import websocketService from '../../services/websocketService';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -57,6 +63,53 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     gap: theme.spacing(1),
   },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+  },
+  progressContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+  },
+  progress: {
+    flexGrow: 1,
+  },
+  error: {
+    marginTop: theme.spacing(1),
+  },
+  content: {
+    flexGrow: 1,
+    overflowY: 'auto',
+  },
+  editor: {
+    marginTop: theme.spacing(1),
+  },
+  markdown: {
+    '& h1': {
+      fontSize: '2em',
+      marginBottom: '0.5em',
+    },
+    '& h2': {
+      fontSize: '1.5em',
+      marginBottom: '0.5em',
+    },
+    '& h3': {
+      fontSize: '1.17em',
+      marginBottom: '0.5em',
+    },
+    '& p': {
+      marginBottom: '1em',
+    },
+    '& ul, & ol': {
+      marginBottom: '1em',
+      paddingLeft: '2em',
+    },
+    '& li': {
+      marginBottom: '0.5em',
+    },
+  },
 }));
 
 // Placeholder for generated content - replace with actual API call result
@@ -65,13 +118,16 @@ const generateMockContent = (instructions) => {
 };
 
 // Updated function to format explicit content
-const formatExplicitContent = (content = '', format = 'paragraph') => {
-  // Don't trim here, preserve leading/trailing spaces for potential indentation/breaks
-  if (!content) return '';
+const formatExplicitContent = (contentInput, format = 'paragraph') => {
+  // Ensure content is a string; if contentInput is null or undefined, default to empty string.
+  // Otherwise, convert to string. This handles numbers, booleans, objects (e.g. "[object Object]"), and arrays (e.g. "item1,item2").
+  const content = (contentInput === null || contentInput === undefined) ? '' : String(contentInput);
+  
+  const lines = content.split('\n');
 
   switch (format) {
     case 'h1':
-      return `# ${content.trim()}`; // Trim only for headings to avoid awkward space after #
+      return `# ${content.trim()}`;
     case 'h2':
       return `## ${content.trim()}`;
     case 'h3':
@@ -82,154 +138,231 @@ const formatExplicitContent = (content = '', format = 'paragraph') => {
       return `##### ${content.trim()}`;
     case 'h6':
       return `###### ${content.trim()}`;
-    // For paragraph, bullet, numbered: return raw content.
-    // ReactMarkdown with remark-gfm and remark-breaks will handle lists and line breaks.
     case 'paragraph':
-    case 'bullet':
-    case 'numbered':
+      return content; // ReactMarkdown with remarkBreaks will handle line breaks within paragraphs
+    case 'bulletList':
+      return lines.map(line => `- ${line}`).join('\n'); // No need to trim here, preserve indentation if any
+    case 'numberedList':
+      return lines.map((line, index) => `${index + 1}. ${line}`).join('\n');
     default:
-      return content;
+      return content; // Treat as paragraph by default
   }
 };
 
 function ReportPreviewPanel({ definition, onContentChange }) {
   const classes = useStyles();
-  const [generatedReport, setGeneratedReport] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [error, setError] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  // Effect to regenerate the preview when the definition changes
   useEffect(() => {
-    if (definition?.elements) {
-      let reportMarkdown = '';
-
-      if (definition.title) {
-        reportMarkdown += `# ${definition.title}\n\n`;
-      }
-      if (definition.description) {
-        reportMarkdown += `${definition.description}\n\n`;
-      }
-
-      definition.elements.forEach((element) => {
-        let elementMarkdown = '';
+    if (definition && definition.elements) {
+      const markdown = definition.elements.map(element => {
         if (element.type === 'explicit') {
-          elementMarkdown = formatExplicitContent(element.content, element.format);
-        } else if (element.type === 'generative') {
-          elementMarkdown = generateMockContent(element.instructions || 'No instructions provided');
-        }
-        
-        if (elementMarkdown) {
-          if (reportMarkdown !== '') {
-            // Add separation - use two newlines which Markdown interprets as paragraph break
-            reportMarkdown += '\n\n';
+          // For headings, if content is empty, consider using element.title.
+          // However, ReportConfigPanel is now designed to place heading text in element.content.
+          // So, we primarily rely on element.content.
+          let contentToFormat = element.content || '';
+          if (!element.content && element.title && element.format && element.format.match(/^h[1-6]$/)) {
+            // Fallback for headings if content is truly empty but title exists
+            contentToFormat = element.title;
           }
-          reportMarkdown += elementMarkdown;
+          return formatExplicitContent(contentToFormat, element.format);
+        } else if (element.type === 'generative') {
+          return generateMockContent(element.instructions || `Generate content for: ${element.title || 'this element'}`);
         }
-      });
-
-      setGeneratedReport(reportMarkdown);
-      setEditText(reportMarkdown);
+        return ''; // Should not happen if elements always have a valid type
+      }).filter(Boolean).join('\n\n'); // Join elements with double newline for markdown paragraph spacing
+      
+      setEditText(markdown);
     } else {
-      let initialContent = '';
-      if (definition?.title) initialContent += `# ${definition.title}\n\n`;
-      if (definition?.description) initialContent += `${definition.description}\n\n`;
-      if (!definition?.elements || definition.elements.length === 0) {
-        initialContent += initialContent ? '\n\n*No elements defined yet.*' : '*No elements defined yet.*';
-      }
-      setGeneratedReport(initialContent || 'Report preview appears here.');
-      setEditText(initialContent || 'Report preview appears here.');
+      setEditText('');
     }
-    setIsEditing(false);
   }, [definition]);
 
   const handleEditClick = () => {
-    setEditText(generatedReport); // Load current report into editor
     setIsEditing(true);
   };
 
   const handleSaveClick = () => {
-    setGeneratedReport(editText); // Update the displayed report
     setIsEditing(false);
-    // TODO: Define how saving edited markdown reconciles with the element structure.
-    // This currently only updates the local preview state.
-    // Passing `editText` back via onContentChange might be one way, but the parent
-    // needs to know how to handle raw markdown vs the structured definition.
-    console.log("Saved edited content locally (preview only).");
-    // Example: onContentChange({ ...definition, rawMarkdownOverride: editText }); 
+    if (onContentChange) {
+      // Parse the markdown back into the mockReports structure
+      const lines = editText.split('\n');
+      const elements = [];
+      let currentElement = null;
+      let currentSection = null;
+
+      lines.forEach(line => {
+        if (line.startsWith('# ')) {
+          if (currentElement) elements.push(currentElement);
+          currentElement = {
+            type: 'header',
+            content: line.slice(2)
+          };
+        } else if (line.startsWith('## ')) {
+          if (currentSection) elements.push(currentSection);
+          currentSection = {
+            type: 'section',
+            title: line.slice(3),
+            elements: []
+          };
+        } else if (line.startsWith('- ')) {
+          if (!currentSection) {
+            currentSection = {
+              type: 'section',
+              title: 'Unnamed Section',
+              elements: []
+            };
+          }
+          const bulletList = currentSection.elements.find(e => e.type === 'bulletList');
+          if (bulletList) {
+            bulletList.items.push(line.slice(2));
+          } else {
+            currentSection.elements.push({
+              type: 'bulletList',
+              items: [line.slice(2)]
+            });
+          }
+        } else if (line.trim()) {
+          if (!currentSection) {
+            currentSection = {
+              type: 'section',
+              title: 'Unnamed Section',
+              elements: []
+            };
+          }
+          const paragraph = currentSection.elements.find(e => e.type === 'paragraph');
+          if (paragraph) {
+            paragraph.content += '\n' + line;
+          } else {
+            currentSection.elements.push({
+              type: 'paragraph',
+              content: line
+            });
+          }
+        }
+      });
+
+      if (currentElement) elements.push(currentElement);
+      if (currentSection) elements.push(currentSection);
+
+      onContentChange({
+        ...definition,
+        elements
+      });
+    }
   };
 
   const handleCancelClick = () => {
     setIsEditing(false);
-    setEditText(generatedReport); // Revert changes
+    setEditText(definition ? definition.elements.map(element => {
+      switch (element.type) {
+        case 'header':
+          return `# ${element.content}`;
+        case 'section':
+          return [
+            `## ${element.title}`,
+            ...element.elements.map(subElement => {
+              switch (subElement.type) {
+                case 'bulletList':
+                  return subElement.items.map(item => `- ${item}`).join('\n');
+                case 'paragraph':
+                  return subElement.content;
+                default:
+                  return '';
+              }
+            }).filter(Boolean)
+          ].join('\n\n');
+        default:
+          return '';
+      }
+    }).filter(Boolean).join('\n\n') : '');
   };
 
   const handleEditorChange = (e) => {
     setEditText(e.target.value);
   };
 
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
   return (
     <Box className={classes.root}>
-      <GradientText variant="h6" component="h2" gutterBottom>
-        Report Preview / Editor
-      </GradientText>
-      <Paper className={classes.previewArea} elevation={1}>
-        {!isEditing && (
-          <Button
-            variant="outlined"
-            size="small"
-            className={classes.editButton}
-            onClick={handleEditClick}
-            disabled={!generatedReport || generatedReport === 'Report preview appears here.' || generatedReport.includes('*No elements defined yet.*')} // Disable if no content
-          >
-            Edit Full Report
-          </Button>
-        )}
-        {isEditing && (
-          <Box className={classes.saveCancelContainer}>
-            <Button variant="contained" color="primary" size="small" onClick={handleSaveClick}>
-              Save Changes
-            </Button>
-            <Button variant="outlined" size="small" onClick={handleCancelClick}>
-              Cancel
-            </Button>
-          </Box>
-        )}
-
+      <Box className={classes.previewArea}>
         {isEditing ? (
-          <TextareaAutosize
-            className={classes.editorArea}
-            value={editText}
-            onChange={handleEditorChange}
-            aria-label="report editor"
-            minRows={20} // Adjust as needed
-          />
+          <>
+            <TextareaAutosize
+              className={classes.editorArea}
+              value={editText}
+              onChange={handleEditorChange}
+              placeholder="Edit report content..."
+            />
+            <Box className={classes.saveCancelContainer}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleSaveClick}
+                size="small"
+              >
+                Save
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleCancelClick}
+                size="small"
+              >
+                Cancel
+              </Button>
+            </Box>
+          </>
         ) : (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-              code({ node, inline, className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '');
-                return !inline && match ? (
-                  <SyntaxHighlighter
-                    style={materialDark}
-                    language={match[1]}
-                    PreTag="div"
-                    {...props}
-                  >
-                    {String(children).replace(/^\n$/, '')}
-                  </SyntaxHighlighter>
-                ) : (
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                );
-              }
-            }}
-          >
-            {generatedReport}
-          </ReactMarkdown>
+          <>
+            <Button
+              className={classes.editButton}
+              variant="outlined"
+              size="small"
+              onClick={handleEditClick}
+            >
+              Edit
+            </Button>
+            <Box className={classes.markdown}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        style={materialDark}
+                        language={match[1]}
+                        PreTag="div"
+                        {...props}
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    );
+                  }
+                }}
+              >
+                {editText}
+              </ReactMarkdown>
+            </Box>
+          </>
         )}
-      </Paper>
+      </Box>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={error || 'Report updated successfully'}
+      />
     </Box>
   );
 }

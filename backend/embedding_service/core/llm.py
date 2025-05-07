@@ -20,7 +20,7 @@ class VLLMLLM:
     LLM integration class for vLLM models using OpenAI-compatible API.
     """
     
-    def __init__(self, model: str = "/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2", base_url: str = None):
+    def __init__(self, model: str = "/models/DeepSeek-R1-Distill-Llama-8B-abliterated", base_url: str = None):
         """
         Initialize vLLM LLM integration.
         
@@ -92,7 +92,7 @@ class VLLMLLM:
         if preferred_models is None:
             # Default models in order of preference
             preferred_models = [
-                "/models/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2"
+                "/models/DeepSeek-R1-Distill-Llama-8B-abliterated"
             ]
         
         # Get available models

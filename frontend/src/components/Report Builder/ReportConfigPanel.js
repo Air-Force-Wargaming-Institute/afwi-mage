@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -12,12 +12,15 @@ import {
   makeStyles, 
   IconButton,
   ButtonGroup,
-  Tooltip
+  Tooltip,
+  Collapse
 } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import FormatListBulletedIcon from '@material-ui/icons/FormatListBulleted';
 import FormatListNumberedIcon from '@material-ui/icons/FormatListNumbered';
 import { GradientText, SubtleGlowPaper } from '../../styles/StyledComponents';
@@ -41,6 +44,10 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: 'column',
     gap: theme.spacing(1),
     padding: theme.spacing(1.5),
+    position: 'relative',
+    '&:hover .insertButtonOverlay': {
+      opacity: 1,
+    },
   },
   elementHeader: {
     display: 'flex',
@@ -49,6 +56,12 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: theme.spacing(0.5),
     borderBottom: `1px solid ${theme.palette.divider}`,
     paddingBottom: theme.spacing(0.5),
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+    padding: theme.spacing(0.5),
+    borderRadius: theme.shape.borderRadius,
   },
   elementTitleText: {
     fontWeight: 500,
@@ -79,10 +92,94 @@ const useStyles = makeStyles((theme) => ({
   insertButtonContainer: {
     display: 'flex',
     justifyContent: 'center',
-    marginTop: theme.spacing(1),
-    paddingTop: theme.spacing(1),
-    borderTop: `1px dashed ${theme.palette.divider}`,
-  }
+  },
+  bulletList: {
+    listStyleType: 'disc',
+    paddingLeft: theme.spacing(3),
+    margin: theme.spacing(1, 0),
+  },
+  bulletItem: {
+    display: 'list-item',
+    marginBottom: theme.spacing(0.5),
+    '&:last-child': {
+      marginBottom: 0,
+    },
+  },
+  elementContent: {
+    padding: theme.spacing(1),
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing(2),
+    width: '100%',
+  },
+  sectionContent: {
+    marginLeft: theme.spacing(2),
+    borderLeft: `2px solid ${theme.palette.divider}`,
+    paddingLeft: theme.spacing(2),
+  },
+  collapseButton: {
+    padding: theme.spacing(0.5),
+    marginRight: theme.spacing(1),
+    '&:hover': {
+      backgroundColor: 'transparent',
+    },
+  },
+  sectionTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  elementTitle: {
+    flex: 1,
+    fontWeight: 500,
+    fontSize: '0.95rem',
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+      borderRadius: theme.shape.borderRadius,
+      padding: theme.spacing(0.5),
+    },
+  },
+  elementTitleInput: {
+    flex: 1,
+    '& .MuiInputBase-root': {
+      fontSize: '0.95rem',
+      fontWeight: 500,
+    },
+    '& .MuiInputBase-input': {
+      padding: theme.spacing(0.5),
+    },
+  },
+  insertButtonOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    padding: theme.spacing(1),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderTop: `1px solid ${theme.palette.divider}`,
+    opacity: 0,
+    transition: 'opacity 0.2s ease-in-out',
+    zIndex: 1,
+  },
+  insertButton: {
+    backgroundColor: theme.palette.background.paper,
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  collapseAllButton: {
+    marginLeft: 'auto',
+    backgroundColor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    '&:hover': {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
 }));
 
 // Available format options
@@ -94,8 +191,8 @@ const formatOptions = [
   { value: 'h4', label: 'H4' },
   { value: 'h5', label: 'H5' },
   { value: 'h6', label: 'H6' },
-  { value: 'bullet', label: 'Bullet List', icon: FormatListBulletedIcon },
-  { value: 'numbered', label: 'Numbered List', icon: FormatListNumberedIcon },
+  { value: 'bulletList', label: 'Bullet List', icon: FormatListBulletedIcon },
+  { value: 'numberedList', label: 'Numbered List', icon: FormatListNumberedIcon },
   // Add more formats like blockquote, code block if needed
 ];
 
@@ -109,6 +206,69 @@ const mockVectorStores = [
 function ReportConfigPanel({ definition, onChange }) {
   const classes = useStyles();
   const [vectorStores, setVectorStores] = React.useState(mockVectorStores);
+  const [collapsedElements, setCollapsedElements] = useState({});
+  const [editingTitle, setEditingTitle] = useState(null);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateKey = urlParams.get('templateKey');
+
+    if (templateKey && (!definition || !definition.elements || definition.elements.length === 0)) {
+      try {
+        const templateDataString = sessionStorage.getItem(templateKey);
+        if (templateDataString) {
+          const template = JSON.parse(templateDataString);
+          
+          const processedElements = (template.prebuiltElements || []).map((element, index) => {
+            let derivedFormat = 'paragraph'; // Default format
+            if (element.style) {
+              const styleValue = element.style;
+              if (/^h[1-6]$/i.test(styleValue)) { // Handles 'h1', 'H1', etc.
+                derivedFormat = styleValue.toLowerCase();
+              } else if (styleValue.toLowerCase() === 'paragraph') {
+                derivedFormat = 'paragraph';
+              } else if (styleValue.toLowerCase() === 'bulletlist' || styleValue.toLowerCase() === 'bullet') {
+                derivedFormat = 'bulletList'; // Canonical format name
+              } else if (styleValue.toLowerCase() === 'numberedlist' || styleValue.toLowerCase() === 'numbered') {
+                derivedFormat = 'numberedList'; // Canonical format name
+              } else if (styleValue === 'bulletList' || styleValue === 'numberedList') { // If style is already canonical
+                derivedFormat = styleValue;
+              }
+            }
+
+            let content = element.content;
+            if (derivedFormat === 'bulletList' || derivedFormat === 'numberedList') {
+              if (Array.isArray(element.content)) {
+                content = element.content.join('\n');
+              } else if (typeof element.content !== 'string') {
+                content = ''; 
+              }
+            } else if (typeof element.content !== 'string') {
+              content = String(element.content || ''); 
+            }
+
+            return {
+              id: `${template.id || 'template'}-${element.title ? element.title.replace(/\s+/g, '-').toLowerCase() : 'element'}-${index}-${Date.now()}`,
+              type: element.type || 'explicit',
+              format: derivedFormat,
+              content: content,
+              title: element.title || `Element ${index + 1}`
+            };
+          });
+
+          onChange({
+            id: template.id || `template-report-${Date.now()}`,
+            title: template.name || 'New Report from Template',
+            description: template.description || '',
+            elements: processedElements,
+            vectorStoreId: template.vectorStoreId || ''
+          });
+        }
+      } catch (error) {
+        console.error('Error processing template data:', error);
+      }
+    }
+  }, [definition, onChange]); // Add definition and onChange to dependency array
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -162,6 +322,65 @@ function ReportConfigPanel({ definition, onChange }) {
     onChange({ ...definition, elements: newElements });
   };
 
+  const isBulletFormat = (element) => {
+    return element.format === 'bulletList';
+  };
+
+  const getBulletItems = (element) => {
+    if (element.type === 'bulletList') {
+      return element.items;
+    }
+    if (element.format === 'bulletList') {
+      return element.content ? element.content.split('\n') : [];
+    }
+    return [];
+  };
+
+  const handleBulletChange = (elementId, value, element) => {
+    const items = value.split('\n').filter(item => item.trim() !== '');
+    if (element.type === 'bulletList') {
+      handleElementChange(elementId, 'items', items);
+    } else {
+      handleElementChange(elementId, 'content', value);
+    }
+  };
+
+  const toggleElement = (elementId) => {
+    setCollapsedElements(prev => ({
+      ...prev,
+      [elementId]: !prev[elementId]
+    }));
+  };
+
+  const handleTitleClick = (elementId, e) => {
+    e.stopPropagation();
+    setEditingTitle(elementId);
+  };
+
+  const handleTitleChange = (elementId, newTitle) => {
+    handleElementChange(elementId, 'title', newTitle);
+    setEditingTitle(null);
+  };
+
+  const handleTitleKeyPress = (e, elementId) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setEditingTitle(null);
+    }
+  };
+
+  const toggleAllElements = (collapse) => {
+    const newCollapsedState = {};
+    (definition?.elements || []).forEach(element => {
+      newCollapsedState[element.id] = collapse;
+    });
+    setCollapsedElements(newCollapsedState);
+  };
+
+  const areAllCollapsed = () => {
+    return (definition?.elements || []).every(element => collapsedElements[element.id]);
+  };
+
   return (
     <Box className={classes.root}>
       <Box className={classes.configSection}>
@@ -207,130 +426,195 @@ function ReportConfigPanel({ definition, onChange }) {
         </FormControl>
       </Box>
 
-      <GradientText variant="h6" component="h2" gutterBottom>
-        Report Elements
-      </GradientText>
+      <Box className={classes.sectionHeader}>
+        <GradientText variant="h6" component="h2">
+          Report Elements
+        </GradientText>
+        <Button
+          size="small"
+          variant="outlined"
+          color="primary"
+          onClick={() => toggleAllElements(!areAllCollapsed())}
+          className={classes.collapseAllButton}
+          startIcon={areAllCollapsed() ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+        >
+          {areAllCollapsed() ? 'Expand All' : 'Collapse All'}
+        </Button>
+      </Box>
+
       <Box className={classes.elementsContainer}>
         {(definition?.elements || []).map((element, index) => (
-          <SubtleGlowPaper key={element.id} className={classes.elementItem} elevation={2}>
-            <Box className={classes.elementHeader}>
-              <Typography variant="subtitle1" className={classes.elementTitleText}>Element {index + 1}</Typography>
+          <SubtleGlowPaper key={element.id || index} className={classes.elementItem} elevation={2}>
+            <Box 
+              className={classes.elementHeader}
+              onClick={() => toggleElement(element.id)}
+            >
+              <Box style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                <IconButton 
+                  size="small" 
+                  className={classes.collapseButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleElement(element.id);
+                  }}
+                >
+                  {collapsedElements[element.id] ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                </IconButton>
+                {editingTitle === element.id ? (
+                  <TextField
+                    className={classes.elementTitleInput}
+                    value={element.title || `Element ${index + 1}`}
+                    onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
+                    onBlur={() => setEditingTitle(null)}
+                    onKeyPress={(e) => handleTitleKeyPress(e, element.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                    size="small"
+                    variant="standard"
+                  />
+                ) : (
+                  <Typography 
+                    className={classes.elementTitle}
+                    onClick={(e) => handleTitleClick(element.id, e)}
+                  >
+                    {element.title || `Element ${index + 1}`}
+                  </Typography>
+                )}
+              </Box>
               <Box className={classes.elementActions}>
-                <IconButton size="small" onClick={() => handleMoveElement(index, -1)} disabled={index === 0} title="Move Up">
+                <IconButton size="small" onClick={(e) => {
+                  e.stopPropagation();
+                  handleMoveElement(index, -1);
+                }} disabled={index === 0} title="Move Up">
                   <ArrowUpwardIcon fontSize="inherit"/>
                 </IconButton>
-                <IconButton size="small" onClick={() => handleMoveElement(index, 1)} disabled={index === (definition?.elements?.length || 0) - 1} title="Move Down">
+                <IconButton size="small" onClick={(e) => {
+                  e.stopPropagation();
+                  handleMoveElement(index, 1);
+                }} disabled={index === (definition?.elements?.length || 0) - 1} title="Move Down">
                   <ArrowDownwardIcon fontSize="inherit"/>
                 </IconButton>
-                <IconButton size="small" onClick={() => handleDeleteElement(element.id)} color="secondary" title="Delete Element">
+                <IconButton size="small" onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteElement(element.id);
+                }} color="secondary" title="Delete Element">
                   <DeleteIcon fontSize="inherit"/>
                 </IconButton>
               </Box>
             </Box>
 
-            <Box className={classes.elementControls}>
-              <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
-                <Button
-                  className={classes.formatButton}
-                  variant={element.type === 'explicit' ? 'contained' : 'outlined'}
-                  color={element.type === 'explicit' ? 'primary' : 'default'}
-                  onClick={() => handleElementChange(element.id, 'type', 'explicit')}
-                >
-                  Explicit
-                </Button>
-                <Button
-                  className={classes.formatButton}
-                  variant={element.type === 'generative' ? 'contained' : 'outlined'}
-                  color={element.type === 'generative' ? 'primary' : 'default'}
-                  onClick={() => handleElementChange(element.id, 'type', 'generative')}
-                >
-                  AI Gen
-                </Button>
-              </ButtonGroup>
+            <Collapse in={!collapsedElements[element.id]}>
+              <Box className={classes.elementContent}>
+                <Box className={classes.elementControls}>
+                  <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
+                    <Button
+                      className={classes.formatButton}
+                      variant={element.type === 'explicit' ? 'contained' : 'outlined'}
+                      color={element.type === 'explicit' ? 'primary' : 'default'}
+                      onClick={() => handleElementChange(element.id || index, 'type', 'explicit')}
+                    >
+                      Explicit
+                    </Button>
+                    <Button
+                      className={classes.formatButton}
+                      variant={element.type === 'generative' ? 'contained' : 'outlined'}
+                      color={element.type === 'generative' ? 'primary' : 'default'}
+                      onClick={() => handleElementChange(element.id || index, 'type', 'generative')}
+                    >
+                      AI Gen
+                    </Button>
+                  </ButtonGroup>
 
-              {element.type === 'explicit' && (
-                <ButtonGroup className={classes.formatButtonGroup} size="small" aria-label="format options">
-                  {formatOptions.map(opt => {
-                    const isSelected = element.format === opt.value;
-                    const FormatIcon = opt.icon;
-                    return (
-                      FormatIcon ? (
-                        <Tooltip title={opt.label} key={opt.value}>
-                          <IconButton
-                            className={classes.formatIconButton}
-                            size="small"
-                            color={isSelected ? 'primary' : 'default'}
-                            onClick={() => handleElementChange(element.id, 'format', opt.value)}
-                            style={{ border: isSelected ? '1px solid' : '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px' }}
-                          >
-                             <FormatIcon fontSize="small" />
-                          </IconButton>
-                         </Tooltip>
-                      ) : (
-                        <Button 
-                          key={opt.value}
-                          className={classes.formatButton}
-                          variant={isSelected ? 'contained' : 'outlined'}
-                          color={isSelected ? 'primary' : 'default'}
-                          onClick={() => handleElementChange(element.id, 'format', opt.value)}
-                        >
-                          {opt.label}
-                        </Button>
-                      )
-                    );
-                  })}
-                </ButtonGroup>
-              )}
-            </Box>
-            
-            {element.type === 'explicit' ? (
-              <TextField
-                label="Content"
-                multiline
-                rows={3}
-                fullWidth
-                variant="outlined"
-                margin="dense"
-                size="small"
-                value={element.content || ''}
-                onChange={(e) => handleElementChange(element.id, 'content', e.target.value)}
-                helperText={
-                  element.format === 'bullet' ? 
-                  'Enter list items. Use line breaks (Enter) for new items. Indent with spaces for sub-lists.' : 
-                  element.format === 'numbered' ? 
-                  'Enter list items. Use line breaks (Enter) for new items. Indent with spaces for sub-lists (numbering is automatic).' : 
-                  element.format === 'paragraph' ? 
-                  'Enter text. Line breaks (Enter) will be preserved.' : 
-                  'Enter text content here. Formatting is controlled by the buttons above.'
-                }
-              />
-            ) : (
-              <TextField
-                label="AI Instructions"
-                multiline
-                rows={3}
-                fullWidth
-                variant="outlined"
-                margin="dense"
-                size="small"
-                value={element.instructions || ''}
-                onChange={(e) => handleElementChange(element.id, 'instructions', e.target.value)}
-                helperText="Provide clear instructions for the AI to generate this element."
-              />
-            )}
+                  {element.type === 'explicit' && (
+                    <ButtonGroup className={classes.formatButtonGroup} size="small" aria-label="format options">
+                      {formatOptions.map(opt => {
+                        const isSelected = element.format === opt.value;
+                        const FormatIcon = opt.icon;
+                        return (
+                          FormatIcon ? (
+                            <Tooltip title={opt.label} key={opt.value}>
+                              <IconButton
+                                className={classes.formatIconButton}
+                                size="small"
+                                color={isSelected ? 'primary' : 'default'}
+                                onClick={() => handleElementChange(element.id || index, 'format', opt.value)}
+                                style={{ border: isSelected ? '1px solid' : '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px' }}
+                              >
+                                <FormatIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Button 
+                              key={opt.value}
+                              className={classes.formatButton}
+                              variant={isSelected ? 'contained' : 'outlined'}
+                              color={isSelected ? 'primary' : 'default'}
+                              onClick={() => handleElementChange(element.id || index, 'format', opt.value)}
+                            >
+                              {opt.label}
+                            </Button>
+                          )
+                        );
+                      })}
+                    </ButtonGroup>
+                  )}
+                </Box>
+                
+                {element.type === 'explicit' ? (
+                  <TextField
+                    label="Content"
+                    multiline
+                    rows={3}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    size="small"
+                    value={isBulletFormat(element) ? getBulletItems(element).join('\n') : element.content || ''}
+                    onChange={(e) => {
+                      if (isBulletFormat(element)) {
+                        handleBulletChange(element.id || index, e.target.value, element);
+                      } else {
+                        handleElementChange(element.id || index, 'content', e.target.value);
+                      }
+                    }}
+                    helperText={
+                      isBulletFormat(element) ? 
+                      'Enter list items. Use line breaks (Enter) for new items.' : 
+                      element.format === 'numberedList' ? 
+                      'Enter list items. Use line breaks (Enter) for new items. Indent with spaces for sub-lists (numbering is automatic).' : 
+                      element.format === 'paragraph' ? 
+                      'Enter text. Line breaks (Enter) will be preserved.' : 
+                      'Enter text content here. Formatting is controlled by the buttons above.'
+                    }
+                  />
+                ) : (
+                  <TextField
+                    label="AI Instructions"
+                    multiline
+                    rows={3}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    size="small"
+                    value={element.instructions || ''}
+                    onChange={(e) => handleElementChange(element.id || index, 'instructions', e.target.value)}
+                    helperText="Provide clear instructions for the AI to generate this element."
+                  />
+                )}
+              </Box>
+            </Collapse>
 
             <Box className={classes.insertButtonContainer}>
-               <Button 
-                  size="small"
-                  variant="text"
-                  color="primary" 
-                  startIcon={<AddIcon />} 
-                  onClick={() => handleInsertElementBelow(index)}
-               >
-                  Insert Element Below
-               </Button>
+              <Button 
+                size="small"
+                variant="text"
+                color="primary" 
+                startIcon={<AddIcon />} 
+                onClick={() => handleInsertElementBelow(index)}
+              >
+                Insert Element Below
+              </Button>
             </Box>
-
           </SubtleGlowPaper>
         ))}
         {(definition?.elements || []).length === 0 && (
