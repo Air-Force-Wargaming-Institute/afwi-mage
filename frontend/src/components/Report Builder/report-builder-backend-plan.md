@@ -9,22 +9,24 @@ This plan focuses on the backend development for the Report Builder feature, bui
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want to set up a new FastAPI project for `report_builder_service` so that I have a dedicated environment for report builder logic.**
-    *   [ ] Task: Initialize a new FastAPI application within the `backend/report_builder_service` directory.
-    *   [ ] Task: Ensure basic configuration for port, logging, and environment variables is in place.
+    *   [X] Task: Initialize a new FastAPI application within the `backend/report_builder_service` directory.
+    *   [X] Task: Ensure basic configuration for port, logging, and environment variables is in place.
 *   **As a Backend Developer, I want to define Pydantic models that accurately represent the frontend's report definition structure so that data can be exchanged reliably.**
-    *   [ ] Task: Review `ReportConfigPanel.js` and `reportTemplates.js` to understand the full structure of `ReportElement` (including `type: 'explicit'|'generative'`, `format`, `title`, `content`, `instructions`).
-    *   [ ] Task: Update `ReportElement` and `ReportContent` Pydantic models in `report_builder_service/main.py` to match this detailed structure.
-    *   [ ] Task: Ensure `ReportCreate` and `Report` models correctly use these updated content structures.
-*   **As a Backend Developer, I want to replace the in-memory `fake_reports_db` with a PostgreSQL database schema and connection so that report definitions are stored persistently.**
-    *   [ ] Task: Design a database schema for storing report definitions and their elements. Consider how to store the list of potentially nested elements.
-    *   [ ] Task: Integrate SQLAlchemy or a similar ORM to interact with the PostgreSQL database.
-    *   [ ] Task: Update CRUD endpoints (`/api/report_builder/reports`) to use the database instead of `fake_reports_db`.
-    *   [ ] Task: Ensure the `report_builder_service` in `docker-compose.yml` correctly connects to its own dedicated PostgreSQL database instance or schema.
-*   **As a Backend Developer, I want to ensure the existing CRUD API endpoints (`POST`, `GET`, `PUT`, `DELETE` for `/api/report_builder/reports`) correctly handle the detailed report definition structure with database persistence so that the frontend can save and load full reports.**
-    *   [ ] Task: Test `POST /api/report_builder/reports` with a detailed report definition from the frontend (simulating a save from `ReportDesignerPage.js`).
-    *   [ ] Task: Test `GET /api/report_builder/reports/{report_id}` to ensure it retrieves the full, detailed structure.
-    *   [ ] Task: Test `PUT /api/report_builder/reports/{report_id}` to ensure it can update a report with a new detailed structure.
-    *   [ ] Task: Test `DELETE /api/report_builder/reports/{report_id}`.
+    *   [X] Task: Review `ReportConfigPanel.js` and `reportTemplates.js` to understand the full structure of `ReportElement` (including `type: 'explicit'|'generative'`, `format`, `title`, `content`, `instructions`).
+    *   [X] Task: Update `ReportElement` and `ReportContent` Pydantic models in `report_builder_service/main.py` to match this detailed structure.
+    *   [X] Task: Ensure `ReportCreate` and `Report` models correctly use these updated content structures.
+*   **As a Backend Developer, I want to replace the in-memory `fake_reports_db` with persistent storage using a JSON file so that report definitions are saved between service restarts.**
+    *   [X] Task: Define a file path for storing report data (e.g., `reports_data.json`) within the `report_builder_service`.
+    *   [X] Task: Implement helper functions to `load_reports_from_file` (parsing JSON into Pydantic models) and `save_reports_to_file` (serializing Pydantic models to JSON).
+    *   [X] Task: Modify CRUD endpoints (`/api/report_builder/reports`) to use these helper functions for loading data at startup and saving data after modifications.
+    *   [ ] (Deferred) Task: Design a database schema for storing report definitions and their elements.
+    *   [ ] (Deferred) Task: Integrate SQLAlchemy or a similar ORM to interact with the PostgreSQL database.
+    *   [ ] (Deferred) Task: Ensure the `report_builder_service` in `docker-compose.yml` correctly connects to its own dedicated PostgreSQL database instance or schema.
+*   **As a Backend Developer, I want to ensure the existing CRUD API endpoints (`POST`, `GET`, `PUT`, `DELETE` for `/api/report_builder/reports`) correctly handle the detailed report definition structure with JSON file persistence so that the frontend can save and load full reports.**
+    *   [X] Task: Test `POST /api/report_builder/reports` with a detailed report definition from the frontend (simulating a save from `ReportDesignerPage.js`), ensuring `reports_data.json` is updated.
+    *   [X] Task: Test `GET /api/report_builder/reports/{report_id}` to ensure it retrieves the full, detailed structure.
+    *   [X] Task: Test `PUT /api/report_builder/reports/{report_id}` to ensure it can update a report with a new detailed structure.
+    *   [X] Task: Test `DELETE /api/report_builder/reports/{report_id}`.
 
 ## Phase 2: Vector Store Integration & Basic Generation Placeholder
 

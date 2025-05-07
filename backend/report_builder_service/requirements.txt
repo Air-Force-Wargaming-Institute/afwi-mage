@@ -1,2 +1,4 @@
 fastapi
-uvicorn[standard] 
+uvicorn[standard]
+pydantic
+httpx # For making async HTTP requests 

@@ -388,10 +388,10 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - PORT=8019
+      - PYTHONUNBUFFERED=1
 
   # report_service:
   #   build:
-  #     context: ./report_service
 
 volumes:
   postgres_data:
