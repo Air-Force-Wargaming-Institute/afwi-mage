@@ -1,44 +1,31 @@
 {
-  "id": "72fd68e3-70b0-40b4-a45a-38366a9cddfd",
-  "name": "dfgdfgdf",
-  "description": "sfddfsdfdf",
-  "designer": "dfdfgdfgdfgdfgdfdd",
-  "securityClassification": "UNCLASSIFIED",
-  "roadToWar": "hello\nasdfsd",
-  "researchObjectives": [
-    "sdfsdfsdfsdf",
-    "yyyyyydf",
-    "tyutyutyutyutyu",
-    "ddfgdfgd",
-    "dfgdfgdfg",
-    "werwerw",
-    "qweqweq"
-  ],
-  "numberOfIterations": 8,
+  "id": "c95e8c7f-8cab-469a-872e-356ddfe91ba9",
+  "name": "cocom",
+  "description": "test new cocoms",
+  "designer": "me",
+  "securityClassification": null,
+  "roadToWar": "",
+  "researchObjectives": [],
+  "numberOfIterations": 5,
   "numberOfMoves": 10,
-  "timeHorizon": "5 months",
+  "timeHorizon": null,
   "wargameStartDate": null,
-  "selectedVectorstore": "vectorstore_2",
+  "selectedVectorstore": null,
   "selectedDatabase": null,
-  "approvedFields": {
-    "researchObjectives": true,
-    "roadToWar": false
-  },
+  "approvedFields": {},
   "activatedEntities": [
     {
-      "entityId": "US",
-      "entityName": "United States of America",
-      "entityType": "nation",
-      "isConfigured": true,
+      "entityId": "NATO",
+      "entityName": "NATO",
+      "entityType": "organization",
+      "isConfigured": false,
       "isCustom": false,
       "configData": {
         "generalConfig": {
           "supportingDocuments": []
         },
         "diplomacy": {
-          "objectives": [
-            "uuuuuu"
-          ],
+          "objectives": [],
           "posture": "",
           "keyInitiatives": "",
           "prioritiesMatrix": "",
@@ -147,8 +134,8 @@
       }
     },
     {
-      "entityId": "DZ",
-      "entityName": "Algeria",
+      "entityId": "RU",
+      "entityName": "Russia",
       "entityType": "nation",
       "isConfigured": false,
       "isCustom": false,
@@ -266,8 +253,8 @@
       }
     },
     {
-      "entityId": "SA",
-      "entityName": "Saudi Arabia",
+      "entityId": "Greenland",
+      "entityName": "Greenland",
       "entityType": "nation",
       "isConfigured": false,
       "isCustom": false,
@@ -387,41 +374,206 @@
   ],
   "customEntities": [],
   "nationRelationships": {
-    "DZ_US": {
-      "type": "partner",
-      "notes": ""
-    },
-    "SA_US": {
-      "type": "partner",
-      "notes": ""
-    },
-    "DZ_SA": {
+    "NATO_RU": {
       "type": "enemy",
+      "notes": ""
+    },
+    "Greenland_NATO": {
+      "type": "ally",
+      "notes": ""
+    },
+    "Greenland_RU": {
+      "type": "adversary",
       "notes": ""
     }
   },
   "conflictTheaters": [
     {
-      "id": "theater-1746463841789",
-      "name": "New Theater",
+      "cocomId": "AFRICOM",
+      "name": "US Africa Command",
       "description": "",
+      "isActive": true,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "NATO",
+          "supportingNationIds": [
+            "Greenland"
+          ],
+          "colorCode": "#4285F4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "RU",
+          "supportingNationIds": [],
+          "colorCode": "#EA4335"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": true,
+        "SOCOM": false,
+        "STRATCOM": true,
+        "TRANSCOM": true
+      }
+    },
+    {
+      "cocomId": "CENTCOM",
+      "name": "US Central Command",
+      "description": "",
+      "isActive": false,
       "sides": [
         {
           "id": "side1",
           "leadNationId": "",
           "supportingNationIds": [],
-          "colorCode": "#4285F4"
+          "colorCode": "#34A853"
         },
         {
           "id": "side2",
           "leadNationId": "",
           "supportingNationIds": [],
-          "colorCode": "#EA4335"
+          "colorCode": "#FBBC05"
         }
-      ]
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "EUCOM",
+      "name": "US European Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#673AB7"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FF9800"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "INDOPACOM",
+      "name": "US Indo-Pacific Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#00BCD4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FF5722"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "NORTHCOM",
+      "name": "US Northern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#3F51B5"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#F44336"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SOUTHCOM",
+      "name": "US Southern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#9C27B0"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FFC107"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SPACECOM_GEO",
+      "name": "US Space Command (Geographic)",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#009688"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#E91E63"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
     }
   ],
-  "createdAt": "2025-05-02T22:37:01.010806",
-  "modifiedAt": "2025-05-05T16:50:54.501061",
+  "createdAt": "2025-05-06T17:40:45.404953",
+  "modifiedAt": "2025-05-06T19:56:46.156942",
   "lastExecuted": null
 }

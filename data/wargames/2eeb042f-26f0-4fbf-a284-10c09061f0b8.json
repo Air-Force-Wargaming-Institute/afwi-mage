@@ -1,0 +1,1770 @@
+{
+  "id": "2eeb042f-26f0-4fbf-a284-10c09061f0b8",
+  "name": "European Energy Crisis",
+  "description": "A harsh winter in Europe collides with deepening geopolitical rifts as Russia leverages energy exports for political coercion. The EU faces internal fractures, social unrest, and supply chain vulnerabilities as gas supplies are throttled. NATO must weigh escalation risks against protecting alliance unity.",
+  "designer": null,
+  "securityClassification": null,
+  "roadToWar": "Background:\nIn the winter of 2026, a perfect storm emerges in Europe: record-low temperatures, declining natural gas reserves, and a coordinated disinformation campaign originating from Russian-aligned actors. Following years of reduced energy dependency on Russia, several EU nations have shifted to alternative supplies\u2014yet new LNG routes remain underdeveloped, and aging infrastructure is fragile.\n\nMeanwhile, Russia, facing domestic instability and economic isolation, begins weaponizing its remaining energy exports to destabilize NATO unity. Coordinated cyberattacks target energy terminals in Poland, Germany, and France. Protests erupt across Europe as rolling blackouts and food shortages grip major cities.\n\nKey Actors & Starting Posture:\nRussia:\nPostured for asymmetric confrontation. Leverages energy choke points, disinformation, and limited GRU activity in Eastern Europe. No direct troop movement\u2014but high readiness in Kaliningrad and Belarus.\n\nEuropean Union / NATO Nations:\nDisunified initial posture. Southern nations advocate negotiation; Eastern states push for confrontation. Force posture largely defensive with small-scale cyber response teams activated.\n\nUnited States:\nPublicly committed to NATO Article 5, but constrained by domestic economic pressures. Rapid deployment forces on alert; cyber commands tasked with protecting critical European infrastructure.\n\nChina:\nOfficially neutral but quietly expanding energy exports to Russia and EU. Positioning itself as a global \u201cstabilizer\u201d through diplomatic overtures and discounted LNG contracts.\n\nNational Objectives:\nRussia: Exploit Europe's dependency and division to achieve sanctions relief, weaken NATO, and project dominance without triggering kinetic escalation.\n\nEU/NATO: Preserve energy security and civilian order, defend alliance credibility, and counter disinformation while avoiding war.\n\nUS: Deter Russian expansion, reassure allies, and demonstrate capability in hybrid threat environments without being dragged into open war.\n\nChina: Expand economic and diplomatic leverage with minimal geopolitical cost.\n\nDIME Integration:\nDiplomacy: Bilateral cracks appear in NATO; France and Hungary explore independent negotiations. US and UK push to centralize response via NATO command.\n\nInformation: Russian influence ops portray EU leaders as failures. Pro-NATO information campaigns struggle against internal distrust and media saturation.\n\nMilitary: Increased NATO readiness in Baltics and Poland. US deploys cyber and intel teams. Russian GRU-linked provocations escalate but avoid direct conflict.\n\nEconomic: Energy prices surge; black-market gas shipments rise. Sanctions regimes fray as European governments prioritize domestic stability over unity.",
+  "researchObjectives": [
+    "Alliance Cohesion under Hybrid Pressure: Evaluate NATO's ability to maintain unity and coordinated response when individual member states face asymmetric hybrid threats (energy coercion, civil unrest, cyberattacks).",
+    "Operational Readiness in Civil Support Contingencies: Determine the readiness of European and US forces to support host nations with logistics, infrastructure defense, and public safety missions during energy-deprived crises.",
+    "Effectiveness of Deterrence through Economic and Informational Means: Assess the strategic utility of economic sanctions, energy diversification policies, and influence campaigns as tools of deterrence and de-escalation.",
+    "Cyber Resilience of Critical Infrastructure: Examine vulnerabilities and response options for protecting or restoring energy infrastructure targeted by near-peer cyber capabilities.",
+    "Thresholds for Conventional Military Involvement in Hybrid Scenarios: Identify indicators and decision points at which hybrid warfare escalates to scenarios requiring military intervention under Article 5 or unilateral action."
+  ],
+  "numberOfIterations": 5,
+  "numberOfMoves": 10,
+  "timeHorizon": null,
+  "wargameStartDate": null,
+  "selectedVectorstore": null,
+  "selectedDatabase": null,
+  "approvedFields": {
+    "roadToWar": true,
+    "description": true,
+    "researchObjectives": true,
+    "wargameParameters": true,
+    "designer": true,
+    "securityClassification": true,
+    "timeHorizon": true,
+    "wargameStartDate": true
+  },
+  "activatedEntities": [
+    {
+      "entityId": "RU",
+      "entityName": "Russia",
+      "entityType": "nation",
+      "isConfigured": true,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Secure alternative energy supplies to replace Russian imports",
+            "Maintain EU unity while addressing acute German vulnerabilities",
+            "Preserve minimum communication channels with Russia for deescalation",
+            "Balance firm response with economic damage mitigation"
+          ],
+          "posture": "Multilateral cooperation-focused approach emphasizing European solidarity while acknowledging Germany's particular vulnerability. Calibrated firmness toward Russia with openness to pragmatic arrangements.",
+          "keyInitiatives": "Nordic Energy Security Partnership; Energy Solidarity Mechanism within EU; Middle East LNG Supply Diversification; Minimal Dialogue Channel Maintenance with Russia; NATO Energy Security Framework Participation.",
+          "prioritiesMatrix": "Primary: EU coordination mechanisms. Secondary: Bilateral arrangements with alternative suppliers. Tertiary: Maintaining restricted communication with Russia while supporting sanctions.",
+          "redLines": "Deliberate attacks on German critical infrastructure; Complete gas cut-off without technical justification; Cyberattacks causing major public services disruption; Military provocations near NATO borders.",
+          "treatyObligations": "EU Lisbon Treaty commitments; NATO Article 5 obligations; Energy Charter Treaty provisions; Nord Stream commercial contracts; WTO membership requirements.",
+          "diplomaticResources": "Extensive diplomatic network with energy expertise; EU institutional influence; G7 coordination mechanisms; Economic leverage with neighboring states; Technical assistance capacity for energy transitions.",
+          "specialConsiderations": "Germany's historical energy relationship with Russia creates domestic political complexity in responding to the crisis. Industry pressure for accommodation balances against security imperatives and alliance obligations."
+        },
+        "information": {
+          "objectives": [],
+          "propagandaThemes": "European leadership incompetence; NATO as a US puppet destabilizing Europe; Inevitable Russian-European energy interdependence; European sanctions as self-harm; Russia as reliable supplier when respected.",
+          "cyberTargets": "European energy monitoring systems; Power grid operations centers in Germany, Poland, and Baltics; Financial transaction systems; Emergency services communications; EU coordination mechanisms; Critical energy infrastructure control systems.",
+          "strategicCommunicationFramework": "Coordinated messaging across RT, Sputnik, and amplified through social media. Local language operations tailored to national contexts with particular focus on vulnerable democracies. Narratives stress inevitable cooperation with Russia.",
+          "intelCollectionPriorities": "NATO emergency response plans; Internal EU energy policy disputes; European civil unrest indicators; Critical infrastructure vulnerabilities; NATO command communications; Public opinion shifts in key nations.",
+          "disinformationResilience": "Sophisticated counter-messaging capability to rapidly respond to Western narratives. Redundant broadcast capabilities to circumvent potential European restrictions. Prepared deniability narratives for cyber operations.",
+          "mediaLandscapeControl": "Complete control of domestic media outlets with ability to suppress dissenting narratives. Extensive network of seemingly independent but Russian-aligned outlets across Europe. Dedicated troll farms and AI-enhanced narrative deployment.",
+          "specialConsiderations": "Russia carefully balances maintaining deniability for cyber operations while ensuring European publics understand the implicit connection to energy policy. Information operations prioritize eroding public support for costly anti-Russian measures."
+        },
+        "military": {
+          "objectives": [
+            "Deter Russian military escalation through visible force presence",
+            "Protect critical European energy infrastructure",
+            "Enable cyber defense of allied energy systems",
+            "Support civil authorities in managing energy crisis effects"
+          ],
+          "alertLevel": "Elevated Readiness",
+          "doctrine": "Tailored deterrence and infrastructure protection with emphasis on cyber defense and critical infrastructure security. Forward military presence acts as tripwire while enabling broader support to European partners.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "EUCOM forces at elevated readiness; Cyber Command at maximum operational tempo; Strategic airlift assets prepositioned; Rapid response forces prepared for deployment; Naval forces enhanced in European waters; Energy security specialist teams deployed.",
+          "escalationLadder": "1. Intelligence and cyber defense posture enhancement; 2. Visible force readiness activities; 3. Limited forward deployment of specialized capabilities; 4. Enhanced air and missile defense activation; 5. Major combat force forward deployment; 6. Limited kinetic operations against imminent threats; 7. Full-spectrum military response.",
+          "decisionMakingProtocol": "Presidential authority with rapid consultation mechanisms with NATO allies. Standing authorization for defensive cyber operations. Clear delegation of emergency response authorities to EUCOM commander.",
+          "forceProjectionCapabilities": "Strategic airlift on standby for rapid reinforcement; Prepositioned equipment stocks activated; Naval power projection in European waters; Theater missile defense ready status; Special operations teams forward-deployed.",
+          "defenseIndustrialCapacity": "Expedited production of energy infrastructure security components; Cyber defense tool development accelerated; Emergency power generation equipment mobilization; Critical component stockpile release authorized.",
+          "domainPosture": {
+            "land": "Enhanced forward presence in Poland and Baltics; Corps-level forces at heightened readiness for deployment; Engineering units deployed supporting energy infrastructure hardening; Civil Affairs teams supporting civilian authorities.",
+            "sea": "Carrier Strike Group in North Sea; Amphibious Ready Group in Mediterranean; Ballistic missile defense vessels in increased numbers; Naval special warfare units deployed to key maritime infrastructure.",
+            "air": "Additional fighter squadrons deployed to Eastern Europe; Strategic bomber rotational presence; ISR platforms at maximum operational tempo; Air mobility assets positioned for emergency response.",
+            "cyber": "Defensive cyber teams embedded with European energy providers; Hunt-forward operations targeting Russian cyber actors; Real-time threat intelligence sharing; Active defense of critical financial and logistics networks.",
+            "space": "Enhanced space-based reconnaissance focused on Russian military indicators; Increased GPS resilience measures; Communications capacity expanded for crisis coordination; Space-based infrastructure monitoring."
+          },
+          "specialConsiderations": "US military posture calibrated to demonstrate commitment without inadvertently escalating to direct conflict. Special focus on enabling European self-defense rather than taking lead combat role."
+        },
+        "economic": {
+          "objectives": [
+            "Expand LNG exports to Europe as Russian alternative",
+            "Coordinate collective economic response to Russian coercion",
+            "Maintain economic pressure on Russia while minimizing European hardship",
+            "Build long-term European energy independence from Russia"
+          ],
+          "tradeFocus": "Prioritized LNG exports to European partners; Energy technology transfers to reduce dependencies; Critical infrastructure security equipment exports; Emergency power generation equipment transfers.",
+          "resourceDeps": "Political support for expanded export operations; European import terminal capacity; LNG transport vessel availability; Allied financial burden-sharing for infrastructure development.",
+          "sanctionsPolicy": "Targeted sanctions against Russian energy sector leadership; Energy technology export restrictions; Financial restrictions on Russian energy transactions; Selective exemptions for humanitarian energy needs.",
+          "economicWarfareTools": "Strategic petroleum reserve releases; LNG export prioritization; Financial tracking of Russian circumvention efforts; Technical assistance for European energy diversification; Sanctions coordination mechanism.",
+          "criticalInfrastructureResilience": "Energy export facilities security enhancement; Financial system hardening against cyber attacks; Supply chain monitoring for critical components; Strategic reserves accessibility improvements.",
+          "strategicResourceAccess": "Coordination with Gulf allies for increased European supply; Western Hemisphere energy production expansion; Rare earth mineral security partnerships; Energy technology leadership maintenance.",
+          "financialSystemLeverage": "Dollar clearing restrictions on Russian energy transactions; SWIFT access management for Russian entities; Investment restrictions in Russian energy projects; Carbon border adjustment mechanisms favorable to US exports.",
+          "technologyTransferControls": "Expedited approval for energy technology transfers to allies; Enhanced restrictions on dual-use technologies to Russia; Clean energy technology sharing programs; Critical infrastructure security technology transfers.",
+          "specialConsiderations": "US balances imposing costs on Russia against the need to maintain adequate global energy supplies. Policies consider domestic political sensitivity to energy prices while supporting European allies."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "US",
+      "entityName": "United States of America",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Reinforce NATO cohesion against Russian energy coercion",
+            "Coordinate unified European response to Russian pressure tactics",
+            "Expand LNG export arrangements to reduce European dependencies",
+            "Isolate Russia diplomatically while offering conditional re-engagement"
+          ],
+          "posture": "Forward-leaning alliance leadership with emphasis on multilateral coordination. The US positions itself as the primary security guarantor of Europe while encouraging European self-sufficiency in energy.",
+          "keyInitiatives": "NATO Energy Security Task Force; Bilateral energy security assistance packages; Multilateral sanctions coordination mechanisms; Allied response coordination centers; Diplomatic isolation campaign against Russia.",
+          "prioritiesMatrix": "Primary: NATO/EU institutional frameworks. Secondary: Bilateral relations with frontline Eastern European states. Tertiary: Coordination with energy-producing allies to increase European supply alternatives.",
+          "redLines": "Russian military incursions into NATO territory; Critical infrastructure attacks causing civilian casualties; Deliberate targeting of US citizens or assets; Interference with emergency energy relief shipments.",
+          "treatyObligations": "NATO Article 5 mutual defense commitment; Energy security cooperation agreements; Strategic energy reserve sharing arrangements; Bilateral defense agreements with frontline states.",
+          "diplomaticResources": "Extensive Embassy network throughout Europe; Senior-level envoys for energy security; NATO command structure influence; Intelligence sharing frameworks; Economic aid leverage; Energy export capacity.",
+          "specialConsiderations": "The US balances leadership in the crisis against domestic reluctance for overseas entanglements. Democratic administration faces political constraints on extent of involvement while messaging firmness against Russian aggression."
+        },
+        "information": {
+          "objectives": [
+            "Maintain public support for NATO cohesion despite economic hardship",
+            "Attribute Russian responsibility for the energy crisis",
+            "Counter Russian disinformation about Western motives and actions",
+            "Highlight US leadership in providing energy alternatives"
+          ],
+          "propagandaThemes": "NATO unity as strength; Russian weaponization of energy supplies; Democratic resilience against authoritarian pressure; Transatlantic partnership delivering energy security; Long-term energy independence from Russia.",
+          "cyberTargets": "Russian disinformation networks; Energy market manipulation systems; Cyber-physical systems targeting European infrastructure; Command nodes for Russian influence operations.",
+          "strategicCommunicationFramework": "Coordinated messaging across NATO capitals emphasizing unity and resilience. Public attribution of Russian cyber activities. Regular high-level statements tying Russian actions to broader pattern of aggression.",
+          "intelCollectionPriorities": "Russian cyber operation planning; Energy infrastructure targeting; Military posture changes; Leadership intentions; Domestic stability indicators; Alternative supply route vulnerabilities.",
+          "disinformationResilience": "Pre-bunking of likely Russian narratives; Rapid response teams to counter emerging disinformation; Platform engagement to limit spread of harmful narratives; Real-time intelligence declassification to expose Russian operations.",
+          "mediaLandscapeControl": "Limited direct media control but strong influence through close coordination with major outlets. Regular background briefings and strategic leaks. Embedded journalists in energy security operations.",
+          "specialConsiderations": "US information operations must navigate European sensitivity to American influence while still providing leadership against Russian narratives. Operations prioritize attributable truth-based messaging over covert influence."
+        },
+        "military": {
+          "objectives": [],
+          "alertLevel": "",
+          "doctrine": "",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "",
+          "escalationLadder": "",
+          "decisionMakingProtocol": "",
+          "forceProjectionCapabilities": "",
+          "defenseIndustrialCapacity": "",
+          "domainPosture": {
+            "land": "",
+            "sea": "",
+            "air": "",
+            "cyber": "",
+            "space": ""
+          },
+          "specialConsiderations": ""
+        },
+        "economic": {
+          "objectives": [],
+          "tradeFocus": "",
+          "resourceDeps": "",
+          "sanctionsPolicy": "",
+          "economicWarfareTools": "",
+          "criticalInfrastructureResilience": "",
+          "strategicResourceAccess": "",
+          "financialSystemLeverage": "",
+          "technologyTransferControls": "",
+          "specialConsiderations": ""
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "DE",
+      "entityName": "Germany",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Secure alternative energy supplies to replace Russian imports",
+            "Maintain EU unity while addressing acute German vulnerabilities",
+            "Preserve minimum communication channels with Russia for deescalation",
+            "Balance firm response with economic damage mitigation"
+          ],
+          "posture": "Multilateral cooperation-focused approach emphasizing European solidarity while acknowledging Germany's particular vulnerability. Calibrated firmness toward Russia with openness to pragmatic arrangements.",
+          "keyInitiatives": "Nordic Energy Security Partnership; Energy Solidarity Mechanism within EU; Middle East LNG Supply Diversification; Minimal Dialogue Channel Maintenance with Russia; NATO Energy Security Framework Participation.",
+          "prioritiesMatrix": "Primary: EU coordination mechanisms. Secondary: Bilateral arrangements with alternative suppliers. Tertiary: Maintaining restricted communication with Russia while supporting sanctions.",
+          "redLines": "Deliberate attacks on German critical infrastructure; Complete gas cut-off without technical justification; Cyberattacks causing major public services disruption; Military provocations near NATO borders.",
+          "treatyObligations": "EU Lisbon Treaty commitments; NATO Article 5 obligations; Energy Charter Treaty provisions; Nord Stream commercial contracts; WTO membership requirements.",
+          "diplomaticResources": "Extensive diplomatic network with energy expertise; EU institutional influence; G7 coordination mechanisms; Economic leverage with neighboring states; Technical assistance capacity for energy transitions.",
+          "specialConsiderations": "Germany's historical energy relationship with Russia creates domestic political complexity in responding to the crisis. Industry pressure for accommodation balances against security imperatives and alliance obligations."
+        },
+        "information": {
+          "objectives": [
+            "Build public support for consumption reduction and solidarity measures",
+            "Counter Russian narratives about German energy policy failures",
+            "Promote accelerated energy transition as security measure",
+            "Maintain public confidence in government crisis management"
+          ],
+          "propagandaThemes": "Energy conservation as civic duty; Russian weaponization of dependencies; German leadership in European solutions; Technological innovation overcoming crisis; Short-term sacrifice for long-term security.",
+          "cyberTargets": "Russian disinformation networks; Energy market manipulation indicators; Industrial control system vulnerabilities; Critical infrastructure monitoring networks.",
+          "strategicCommunicationFramework": "Coordinated government messaging emphasizing both severity of situation and capability to manage crisis. Regular public briefings on status and measures. Cross-party approach to demonstrate unity.",
+          "intelCollectionPriorities": "Russian energy supply intentions; Critical infrastructure vulnerabilities; Social stability indicators; Extremist exploitation opportunities; Supply chain security threats.",
+          "disinformationResilience": "Federal Office for Information Security expanded mandate; Media literacy campaign; Platform cooperation on foreign influence operations; Cross-government counter-disinformation taskforce.",
+          "mediaLandscapeControl": "Limited direct control but strong public broadcasting influence. Regular background briefings and coordination with major outlets. Crisis communication protocols activated.",
+          "specialConsiderations": "German information operations must navigate complex public attitudes toward Russia and energy policy history, including widespread criticism of previous dependency development."
+        },
+        "military": {
+          "objectives": [
+            "Protect critical energy infrastructure within German territory",
+            "Support civil authorities in managing energy shortage consequences",
+            "Contribute to NATO deterrence posture on eastern flank",
+            "Prepare contingencies for large-scale civilian support operations"
+          ],
+          "alertLevel": "Elevated Readiness",
+          "doctrine": "Territorial and infrastructure protection with emphasis on supporting civil authorities. Bundeswehr primarily deployed in domestic support role while maintaining NATO commitments.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Territorial units at full readiness; Critical Infrastructure Protection Command activated; NBC units on standby for industrial accidents; Cybersecurity Center at maximum staffing; Logistics units prepared for civilian support.",
+          "escalationLadder": "1. Enhanced protective measures for critical infrastructure; 2. Limited domestic deployment supporting authorities; 3. Humanitarian assistance operations; 4. Border security enhancement; 5. NATO defensive deployment participation; 6. Full national defense mobilization.",
+          "decisionMakingProtocol": "Security Cabinet in regular session; Defense Minister delegated emergency authorities; Joint Information and Situation Centre fully activated; Civil-military cooperation cells established at federal and state levels.",
+          "forceProjectionCapabilities": "Domestic deployment capabilities prioritized; Eastern NATO deployment commitments maintained; Logistics support for civilian supply chains; Engineering assets for infrastructure repair; Medical support for civilian healthcare system.",
+          "defenseIndustrialCapacity": "Energy-related manufacturing prioritization; Critical component stockpiling; Dual-use production adaptation for energy infrastructure; Research funding for energy security technology.",
+          "domainPosture": {
+            "land": "Territorial defense forces deployed to critical infrastructure; Engineering units supporting civilian infrastructure; Logistics units enabling emergency supply distribution; CBRN units prepared for industrial incidents.",
+            "sea": "Baltic naval assets at heightened readiness; North Sea energy infrastructure protection; Maritime reconnaissance intensified; Port security enhanced for energy deliveries.",
+            "air": "Air policing contribution maintained; Transport fleet prepared for emergency distribution; Air defense coverage of critical facilities; Surveillance of border areas and key infrastructure.",
+            "cyber": "Expanded defensive operations on critical networks; Military Cyber Forces supporting BSI operations; Intelligence collection on threat actors; Operational technology protection prioritized for energy sector.",
+            "space": "Satellite reconnaissance supporting infrastructure monitoring; Secure communications for crisis management; Cooperation with EU and NATO space assets; Early warning capabilities enhanced."
+          },
+          "specialConsiderations": "German military operations face significant legal constraints on domestic deployment, requiring carefully calibrated support to civil authorities while maintaining essential NATO contributions."
+        },
+        "economic": {
+          "objectives": [
+            "Secure energy supply continuity for critical industries",
+            "Implement emergency consumption reduction measures",
+            "Accelerate alternative supply development",
+            "Shield vulnerable populations from extreme energy costs"
+          ],
+          "tradeFocus": "Emergency LNG procurement from global markets; Coal supply contracts for power generation; Industrial component stockpiling; Energy efficiency technology imports.",
+          "resourceDeps": "Natural gas for industry and heating; LNG terminal capacity; Coal for power generation; Critical industrial components; Specialized maintenance expertise.",
+          "sanctionsPolicy": "Calibrated implementation of EU measures with temporary exemptions for critical supplies; Technical assistance for affected industries; Compliance monitoring system; Humanitarian considerations framework.",
+          "economicWarfareTools": "Strategic gas reserve management; Industrial production prioritization; Consumption reduction requirements; Price cap implementation; Market intervention authorities.",
+          "criticalInfrastructureResilience": "Energy grid hardening against cyber and physical threats; Redundancy development for key systems; Supply chain security enhancement; Emergency operational protocols implementation.",
+          "strategicResourceAccess": "LNG terminal development acceleration; Pipeline capacity agreements with neighbors; Strategic reserve management; Critical industrial materials stockpiling.",
+          "financialSystemLeverage": "KfW emergency funding for energy transition; Banking sector liquidity support for energy-intensive industries; Export credit guarantees for energy security projects; Municipal support fund for local utilities.",
+          "technologyTransferControls": "Accelerated deployment of energy efficiency technology; Critical infrastructure protection technology programs; Renewable transition financing; Industrial adaptation process support.",
+          "specialConsiderations": "Germany balances immediate crisis management requiring fossil fuel adaptations against long-term energy transition goals, while protecting its industrial base from permanent damage."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "FR",
+      "entityName": "France",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Assert European strategic autonomy in energy security response",
+            "Maintain EU unity while pursuing distinctive French diplomatic approach",
+            "Leverage nuclear expertise to enhance European energy resilience",
+            "Preserve conditional dialogue channels with Russia while supporting sanctions"
+          ],
+          "posture": "Independent European leadership stance emphasizing strategic autonomy while supporting EU solidarity. France positions itself as a bridge between hardline and conciliatory approaches within Europe.",
+          "keyInitiatives": "European Defense and Energy Security Initiative; Mediterranean Energy Partnership; Franco-German Energy Resilience Pact; Conditional Russian Engagement Framework; African Energy Development Program.",
+          "prioritiesMatrix": "Primary: EU/European solutions with French leadership. Secondary: Bilateral energy security with key partners. Tertiary: Minimally maintained dialogue with Russia while supporting coordinated pressure.",
+          "redLines": "Attacks on French nuclear infrastructure; Deliberate targeting of French citizens; Military provocations against NATO allies; Complete disruption of Mediterranean energy flows.",
+          "treatyObligations": "NATO Article 5 commitments; EU Lisbon Treaty obligations; Franco-German cooperation treaties; Mediterranean bilateral security agreements; Nuclear non-proliferation commitments.",
+          "diplomaticResources": "Extensive diplomatic network with strong African presence; Permanent UN Security Council seat; EU institutional influence; Nuclear power expertise leverage; Cultural and linguistic ties across regions.",
+          "specialConsiderations": "France balances its traditional Gaullist independent stance with the need for European solidarity, while leveraging its relative energy independence through nuclear power to assert leadership."
+        },
+        "information": {
+          "objectives": [
+            "Project image of French leadership in European crisis response",
+            "Highlight nuclear energy as security solution for Europe",
+            "Counter Russian narratives regarding European disunity",
+            "Build public support for strategic autonomy approach"
+          ],
+          "propagandaThemes": "European strategic autonomy as security necessity; French leadership in crisis resolution; Nuclear energy as strategic asset; Russian reliability myths; Mediterranean partnerships as European solution.",
+          "cyberTargets": "Russian disinformation networks targeting French audiences; Energy market manipulation systems; Critical infrastructure control networks; Russian intelligence operations in France and Francophone regions.",
+          "strategicCommunicationFramework": "Coordinated messaging emphasizing French leadership and European solutions. Presidential communications highlighting crisis management competence. Regular attribution of Russian hybrid operations.",
+          "intelCollectionPriorities": "Russian energy coercion planning; Eastern European stability indicators; North African and Middle Eastern energy developments; EU member positions on energy security; Alternative supply route vulnerabilities.",
+          "disinformationResilience": "Interministerial working group on information manipulation; Media cooperation framework; Digital platforms engagement strategy; Rapid response capability for emerging narratives.",
+          "mediaLandscapeControl": "Strong government influence over public broadcasting; Coordination with major French media groups; Crisis communication procedures activated; Strategic messaging through cultural and linguistic networks.",
+          "specialConsiderations": "French information operations emphasize distinctive French approach while avoiding appearance of undermining EU unity, balancing traditional Gaullist independence with crisis solidarity requirements."
+        },
+        "military": {
+          "objectives": [
+            "Protect critical French energy infrastructure",
+            "Demonstrate nuclear deterrence reliability during crisis",
+            "Provide specialized capabilities to NATO eastern flank operations",
+            "Support Mediterranean energy security operations"
+          ],
+          "alertLevel": "Vigilance Renforc\u00e9e (Enhanced Vigilance)",
+          "doctrine": "Strategic autonomy with selective force projection emphasizing French sovereign capabilities while supporting allied operations. Nuclear deterrence remains cornerstone with conventional forces enabling flexible response.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Nuclear forces at standard high alert; Rapid Reaction Force at enhanced readiness; Cyber Command at heightened operational tempo; Critical infrastructure protection units activated; Mediterranean naval presence reinforced.",
+          "escalationLadder": "1. Intelligence posture enhancement; 2. Visible readiness measures; 3. Forward deployment of specialized capabilities; 4. Limited military support to allies; 5. Mediterranean security operations; 6. Major force deployment to NATO eastern flank; 7. National strategic forces alert level adjustment.",
+          "decisionMakingProtocol": "Presidential authority with Defense Council in regular session; Chief of Defense Staff delegated crisis response authorities; Civil-military coordination cells activated; Nuclear forces command and control reinforced.",
+          "forceProjectionCapabilities": "Carrier Battle Group ready for Mediterranean deployment; Strategic airlift prepared for rapid response; Special forces elements on shortened alert timeline; Expeditionary capabilities prepared for eastern flank support.",
+          "defenseIndustrialCapacity": "Nuclear industry protection prioritized; Energy infrastructure security equipment production accelerated; Cyber defense capabilities enhanced; Strategic reserve components mobilization prepared.",
+          "domainPosture": {
+            "land": "Territorial units securing critical infrastructure; Specialized mountain and Arctic-capable forces ready for eastern deployment; CBRN units on enhanced alert; Engineer assets prepared for infrastructure protection.",
+            "sea": "Mediterranean naval presence reinforced; Carrier Strike Group at heightened readiness; Submarine patrols intensified; Maritime protection of energy shipping routes prioritized.",
+            "air": "Air defense coverage of nuclear facilities enhanced; Fighter squadrons prepared for NATO air policing rotation; Strategic air assets maintaining deterrence cre",
+            "cyber": "NATO Cyber Defense Centre of Excellence at full operational status; Continuous hunt and defensive operations on key networks; Cyber effects approval process streamlined; Cyber defense assistance teams deployed to vulnerable allies.",
+            "space": "Space-based early warning optimized; GPS/positioning service resilience enhanced; Secure communications capacity expanded; Allied space-based reconnaissance assets tasked for eastern flank monitoring."
+          },
+          "specialConsiderations": "French military operations are designed to support NATO's broader security objectives while maintaining a strong defensive posture. Special emphasis on nuclear deterrence and regional security cooperation."
+        },
+        "economic": {
+          "objectives": [
+            "Maintain economic stability and growth during crisis",
+            "Promote French energy exports and technological leadership",
+            "Facilitate energy resource sharing among EU member states",
+            "Support strategic autonomy in energy security"
+          ],
+          "tradeFocus": "Intra-EU energy trade agreements; Bilateral energy cooperation with key partners; Export of nuclear energy technology; Development of hydrogen energy infrastructure.",
+          "resourceDeps": "French nuclear power industry; LNG export infrastructure; Hydrogen production facilities; Strategic gas reserves; Renewable energy sources.",
+          "sanctionsPolicy": "Coordination with EU sanctions mechanisms; National energy security strategies; Import of strategic energy resources; Development of alternative energy markets.",
+          "economicWarfareTools": "Strategic energy diplomacy; Public diplomacy campaigns; Cultural exchange programs; International energy forums.",
+          "criticalInfrastructureResilience": "Energy Grid Protection Standards implementation; Cybersecurity minimum requirements enforcement; Physical protection requirements; Supply chain security coordination.",
+          "strategicResourceAccess": "Joint procurement mechanisms for emergency supplies; Allied energy resource sharing framework; Critical infrastructure component stockpile management; Energy corridor protection arrangements.",
+          "financialSystemLeverage": "Euro clearing restrictions for Russian energy transactions; European Investment Bank emergency funding for infrastructure; Banking regulations for energy crisis liquidity; NextGenerationEU funds repurposing for energy security.",
+          "technologyTransferControls": "Accelerated renewable technology deployment; Energy efficiency technology sharing platform; Dual-use technology security framework; Critical infrastructure protection technology standards.",
+          "specialConsiderations": "France balances immediate crisis management requirements with long-term strategic objectives, while supporting broader European economic interests."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "PL",
+      "entityName": "Poland",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Strengthen NATO's eastern flank against Russian pressure",
+            "Accelerate Central European energy independence from Russia",
+            "Build regional security coalition among Baltic and Eastern European states",
+            "Advocate for maximum pressure on Russia within EU and NATO frameworks"
+          ],
+          "posture": "Forward-leaning stance emphasizing robust deterrence and complete energy decoupling from Russia. Poland positions itself as the eastern bulwark of NATO and leader of regional resistance to Russian coercion.",
+          "keyInitiatives": "Three Seas Initiative enhancement; Baltic Energy Security Network; Central European Defense Coalition; Eastern Partnership Energy Independence Program; Nordic-Polish Energy Corridor.",
+          "prioritiesMatrix": "Primary: US and NATO security guarantees. Secondary: Regional Eastern European cooperation. Tertiary: EU energy solidarity mechanisms with Western European states.",
+          "redLines": "Russian military movements near Polish borders; Cyberattacks on Polish critical infrastructure; Deliberate disruption of alternative energy supplies; Threats to Baltic states security.",
+          "treatyObligations": "NATO Article 5 commitments; EU energy solidarity mechanisms; Bilateral defense agreements with US; Three Seas Initiative partnerships; Visegr\u00e1d Group coordination.",
+          "diplomaticResources": "Strategic geographic position as transit hub; Strong US relationship leverage; Regional leadership among post-Soviet states; Credibility as early warner on Russian threats; LNG terminal and pipeline infrastructure.",
+          "specialConsiderations": "Poland's historical experience with Russia creates high threat perception and skepticism toward accommodationist approaches. Economic considerations remain secondary to security imperatives in Polish diplomatic calculations."
+        },
+        "information": {
+          "objectives": [
+            "Build international support for maximum pressure on Russia",
+            "Counter Russian narratives about inevitability of energy dependence",
+            "Promote Poland as model for successful Russian energy decoupling",
+            "Strengthen Eastern European information resilience against Russian operations"
+          ],
+          "propagandaThemes": "Russian energy as geopolitical weapon; Historical vindication of Polish warnings; NATO as essential guarantor of European security; Energy independence as national security; Central European resilience against Russian pressure.",
+          "cyberTargets": "Russian disinformation networks targeting Polish and Eastern European audiences; Energy infrastructure targeting indicators; Russian cyber operation infrastructure; Foreign influence operations in regional politics.",
+          "strategicCommunicationFramework": "Coordinated government messaging emphasizing regional leadership and historical vindication. Regular exposure of Russian hybrid tactics. Consistent messaging linking energy independence to national sovereignty.",
+          "intelCollectionPriorities": "Russian military movements near borders; Cyber operation planning against infrastructure; Belarus stability indicators; Russian energy leverage patterns; Disinformation campaign targets.",
+          "disinformationResilience": "Strategic Communication Department activities expanded; Regional counter-disinformation coalition; Media literacy campaign; Platform cooperation on foreign influence operations; Energy security narrative promotion.",
+          "mediaLandscapeControl": "Strong government influence in public broadcasting; Regulatory pressure on media ownership; Crisis communication protocols activated; Regional media cooperation initiatives.",
+          "specialConsiderations": "Polish information operations emphasize historical context of Russian relations, positioning current crisis as continuation of historical patterns while building broader European support for Polish security perspective."
+        },
+        "military": {
+          "objectives": [
+            "Defend critical Polish energy infrastructure and transit routes",
+            "Strengthen eastern NATO flank against potential escalation",
+            "Enhance military readiness for territorial defense",
+            "Develop robust capability to counter Russian hybrid operations"
+          ],
+          "alertLevel": "Heightened Combat Readiness",
+          "doctrine": "Territorial defense prioritization with forward posture and robust force presence. Polish military emphasizes conventional deterrence, infrastructure protection, and counter-hybrid warfare capabilities.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Territorial Defense Forces fully mobilized; Mechanized divisions at high readiness; Air defenses on increased alert; Cyber Defense Center at maximum staffing; Strategic reserves partially activated.",
+          "escalationLadder": "1. Enhanced border security and critical infrastructure protection; 2. Limited reserve mobilization; 3. Major force deployments to eastern regions; 4. Full territorial defense activation; 5. National mobilization; 6. Offensive cyber operations; 7. Full spectrum military response.",
+          "decisionMakingProtocol": "National Security Bureau in continuous session; Defense Minister granted emergency authorities; Military communications with NATO allies enhanced; Civil-military coordination cells activated at voivodeship level.",
+          "forceProjectionCapabilities": "Rapid deployment to eastern borders; Air defense coverage of critical infrastructure; Special forces prepared for counter-hybrid operations; Logistics support for allied forward presence.",
+          "defenseIndustrialCapacity": "Defense production shifted to critical infrastructure protection equipment; Strategic reserves deployment; Emergency maintenance capabilities enhanced; Energy security technology prioritization.",
+          "domainPosture": {
+            "land": "Mechanized forces deployed to eastern regions; Territorial defense units securing critical infrastructure; Engineers supporting infrastructure hardening; Border Guard reinforced at Belarus and Kaliningrad frontiers.",
+            "sea": "Baltic naval forces at high readiness; LNG terminal security enhanced; Port facilities protected for alternative energy imports; Maritime domain awareness intensified.",
+            "air": "Combat air patrols increased; Air defense coverage prioritizing energy infrastructure; Transport fleet ready for rapid reinforcement; Surveillance of border regions intensified.",
+            "cyber": "Defensive operations on critical networks; Intelligence gathering on potential threats; Active defense measures prepared; Information sharing with regional allies enhanced.",
+            "space": "Satellite communications security enhanced; Space-based reconnaissance leveraged through allies; GPS alternative positioning systems activated; Early warning capabilities enhanced."
+          },
+          "specialConsiderations": "Polish military operations emphasize territorial defense while integrating with NATO's broader defensive posture. Force employment prioritizes eastern regions facing Belarus and Kaliningrad, while maintaining flexibility for infrastructure protection nationwide."
+        },
+        "economic": {
+          "objectives": [
+            "Complete Poland's energy independence from Russian sources",
+            "Establish Poland as key energy transit hub for Central Europe",
+            "Shield Polish citizens and industry from energy price shocks",
+            "Accelerate renewable energy transition while ensuring energy security"
+          ],
+          "tradeFocus": "LNG imports from US and Qatar; Energy infrastructure equipment imports; Coal supply diversification; Energy efficiency technology adoption.",
+          "resourceDeps": "LNG terminal capacity; Baltic Pipe infrastructure; Coal supplies; Critical infrastructure components; Energy storage technologies.",
+          "sanctionsPolicy": "Maximum implementation of EU measures; Advocacy for expanded restrictions; Technical assistance for enforcement; Front-runner in sanctions compliance monitoring.",
+          "economicWarfareTools": "Strategic energy reserve management; Price control mechanisms; Rationing preparations; Industrial production prioritization; Critical supply chain monitoring.",
+          "criticalInfrastructureResilience": "Energy grid hardening against cyber and physical threats; Redundancy development for key nodes; Supply route diversification; Emergency operational protocols implementation.",
+          "strategicResourceAccess": "LNG terminal expansion; Baltic Pipe capacity optimization; Coal import diversification; Strategic reserve enhancement; Critical industrial materials stockpiling.",
+          "financialSystemLeverage": "Bank Gospodarstwa Krajowego crisis financing; Energy transition investment programs; Municipal utility support mechanisms; Industrial adaptation funding.",
+          "technologyTransferControls": "Critical infrastructure protection technology adoption; Energy independence technology prioritization; Security technology implementation; Industrial adaptation support.",
+          "specialConsiderations": "Poland balances immediate energy security imperatives against economic impact, while positioning itself as regional energy hub alternative to Russian-controlled routes. Historical experience drives willingness to accept economic costs for security gains."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "GB",
+      "entityName": "United Kingdom",
+      "entityType": "nation",
+      "isConfigured": true,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [],
+          "posture": "Forward-leaning stance emphasizing UK's unique position as both European security stakeholder and privileged US partner. Britain positions itself as a responsive, decisive actor free from EU bureaucratic constraints.",
+          "keyInitiatives": "UK-Nordic Energy Security Alliance; City of London Sanctions Coordination Mechanism; Five Eyes Energy Infrastructure Protection Program; Commonwealth Energy Resilience Network; UK-US Strategic Energy Partnership.",
+          "prioritiesMatrix": "Primary: US-UK special relationship and Five Eyes coordination. Secondary: NATO European partners, particularly northern and eastern flank. Tertiary: Practical EU cooperation mechanisms despite Brexit tensions.",
+          "redLines": "Direct targeting of UK critical infrastructure; Attacks on UK citizens abroad; Interference with British overseas territories; Deliberate escalation threatening NATO stability; Cyberattacks causing civilian casualties.",
+          "treatyObligations": "NATO Article 5 commitments; Five Eyes intelligence sharing; UK-US defense cooperation agreements; Post-Brexit EU security arrangements; Commonwealth security partnerships.",
+          "diplomaticResources": "Permanent UN Security Council seat; Intelligence sharing networks; Global diplomatic presence; Financial services leverage; Energy market expertise; Commonwealth leadership.",
+          "specialConsiderations": "Post-Brexit UK seeks to demonstrate value as security partner while managing domestic energy security challenges. Foreign policy emphasizes 'Global Britain' narrative and practical leadership independent of EU constraints."
+        },
+        "information": {
+          "objectives": [],
+          "propagandaThemes": "Global Britain leading European security; UK-US special relationship delivering energy security; Russian malign influence expos\u00e9s; British resilience against coercion; Brexit enabling nimble crisis response.",
+          "cyberTargets": "Russian disinformation networks targeting UK audiences; GRU operational infrastructure; Energy market manipulation systems; Critical infrastructure targeting networks.",
+          "strategicCommunicationFramework": "Coordinated messaging through Cabinet Office, diplomatic networks, and Five Eyes partners. Regular public attribution of Russian activities. Strategic messaging highlighting UK leadership in intelligence and energy security.",
+          "intelCollectionPriorities": "Russian hybrid operation planning; Critical infrastructure vulnerabilities; European political stability indicators; Alternative energy supply security; Russian leadership intentions.",
+          "disinformationResilience": "Counter Disinformation Unit expanded operations; Media literacy campaign; Platform cooperation framework; GCHQ defensive capability deployment; Regular intelligence declassification.",
+          "mediaLandscapeControl": "Limited direct control but strong influence through BBC, strategic briefings, and D-notice system. Regular background briefings for key outlets. Embedded reporting with security operations.",
+          "specialConsiderations": "UK information operations leverage intelligence capabilities and Five Eyes relationships while emphasizing UK's leadership role and independence from EU constraints in responding effectively to the crisis."
+        },
+        "military": {
+          "objectives": [],
+          "alertLevel": "Enhanced Readiness",
+          "doctrine": "Persistent engagement strategy with forward presence and integrated deterrence across domains. UK military emphasizes expeditionary capability, cyber defense, and specialized counter-hybrid warfare operations.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Carrier Strike Group at heightened readiness; Special Forces on shortened notice-to-move; Cyber Command at maximum operational tempo; Critical national infrastructure protection units activated; Strategic reserves at enhanced readiness.",
+          "escalationLadder": "1. Intelligence and cyber defense posture enhancement; 2. Critical infrastructure protection deployment; 3. Visible readiness activities; 4. Limited forward deployment to eastern NATO states; 5. Carrier Strike Group deployment; 6. Special forces counter-hybrid operations; 7. Major combat force deployment.",
+          "decisionMakingProtocol": "National Security Council in continuous session; Defense Secretary granted enhanced authorities; COBR activation for crisis coordination; Chief of Defence Staff delegated emergency response powers.",
+          "forceProjectionCapabilities": "Carrier Strike Group deployable to North Sea or Mediterranean; Expeditionary air group prepared for rapid deployment; SOF elements on alert for counter-hybrid operations; Strategic airlift ready for NATO reinforcement.",
+          "defenseIndustrialCapacity": "Critical infrastructure protection equipment production accelerated; Cyber security capability development prioritized; Strategic energy components manufacturing supported; Defense industrial resilience enhanced.",
+          "domainPosture": {
+            "land": "Enhanced forward presence in Baltic states; Specialized units protecting domestic energy infrastructure; Chemical, biological, radiological and nuclear defense units on enhanced alert; Training support to eastern NATO allies.",
+            "sea": "North Sea and Channel fleet presence increased; Carrier Strike Group at high readiness; Continuous at-sea deterrent maintained; Anti-submarine warfare operations intensified; Maritime energy infrastructure protection prioritized.",
+            "air": "Quick Reaction Alert enhanced; Air policing contribution to NATO increased; Long-range surveillance intensified; Strategic airlift prepared for rapid reinforcement; Air defense coverage of critical infrastructure enhanced.",
+            "cyber": "Offensive and defensive operations against Russian threat actors; Critical infrastructure network monitoring enhanced; Joint operations with Five Eyes partners; Intelligence-led targeting of hybrid threat networks.",
+            "space": "Satellite reconnaissance focused on Russian indicators and warnings; Communications security enhanced; GPS/positioning alternatives prepared; Space-based early warning systems leveraged through allies."
+          },
+          "specialConsiderations": "UK military operations balance domestic infrastructure protection with NATO commitments and global interests. Operations emphasize UK's specialized capabilities in intelligence, cyber, maritime, and special operations domains while demonstrating post-Brexit commitment to European security."
+        },
+        "economic": {
+          "objectives": [
+            "Strengthen transatlantic unity in response to Russian energy coercion"
+          ],
+          "tradeFocus": "LNG imports from US, Qatar and Australia; Energy infrastructure security equipment; North Sea production enhancement; Alternative supply route development.",
+          "resourceDeps": "LNG import terminal capacity; North Sea production capability; Nuclear fuel supplies; Critical infrastructure components; Technical expertise in energy systems.",
+          "sanctionsPolicy": "Robust implementation coordinated with but independent from EU measures; Financial services restrictions leveraging City of London; Targeted energy sector measures; Technical assistance for enforcement.",
+          "economicWarfareTools": "Strategic energy reserve management; London energy market monitoring mechanisms; Financial intelligence targeting; Sanctions coordination with key partners; Alternative supply development.",
+          "criticalInfrastructureResilience": "Energy grid hardening against cyber and physical threats; North Sea installation protection enhanced; LNG terminal security upgraded; Supply chain vulnerability assessment and mitigation.",
+          "strategicResourceAccess": "North Sea production maximization; LNG supply contract diversification; Nuclear fuel stockpile management; Strategic materials reserves enhancement; Critical industrial component stockpiling.",
+          "financialSystemLeverage": "City of London financial restrictions on targeted entities; Energy market stability mechanisms; Industrial support funding programs; Emergency energy price interventions; Critical supply chain financing.",
+          "technologyTransferControls": "Energy security technology fast-track approval; Critical infrastructure protection technology implementation; Dual-use technology restrictions; Energy independence innovation support.",
+          "specialConsiderations": "UK balances immediate crisis management with positioning for post-crisis advantage, leveraging financial services strength and North Sea resources while managing domestic political sensitivity to energy prices."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "HU",
+      "entityName": "Hungary",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Preserve energy supply security while maintaining balanced relations with Russia",
+            "Navigate EU solidarity obligations while protecting Hungarian economic interests",
+            "Leverage Hungary's geographic position for energy transit opportunities",
+            "Expand bilateral energy arrangements with multiple suppliers"
+          ],
+          "posture": "Pragmatic neutrality emphasizing Hungarian national interests and energy security above ideological positions. Hungary positions itself as a diplomatic bridge between Russia and the EU while securing preferential energy arrangements.",
+          "keyInitiatives": "Hungarian Energy Security Protocol; Bilateral Russian Energy Agreement; Central European Energy Hub Development; Multi-source Supply Diversification Framework; Conditional EU Solidarity Participation.",
+          "prioritiesMatrix": "Primary: Bilateral arrangements securing preferential energy access. Secondary: Regional cooperation with neighboring states. Tertiary: EU coordination mechanisms with opt-out provisions.",
+          "redLines": "Complete energy cut-off affecting Hungarian citizens; Forced participation in sanctions harming national interests; Military deployments on Hungarian territory; Uncompensated energy sharing requirements.",
+          "treatyObligations": "EU membership requirements with negotiated exceptions; NATO commitments with national caveats; Bilateral energy agreements with Russia; Visegrád Group coordination; Energy Charter Treaty provisions.",
+          "diplomaticResources": "Strategic geographic position as transit route; Special relationship with Russia; Veto powers within EU frameworks; Regional influence in Central Europe; Experience navigating between power blocs.",
+          "specialConsiderations": "Hungary's historical experience and economic realities drive a pragmatic approach prioritizing tangible national interests over abstract alliance solidarity. Domestic political considerations strongly influence diplomatic positioning on energy security."
+        },
+        "information": {
+          "objectives": [
+            "Shape domestic narrative emphasizing government's success in securing energy supplies",
+            "Promote Hungary's model of pragmatic neutrality as superior to confrontational approaches",
+            "Counter external criticism of Hungary's independent stance toward Russia",
+            "Highlight risks of European energy policies to Hungarian economic security"
+          ],
+          "propagandaThemes": "Hungarian sovereignty in energy decisions; Western ideological blindness risking citizen welfare; Government competence in crisis management; Russian reliability as energy partner when respected; EU overreach threatening national interests.",
+          "cyberTargets": "Critical infrastructure monitoring systems; EU coordination mechanisms; Anti-government media outlets; Foreign influence operations targeting Hungarian policies; Energy market data collection systems.",
+          "strategicCommunicationFramework": "Centralized government messaging emphasizing pragmatic crisis management success. Regular reinforcement of sovereignty narrative. Consistent criticism of ideologically-driven Western approaches while highlighting Hungarian stability.",
+          "intelCollectionPriorities": "EU decision-making on sanctions and energy policy; Russian energy supply intentions; Regional stability indicators; Alternative supply route viability; Public opinion shifts in neighboring states.",
+          "disinformationResilience": "Controlled media environment limiting foreign narrative penetration; Counter-messaging capability focused on sovereignty themes; Regulatory powers over digital platforms; Rapid response capability for government messaging.",
+          "mediaLandscapeControl": "Strong government influence over mainstream media; Regulatory pressure on independent outlets; Strategic communication coordination through central authorities; International media engagement selective and message-controlled.",
+          "specialConsiderations": "Hungarian information operations balance domestic audience needs against international perception management, while maintaining consistent emphasis on pragmatic national interest-based policy justifications."
+        },
+        "military": {
+          "objectives": [
+            "Protect critical Hungarian energy infrastructure",
+            "Maintain minimum NATO commitments while avoiding provocative deployments",
+            "Prepare for potential domestic energy-related civil unrest",
+            "Support civilian authorities in managing crisis consequences"
+          ],
+          "alertLevel": "Elevated Vigilance",
+          "doctrine": "Defensive posture emphasizing territorial integrity and critical infrastructure protection while minimizing international deployments. Military primarily focused on supporting domestic stability.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Territorial Defense Forces at enhanced readiness; Critical Infrastructure Protection Units activated; Engineering units prepared for emergency support; Cyber defense focused on energy systems; Limited expeditionary capabilities maintained for alliance obligations.",
+          "escalationLadder": "1. Enhanced monitoring and protection of critical infrastructure; 2. Limited domestic deployment supporting civilian authorities; 3. Border security enhancement; 4. Humanitarian assistance operations; 5. Minimal NATO commitment deployment; 6. Full territorial defense mobilization only if directly threatened.",
+          "decisionMakingProtocol": "Centralized authority through National Security Cabinet; Defense Minister granted limited emergency powers; Civil-military cooperation cells activated at county level; Strategic communication coordination with political leadership.",
+          "forceProjectionCapabilities": "Minimal expeditionary capabilities maintained; Domestic deployment prioritized; Engineering and logistics assets prepared for civilian support; Border security enhancement capability; Limited NATO contribution maintained.",
+          "defenseIndustrialCapacity": "Limited domestic production focused on critical infrastructure protection equipment; Strategic reserves managed for domestic needs; Energy security technology prioritization; Emergency maintenance capabilities enhanced.",
+          "domainPosture": {
+            "land": "Ground forces focused on protecting energy infrastructure and transit routes; Military police prepared for civil support; Engineering units ready for emergency infrastructure repair; Border units reinforced selectively.",
+            "sea": "Limited naval capabilities focused on Danube monitoring; River transportation security enhanced; Energy shipment protection capabilities.",
+            "air": "Limited air policing commitment maintained; Transport capability prepared for emergency operations; Surveillance focused on border areas and critical infrastructure; Selective participation in NATO air activities.",
+            "cyber": "Defensive operations protecting energy control systems; Intelligence gathering on potential threats; Selective information sharing with allies; Government networks protection prioritized.",
+            "space": "Limited capabilities leveraged through alliance relationships; Commercial satellite access secured; Communication security enhanced; Navigation system alternatives identified."
+          },
+          "specialConsiderations": "Hungarian military operations emphasize avoiding provocations that could escalate tensions with Russia while maintaining minimum credible NATO participation. Domestic security and stability remain the priority over external operations."
+        },
+        "economic": {
+          "objectives": [
+            "Secure preferential energy pricing through special arrangements with Russia",
+            "Mitigate economic impacts of the energy crisis on Hungarian industry and consumers",
+            "Leverage geographic position for energy transit fees and infrastructure investment",
+            "Maintain strategic autonomy in energy decisions while accessing EU support mechanisms"
+          ],
+          "tradeFocus": "Bilateral energy imports from Russia with preferential terms; Transit services for regional energy flows; Energy infrastructure equipment imports; Alternative supplier development with pragmatic partnerships.",
+          "resourceDeps": "Russian natural gas for industry and heating; Oil refining capacity; Nuclear fuel and technology; Regional pipeline infrastructure; Storage facility capacity.",
+          "sanctionsPolicy": "Minimal implementation with negotiated exceptions; Technical compliance without practical enforcement; Humanitarian exemptions maximized; National interest protections invoked.",
+          "economicWarfareTools": "Energy transit leverage; EU veto threat on escalatory measures; Strategic national reserves management; Price control mechanisms; Selective market access restrictions.",
+          "criticalInfrastructureResilience": "Energy distribution network protection; Storage facility security enhancement; Control system isolation capabilities; Supply chain diversification for critical components; Emergency operational protocols.",
+          "strategicResourceAccess": "Russian supply agreements maintenance; Transit hub development; Storage capacity expansion; Critical component stockpiling; Alternative supplier relationship development.",
+          "financialSystemLeverage": "Special financial channels for energy transactions; Banking relationships with multiple suppliers; EU funding access for infrastructure; National development bank financing for energy security.",
+          "technologyTransferControls": "Selective implementation of export controls; Energy technology acquisition from multiple sources; Critical infrastructure protection technology adoption; Industrial adaptation support.",
+          "specialConsiderations": "Hungary balances short-term energy security and economic stability against long-term EU integration pressures, while maximizing leverage from its geographic position and special relationship with Russia."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "CN",
+      "entityName": "China",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Position China as a global stabilizing force during European energy turmoil",
+            "Strengthen strategic partnership with Russia while avoiding direct confrontation with West",
+            "Expand economic and diplomatic influence in Europe through energy leverage",
+            "Demonstrate the limitations of Western-led international order"
+          ],
+          "posture": "Strategic opportunism behind a façade of neutrality and responsible global citizenship. China presents itself as a stabilizing mediator while selectively supporting Russia and exploiting Western vulnerabilities.",
+          "keyInitiatives": "Belt and Road Energy Corridor Expansion; Sino-Russian Comprehensive Strategic Partnership Enhancement; European Energy Diplomacy Initiative; Global South Energy Alliance Leadership; Multilateral Energy Security Dialogue Framework.",
+          "prioritiesMatrix": "Primary: Expanding Chinese influence through energy sector opportunities. Secondary: Supporting Russian resistance to Western pressure. Tertiary: Building alternative economic and diplomatic frameworks independent of Western control.",
+          "redLines": "Direct military confrontation involving Chinese assets; Comprehensive financial sanctions against Chinese entities; Forced decoupling from European markets; Security threats to Chinese nationals in Europe; Maritime energy shipment interdiction.",
+          "treatyObligations": "Sino-Russian Comprehensive Strategic Partnership; UN Charter commitments; WTO membership; Various bilateral trade and investment agreements with European nations; Climate change commitments with flexible implementation.",
+          "diplomaticResources": "Permanent UN Security Council seat; Extensive diplomatic network; Economic leverage through trade relationships; Alternative institutional frameworks (SCO, BRICS); Belt and Road Initiative relationships; Growing technological influence.",
+          "specialConsiderations": "China balances opportunistically exploiting the crisis for strategic gains against avoiding direct implication in Russian actions. Public messaging emphasizes responsible global citizenship while practical actions prioritize power projection and influence expansion."
+        },
+        "information": {
+          "objectives": [
+            "Promote China as responsible global stabilizer during Western-created crisis",
+            "Undermine Western alliance cohesion through targeted narratives",
+            "Highlight superiority of Chinese governance model in managing energy security",
+            "Gather intelligence on European vulnerabilities and decision-making"
+          ],
+          "propagandaThemes": "Western hegemony creating instability; Chinese model as superior crisis manager; Russian legitimate security interests; European subordination to US interests harming citizens; China as neutral helper to suffering European populations.",
+          "cyberTargets": "European energy policy coordination systems; NATO communication networks; European public opinion formation channels; Critical infrastructure monitoring systems; Financial market data systems; Decision-making communications.",
+          "strategicCommunicationFramework": "Coordinated messaging through state media, diplomatic channels, and controlled social media highlighting Chinese stability amid Western chaos. Differentiated messaging for domestic and international audiences, with tailored approaches for different European regions.",
+          "intelCollectionPriorities": "European political cohesion indicators; NATO response planning; Russia-Europe negotiation parameters; Critical infrastructure vulnerabilities; European public sentiment shifts; Financial market stability indicators.",
+          "disinformationResilience": "Strict domestic information control; Multiple redundant external messaging channels; Rapid narrative adaptation capability; Selective platform engagement strategies; Deniable third-party content amplification.",
+          "mediaLandscapeControl": "Complete control of domestic messaging; Strategic use of Western platform access; Growing influence through proxies and friendly outlets in target countries; Sophisticated use of algorithmic content promotion.",
+          "specialConsiderations": "Chinese information operations carefully balance advancing strategic objectives with maintaining plausible deniability, while adapting messaging for different regions of Europe based on existing relationships and vulnerabilities."
+        },
+        "military": {
+          "objectives": [
+            "Demonstrate Chinese military modernization through selective presence",
+            "Gather intelligence on NATO operational patterns",
+            "Protect critical Chinese economic interests and nationals in affected regions",
+            "Support Russian position through non-kinetic means while avoiding direct involvement"
+          ],
+          "alertLevel": "Measured Vigilance",
+          "doctrine": "Strategic restraint with selective demonstrations of capability. China maintains primarily non-kinetic military posture while leveraging the crisis for intelligence collection and influence projection.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Naval task groups at heightened readiness; Strategic rocket forces at standard alert levels; Cyber operations at enhanced tempo; Intelligence assets fully activated; Contingency evacuation capabilities prepared; Space-based surveillance maximized.",
+          "escalationLadder": "1. Enhanced intelligence collection and presence operations; 2. Naval diplomacy missions to European waters; 3. Cyber and information operations in support of strategic objectives; 4. Visible exercising with Russian forces in non-European theaters; 5. Limited military advisory support to Russian operations; 6. Evacuation operations for Chinese nationals if necessary; 7. Direct military involvement only if Chinese core interests directly threatened.",
+          "decisionMakingProtocol": "Central Military Commission direct control; President Xi's personal authority; Politburo Standing Committee consultation for major decisions; Theater commands prepared for contingency operations; Crisis response cells activated.",
+          "forceProjectionCapabilities": "Naval task group deployable to Mediterranean; Strategic airlift prepared for evacuation operations; Cyber forces at full operational capability; Space-based intelligence collection maximized; Special operations forces on standby for critical asset protection.",
+          "defenseIndustrialCapacity": "Accelerated production of energy security-related technologies; Strategic reserve management; Critical component stockpiling; Alternative supply chain activation; Technology transfer protocols for Russian support.",
+          "domainPosture": {
+            "land": "Minimal direct presence; Military advisors with Russian partners; Protection forces for Chinese assets abroad; Logistics preparation for potential evacuation; Border security enhanced in shared regions with Russia.",
+            "sea": "Naval task groups prepared for Mediterranean and North Sea deployment; Maritime intelligence collection enhanced; Merchant fleet protection capabilities activated; Port access agreements leveraged for presence operations.",
+            "air": "Long-range aviation prepared for presence missions; Transport fleet readied for contingency operations; Intelligence collection flights increased; Space-launch capabilities at heightened readiness.",
+            "cyber": "Offensive and defensive operations against Western targets; Critical infrastructure assessment operations; Intelligence collection prioritized; Coordination with Russian cyber entities; Protection of domestic systems against Western countermeasures.",
+            "space": "Satellite reconnaissance maximized over European theater; Communications security enhanced; Navigation warfare capabilities at increased readiness; Space-based intelligence sharing with Russian partners on selective basis."
+          },
+          "specialConsiderations": "Chinese military operations emphasize plausible deniability and non-attribution while maintaining strategic messaging value. Activities balance supporting Russian position against avoiding direct military confrontation with NATO forces."
+        },
+        "economic": {
+          "objectives": [
+            "Leverage energy exports to Europe for maximum economic and political gain",
+            "Strengthen economic integration with Russia through crisis opportunities",
+            "Protect Chinese investments and supply chains from disruption",
+            "Position yuan as alternative settlement currency for energy transactions"
+          ],
+          "tradeFocus": "Expanded energy exports to European markets; Critical technology imports from vulnerable economies; Alternative payment systems promotion; Infrastructure investment in exchange for political concessions.",
+          "resourceDeps": "Energy export capacity; Euro and dollar market access; Technology supply chains; Maritime shipping security; Financial transaction systems; European infrastructure investment opportunities.",
+          "sanctionsPolicy": "Selective compliance with international sanctions; Alternative channel development for Russian trade; Humanitarian exemption exploitation; Countermeasure preparation against potential Western sanctions.",
+          "economicWarfareTools": "Strategic market interventions; Alternative payment systems promotion; Critical resource export leverage; Targeted investment in vulnerable economies; Debt leverage against dependent states.",
+          "criticalInfrastructureResilience": "Alternative financial transaction systems; Supply chain redundancy; Energy delivery protection mechanisms; Communication network security; Data sovereignty enforcement.",
+          "strategicResourceAccess": "Energy export capacity maximization; Rare earth element leverage; Technology component control; Alternative shipping route development; Strategic stockpile management.",
+          "financialSystemLeverage": "Yuan internationalization through energy trade; CIPS (Cross-Border Interbank Payment System) promotion; Development bank financing for European energy security; Selective capital controls; Digital currency advancement.",
+          "technologyTransferControls": "Selective technology sharing with Russian partners; Critical component export restrictions; Data protection regulations; Intellectual property selective enforcement; Technology standards promotion.",
+          "specialConsiderations": "China calibrates economic measures to demonstrate an alternative to Western-dominated systems while avoiding severe blowback. Crisis presents opportunity to advance long-term economic strategy of reduced dollar dependence and increased European economic integration on Chinese terms."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "NATO",
+      "entityName": "NATO",
+      "entityType": "organization",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Maintain alliance cohesion amid differing energy vulnerability levels",
+            "Coordinate unified response to Russian hybrid threats",
+            "Expand cooperation with non-NATO EU members on energy security",
+            "Establish energy security as core to collective defense concept"
+          ],
+          "posture": "Unified diplomatic front emphasizing collective security while acknowledging diversity of member vulnerabilities. NATO positions energy security as fundamental to traditional security concerns.",
+          "keyInitiatives": "Enhanced Article 4 consultation mechanism on energy threats; Critical Infrastructure Protection Framework; Energy Security Center of Excellence expansion; Partner country energy security assistance program.",
+          "prioritiesMatrix": "Primary: Internal alliance cohesion maintenance. Secondary: Eastern flank security reassurance. Tertiary: Partnerships with energy-producing nations for supply diversification.",
+          "redLines": "Kinetic attacks on energy infrastructure; Deliberate targeting creating humanitarian emergencies; Cyber attacks causing physical damage to critical systems; Military escalation near alliance borders.",
+          "treatyObligations": "Article 5 collective defense guarantee; Strategic Concept commitments to comprehensive security; Enhanced Forward Presence agreements; Defense capacity building arrangements.",
+          "diplomaticResources": "North Atlantic Council emergency procedures; Secretary General's good offices; International Staff crisis coordination; Defense Planning Committee emergency powers; Science for Peace and Security Programme.",
+          "specialConsiderations": "NATO must manage internal divisions between heavily Russian-dependent southern members and security-focused eastern members while demonstrating unified resolve."
+        },
+        "information": {
+          "objectives": [
+            "Counter Russian information operations aimed at splitting the alliance",
+            "Build public support for collective response to energy coercion",
+            "Attribute Russian responsibility for hybrid operations",
+            "Promote narrative of NATO adaptation to emerging threats"
+          ],
+          "propagandaThemes": "NATO unity in face of hybrid threats; Collective strength providing energy security; Russian weaponization of essential services; NATO's evolution to counter new challenges.",
+          "cyberTargets": "Russian disinformation networks; Bot farms spreading divisive content; Compromise indicators on NATO networks; Critical infrastructure monitoring systems.",
+          "strategicCommunicationFramework": "Coordinated messaging across all member capitals emphasizing shared burden and collective response. Regular public attributions of Russian activities. Transparency on NATO defensive measures.",
+          "intelCollectionPriorities": "Russian cyber operations intent; Military movement near borders; Information operation planning; Energy infrastructure vulnerabilities; Member state public opinion indicators.",
+          "disinformationResilience": "Counter-disinformation rapid response teams; Allied information sharing on Russian tactics; Public early warning systems for significant operations; Strategic Communication Guidelines for Energy Crisis.",
+          "mediaLandscapeControl": "Limited direct control but Strategic Communications Center of Excellence provides coordination. Public Affairs units activated across command structure. Regular media backgrounders on Russian activities.",
+          "specialConsiderations": "NATO information operations must balance transparency requirements of democratic alliance with operational security, while addressing multiple languages and national communication cultures."
+        },
+        "military": {
+          "objectives": [
+            "Deter Russian military escalation",
+            "Protect critical energy infrastructure across alliance territory",
+            "Enable national forces to support civilian authorities during energy shortages",
+            "Demonstrate alliance capability to respond to hybrid threats"
+          ],
+          "alertLevel": "Heightened Alert",
+          "doctrine": "Evolved deterrence incorporating hybrid threat response and critical infrastructure protection. NATO emphasizes comprehensive defense concept bridging conventional forces and emerging challenges.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "NATO Response Force at shortened activation timeline; Enhanced Forward Presence reinforced; Standing Naval Forces at heightened readiness; Integrated Air and Missile Defense alert status elevated; Counter-Cyber Operations teams activated.",
+          "escalationLadder": "1. Intelligence and indicators monitoring; 2. Defensive posture enhancement; 3. Limited forward deployment; 4. Strategic enablers activation; 5. NATO Response Force deployment; 6. Major combat force generation; 7. Article 5 collective defense operations.",
+          "decisionMakingProtocol": "North Atlantic Council emergency decision procedures activated; Supreme Allied Commander Europe delegated crisis response authorities; Graduated Response Plans authorized for implementation; National red-card restrictions minimized for specific capabilities.",
+          "forceProjectionCapabilities": "Enhanced Forward Presence battlegroups reinforced; Air policing missions doubled; Maritime groups strengthened in Baltic and Black Seas; Strategic airlift coordination center fully activated; Rapid Air Mobility clearances pre-approved.",
+          "defenseIndustrialCapacity": "Defense Production Action Plan activated; Critical munitions stockpile sharing enabled; Host nation support for energy infrastructure defense expanded; Strategic lift assets pooled for emergency response.",
+          "domainPosture": {
+            "land": "Additional battlegroups deployed to eastern flank; Corps-level forces at high readiness; Engineers and CBRN units postured for infrastructure protection and consequence management; Military mobility corridors prepared.",
+            "sea": "Standing Naval Forces reinforced; Maritime critical infrastructure patrol coverage expanded; Anti-submarine warfare operations intensified; Naval special warfare teams deployed to key infrastructure.",
+            "air": "Air policing missions expanded; Theater missile defense readiness enhanced; ISR collection operations maximized; Strategic airlift maintained at high readiness.",
+            "cyber": "NATO Cyber Defense Centre of Excellence at full operational status; Continuous hunt and defensive operations on key networks; Cyber effects approval process streamlined; Cyber defense assistance teams deployed to vulnerable allies.",
+            "space": "Space-based early warning optimized; GPS/positioning service resilience enhanced; Secure communications capacity expanded; Allied space-based reconnaissance assets tasked for eastern flank monitoring."
+          },
+          "specialConsiderations": "NATO military operations maintain defensive character while demonstrating capability to respond at multiple levels of escalation. Special emphasis on supporting civilian energy crisis management while maintaining traditional deterrence posture."
+        },
+        "economic": {
+          "objectives": [
+            "Coordinate burden-sharing for energy security investments",
+            "Develop common approach to Russian economic coercion",
+            "Enable energy resource sharing among alliance members",
+            "Build resilience against future weaponization of energy dependencies"
+          ],
+          "tradeFocus": "Intra-alliance energy resource sharing mechanisms; Defense industry capacity sharing for critical infrastructure protection; Emergency response equipment standardization and distribution.",
+          "resourceDeps": "Member state contributions for crisis response; Strategic energy reserve access; Critical infrastructure protection equipment; Emergency power generation capability.",
+          "sanctionsPolicy": "Coordination mechanism for national sanctions programs; Technical assistance for implementation; Impact assessment framework; Humanitarian exemption standards.",
+          "economicWarfareTools": "Strategic energy reserve coordination; Critical resource sharing mechanisms; Infrastructure protection investment pooling; Financial burden-sharing arrangements.",
+          "criticalInfrastructureResilience": "Energy Grid Protection Standards implementation; Cybersecurity minimum requirements enforcement; Physical protection requirements; Supply chain security coordination.",
+          "strategicResourceAccess": "Joint procurement mechanisms for emergency supplies; Allied energy resource sharing framework; Critical infrastructure component stockpile management; Energy corridor protection arrangements.",
+          "financialSystemLeverage": "Limited direct financial tools but coordination of national financial measures through NATO-EU cooperation mechanisms.",
+          "technologyTransferControls": "Critical infrastructure protection technology sharing; Cyber defense tool distribution; Dual-use technology security frameworks; Energy security technology standards.",
+          "specialConsiderations": "NATO's economic tools are limited by its security focus, requiring close coordination with EU mechanisms for economic response, while respecting diverse economic circumstances of members."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "EU",
+      "entityName": "European Union",
+      "entityType": "organization",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Maintain EU unity in response to Russian energy coercion",
+            "Coordinate emergency energy measures across member states",
+            "Engage alternative energy suppliers to replace Russian sources",
+            "Balance firm response to Russia with maintaining dialogue channels"
+          ],
+          "posture": "Unified but pragmatic stance emphasizing European solidarity while maintaining diplomatic channels with Russia. The EU positions itself as protecting European citizens while remaining open to deescalation.",
+          "keyInitiatives": "Emergency Energy Security Coordination Mechanism; EU-NATO Joint Response Protocol; Energy Diplomacy Task Force; Russian Dialogue Platform with Preconditions; Mediterranean Energy Partnership Enhancement.",
+          "prioritiesMatrix": "Primary: Internal EU solidarity and burden-sharing. Secondary: Alternative supply relationships (Norway, Algeria, Qatar, US). Tertiary: Unified approach to Russia with conditional re-engagement.",
+          "redLines": "Deliberate infrastructure attacks causing civilian casualties; Complete cutoff of gas to multiple member states; Russian interference in EU emergency response operations; Military escalation near EU borders.",
+          "treatyObligations": "Lisbon Treaty mutual assistance and solidarity clauses; Energy Charter Treaty commitments; European Green Deal implementation timeline; Third Energy Package regulations.",
+          "diplomaticResources": "Commission Crisis Coordination mechanism; High Representative mandate; European External Action Service full activation; Council emergency procedures; Regulatory enforcement powers for energy markets.",
+          "specialConsiderations": "The EU navigates internal divisions between Russian-dependent eastern members and less vulnerable western states, while balancing immediate crisis response with long-term climate objectives."
+        },
+        "information": {
+          "objectives": [
+            "Counter Russian narratives blaming EU for energy shortages",
+            "Build public support for solidarity measures and consumption reduction",
+            "Highlight Russian weaponization of energy dependencies",
+            "Promote EU-led solutions to the crisis"
+          ],
+          "propagandaThemes": "European solidarity as strength; Russian reliability as energy supplier myth; Accelerated green transition as security; EU leadership in crisis response; Temporary sacrifice for long-term resilience.",
+          "cyberTargets": "Russian disinformation networks targeting EU audiences; Critical infrastructure monitoring systems; Energy market manipulation indicators; Social media manipulation networks.",
+          "strategicCommunicationFramework": "Coordinated messaging through Commission spokespersons, national leaders, and EU agencies emphasizing solidarity and resilience. Regular public reporting on Russian actions and EU countermeasures.",
+          "intelCollectionPriorities": "Russian information operation planning; Energy infrastructure vulnerabilities; Member state public opinion shifts; Social cohesion threat indicators; Supply chain security risks.",
+          "disinformationResilience": "East StratCom Task Force expanded operations; Digital Services Act emergency implementation; Media literacy rapid campaign; Coordination with platform companies on Russian operation disruption.",
+          "mediaLandscapeControl": "Limited direct control but strong regulatory influence through Digital Services Act emergency provisions, media briefings, and coordinated national messaging strategy.",
+          "specialConsiderations": "EU information operations must navigate 27 different national media environments and languages while maintaining unified messaging and respecting member state sovereignty."
+        },
+        "military": {
+          "objectives": [
+            "Support civilian authorities in managing energy crisis effects",
+            "Protect critical energy infrastructure across member states",
+            "Coordinate with NATO on complementary security response",
+            "Enable military assets to support humanitarian response"
+          ],
+          "alertLevel": "Enhanced Vigilance",
+          "doctrine": "Comprehensive approach emphasizing civil-military cooperation for critical infrastructure protection and consequence management. Military assets primarily in support role to civilian authorities.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "EU Battlegroups at shortened notice-to-move; Military Planning and Conduct Capability fully staffed; Military mobility corridors activated; Civil protection modules at full readiness; Cyber rapid response teams activated.",
+          "escalationLadder": "1. Monitoring and assessment; 2. Preventive deployment of critical capabilities; 3. Civil protection mechanism activation; 4. Military support to civilian authorities; 5. EU-led crisis management operations; 6. Full-spectrum security response coordinated with NATO.",
+          "decisionMakingProtocol": "Political and Security Committee in permanent session; EU Military Committee providing continuous military advice; Commission emergency powers activated; Integrated Political Crisis Response arrangements implemented.",
+          "forceProjectionCapabilities": "Strategic airlift coordination; Military-assisted border management; Critical infrastructure protection detachments; CBRN response units; Humanitarian logistics capabilities.",
+          "defenseIndustrialCapacity": "European Defence Fund emergency procedures; Critical energy component production coordination; Strategic reserves management; Research and innovation emergency funding for energy security technology.",
+          "domainPosture": {
+            "land": "Military engineering assets supporting infrastructure protection; CBRN units prepared for industrial accidents; Logistics capabilities supporting civilian supply chains; Border security reinforced at critical energy entry points.",
+            "sea": "Maritime surveillance of critical energy routes; Naval assets protecting LNG terminals and offshore infrastructure; Coast guard operations intensified; Port security enhanced for energy deliveries.",
+            "air": "Air policing coordinated with NATO; Air mobility assets available for emergency response; ISR capabilities monitoring critical infrastructure; Medical evacuation capacity enhanced.",
+            "cyber": "EU Cyber Defence Policy Framework activated; Cyber rapid response teams deployed; Network and Information Security cooperation enhanced; Critical energy control system protection prioritized.",
+            "space": "Copernicus emergency mapping service activated; Satellite communications supporting crisis management; Earth observation assets monitoring energy infrastructure; Galileo service guarantees for emergency services."
+          },
+          "specialConsiderations": "EU military capabilities are limited and focus primarily on supporting civilian authorities, while closely coordinating with NATO for core defense functions. Operations emphasize humanitarian aspects and infrastructure protection."
+        },
+        "economic": {
+          "objectives": [
+            "Coordinate emergency energy sharing across member states",
+            "Implement unified response to Russian market manipulation",
+            "Accelerate diversification away from Russian energy sources",
+            "Mitigate economic damage to vulnerable member states and populations"
+          ],
+          "tradeFocus": "Emergency energy import diversification; Coordinated procurement of gas and LNG; Crisis-oriented industrial policy; Regulatory flexibility for energy security investments.",
+          "resourceDeps": "Member state solidarity contributions; Strategic gas reserves; Emergency power generation capacity; Alternative supply route access.",
+          "sanctionsPolicy": "Targeted measures against Russian energy sector; Phased implementation to manage economic impact; Technical assistance for implementation; Humanitarian exemptions framework.",
+          "economicWarfareTools": "Energy price cap mechanisms; Market manipulation countermeasures; Strategic reserve releases; Emergency state aid framework; Joint procurement platforms.",
+          "criticalInfrastructureResilience": "Critical Energy Infrastructure Protection Directive emergency implementation; Cybersecurity certification fast-track procedure; Physical protection requirements; Cross-border infrastructure protection coordination.",
+          "strategicResourceAccess": "LNG terminal capacity sharing requirements; Mediterranean pipeline capacity optimization; Strategic energy reserve sharing mechanism; Critical components joint procurement facility.",
+          "financialSystemLeverage": "Euro clearing restrictions for Russian energy transactions; European Investment Bank emergency funding for infrastructure; Banking regulations for energy crisis liquidity; NextGenerationEU funds repurposing for energy security.",
+          "technologyTransferControls": "Accelerated renewable technology deployment; Energy efficiency technology sharing platform; Dual-use technology security framework; Critical infrastructure protection technology standards.",
+          "specialConsiderations": "EU balances immediate crisis response measures against long-term Green Deal objectives, while managing widely varying impacts across member states with different energy vulnerabilities."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    }
+  ],
+  "customEntities": [],
+  "nationRelationships": {
+    "RU_US": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "DE_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "FR_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "PL_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "GB_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "HU_RU": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "CN_RU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "NATO_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "EU_RU": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "DE_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "FR_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "PL_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "GB_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "EU_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_EU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "CN_NATO": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "EU_HU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "HU_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_HU": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "EU_GB": {
+      "type": "partner",
+      "notes": ""
+    },
+    "GB_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_GB": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "GB_HU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "EU_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "NATO_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_PL": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "HU_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "GB_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "EU_FR": {
+      "type": "partner",
+      "notes": ""
+    },
+    "FR_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_FR": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "FR_HU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "FR_GB": {
+      "type": "partner",
+      "notes": ""
+    },
+    "FR_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DE_EU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DE_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_DE": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "DE_HU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DE_GB": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DE_PL": {
+      "type": "partner",
+      "notes": ""
+    },
+    "DE_FR": {
+      "type": "partner",
+      "notes": ""
+    },
+    "EU_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "NATO_US": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_US": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "HU_US": {
+      "type": "partner",
+      "notes": ""
+    }
+  },
+  "conflictTheaters": [
+    {
+      "cocomId": "AFRICOM",
+      "name": "US Africa Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#4285F4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#EA4335"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "CENTCOM",
+      "name": "US Central Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#34A853"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FBBC05"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "EUCOM",
+      "name": "US European Command",
+      "description": "",
+      "isActive": true,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "NATO",
+          "supportingNationIds": [
+            "US",
+            "DE",
+            "FR",
+            "PL",
+            "EU",
+            "HU",
+            "GB"
+          ],
+          "colorCode": "#673AB7"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "RU",
+          "supportingNationIds": [
+            "CN"
+          ],
+          "colorCode": "#FF9800"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "INDOPACOM",
+      "name": "US Indo-Pacific Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#00BCD4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FF5722"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "NORTHCOM",
+      "name": "US Northern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#3F51B5"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#F44336"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SOUTHCOM",
+      "name": "US Southern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#9C27B0"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FFC107"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SPACECOM_GEO",
+      "name": "US Space Command (Geographic)",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#009688"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#E91E63"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    }
+  ],
+  "createdAt": "2025-05-06T20:33:20.987288",
+  "modifiedAt": "2025-05-06T21:36:44.437216",
+  "lastExecuted": null
+}
