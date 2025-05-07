@@ -133,27 +133,41 @@ function ReportDesignerPage() {
       setIsLoading(true);
       const report = mockReports.find(r => r.id === reportId);
       if (report) {
-        const transformedReport = {
+        // Simplified transformation: Only ensure unique IDs and pass structure mostly as-is.
+        // ReportConfigPanel will expect `format` and string list content directly from this definition.
+        const transformedElements = report.prebuiltElements.map((element, index) => {
+          const baseElementWithId = {
+            ...element, // Pass original element properties
+            id: `${element.type || 'element'}-${report.id}-${index}-${Date.now()}`,
+            // No style-to-format or list content transformation here anymore.
+            // This assumes mockReports.js will be updated to provide `format` and string list content.
+          };
+
+          // This section handling might still be relevant if mock reports can have nested structures,
+          // though the current TSSG example is flat.
+          if (element.type === 'section' && element.elements) { 
+            const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
+              ...subElement,
+              id: `${subElement.type || 'subElement'}-${report.id}-${index}-${subIndex}-${Date.now()}`
+            }));
+            return { ...baseElementWithId, elements: subElementsWithIds };
+          }
+          return baseElementWithId;
+        });
+
+        setCurrentDefinition({
           id: report.id,
           title: report.name,
           description: report.description,
-          elements: report.prebuiltElements.map((element, index) => {
-            const baseElementWithId = {
-              ...element,
-              id: `${element.type || 'element'}-${report.id}-${index}-${Date.now()}`
-            };
+          elements: transformedElements,
+          vectorStoreId: report.vectorStoreId || '' 
+        });
 
-            if (element.type === 'section' && element.elements) {
-              const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
-                ...subElement,
-                id: `${subElement.type || 'subElement'}-${report.id}-${index}-${subIndex}-${Date.now()}`
-              }));
-              return { ...baseElementWithId, elements: subElementsWithIds };
-            }
-            return baseElementWithId;
-          })
-        };
-        setCurrentDefinition(transformedReport);
+      } else {
+        setCurrentDefinition(prevDef => ({
+          ...getDefaultReport(),
+          id: reportId
+        }));
       }
       setIsLoading(false);
     }
@@ -240,6 +254,7 @@ function ReportDesignerPage() {
           <ReportConfigPanel
             definition={currentDefinition}
             onChange={handleDefinitionChange}
+            currentReportId={reportId}
           />
         </Box>
         <Box className={classes.rightPanel}>

@@ -109,37 +109,49 @@ const ReportBuilderMain = () => {
     const theme = useTheme();
     const [reports, setReports] = useState(mockReports);
 
-    const handleCreateReport = (reportData) => {
-        // If reportData is a template, use it to create a new report
-        if (reportData?.prebuiltElements) {
-            const newReport = {
-                id: `report-${Date.now()}`,
-                name: reportData.name || 'New Report',
-                description: reportData.description || '',
+    const handleCreateReport = (options) => {
+        const newReportInstanceId = `report-${Date.now()}`;
+
+        if (options && options.type === 'template' && options.data) {
+            const template = options.data; // This is the raw template object
+
+            try {
+                sessionStorage.setItem(template.id, JSON.stringify(template));
+            } catch (e) {
+                console.error("Error saving template to session storage", e);
+                // Optionally, notify the user or handle the error appropriately
+                return;
+            }
+
+            // Open ReportDesignerPage with the new report's dynamic ID AND the templateKey
+            window.open(`/report-designer/${newReportInstanceId}?templateKey=${template.id}`, '_blank', 'width=1200,height=800');
+
+            const reportForList = {
+                id: newReportInstanceId,
+                name: `New from: ${template.name}`,
+                description: template.description,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 status: 'draft',
-                prebuiltElements: reportData.prebuiltElements,
-                type: 'Template'
+                prebuiltElements: [], // Keep light for list view
+                type: 'Template-based' 
             };
-            setReports(prev => [...prev, newReport]);
-            // Open in new window
-            window.open(`/report-designer/${newReport.id}`, '_blank', 'width=1200,height=800');
-        } else {
-            // Create a new empty report
+            setReports(prev => [...prev, reportForList]);
+
+        } else { // Handles custom (e.g., options.type === 'custom') or if options is undefined (fallback for old behavior)
             const newReport = {
-                id: `report-${Date.now()}`,
-                name: 'New Report',
-                description: '',
+                id: newReportInstanceId,
+                name: 'New Custom Report',
+                description: 'A new report created from scratch.',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 status: 'draft',
-                prebuiltElements: [],
+                prebuiltElements: [], // Empty for custom report
                 type: 'Custom'
             };
             setReports(prev => [...prev, newReport]);
-            // Open in new window
-            window.open(`/report-designer/${newReport.id}`, '_blank', 'width=1200,height=800');
+            // Open designer without templateKey for a blank report
+            window.open(`/report-designer/${newReportInstanceId}`, '_blank', 'width=1200,height=800');
         }
     };
 

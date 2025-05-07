@@ -203,7 +203,7 @@ const mockVectorStores = [
   { id: 'vs3', name: 'Historical Ops Data' },
 ];
 
-function ReportConfigPanel({ definition, onChange }) {
+function ReportConfigPanel({ definition, onChange, currentReportId }) {
   const classes = useStyles();
   const [vectorStores, setVectorStores] = React.useState(mockVectorStores);
   const [collapsedElements, setCollapsedElements] = useState({});
@@ -213,62 +213,34 @@ function ReportConfigPanel({ definition, onChange }) {
     const urlParams = new URLSearchParams(window.location.search);
     const templateKey = urlParams.get('templateKey');
 
-    if (templateKey && (!definition || !definition.elements || definition.elements.length === 0)) {
+    if (templateKey && currentReportId && (!definition || !definition.elements || definition.elements.length === 0)) {
       try {
         const templateDataString = sessionStorage.getItem(templateKey);
         if (templateDataString) {
-          const template = JSON.parse(templateDataString);
+          const template = JSON.parse(templateDataString); // template is already in the new format
           
-          const processedElements = (template.prebuiltElements || []).map((element, index) => {
-            let derivedFormat = 'paragraph'; // Default format
-            if (element.style) {
-              const styleValue = element.style;
-              if (/^h[1-6]$/i.test(styleValue)) { // Handles 'h1', 'H1', etc.
-                derivedFormat = styleValue.toLowerCase();
-              } else if (styleValue.toLowerCase() === 'paragraph') {
-                derivedFormat = 'paragraph';
-              } else if (styleValue.toLowerCase() === 'bulletlist' || styleValue.toLowerCase() === 'bullet') {
-                derivedFormat = 'bulletList'; // Canonical format name
-              } else if (styleValue.toLowerCase() === 'numberedlist' || styleValue.toLowerCase() === 'numbered') {
-                derivedFormat = 'numberedList'; // Canonical format name
-              } else if (styleValue === 'bulletList' || styleValue === 'numberedList') { // If style is already canonical
-                derivedFormat = styleValue;
-              }
-            }
-
-            let content = element.content;
-            if (derivedFormat === 'bulletList' || derivedFormat === 'numberedList') {
-              if (Array.isArray(element.content)) {
-                content = element.content.join('\n');
-              } else if (typeof element.content !== 'string') {
-                content = ''; 
-              }
-            } else if (typeof element.content !== 'string') {
-              content = String(element.content || ''); 
-            }
-
-            return {
-              id: `${template.id || 'template'}-${element.title ? element.title.replace(/\s+/g, '-').toLowerCase() : 'element'}-${index}-${Date.now()}`,
-              type: element.type || 'explicit',
-              format: derivedFormat,
-              content: content,
-              title: element.title || `Element ${index + 1}`
-            };
-          });
+          // Simplified processing: template.prebuiltElements are now in the correct format.
+          // We just need to ensure unique IDs for elements within this new report instance.
+          const processedElements = (template.prebuiltElements || []).map((element, index) => ({
+            ...element, // Spread the element, which already has `format` and correct `content` structure
+            id: `${template.id || 'template'}-${element.title ? element.title.replace(/\s+/g, '-').toLowerCase() : 'element'}-${index}-${Date.now()}`,
+            // No need for derivedFormat or content processing logic here anymore.
+          }));
 
           onChange({
-            id: template.id || `template-report-${Date.now()}`,
+            id: currentReportId,
             title: template.name || 'New Report from Template',
             description: template.description || '',
             elements: processedElements,
             vectorStoreId: template.vectorStoreId || ''
           });
+          // sessionStorage.removeItem(templateKey); // Optional: Clear sessionStorage after use
         }
       } catch (error) {
-        console.error('Error processing template data:', error);
+        console.error('Error processing template data from sessionStorage:', error);
       }
     }
-  }, [definition, onChange]); // Add definition and onChange to dependency array
+  }, [definition, onChange, currentReportId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

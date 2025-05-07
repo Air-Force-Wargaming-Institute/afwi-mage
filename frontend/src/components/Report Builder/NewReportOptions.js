@@ -103,22 +103,8 @@ const useStyles = makeStyles((theme) => ({
 function NewReportOptions({ onCreateNew, onCreateTemplate }) {
   const classes = useStyles();
 
-  const handleTemplateSelect = (template) => {
-    // Create a new report based on the template
-    const newReport = {
-      title: `New ${template.name}`,
-      description: template.description,
-      elements: template.prebuiltElements.map((element, index) => ({
-        id: `element-${Date.now()}-${index}`,
-        type: element.type === 'header' ? 'explicit' : element.type,
-        format: element.type === 'header' ? `h${element.level}` : 'paragraph',
-        content: element.content || '',
-        title: element.title || element.content || `Element ${index + 1}`,
-        items: element.items || []
-      })),
-      vectorStoreId: ''
-    };
-    onCreateNew(newReport);
+  const handleSelectTemplate = (template) => {
+    onCreateNew({ type: 'template', data: template });
   };
 
   return (
@@ -131,7 +117,7 @@ function NewReportOptions({ onCreateNew, onCreateTemplate }) {
         variant="contained" 
         color="primary" 
         fullWidth 
-        onClick={() => onCreateNew()} // Call without template for custom
+        onClick={() => onCreateNew({ type: 'custom' })}
         className={classes.button}
       >
         Design Custom Report
@@ -148,7 +134,7 @@ function NewReportOptions({ onCreateNew, onCreateTemplate }) {
             key={template.id} 
             button 
             className={classes.templateItem} 
-            onClick={() => handleTemplateSelect(template)}
+            onClick={() => handleSelectTemplate(template)}
           >
             <ListItemText 
               primary={template.name} 
@@ -168,8 +154,9 @@ function NewReportOptions({ onCreateNew, onCreateTemplate }) {
         onClick={onCreateTemplate}
         className={classes.button}
         style={{ marginTop: 'auto' }}
+        disabled={true}
       >
-        Create New Template
+        Create New Template (Coming Soon)
       </Button>
     </Paper>
   );
