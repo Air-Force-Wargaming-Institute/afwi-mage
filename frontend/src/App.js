@@ -23,7 +23,7 @@ import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { HILChatProvider } from './contexts/HILChatContext';
 import { TranscriptionProvider } from './contexts/TranscriptionContext';
-import DirectChat from './components/DirectChat';
+import DirectChat from './components/direct_chat/DirectChat.js';
 import { DirectChatProvider } from './contexts/DirectChatContext';
 import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
 import { WorkbenchProvider } from './contexts/WorkbenchContext';
@@ -38,6 +38,7 @@ import backgroundImage from './assets/background.jpg';
 import WargameBuilder from './components/builder/wargames/WargameBuilder';
 import ReportBuilderMain from './components/Report Builder/ReportBuilderMain';
 import ReportDesignerPage from './components/Report Builder/ReportDesignerPage';
+import DocumentViewerPopup from './components/direct_chat/DocumentViewerPopup';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -200,6 +201,9 @@ function App() {
                                 <RecordTranscribeStandalone />
                               </Box>
                             </Route>
+
+                            {/* Add route for DocumentViewerPopup */}
+                            <Route path="/view-document" component={DocumentViewerPopup} />
 
                             {/* All other routes go through the standard authenticated layout */}
                             <Route path="/">
