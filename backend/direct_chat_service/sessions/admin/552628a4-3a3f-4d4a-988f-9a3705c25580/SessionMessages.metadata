@@ -3,10 +3,10 @@
     "id": "552628a4-3a3f-4d4a-988f-9a3705c25580",
     "name": "PRC Discussion - CASI Docs",
     "created_at": "2025-05-06 21:31:28.979452",
-    "updated_at": "2025-05-06 21:40:49.836860",
-    "vectorstore": "91384521-389e-417f-996d-7150dd02df38"
+    "updated_at": "2025-05-07 15:55:17.432460",
+    "vectorstore": "9fa7eb8c-ccde-4432-8e21-75c25829caa4"
   },
-  "vectorstore": "91384521-389e-417f-996d-7150dd02df38",
+  "vectorstore": "9fa7eb8c-ccde-4432-8e21-75c25829caa4",
   "document_states": {},
   "document_metadata": {}
 }

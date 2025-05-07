@@ -23,7 +23,7 @@ import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { HILChatProvider } from './contexts/HILChatContext';
 import { TranscriptionProvider } from './contexts/TranscriptionContext';
-import DirectChat from './components/DirectChat';
+import DirectChat from './components/direct_chat/DirectChat.js';
 import { DirectChatProvider } from './contexts/DirectChatContext';
 import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
 import { WorkbenchProvider } from './contexts/WorkbenchContext';
