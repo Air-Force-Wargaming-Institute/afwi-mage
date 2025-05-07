@@ -6,7 +6,7 @@ python-multipart>=0.0.9 # For file uploads
 
 # WhisperX and its core dependencies
 # Using git+https to potentially get latest fixes/features
-whisperx @ git+https://github.com/m-bain/whisperX.git
+# whisperx @ git+https://github.com/m-bain/whisperX.git
 
 # Faster-whisper is usually a dependency of whisperx, but explicitly listing
 # faster-whisper>=0.10.0 # Consider pinning if needed
@@ -22,15 +22,13 @@ numpy>=1.24.0 # Often needed by audio/ML libs
 asyncpg>=0.29.0 # Async PostgreSQL driver
 SQLAlchemy>=2.0 # ORM or Core API (Optional but recommended for structure)
 
-# Torch dependencies (ensure compatibility with Docker image CUDA version)
-# Using cu126 index as requested (suitable for CUDA >= 12.6)
-torch>=2.1.0 --index-url https://download.pytorch.org/whl/cu126
-torchaudio>=2.1.0 --index-url https://download.pytorch.org/whl/cu126
-
-# If using CPU only, you might use:
+# Torch dependencies (CPU-only)
+# torch>=2.1.0 --index-url https://download.pytorch.org/whl/cu126
+# torchaudio>=2.1.0 --index-url https://download.pytorch.org/whl/cu126
 # torch>=2.1.0
 # torchaudio>=2.1.0
 
 # Setuptools-rust is often needed for building whisper dependencies
 setuptools-rust>=1.1.2
-onnxruntime-gpu # For GPU execution with some alignment/diarization backends 
+# onnxruntime-gpu # For GPU execution with some alignment/diarization backends
+onnxruntime # For CPU execution 

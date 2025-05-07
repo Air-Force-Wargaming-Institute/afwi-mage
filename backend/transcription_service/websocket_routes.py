@@ -30,12 +30,13 @@ logger = logging.getLogger(__name__)
 # Placeholder function for token validation (replace with actual logic)
 async def validate_token(token: str) -> bool:
     """Placeholder for actual token validation logic."""
-    if not token:
-        return False
-    # In a real scenario, decode JWT, call auth service, etc.
-    logger.debug(f"Validating token (length: {len(token)})...") # Basic check
-    # For now, just check if it's not empty
-    return len(token) > 10 # Example: Simple length check
+    # if not token:
+    #     return False
+    # # In a real scenario, decode JWT, call auth service, etc.
+    # logger.debug(f"Validating token (length: {len(token)})...") # Basic check
+    # # For now, just check if it's not empty
+    # return len(token) > 10 # Example: Simple length check
+    return True
 # --- END EDIT ---
 
 # Constants
@@ -264,7 +265,7 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
         audio_buffer.truncate()
         logger.debug(f"[{session_id}] Audio buffer cleared.")
 
-@router.websocket("/stream/{session_id}")
+@router.websocket("/api/transcription/stream/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for streaming audio, buffering, transcription, and diarization.

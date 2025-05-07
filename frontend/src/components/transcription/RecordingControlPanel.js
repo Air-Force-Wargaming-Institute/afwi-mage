@@ -527,6 +527,73 @@ const RecordingControlPanel = () => {
     }
   }, [isStreaming]);
 
+  // --- New Function to Upload and Transcribe Full Audio File ---
+  const uploadAndTranscribeAudio = useCallback(async (audioBlob, inputFilename) => {
+    if (!audioBlob || audioBlob.size === 0) {
+      console.warn('[TranscriptionUtil] No audio data to upload.');
+      setApiError('No audio data to send for utility transcription.');
+      setSnackbarMessage('No audio data for utility transcription.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    if (!token) {
+      console.error('[TranscriptionUtil] Auth token not available for upload.');
+      setApiError('Authentication token missing. Cannot upload file.');
+      setSnackbarMessage('Auth token missing. Cannot upload file.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const formData = new FormData();
+    // The backend expects the file under the key "file"
+    // Use a generic name or the one from input, ensuring it has an extension
+    const filename = inputFilename && inputFilename.includes('.') ? inputFilename : 'recording.webm';
+    formData.append('file', audioBlob, filename);
+
+    console.log(`[TranscriptionUtil] Uploading ${filename} (${(audioBlob.size / 1024).toFixed(2)} KB) for utility transcription...`);
+    setSnackbarMessage(`Uploading ${filename} for transcription...`);
+    setSnackbarSeverity('info');
+    setSnackbarOpen(true);
+
+    try {
+      const response = await fetch(getGatewayUrl('/api/transcription/transcribe-file'), {
+        method: 'POST',
+        headers: {
+          // 'Content-Type': 'multipart/form-data' // This is set automatically by the browser when using FormData
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[TranscriptionUtil] API Error (${response.status}):`, errorText);
+        throw new Error(`Server error ${response.status}: ${errorText || 'Failed to transcribe file'}`);
+      }
+
+      const result = await response.json();
+      console.log('[TranscriptionUtil] Transcription result:', result);
+      // TODO: Do something with the transcription result (e.g., display it, store in context)
+      // For now, just show a success message with detected language
+      const lang = result.language || 'N/A';
+      const numSegments = result.segments ? result.segments.length : 0;
+      setSnackbarMessage(`File transcribed (${lang}, ${numSegments} segments). Check console for details.`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (error) {
+      console.error('[TranscriptionUtil] Error uploading or transcribing file:', error);
+      setApiError(`Failed to transcribe utility: ${error.message}`);
+      setSnackbarMessage(`Error during utility transcription: ${error.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  }, [token, setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
+  // --- End of New Function ---
+
   // --- Recording Logic ---
   const initializeRecording = useCallback(async () => {
     if (loadedSessionId) {
@@ -675,7 +742,7 @@ const RecordingControlPanel = () => {
     loadedSessionId, dispatch, token, user,
     audioFilename, eventMetadata, 
     selectedClassification, caveatType, customCaveat, 
-    participants, connectWebSocket, streamAudioChunk
+    participants, connectWebSocket, streamAudioChunk, uploadAndTranscribeAudio
   ]);
 
   const startRecording = useCallback(async () => {
@@ -782,6 +849,7 @@ const RecordingControlPanel = () => {
     if (loadedSessionId || !mediaRecorder || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) return;
     
     const sessionToStop = sessionId; // Capture session ID before potential state changes
+    const currentAudioFilename = audioFilename || 'Untitled_Recording'; // Capture filename
 
     try {
       // Stop the media recorder
@@ -801,43 +869,6 @@ const RecordingControlPanel = () => {
         wsRef.current = null; // Clear ref immediately
       }
       
-      const baseFilename = audioFilename || 'Untitled_Recording';
-      const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
-      
-      // API call to stop and finalize session
-      if (sessionId && token) {
-        // Prepare API payload
-        const stopPayload = {
-          audio_filename: baseFilename,
-          transcription_filename: baseFilename,
-        };
-        
-        const stopUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}/stop`);
-        console.log(`[API] Stopping session: ${stopUrl}`);
-        console.log(`[API] With payload:`, stopPayload);
-        
-        const response = await fetch(stopUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(stopPayload)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API Error (${response.status}): ${await response.text() || response.statusText}`);
-        }
-        
-        const result = await response.json();
-        console.log('Stop session result:', result);
-        
-        setSnackbarMessage('Recording stopped and saved');
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
-      }
-      
-      // Save the complete Blob (no longer need chunks array here)
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
@@ -851,13 +882,21 @@ const RecordingControlPanel = () => {
           // Create download link
           const a = document.createElement('a');
           a.href = downloadUrl;
-          a.download = `${baseFilename}.webm`;
+          a.download = `${currentAudioFilename}.webm`; // Use captured filename
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
           
           console.log('Audio saved locally');
+
+          // --- Call the new utility transcription function ---
+          if (completeAudioBlob && completeAudioBlob.size > 0) {
+            // Use the original session name (audioFilename) for the uploaded file if available
+            uploadAndTranscribeAudio(completeAudioBlob, `${currentAudioFilename}.webm`);
+          }
+          // --- End of call ---
+
         } catch (saveError) {
           console.error('Error saving audio locally:', saveError);
         }
@@ -880,7 +919,8 @@ const RecordingControlPanel = () => {
     loadedSessionId, mediaRecorder, recordingState, token,
     audioStream, dispatch, sessionId, 
     audioFilename, selectedClassification, caveatType, customCaveat, 
-    audioChunks
+    audioChunks,
+    uploadAndTranscribeAudio
   ]);
 
   // --- Validation Logic ---
