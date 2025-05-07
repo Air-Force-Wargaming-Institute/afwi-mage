@@ -7,7 +7,7 @@ Use, modification, and redistribution are authorized for official U.S. Governmen
 For questions regarding licensing or distribution, please contact:
 
 **LeMay Center, Air University**  
-Maxwell Air Force Base, Alabama
+Maxwell Air Force Base, AL
 
 # AFWI Multi-Agent Generative Engine
 
