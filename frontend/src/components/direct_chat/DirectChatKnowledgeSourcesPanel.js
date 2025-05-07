@@ -21,6 +21,7 @@ import {
 } from '@material-ui/core';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import DeleteIcon from '@material-ui/icons/Delete';
+import VisibilityIcon from '@material-ui/icons/Visibility';
 import { useDropzone } from 'react-dropzone';
 import { GradientText } from '../../styles/StyledComponents';
 import { AuthContext } from '../../contexts/AuthContext'; // Needed if token is used directly, otherwise pass as prop
@@ -272,6 +273,9 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 'auto',
     marginRight: theme.spacing(1.5),
     color: theme.palette.text.secondary,
+    '& .MuiIconButton-root': {
+      padding: theme.spacing(0.5),
+    },
   },
   documentListItemText: {
     fontSize: '0.875rem',
@@ -298,11 +302,10 @@ const useStyles = makeStyles((theme) => ({
     fontStyle: 'italic',
   },
   manageButton: {
-    marginTop: 'auto',
-    alignSelf: 'center',
-    width: '90%',
+    marginTop: theme.spacing(1),
+    width: '100%',
     flexShrink: 0,
-    marginBottom: theme.spacing(1),
+    marginBottom: theme.spacing(2),
   },
   vsErrorAlert: { // Style for the vector store error alert
     marginTop: theme.spacing(1),
@@ -574,6 +577,18 @@ const DirectChatKnowledgeSourcesPanel = ({
 
         <Divider className={classes.divider}/>
 
+        {/* Manage Documents Button - MOVED HERE */}
+        <Button
+          variant="contained"
+          color="primary"
+          disabled={!selectedVectorstore || isLoadingVsDocs || !!vectorstoreError}
+          className={classes.manageButton}
+          onClick={handleOpenManageModal}
+          startIcon={<SettingsIcon />}
+        >
+          Manage Documents
+        </Button>
+
         <Typography variant="h6" className={classes.sectionTitleDocs}>
           Documents in Selected Database
         </Typography>
@@ -595,35 +610,57 @@ const DirectChatKnowledgeSourcesPanel = ({
             </Typography>
           ) : (
             <List dense className={classes.documentList}>
-              {currentVectorstoreDocuments.map((doc, index) => (
-                <ListItem key={doc.document_id || doc.filename || index} className={classes.documentListItem}>
-                  <ListItemIcon className={classes.documentListItemIcon}>
-                    <DescriptionIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      <Typography variant="body2" className={classes.documentListItemText}>
-                        {doc.filename || 'Unknown Filename'}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
+              {currentVectorstoreDocuments.map((doc, index) => {
+                let previewFileType = doc.file_type?.replace('.', '').toUpperCase();
+                if (previewFileType === 'TXT' || previewFileType === 'PDF' || previewFileType === 'DOCX') {
+                  // Valid for preview
+                } else {
+                  const ext = doc.filename?.split('.').pop()?.toUpperCase();
+                  if (ext === 'TXT' || ext === 'PDF' || ext === 'DOCX') {
+                    previewFileType = ext;
+                  } else {
+                    previewFileType = null; // Cannot determine a previewable type
+                  }
+                }
+
+                const handlePreviewClick = () => {
+                  if (!previewFileType || !doc.original_path || !token) {
+                    console.warn('Cannot preview document. Missing type, path, or token.', doc);
+                    return;
+                  }
+                  const previewUrl = `/view-document?filePath=${encodeURIComponent(doc.original_path)}&fileName=${encodeURIComponent(doc.filename)}&fileType=${encodeURIComponent(previewFileType)}&token=${encodeURIComponent(token)}`;
+                  window.open(previewUrl, `DocumentPreview_${doc.document_id || index}`, 'width=1024,height=768,resizable,scrollbars');
+                };
+
+                return (
+                  <ListItem key={doc.document_id || doc.filename || index} className={classes.documentListItem}>
+                    <ListItemIcon className={classes.documentListItemIcon}>
+                      <DescriptionIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" className={classes.documentListItemText}>
+                          {doc.filename || 'Unknown Filename'}
+                        </Typography>
+                      }
+                    />
+                    {previewFileType && (
+                      <ListItemIcon className={classes.documentListItemIcon} style={{ justifyContent: 'flex-end' }}>
+                        <IconButton
+                          size="small"
+                          onClick={handlePreviewClick}
+                          title={`Preview ${doc.filename}`}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemIcon>
+                    )}
+                  </ListItem>
+                );
+              })}
             </List>
           )}
         </div>
-
-        {/* Manage Documents Button */}
-        <Button
-          variant="contained"
-          color="primary"
-          disabled={!selectedVectorstore || isLoadingVsDocs || !!vectorstoreError}
-          className={classes.manageButton}
-          onClick={handleOpenManageModal}
-          startIcon={<SettingsIcon />}
-        >
-          Manage Documents
-        </Button>
 
       </div>
 

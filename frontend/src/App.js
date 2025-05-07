@@ -36,6 +36,7 @@ import { Box, CssBaseline } from '@material-ui/core';
 import { StyledContainer } from './styles/StyledComponents';
 import backgroundImage from './assets/background.jpg';
 import WargameBuilder from './components/builder/wargames/WargameBuilder';
+import DocumentViewerPopup from './components/direct_chat/DocumentViewerPopup';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -189,6 +190,9 @@ function App() {
                                 <RecordTranscribeStandalone />
                               </Box>
                             </Route>
+
+                            {/* Add route for DocumentViewerPopup */}
+                            <Route path="/view-document" component={DocumentViewerPopup} />
 
                             {/* All other routes go through the standard authenticated layout */}
                             <Route path="/">
