@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Box, Typography, Paper } from '@material-ui/core';
 import NewReportOptions from './NewReportOptions';
 import PriorReportsList from './PriorReportsList';
@@ -8,6 +8,8 @@ import { makeStyles, styled, useTheme } from '@material-ui/core/styles';
 import { GradientText } from '../../styles/StyledComponents';
 import { mockReports } from './mockReports';
 import { reportTemplates } from './reportTemplates';
+import axios from 'axios';
+import { getGatewayUrl } from '../../config';
 
 // Styled components
 const GradientHeader = styled(Paper)(({ theme }) => ({
@@ -103,73 +105,131 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const ReportBuilderMain = () => {
-    const { isAuthenticated, isLoading } = useContext(AuthContext);
+    const { user, token, isAuthenticated, isLoading: authIsLoading } = useContext(AuthContext);
     const history = useHistory();
     const classes = useStyles();
     const theme = useTheme();
-    const [reports, setReports] = useState(mockReports);
+    const [reports, setReports] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    const handleCreateReport = (options) => {
-        const newReportInstanceId = `report-${Date.now()}`;
+    useEffect(() => {
+        if (token) {
+            const fetchReports = async () => {
+                setIsLoading(true);
+                setError(null);
+                try {
+                    const response = await axios.get(getGatewayUrl('/api/report_builder/reports'), {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    setReports(response.data || []);
+                } catch (err) {
+                    console.error("Error fetching reports:", err);
+                    setError('Failed to fetch reports. Please try again.');
+                    setReports([]);
+                }
+                setIsLoading(false);
+            };
+            fetchReports();
+        }
+    }, [token]);
+
+    const handleCreateReport = async (options) => {
+        const newReportInstanceIdBase = `report-${Date.now()}`;
+        let newReportData = {};
+        let templateToStore = null;
+        let reportType = 'Custom';
+        let reportName = 'New Custom Report';
+        let reportDescription = 'A new report created from scratch.';
 
         if (options && options.type === 'template' && options.data) {
-            const template = options.data; // This is the raw template object
+            templateToStore = options.data;
+            reportType = 'Template-based';
+            reportName = `New from: ${templateToStore.name}`;
+            reportDescription = templateToStore.description;
+            newReportData = {
+                name: reportName,
+                description: reportDescription,
+                type: reportType,
+                templateId: templateToStore.id,
+                content: templateToStore.structure || { elements: [] } 
+            };
+        } else {
+            newReportData = {
+                name: reportName,
+                description: reportDescription,
+                type: reportType,
+                content: { elements: [] }
+            };
+        }
 
-            try {
-                sessionStorage.setItem(template.id, JSON.stringify(template));
-            } catch (e) {
-                console.error("Error saving template to session storage", e);
-                // Optionally, notify the user or handle the error appropriately
-                return;
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await axios.post(getGatewayUrl('/api/report_builder/reports'), newReportData, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const createdReport = response.data;
+            setReports(prev => [...prev, createdReport]);
+
+            if (templateToStore) {
+                try {
+                    sessionStorage.setItem(templateToStore.id, JSON.stringify(templateToStore));
+                } catch (e) {
+                    console.error("Error saving template to session storage", e);
+                }
+                window.open(`/report-designer/${createdReport.id}?templateKey=${templateToStore.id}`, '_blank', 'width=1200,height=800');
+            } else {
+                window.open(`/report-designer/${createdReport.id}`, '_blank', 'width=1200,height=800');
             }
 
-            // Open ReportDesignerPage with the new report's dynamic ID AND the templateKey
-            window.open(`/report-designer/${newReportInstanceId}?templateKey=${template.id}`, '_blank', 'width=1200,height=800');
-
-            const reportForList = {
-                id: newReportInstanceId,
-                name: `New from: ${template.name}`,
-                description: template.description,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                status: 'draft',
-                prebuiltElements: [], // Keep light for list view
-                type: 'Template-based' 
-            };
-            setReports(prev => [...prev, reportForList]);
-
-        } else { // Handles custom (e.g., options.type === 'custom') or if options is undefined (fallback for old behavior)
-            const newReport = {
-                id: newReportInstanceId,
-                name: 'New Custom Report',
-                description: 'A new report created from scratch.',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                status: 'draft',
-                prebuiltElements: [], // Empty for custom report
-                type: 'Custom'
-            };
-            setReports(prev => [...prev, newReport]);
-            // Open designer without templateKey for a blank report
-            window.open(`/report-designer/${newReportInstanceId}`, '_blank', 'width=1200,height=800');
+        } catch (err) {
+            console.error("Error creating report:", err);
+            setError('Failed to create report. Please try again.');
         }
+        setIsLoading(false);
     };
 
     const handleViewEdit = (report) => {
-        // Open report in new window
-        window.open(`/report-designer/${report.id}`, '_blank', 'width=1200,height=800');
+        const url = report.templateId 
+            ? `/report-designer/${report.id}?templateKey=${report.templateId}`
+            : `/report-designer/${report.id}`;
+        window.open(url, '_blank', 'width=1200,height=800');
     };
 
-    const handleDeleteReport = (reportId) => {
-        setReports(prev => prev.filter(report => report.id !== reportId));
+    const handleDeleteReport = async (reportId) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            await axios.delete(getGatewayUrl(`/api/report_builder/reports/${reportId}`), {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setReports(prev => prev.filter(report => report.id !== reportId));
+        } catch (err) {
+            console.error("Error deleting report:", err);
+            setError('Failed to delete report. Please try again.');
+        }
+        setIsLoading(false);
     };
 
-    if (isLoading) {
-        return <div>Loading...</div>;
+    if (authIsLoading) {
+        return <div>Loading authentication...</div>;
     }
 
     if (!isAuthenticated) {
-        return null;
+        return <div>Please log in to access the Report Builder.</div>;
+    }
+    
+    if (isLoading && !authIsLoading) {
+        return <div>Loading reports...</div>;
+    }
+
+    if (error) {
+        return (
+            <Box sx={{ padding: 2, textAlign: 'center' }}>
+                <Typography color="error">{error}</Typography>
+            </Box>
+        );
     }
 
     return (

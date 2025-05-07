@@ -13,7 +13,8 @@ import {
   IconButton,
   ButtonGroup,
   Tooltip,
-  Collapse
+  Collapse,
+  useTheme
 } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
@@ -205,6 +206,7 @@ const mockVectorStores = [
 
 function ReportConfigPanel({ definition, onChange, currentReportId }) {
   const classes = useStyles();
+  const theme = useTheme();
   const [vectorStores, setVectorStores] = React.useState(mockVectorStores);
   const [collapsedElements, setCollapsedElements] = useState({});
   const [editingTitle, setEditingTitle] = useState(null);
@@ -508,9 +510,14 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
                               <IconButton
                                 className={classes.formatIconButton}
                                 size="small"
-                                color={isSelected ? 'primary' : 'default'}
+                                color={'primary'} 
                                 onClick={() => handleElementChange(element.id || index, 'format', opt.value)}
-                                style={{ border: isSelected ? '1px solid' : '1px solid rgba(0, 0, 0, 0.23)', borderRadius: '4px' }}
+                                style={{
+                                  border: `1px solid ${theme.palette.primary.main}`, // Always use primary color for border
+                                  borderRadius: '4px',
+                                  color: isSelected ? theme.palette.primary.contrastText : theme.palette.primary.main,
+                                  backgroundColor: isSelected ? theme.palette.primary.main : 'transparent',
+                                }}
                               >
                                 <FormatIcon fontSize="small" />
                               </IconButton>

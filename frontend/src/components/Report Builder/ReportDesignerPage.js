@@ -76,7 +76,7 @@ const useStyles = makeStyles((theme) => ({
   },
   leftPanel: {
     width: '20%',
-    minWidth: '375px',
+    minWidth: '400px',
     borderRight: `1px solid ${theme.palette.divider}`,
     overflowY: 'auto',
     padding: theme.spacing(2),

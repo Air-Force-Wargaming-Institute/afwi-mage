@@ -372,6 +372,27 @@ services:
   #   networks:
   #     - app-network
 
+  report_builder_service:
+    build:
+      context: ./report_builder_service
+    container_name: report_builder_service
+    ports:
+      - "8019:8019"
+    volumes:
+      - ./report_builder_service:/app
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=8019
+
+  # report_service:
+  #   build:
+  #     context: ./report_service
+
 volumes:
   postgres_data:
   nltk_data_volume:

@@ -240,6 +240,19 @@ http:
         - "auth-middleware"
         - "security-headers"
       
+    # New Router for Report Builder Service
+    report-builder-router:
+      rule: "PathPrefix(`/api/report_builder`) || Path(`/api/report_builder/health`)"
+      service: "report-builder-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
+        - "compress"
+        - "retry-middleware"
+
     # New Router for Wargame Service
     wargame-router:
       rule: "PathPrefix(`/api/wargame`) || Path(`/api/wargame/health`)"
@@ -365,6 +378,16 @@ http:
           - url: "http://workbench:8020"
         healthCheck:
           path: "/api/workbench/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+
+    report-builder-service:
+      loadBalancer:
+        servers:
+          - url: "http://report_builder_service:8019"
+        healthCheck:
+          path: "/api/report_builder/health"
           interval: "120s"
           timeout: "5s"
           followRedirects: true
