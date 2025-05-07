@@ -52,8 +52,13 @@ docker build -t mage-base:latest -f Dockerfile.base .
 # Windows users: Use Git Bash or WSL terminal
 cd backend
 
-# Copy environment file
-cp auth_service/.env.example auth_service/.env
+- An example environment file (`.env.example`) is provided at the backend directory of the repository.
+- Copy this file to `.env` in the **backend directory** before starting:
+  ```bash
+  # From the repository backend directory:
+  cp /backend/.env.example /backend/.env
+  ```
+- Edit the `.env` file to set necessary configurations (like database passwords, JWT secrets, API keys, HF_TOKEN, etc.).
 
 docker compose build   # Note: First build will take longer due to NLTK data download (about 3.5GB)
 
