@@ -34,8 +34,6 @@ http:
           - "http://127.0.0.1:3000"
           - "http://localhost"
           - "http://127.0.0.1"
-          - "http://10.11.45.216:3000"
-          - "http://10.11.45.216"
         accessControlAllowCredentials: true
         accessControlAllowHeaders:
           - "Authorization"
@@ -96,15 +94,15 @@ http:
         attempts: 3
         initialInterval: "500ms"
     
-    # Circuit breaker middleware
-    circuit-breaker:
-      circuitBreaker:
-        expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
+    # # Circuit breaker middleware
+    # circuit-breaker:
+    #   circuitBreaker:
+    #     expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
     
     # Compress middleware
     compress:
       compress: {}
-      
+    
   # Routers with corrected path patterns
   routers:
     # Health Check Router
@@ -140,7 +138,7 @@ http:
         - "rate-limit-chat"
         - "compress"
         - "retry-middleware"
-        - "circuit-breaker"
+        # - "circuit-breaker"
     
     # Upload Service Router
     upload-router:
@@ -153,6 +151,17 @@ http:
         - "auth-middleware"
         - "security-headers"
         - "rate-limit-upload"
+
+    # Transcription Service Router
+    transcription-router: 
+      rule: "PathPrefix(`/api/transcription`) || Path(`/api/transcription/health`)"
+      service: "transcription-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
       
     # Core Service Router
     core-router:
@@ -242,6 +251,17 @@ http:
         - "auth-middleware"
         - "security-headers"
       
+    # New Router for Wargame Service
+    wargame-router:
+      rule: "PathPrefix(`/api/wargame`) || Path(`/api/wargame/health`)"
+      service: wargame-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - auth-middleware
+        - security-headers
+
   # Services with consistent health check paths
   services:
     # Special API Health Status service
@@ -356,6 +376,26 @@ http:
           - url: "http://workbench:8020"
         healthCheck:
           path: "/api/workbench/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+
+    transcription-service:
+      loadBalancer:
+        servers:
+          - url: "http://transcription:8021"
+        healthCheck:
+          path: "/api/transcription/health"
+          interval: "120s"
+          timeout: "5s"
+          followRedirects: true
+
+    wargame-service:
+      loadBalancer:
+        servers:
+          - url: "http://wargame_service:8012"
+        healthCheck:
+          path: "/api/wargame/health"
           interval: "120s"
           timeout: "5s"
           followRedirects: true

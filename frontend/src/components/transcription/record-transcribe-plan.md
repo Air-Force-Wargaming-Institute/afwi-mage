@@ -1,17 +1,29 @@
 # Record & Transcribe Live Feature Implementation Plan
 
 ## Implementation Progress
-**Frontend Progress**: 100% Complete ✅  
-**Backend Progress**: 0% Complete ⏳  
-**Overall Progress**: 50% Complete 🚀
+**Frontend Progress**: ~90% Integrated ✅ (Core recording/playback/editing/fetching integrated)
+**Backend Progress**: ~95% Complete ✅ (Core functionality done, PDF/DOCX pending)
+**Docker Progress**: 100% Complete ✅
+**Overall Progress**: ~70% Complete ⏳
 
-**Current Status**: Frontend UI implementation and API integration scaffolding are complete. The frontend is fully prepared for backend integration with all necessary connection points, error handling, data structures, and WebSocket implementation defined. Backend development is now the critical path.
+**Current Status**: Frontend UI components and structure are largely complete and integrated with the live backend via the API gateway. Backend service structure includes database integration (PostgreSQL) for session persistence, automatic table creation, WebSocket endpoint for streaming/processing/storage, core session management endpoints, and artifact saving logic in `/stop` (TXT/WEBM). Docker configuration (`Dockerfile`, `docker-compose.yml`) is complete.
+
+**Key Outstanding Issues**
+1. [ ] WebSocket Authentication: ✅ **Implemented (Query Parameter Method).** Uses placeholder validation.
+2. [ ] Utility Endpoint Auth: ❓ Needs review/decision.
+3. [ ] Frontend Auth Handling (REST): ✅ Seems implemented. Needs end-to-end testing.
+4. [ ] Audio Serving: ✅ **Implemented.** Added `GET /sessions/{session_id}/audio` endpoint using `FileResponse` in `transcribe_routes.py`. The `GET /sessions/{session_id}` endpoint now returns the correct relative URL for audio playback.
+5. [ ] Missing Feature (PDF/DOCX): ❗ Not implemented in `/stop`.
+6. [ ] Backend User ID Handling: ✅ **Implemented.** Uses gateway header.
+7. [ ] Potential Memory Issue (Long Transcripts): ✅ Acknowledged. Monitor in testing.
+8. [ ] Secure Utility Endpoint: ❓ Needs review/decision.
+9. [ ] 
 
 **Next Priorities**:
-1. Develop backend transcription service
-2. Implement WebSocket server for real-time updates
-3. Create session management and storage endpoints
-4. Connect frontend to backend services using established API patterns
+1.  **Testing:** Conduct thorough end-to-end testing (including audio playback, user-specific session listing, and save changes logic).
+2.  **Backend - Implement Other Output Formats:** Add PDF/DOCX generation to `/stop`. (Lower Priority)
+3.  **Robust WS Token Validation:** Implement actual token validation in `websocket_routes.py` (Lower Priority for now).
+4.  Refine WebSocket segment info (e.g., enhance confidence reporting). (Lower Priority)
 
 ## Frontend-Backend Integration Guide
 
@@ -19,27 +31,26 @@ This guide outlines what's been prepared on the frontend and what backend develo
 
 ### API Integration Status
 
-All frontend components have been prepared for backend integration:
+**Components Integrated:**
+- `SessionBrowserPanel.js`: ✅ Fetches session list and details via API gateway with auth.
+- `RecordingControlPanel.js`: ✅ Uses live API calls & WS connection. ✅ Provides WS sender via context.
+- `TranscriptionDisplay.js`: ✅ Renders transcription from context state (live updates via WS). ✅ Fetches final transcript via API gateway for loaded sessions.
+- `RealtimeTaggingPanel.js`: ✅ Saves markers via live API call. ✅ Sends speaker tags via WebSocket context function.
+- `RecordTranscribe.js`: ✅ Handles saving edited session data (`PUT /sessions/{id}`) for loaded sessions.
+- `ParticipantManager.js` / `SessionMetadataForm.js`: ✅ Allow editing when session is loaded (no separate API calls needed for save).
 
-1. **API Connection Points**: ✅ Complete
-   - All necessary API endpoints are scaffolded
-   - WebSocket connection infrastructure is in place
-   - Error handling is implemented across all components
+**Components Pending Integration:**
+- None (Core integration complete).
 
-2. **Data Structures**: ✅ Complete  
-   - All expected request and response formats are defined
-   - Data validation is implemented for API calls
-   - Consistent naming conventions are used
+### Integration Steps for Frontend Developers
 
-3. **Error Handling & Recovery**: ✅ Complete
-   - Comprehensive error handling for all API interactions
-   - Reconnection logic for WebSocket disconnects
-   - Offline mode fallbacks implemented
-
-4. **User Experience**: ✅ Complete
-   - Loading states for all asynchronous operations
-   - Appropriate feedback for user actions
-   - Clear error messaging
+1.  **End-to-End Testing:** Thoroughly test all interactions (recording, playback, editing, saving, markers, tags), refine error messages, loading states, and UI feedback based on live API/WebSocket behavior. Verify audio playback for loaded sessions and test the "Save Changes" button logic.
+2.  **State Management & Context Review:**
+    - Logic to track/compare initial loaded data vs. current state for enabling "Save Changes" is implemented via `initialLoadedData` and `isDirty` state in context. Verify in testing.
+    - Ensure state updates are consistent after saving changes.
+3.  **Reconnection Logic:** Test WebSocket reconnection logic under various scenarios (server restart, temporary network loss).
+4.  **Backend - Implement Other Output Formats (Optional):** If needed, implement PDF/DOCX generation on backend.
+5.  **(Cleanup) Remove Unused Code:** Remove `frontend/src/services/transcriptionService.js`.
 
 ### Backend Implementation Requirements
 
@@ -47,42 +58,49 @@ The backend needs to implement these endpoints to connect with the frontend:
 
 #### Core API Endpoints
 
-| Endpoint | Method | Status | Description |
-|----------|--------|--------|-------------|
-| `/api/transcription/start-session` | POST | ⏳ Needed | Initialize a recording session |
-| `/api/transcription/stream/{session_id}` | WebSocket | ⏳ Needed | Audio streaming and real-time transcription |
-| `/api/transcription/sessions/{session_id}/pause` | POST | ⏳ Needed | Pause recording |
-| `/api/transcription/sessions/{session_id}/resume` | POST | ⏳ Needed | Resume recording |
-| `/api/transcription/sessions/{session_id}/stop` | POST | ⏳ Needed | Stop and finalize recording |
-| `/api/transcription/sessions/{session_id}/cancel` | POST | ⏳ Needed | Cancel recording session |
-| `/api/transcription/sessions` | GET | ⏳ Needed | List previous sessions |
-| `/api/transcription/sessions/{session_id}` | GET | ⏳ Needed | Get session details |
-| `/api/transcription/sessions/{session_id}/transcription` | GET | ⏳ Needed | Get transcription text |
-| `/api/transcription/sessions/{session_id}/markers` | POST | ⏳ Needed | Add timeline marker |
-| `/api/transcription/sessions/{session_id}/speakers` | PUT | ⏳ Needed | Update speaker information |
-| `/api/transcription/sessions/{session_id}` | PUT | ⏳ Needed | Update session details |
+| Endpoint                                          | Method    | Status                          | Description                               |
+|---------------------------------------------------|-----------|---------------------------------|-------------------------------------------|
+| `/api/transcription/start-session`                | POST      | ✅ Done                         | Initialize a recording session (DB)       |
+| `/api/transcription/stream/{session_id}`          | WebSocket | ✅ Done (Handles Streaming, Processing, Storage) | Audio streaming, processing, updates    |
+| `/api/transcription/sessions/{session_id}/pause`  | POST      | ✅ Done                         | Pause recording (DB update)               |
+| `/api/transcription/sessions/{session_id}/resume` | POST      | ✅ Done                         | Resume recording (DB update)              |
+| `/api/transcription/sessions/{session_id}/stop`   | POST      | ✅ Done (Handles core finalize, PDF/DOCX TBD) | Stop, apply tags, concat audio, save artifacts, finalize DB |
+| `/api/transcription/sessions/{session_id}/cancel` | POST      | ✅ Done                         | Cancel recording session (DB update)      |
+| `/api/transcription/sessions`                     | GET       | ✅ Done                         | List previous sessions (DB)               |
+| `/api/transcription/sessions/{session_id}`        | GET       | ✅ Done                         | Get session details (DB)                  |
+| `/api/transcription/sessions/{session_id}/transcription` | GET  | ✅ Done                         | Get final transcription text/segments (DB)|
+| `/api/transcription/sessions/{session_id}/markers` | POST     | ✅ Done                         | Add timeline marker (DB)                  |
+| `/api/transcription/sessions/{session_id}/speakers` | WebSocket | ✅ Done (Via `speaker_tag` event) | Tag current speaker (Event stored in DB)  |
+| `/api/transcription/sessions/{session_id}`        | PUT       | ✅ Done                         | Update session details (DB)               |
+| `/api/transcription/transcribe-file`              | POST      | ✅ Done                         | Basic file transcription util (Not for live) |
 
-#### Integration Steps for Backend Developers
+#### Integration Steps for Frontend Developers
 
-1. **WebSocket Implementation**:
-   - Create WebSocket server at `/api/transcription/stream/{session_id}`
-   - Implement binary audio reception
-   - Send transcription updates in the format defined in the API Documentation section
+1.  **Replace Simulations:** Remove all simulated `fetch` calls, `setTimeout` delays, and dummy data generation within the frontend components (`RecordingControlPanel`, `RealtimeTaggingPanel`, `TranscriptionDisplay`, `SessionBrowserPanel`, etc.).
+2.  **API Gateway Integration:** Update all API calls to use the `getGatewayUrl` function (similar to `MultiAgentHILChat.js`) to route requests through the central API gateway.
+3.  **Authentication:** Implement logic to retrieve the authentication token (likely from `AuthContext`, similar to `MultiAgentHILChat.js`) and include it in the `Authorization: Bearer <token>` header for all API requests to the backend service via the gateway.
+4.  **WebSocket Connection:** Implement a live WebSocket connection to the backend endpoint (`/api/transcription/stream/{session_id}`) using the URL provided by the `/start-session` response. Handle incoming messages (transcription updates, status) and outgoing messages (speaker tags) according to the defined protocol. Implement robust connection/disconnection/error handling.
+5.  **State Management:** Ensure the frontend state (managed by `TranscriptionContext`) is correctly updated based on live data received from the API and WebSocket.
+6.  **Error Handling:** Test and refine error handling based on actual responses and potential failures from the live backend and gateway.
 
-2. **Session Management**:
-   - Implement session creation, storage, and retrieval
-   - Support pausing, resuming, and stopping sessions
-   - Include metadata management
+#### Backend Implementation Requirements (Recap)
 
-3. **Transcription Engine**:
-   - Implement speech-to-text processing
-   - Support speaker identification (if possible)
-   - Handle classification markers
+1.  **WebSocket Implementation**: ✅ Done
+    - Handles audio streaming, buffering, transcription (WhisperX), diarization (WhisperX), segment updates, DB storage, and progressive audio chunk saving.
 
-4. **Testing with Frontend**:
-   - Once endpoints are implemented, update the frontend `getApiUrl` function
-   - Uncomment the actual API calls (currently commented out in the frontend code)
-   - Remove simulation code
+2. **Session Management**: ✅ Done (DB Integration)
+   - Implemented session creation, DB storage (PostgreSQL), retrieval, status updates (pause, resume, cancel, stop).
+   - `/stop` endpoint handles artifact saving (TXT/WEBM) and tag application.
+
+3. **Transcription Engine**: ✅ Done (WhisperX Integration)
+    - WhisperX used for transcription and diarization within WebSocket flow.
+    - Speaker identification handled by WhisperX diarization + speaker tag application in `/stop`.
+    - Timeline markers stored via `/markers` endpoint.
+
+4. **Testing with Frontend**: ⏳ Needed
+    - Backend endpoints are implemented and ready for connection.
+    - Frontend needs connection to live backend endpoints via the API gateway.
+    - Simulation code in frontend needs removal.
 
 ## Backend Service Architecture (Recommendation)
 
@@ -106,13 +124,14 @@ We recommend structuring the backend service as follows:
 ## API Documentation for Backend Developers
 
 ### API Overview
-The Record & Transcribe Live feature requires a set of RESTful API endpoints and a WebSocket connection for real-time updates. The frontend is built to work with these endpoints and can handle various types of errors and network conditions.
+The Record & Transcribe Live feature uses RESTful API endpoints for session lifecycle management and data retrieval, and a WebSocket connection for real-time audio streaming and transcription/diarization updates. Session data is persisted in a PostgreSQL database.
 
 ### Required API Endpoints
 
 #### 1. Start Recording Session
 - **Endpoint**: `/api/transcription/start-session`
 - **Method**: POST
+- **Status**: ✅ Done
 - **Purpose**: Initialize a new recording session and return a session ID
 - **Request Body**: 
   ```json
@@ -158,6 +177,7 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 2. Stream Audio Chunks
 - **Endpoint**: WebSocket connection to `/api/transcription/stream/{session_id}`
 - **Method**: WebSocket
+- **Status**: ✅ Done (Handles Streaming, Processing, Storage)
 - **Purpose**: Stream audio chunks to the server for processing
 - **Events**:
   - Client sends: Binary audio chunks with channel metadata
@@ -166,24 +186,23 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 3. Get Live Transcription
 - **Endpoint**: `/api/transcription/sessions/{session_id}/transcription`
 - **Method**: GET
-- **Purpose**: Get the current transcription state
+- **Status**: ✅ Done
+- **Purpose**: Get the final transcription text for a completed session.
 - **Response**: 
   ```json
   {
     "session_id": "string",
-    "transcription": [
+    "full_transcript_text": "string", // The final, potentially edited transcript
+    "transcription_segments": [ // The structured segments used to build the text
       {
-        "segment_id": "string",
-        "speaker_id": "string",
+        "speaker": "string",
         "text": "string",
-        "start_time": "float",
-        "end_time": "float",
-        "confidence": "float",
-        "classification": "string",
-        "markers": ["decision", "insight", "question"]
+        "start": "float",
+        "end": "float",
+        "confidence": "float"
       }
+      // ... more segments
     ],
-    "is_final": false,
     "last_update": "ISO datetime"
   }
   ```
@@ -191,7 +210,8 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 4. Pause Recording
 - **Endpoint**: `/api/transcription/sessions/{session_id}/pause`
 - **Method**: POST
-- **Purpose**: Pause the current recording session
+- **Status**: ✅ Done
+- **Purpose**: Pause the current recording session (updates DB status)
 - **Response**: 
   ```json
   {
@@ -204,7 +224,8 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 5. Resume Recording
 - **Endpoint**: `/api/transcription/sessions/{session_id}/resume`
 - **Method**: POST
-- **Purpose**: Resume a paused recording session
+- **Status**: ✅ Done
+- **Purpose**: Resume a paused recording session (updates DB status)
 - **Response**: 
   ```json
   {
@@ -217,45 +238,39 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 6. Add Timeline Marker
 - **Endpoint**: `/api/transcription/sessions/{session_id}/markers`
 - **Method**: POST
-- **Purpose**: Add a marker to the timeline
+- **Status**: ✅ Done
+- **Purpose**: Add a marker to the session's marker list in the DB.
 - **Request Body**:
   ```json
   {
-    "marker_type": "decision|insight|question|action_item",
-    "timestamp": "float",
-    "description": "string",
-    "classification": "string",
-    "user_id": "string"
+    "marker_type": "string", // e.g., "decision", "insight", "custom_label"
+    "timestamp": "float", // Recording time in seconds
+    "description": "string", // Optional
+    "classification": "string", // Optional
+    "user_id": "string" // TODO: Get from auth context
   }
   ```
 - **Response**:
   ```json
   {
-    "marker_id": "string",
+    "marker_id": "string", // Unique ID for the marker
     "status": "added",
-    "timestamp": "ISO datetime"
+    "timestamp": "ISO datetime" // DB add timestamp
   }
   ```
 
 #### 7. Stop Recording and Finalize
 - **Endpoint**: `/api/transcription/sessions/{session_id}/stop`
 - **Method**: POST
-- **Purpose**: Stop recording and finalize the transcription
+- **Status**: ✅ Done (Handles core finalize, PDF/DOCX TBD)
+- **Purpose**: Stop recording, apply tags, concat audio, save artifacts, finalize DB
 - **Request Body**: 
   ```json
   {
-    "audio_filename": "string",
-    "transcription_filename": "string",
-    "include_timestamps": boolean,
-    "include_speakers": boolean,
-    "classification": "string",
-    "output_formats": ["pdf", "docx", "txt", "aar", "executive_summary"],
-    "additional_processing": {
-      "speaker_diarization": boolean,
-      "highlight_low_confidence": boolean,
-      "include_markers": boolean,
-      "include_annotations": boolean
-    }
+    "audio_filename": "string", // Base name for saving output
+    "transcription_filename": "string", // Base name for transcript
+    // Other options for final processing can be added here
+    "output_formats": ["pdf", "docx", "txt", "aar", "executive_summary"] // Desired output formats
   }
   ```
 - **Response**: 
@@ -263,30 +278,18 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
   {
     "session_id": "string",
     "status": "completed",
-    "audio_file": {
-      "filename": "string",
-      "path": "string",
-      "duration_seconds": number,
-      "size_bytes": number
-    },
-    "output_files": [
-      {
-        "type": "transcript|aar|summary",
-        "format": "pdf|docx|txt",
-        "filename": "string",
-        "path": "string",
-        "word_count": number,
-        "size_bytes": number
-      }
-    ],
-    "completion_timestamp": "ISO datetime"
+    "completion_timestamp": "ISO datetime",
+    // Details about saved files might be added here later
+    // "audio_file_path": "string",
+    // "transcript_file_path": "string"
   }
   ```
 
 #### 8. Cancel Recording
 - **Endpoint**: `/api/transcription/sessions/{session_id}/cancel`
 - **Method**: POST
-- **Purpose**: Cancel the recording and discard all data
+- **Status**: ✅ Done (Updates DB status)
+- **Purpose**: Cancel the recording session (marks status as 'cancelled' in DB).
 - **Response**: 
   ```json
   {
@@ -299,16 +302,18 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 9. List Previous Sessions
 - **Endpoint**: `/api/transcription/sessions`
 - **Method**: GET
-- **Purpose**: Retrieve a list of past recording sessions for the current user.
+- **Status**: ✅ Done
+- **Purpose**: Retrieve a list of past recording sessions for the user (from DB).
 - **Response**:
   ```json
   {
     "sessions": [
       {
-        "session_id": "string",
+        "session_id": "uuid",
         "session_name": "string",
-        "created_at": "ISO datetime",
-        "classification": "string"
+        "start_time": "ISO datetime",
+        "status": "string",
+        "event_metadata": { /* subset of event metadata */ }
       }
       // ... more sessions
     ]
@@ -318,75 +323,81 @@ The Record & Transcribe Live feature requires a set of RESTful API endpoints and
 #### 10. Get Session Details
 - **Endpoint**: `/api/transcription/sessions/{session_id}`
 - **Method**: GET
-- **Purpose**: Retrieve the full details for a specific recording session.
-- **Response**:
+- **Status**: ✅ Done
+- **Purpose**: Retrieve the full details for a specific recording session (from DB).
+- **Response**: (Corresponds to `SessionDetailsResponse` schema in `transcribe_routes.py`)
   ```json
   {
-    "session_id": "string",
+    "session_id": "uuid",
     "session_name": "string",
-    "audio_url": "string", // URL to fetch/stream the audio
-    "transcription_text": "string",
-    "participants": [
-      {
-        "id": "string",
-        "name": "string",
-        "role": "string",
-        "rank": "string",
-        "organization": "string",
-        "profile_image": "base64 string|url"
-      }
-    ],
-    "event_metadata": {
-      "wargame_name": "string",
-      "scenario": "string",
-      "phase": "string",
-      "classification": "string",
-      "caveat_type": "none|custom",
-      "custom_caveat": "string",
-      "location": "string",
-      "organization": "string",
-      "datetime": "ISO datetime"
-    },
-    "markers": [
-      {
-        "id": "string",
-        "marker_type": "string",
-        "timestamp": "float",
-        "description": "string",
-        "classification": "string" 
-      }
-    ],
-    "created_at": "ISO datetime",
-    "updated_at": "ISO datetime"
+    "status": "string",
+    "start_time": "ISO datetime",
+    "last_update": "ISO datetime",
+    "completion_time": "ISO datetime | null",
+    "detected_language": "string | null",
+    "event_metadata": { /* full EventMetadataSchema */ },
+    "participants": [ /* list of ParticipantSchema */ ],
+    "transcription_segments": [ /* list of processed segments */ ],
+    "markers": [ /* list of marker objects, includes speaker tag events */ ],
+    "audio_storage_path": "string | null",
+    "transcript_storage_path": "string | null",
+    "full_transcript_text": "string | null", // Editable transcript
+    "audio_url": "string | null" // Derived URL for playback
   }
   ```
 
 #### 11. Update Session Details
 - **Endpoint**: `/api/transcription/sessions/{session_id}`
 - **Method**: PUT
-- **Purpose**: Update the editable details of a past recording session.
-- **Request Body**: Contains the fields to be updated
+- **Status**: ✅ Done
+- **Purpose**: Update the editable details of a past recording session (in DB).
+- **Request Body**: 
   ```json
   {
     "session_name": "string", // Optional
-    "transcription_text": "string", // Optional
-    "event_metadata": { ... }, // Optional
-    "participants": [ ... ] // Optional
+    "event_metadata": { /* EventMetadataSchema */ }, // Optional
+    "participants": [ /* ParticipantSchema */ ], // Optional
+    "full_transcript_text": "string" // Optional
   }
   ```
 - **Response**:
   ```json
   {
-    "session_id": "string",
+    "session_id": "uuid",
     "status": "updated",
     "updated_at": "ISO datetime"
   }
   ```
 
+#### 12. Basic File Transcription (Not for Live Feature)
+- **Endpoint**: `/api/transcription/transcribe-file`
+- **Method**: POST
+- **Status**: ✅ Done
+- **Purpose**: Transcribe a single uploaded audio file (used by `transcribe_client.py`). **Not directly used by the live frontend.**
+- **Request Body**: `multipart/form-data` with `file` field.
+- **Response**:
+  ```json
+  {
+    "filename": "string",
+    "language": "string",
+    "segments": [
+      {
+        "start": "float",
+        "end": "float",
+        "text": "string",
+        "speaker": "string"
+      }
+    ]
+  }
+  ```
+
 ### WebSocket Protocol
-The WebSocket connection is used for two primary purposes:
-1. Streaming audio chunks from the client to the server for processing
-2. Receiving real-time transcription updates from the server
+The WebSocket connection at `/api/transcription/stream/{session_id}` is used for:
+1. Streaming audio chunks (WebM format) from the client to the server.
+2. Receiving processed transcription segments (including text, speaker, timestamps, confidence) from the server.
+3. Sending speaker tag events from the client to the server.
+
+**Authentication:** The connection MUST include a valid authentication token passed as a query parameter (e.g., `/api/transcription/stream/{session_id}?token=YOUR_AUTH_TOKEN`). The backend validates this token upon connection.
 
 The WebSocket messages are expected in these formats:
 
@@ -395,20 +406,20 @@ The WebSocket messages are expected in these formats:
 
 **Server to Client (Transcription Updates)**:
 ```json
-{
+{ 
   "type": "transcription_update",
-  "text": "Full transcription text with previous and new content",
   "segments": [
-    {
-      "segment_id": "string",
-      "speaker_id": "string",
-      "text": "string",
-      "start_time": float,
-      "end_time": float,
-      "confidence": float
-    }
-  ],
-  "status": "in_progress"
+     {
+        "speaker": "string | UNKNOWN",
+        "text": "string",
+        "start": "float",
+        "end": "float",
+        "confidence": "float | null"
+      }
+      // ... more segments from the processed buffer
+   ],
+  "status": "in_progress",
+  "is_final": false
 }
 ```
 
@@ -423,16 +434,25 @@ The WebSocket messages are expected in these formats:
 
 **Server to Client (Speaker Identification)**:
 ```json
-{
-  "type": "speaker_identification",
-  "speaker_id": "string",
-  "timestamp": float,
-  "confidence": float
+// Note: Speaker ID is now included within the 'transcription_update' segments.
+// This separate message type is likely no longer needed.
+```
+
+**Client to Server (Speaker Tag)**:
+```json
+{ 
+  "type": "speaker_tag",
+  "speaker_id": "string", // ID of the participant being tagged
+  "timestamp": float // Recording time in seconds when tag occurred
 }
 ```
 
 ### Authentication
-All API endpoints should require standard authentication. The frontend will pass authentication tokens in request headers as per the existing application authentication flow.
+All REST API endpoints should require standard authentication through the API gateway service `backend\api_gateway\dynamic-conf.yaml`. Review the API-gateway to understand the necessary flow from frontend to backend and vice versa via the API gateway. Frontend developers must ensure the Authorization header with the bearer token is included in requests routed through the gateway.
+
+**WebSocket connections now require authentication via a token passed as a query parameter (`?token=...`).**
+
+The existing `/transcribe-file` utility endpoint currently bypasses auth in the gateway config - this should likely be reviewed for production use.
 
 ### Error Handling
 The frontend is designed to handle HTTP status codes and error messages with proper user feedback. Backend endpoints should:
@@ -448,24 +468,10 @@ The frontend is designed to handle HTTP status codes and error messages with pro
 
 ## Next Steps
 
-1. **Backend Development (Current Priority)**:
-   - Develop the transcription service API
-   - Implement WebSocket server for audio streaming
-   - Create session storage and management
-   - Integrate with speech-to-text services
-
-2. **Integration Phase**:
-   - Connect frontend to backend APIs
-   - Uncomment actual API calls in frontend code
-   - Remove simulation/placeholder code
-   - Test full system integration
-
-3. **Enhanced Features (After Integration)**:
-   - Multi-channel recording support
-   - Speaker identification
-   - Military-specific output formats
-   - Offline capability
-   - Advanced noise filtering
+1.  **Frontend Integration:** Connect UI to live backend **via API Gateway**, implement auth, replace simulations.
+2.  **End-to-End Testing:** Conduct thorough testing of the integrated system.
+3.  **Backend - Implement Other Output Formats:** Add logic to `/stop` to generate PDF/DOCX based on request. (Lower Priority)
+4.  Refine WebSocket segment info (e.g., enhance confidence reporting). (Lower Priority)
 
 ## Technical Considerations
 
@@ -474,23 +480,39 @@ The frontend is designed to handle HTTP status codes and error messages with pro
 - Consider using worker processes for transcription
 - Implement efficient storage for audio and transcription data
 - Use caching for frequently accessed sessions
+- Transcription/Diarization is CPU/GPU intensive; ensure adequate resources.
+- Database interactions within WebSocket should be fast; optimize queries.
+- Consider async task queues (e.g., Celery) for lengthy final processing in `/stop` if needed.
+- Efficient storage and retrieval of audio/transcript artifacts.
 
 ### Security
-- Implement proper authentication for all endpoints
-- Secure WebSocket connections with appropriate protocols
+- Implement proper authentication for all endpoints **via the API Gateway**.
+- Secure WebSocket connections with appropriate protocols (WSS).
 - Ensure proper handling of classified materials
 - Implement secure storage of audio and transcription data
+- Ensure database access is properly secured.
+- Validate user permissions for accessing/modifying sessions.
+- Sanitize inputs for markers, session names, etc.
+- Secure artifact storage (e.g., access control on S3 or filesystem permissions).
 
 ### Military Environment Requirements
 - Support for classification marking
 - Compliance with data handling requirements
 - Operation in limited connectivity environments
 - Efficient bandwidth usage
+- Database Choice: PostgreSQL implemented.
+- Schema: Defined in `database.py` (`TranscriptionSession` model).
+- Audio Stitching: Implemented in `/stop` using ffmpeg concat demuxer.
+- Final Processing: Uses streamed segments combined with speaker tags applied during `/stop`.
+- Artifact Storage: Implemented using local storage path defined in config (`ARTIFACT_STORAGE_BASE_PATH`). Requires appropriate volume mapping and permissions in Docker/deployment.
+- Speaker Tag Application: Implemented during `/stop` processing before saving final transcript.
 
 ## Open Questions for Backend Implementation
-- Which speech-to-text service will be used for transcription?
-- How will speaker identification be implemented?
-- What database structure will store session data?
-- How will audio files be stored and secured?
-- What are the performance requirements for real-time transcription?
-- How will the system handle network interruptions during recording?
+- Which speech-to-text service will be used for transcription? -> **Resolved (WhisperX)**
+- How will speaker identification be implemented? -> **Resolved (WhisperX Diarization + Manual Tags)**
+- What database structure will store session data? -> **Resolved (PostgreSQL, see `database.py`)**
+- How will audio files be stored and secured? -> **Resolved (Local path storage, security relies on filesystem/infra)**
+- What are the performance requirements for real-time transcription? -> **Addressed (GPU usage, batching)**
+- How will the system handle network interruptions during recording? -> **Addressed (Session status set to 'interrupted', WS disconnects handled, frontend needs reconnection logic)**
+- How will session data (metadata, participants, markers, audio paths, transcription text) be stored and retrieved? -> **Resolved (PostgreSQL ORM)**
+- How will audio chunks received via WebSocket be processed and stitched together for transcription/storage? -> **Resolved (Progressive chunk saving, ffmpeg concat in `/stop`)**

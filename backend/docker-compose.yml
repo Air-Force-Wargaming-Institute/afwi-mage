@@ -18,6 +18,9 @@ services:
         mkdir -p /data/uploads && chmod -R 777 /data/uploads &&
         mkdir -p /data/workbench/spreadsheets && 
         chmod -R 777 /data/workbench &&
+        mkdir -p /data/transcription/sessions &&
+        mkdir -p /data/transcription/whisper_models &&
+        mkdir -p /data/transcription/huggingface_cache &&
         touch /data/workbench/spreadsheets/.gitkeep &&
         echo 'Initialized data directories successfully'
       "
@@ -40,6 +43,7 @@ services:
       - VLLM_INSTANCES=http://vllm:8000/v1=generate
       - OLLAMA_BASE_URLS=http://ollama:11434
       - DIRECT_CHAT_SERVICE_URL=http://direct_chat_service:8011
+      - TRANSCRIPTION_SERVICE_URL=http://transcription:8021
       - DEBUG=1
       - PYTHONUNBUFFERED=1
       - REDIS_HOST=redis
@@ -66,7 +70,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@chat_db:5432/chat_db
       - VLLM_API_BASE=http://host.docker.internal:8007/v1
       - VLLM_API_KEY=no_key
-      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview-abliterated
     volumes:
       - ../data:/app/data
       - ./chat_service:/app
@@ -180,19 +184,44 @@ services:
       retries: 3
       start_period: 5s
 
+  # New Wargame Builder Service
+  wargame_service:
+    build: ./wargame_service
+    container_name: wargame_service
+    volumes:
+      - ../data:/app/data:rw
+      # Optional: Mount code for development hot-reloading if uvicorn --reload is used
+      # - ./wargame_service:/app 
+    ports:
+      - "8012:8012"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8012 # Internal port
+    networks:
+      - app-network
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   db:
-   image: postgres:13
+   # Build the custom image instead of using the official one directly
+   # Specify the build context (current dir '.' relative to compose file)
+   # and the Dockerfile path relative to the context.
+   build:
+     context: .
+     dockerfile: db/Dockerfile
+   # image: postgres:13 # Removed: We are building instead
    environment:
      POSTGRES_USER: ${POSTGRES_USER:-postgres}
      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-     POSTGRES_MULTIPLE_DATABASES: dbname,authdb
+     POSTGRES_MULTIPLE_DATABASES: dbname,authdb,transcriptiondb
    volumes:
      - postgres_data:/var/lib/postgresql/data
-     - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
    networks:
      - app-network
    healthcheck:
-     test: ["CMD-SHELL", "pg_isready -U postgres"]
+     test: ["CMD-SHELL", "pg_isready -U postgres -d transcriptiondb"]
      interval: 5s
      timeout: 5s
      retries: 5
@@ -297,6 +326,45 @@ services:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
 
+  transcription:
+    build: ./transcription_service
+    ports:
+      - "8021:8021"
+    volumes:
+      - ../data/transcription/sessions:/app/data/sessions
+      - ../data/transcription/whisper_models:/app/.cache/whisperx
+      - ../data/transcription/huggingface_cache:/app/.cache/huggingface
+    environment:
+      - CORE_SERVICE_URL=http://core:8000
+      - TRANSCRIPTION_SERVICE_PORT=8021
+      - ARTIFACT_STORAGE_BASE_PATH=/app/data/sessions
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/transcriptiondb
+      - MODEL_CACHE_DIR=/app/.cache/whisperx
+      - HF_HOME=/app/.cache/huggingface
+      - DEFAULT_MODEL=large-v2
+      - DEVICE=cuda
+      - COMPUTE_TYPE=float16
+      - BATCH_SIZE=16
+      - HF_TOKEN=${HF_TOKEN:-}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=info
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
   # frontend:
   #   build: ../frontend
   #   ports:
@@ -356,4 +424,8 @@ volumes:
   postgres_data:
   nltk_data_volume:
   ollama_data:
+  # Ensure host directories exist relative to the backend directory (where docker-compose.yml is):
+  # ../data/transcription/sessions
+  # ../data/transcription/whisper_models
+  # ../data/transcription/huggingface_cache
 

@@ -14,7 +14,8 @@ import {
   Language as LanguageIcon,
   Timer as TimerIcon,
   Security as SecurityIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Grain as ChunkIcon
 } from '@material-ui/icons';
 
 const useStyles = makeStyles((theme) => ({
@@ -42,10 +43,17 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.info.main,
     cursor: 'help',
   },
+  unknownChip: {
+    backgroundColor: theme.palette.grey[200],
+    color: theme.palette.grey[800],
+    borderColor: theme.palette.grey[400],
+    fontStyle: 'italic',
+  },
 }));
 
 // Security classification colors
 const getSecurityColor = (classification) => {
+  const normalizedClass = classification ? classification.toUpperCase().split('//')[0] : 'UNCLASSIFIED';
   const colors = {
     'UNCLASSIFIED': '#4caf50',
     'CONFIDENTIAL': '#ff9800',
@@ -53,23 +61,58 @@ const getSecurityColor = (classification) => {
     'TOP SECRET': '#9c27b0',
     'default': '#757575'
   };
-  return colors[classification] || colors.default;
+  return colors[normalizedClass] || colors.default;
 };
 
-export const SecurityClassification = ({ classification }) => {
+export const SecurityClassification = ({ classification, labelPrefix = "Document:" }) => {
   const classes = useStyles();
+  const displayClassification = classification || 'UNKNOWN';
+  const isUnknown = displayClassification === 'UNKNOWN';
+  const labelText = isUnknown ? `${labelPrefix} Unknown` : `${labelPrefix} ${displayClassification}`;
+  const color = isUnknown ? getSecurityColor('default') : getSecurityColor(displayClassification);
+  const chipClass = isUnknown ? classes.unknownChip : classes.securityChip;
+  
   return (
-    <Chip
-      icon={<SecurityIcon />}
-      label={classification || 'UNCLASSIFIED'}
-      className={`${classes.chip} ${classes.securityChip}`}
-      style={{
-        backgroundColor: `${getSecurityColor(classification)}20`,
-        color: getSecurityColor(classification),
-        borderColor: getSecurityColor(classification)
-      }}
-      variant="outlined"
-    />
+    <Tooltip title={`${labelPrefix} Security Classification${isUnknown ? ' (Could not be determined)' : ''}`}>
+      <Chip
+        icon={<SecurityIcon style={{ color: color }} />}
+        label={labelText}
+        className={`${classes.chip} ${chipClass}`}
+        style={{
+          backgroundColor: `${color}20`,
+          color: color,
+          borderColor: color
+        }}
+        variant="outlined"
+        size="small"
+      />
+    </Tooltip>
+  );
+};
+
+export const ChunkSecurityClassification = ({ classification, labelPrefix = "Chunk:" }) => {
+  const classes = useStyles();
+  const displayClassification = classification || 'UNKNOWN';
+  const isUnknown = displayClassification === 'UNKNOWN';
+  const labelText = isUnknown ? `${labelPrefix} Unknown` : `${labelPrefix} ${displayClassification}`;
+  const color = isUnknown ? getSecurityColor('default') : getSecurityColor(displayClassification);
+  const chipClass = isUnknown ? classes.unknownChip : classes.securityChip;
+  
+  return (
+    <Tooltip title={`Chunk-Specific Security Classification${isUnknown ? ' (Not detected/inherited)' : ' (Determined from portion markings or inherited)'}`}>
+      <Chip
+        icon={<ChunkIcon style={{ color: color }} />}
+        label={labelText}
+        className={`${classes.chip} ${chipClass}`}
+        style={{
+          backgroundColor: `${color}20`,
+          color: color,
+          borderColor: color
+        }}
+        variant="outlined"
+        size="small"
+      />
+    </Tooltip>
   );
 };
 
@@ -280,8 +323,13 @@ export const MetadataDisplay = ({ metadata }) => {
   const classes = useStyles();
   if (!metadata) return null;
 
-  // Handle direct properties for backward compatibility
-  const security = metadata.security_classification || 'UNCLASSIFIED';
+  // Get both classifications
+  const docSecurity = metadata.security_classification;
+  const chunkSecurity = metadata.chunk_classification;
+  
+  // Determine if chunk security needs separate display
+  const showChunkSecurity = chunkSecurity && 
+                            (docSecurity !== chunkSecurity || docSecurity === null);
   
   // For page info, check both structured and flat format
   const pageInfo = metadata.page_info || {
@@ -336,7 +384,14 @@ export const MetadataDisplay = ({ metadata }) => {
 
   return (
     <Box className={classes.metadataSection}>
-      <SecurityClassification classification={security} />
+      <Box display="flex" flexWrap="wrap" alignItems="center" mb={1}>
+        <SecurityClassification classification={docSecurity} labelPrefix="Chunk:" />
+        
+        {showChunkSecurity && (
+          <ChunkSecurityClassification classification={chunkSecurity} labelPrefix="Chunk:" />
+        )}
+      </Box>
+      
       <DocumentContext context={documentContext} />
       <ContentInfo info={contentAnalysis} />
       <PageInfo info={pageInfo} />
