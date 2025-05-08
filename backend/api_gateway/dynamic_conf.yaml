@@ -154,14 +154,12 @@ http:
 
     # New router for Transcription WebSocket Stream (higher priority, no auth-middleware)
     transcription-ws-router:
-      rule: "PathPrefix(`/api/transcription/stream`)"
+      rule: "PathPrefix(`/api/ws/transcription/stream`)"
       service: "transcription-service"
       entryPoints:
         - "web"
       middlewares:
         - "cors-headers"
-        # auth-middleware is intentionally omitted here;
-        # service itself will validate token from query param for websockets
         - "security-headers"
       priority: 10 # Higher priority than the general transcription-router
 

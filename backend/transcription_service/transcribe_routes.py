@@ -104,7 +104,7 @@ async def start_session(
     #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve session after creation.")
     
     ws_scheme = "ws" if request.url.scheme == "http" else "wss"
-    ws_url = f"{ws_scheme}://{request.url.netloc}/api/transcription/stream/{session_id}"
+    ws_url = f"{ws_scheme}://{request.url.netloc}/api/ws/transcription/stream/{session_id}"
 
     return StartSessionResponse(
         session_id=session_id,

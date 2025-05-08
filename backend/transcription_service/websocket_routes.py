@@ -265,7 +265,7 @@ async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: As
         audio_buffer.truncate()
         logger.debug(f"[{session_id}] Audio buffer cleared.")
 
-@router.websocket("/api/transcription/stream/{session_id}")
+@router.websocket("/api/ws/transcription/stream/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for streaming audio, buffering, transcription, and diarization.
