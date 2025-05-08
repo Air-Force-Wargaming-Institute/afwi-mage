@@ -50,10 +50,13 @@ export const mockReports = [
 //     ]
 //   },
   {
+    templateId: null, //null for custom & prior reports, string for template.
     id: 'TSSG2024',
     name: 'TSSG 2024 Wargame Report',
     description: 'Analysis of trilateral military cooperation and cultural influences on decision-making.',
-    vectorStore: 'None',
+    vectorStoreId: '',
+    createdAt: "2025-05-08T12:50:37.498160Z",
+    updatedAt: "2025-05-08T12:50:37.498160Z",
 
     prebuiltElements: [
       {

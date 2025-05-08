@@ -35,16 +35,16 @@ This plan focuses on the backend development for the Report Builder feature, bui
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want to implement an API endpoint to list available vector stores so the frontend `ReportConfigPanel.js` can populate its dropdown dynamically.**
-    *   [ ] Task: Determine how vector stores are identified and accessed globally in the MAGE system (e.g., from `core_service` or another central registry).
-    *   [ ] Task: Create `GET /api/report_builder/vector_stores` endpoint that fetches and returns a list of available vector stores (ID and name).
+    *   [X] Task: Determine how vector stores are identified and accessed globally in the MAGE system (e.g., from `core_service` or another central registry).
+    *   [X] Task: Create `GET /api/report_builder/vector_stores` endpoint that fetches and returns a list of available vector stores (ID and name).
 *   **As a Backend Developer, I want to modify the report definition model and storage to include a `vectorStoreId` so that reports can be linked to a specific vector store.**
-    *   [ ] Task: Ensure the `Report` Pydantic model and database schema include `vectorStoreId`. (This is already partially in `main.py` but ensure it's used with the DB).
-    *   [ ] Task: Update CRUD operations to save and retrieve this `vectorStoreId`.
+    *   [X] Task: Ensure the `Report` Pydantic model and database schema include `vectorStoreId`. (Confirmed for Pydantic model and JSON file storage; DB schema for later phase).
+    *   [X] Task: Update CRUD operations to save and retrieve this `vectorStoreId`. (Confirmed existing CRUD operations support this for JSON file storage).
 *   **As a Backend Developer, I want to create a placeholder report generation endpoint so the frontend can initiate a generation process, even if full AI integration is pending.**
-    *   [ ] Task: Create `POST /api/report_builder/reports/{report_id}/generate` endpoint.
-    *   [ ] Task: For now, this endpoint should load the specified report definition.
-    *   [ ] Task: It should iterate through "generative" elements and return a mock response (e.g., "AI content for instructions: [instructions] using vector store: [vectorStoreId]").
-    *   [ ] Task: The response should be the complete report Markdown, with explicit sections preserved and mock content for generative ones.
+    *   [X] Task: Create `POST /api/report_builder/reports/{report_id}/generate` endpoint.
+    *   [X] Task: For now, this endpoint should load the specified report definition.
+    *   [X] Task: It should iterate through "generative" elements and return a mock response (e.g., "AI content for instructions: [instructions] using vector store: [vectorStoreId]").
+    *   [X] Task: The response should be the complete report Markdown, with explicit sections preserved and mock content for generative ones.
 
 ## Phase 3: MAGE Integration for Report Generation
 

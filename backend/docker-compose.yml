@@ -389,6 +389,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - PORT=8019
       - PYTHONUNBUFFERED=1
+      - EMBEDDING_SERVICE_URL=http://embedding:8006
 
   # report_service:
   #   build:
