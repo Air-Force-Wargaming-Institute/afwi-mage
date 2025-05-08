@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
   Container, 
@@ -17,7 +17,9 @@ import PublishIcon from '@material-ui/icons/Publish';
 import CloseIcon from '@material-ui/icons/Close';
 import ReportConfigPanel from './ReportConfigPanel';
 import ReportPreviewPanel from './ReportPreviewPanel';
-import { mockReports } from './mockReports';
+import axios from 'axios';
+import { getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 // Helper functions
 const getDefaultReport = () => ({
@@ -122,6 +124,7 @@ function ReportDesignerPage() {
   const classes = useStyles();
   const history = useHistory();
   const { reportId } = useParams();
+  const { token } = useContext(AuthContext);
   const [currentDefinition, setCurrentDefinition] = useState(getDefaultReport());
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -129,61 +132,119 @@ function ReportDesignerPage() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    if (reportId) {
+    if (reportId && token) {
       setIsLoading(true);
-      const report = mockReports.find(r => r.id === reportId);
-      if (report) {
-        // Simplified transformation: Only ensure unique IDs and pass structure mostly as-is.
-        // ReportConfigPanel will expect `format` and string list content directly from this definition.
-        const transformedElements = report.prebuiltElements.map((element, index) => {
-          const baseElementWithId = {
-            ...element, // Pass original element properties
-            id: `${element.type || 'element'}-${report.id}-${index}-${Date.now()}`,
-            // No style-to-format or list content transformation here anymore.
-            // This assumes mockReports.js will be updated to provide `format` and string list content.
-          };
+      setError(null);
+      
+      // Fetch the actual report from the API
+      axios.get(getGatewayUrl(`/api/report_builder/reports/${reportId}`), {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      .then(response => {
+        const report = response.data;
+        
+        // Transform the API response to the format expected by ReportConfigPanel
+        if (report) {
+          // Extract elements from the report content
+          const reportElements = report.content?.elements || [];
+          
+          // Transform elements to add required properties and IDs
+          const transformedElements = reportElements.map((element, index) => {
+            const baseElementWithId = {
+              ...element,
+              id: element.id || `element-${reportId}-${index}-${Date.now()}`,
+              // Ensure format is set
+              format: element.format || 'paragraph'
+            };
+            
+            // Handle nested elements like sections if they exist
+            if (element.type === 'section' && element.elements) { 
+              const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
+                ...subElement,
+                id: subElement.id || `subElement-${reportId}-${index}-${subIndex}-${Date.now()}`,
+                format: subElement.format || 'paragraph'
+              }));
+              return { ...baseElementWithId, elements: subElementsWithIds };
+            }
+            
+            return baseElementWithId;
+          });
 
-          // This section handling might still be relevant if mock reports can have nested structures,
-          // though the current TSSG example is flat.
-          if (element.type === 'section' && element.elements) { 
-            const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
-              ...subElement,
-              id: `${subElement.type || 'subElement'}-${report.id}-${index}-${subIndex}-${Date.now()}`
-            }));
-            return { ...baseElementWithId, elements: subElementsWithIds };
-          }
-          return baseElementWithId;
-        });
-
-        setCurrentDefinition({
-          id: report.id,
-          title: report.name,
-          description: report.description,
-          elements: transformedElements,
-          vectorStoreId: report.vectorStoreId || '' 
-        });
-
-      } else {
+          // Set the definition with proper mapping of API data
+          setCurrentDefinition({
+            id: report.id,
+            title: report.name,
+            description: report.description,
+            elements: transformedElements,
+            vectorStoreId: report.vectorStoreId || '',
+            status: report.status || 'draft'
+          });
+        } else {
+          setCurrentDefinition(prevDef => ({
+            ...getDefaultReport(),
+            id: reportId
+          }));
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching report:", err);
+        setError(err.response?.data?.detail || 'Failed to load report');
+        
+        // Fallback to default report if API call fails
         setCurrentDefinition(prevDef => ({
           ...getDefaultReport(),
           id: reportId
         }));
-      }
-      setIsLoading(false);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
     }
-  }, [reportId]);
+  }, [reportId, token]);
 
   const handleDefinitionChange = (newDefinition) => {
     setCurrentDefinition(newDefinition);
   };
 
   const handleSave = async () => {
-    if (!currentDefinition) return;
+    if (!currentDefinition || !token) return;
+    
     setIsSaving(true);
+    setError(null);
+    
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 700));
-      console.log('Saving report:', currentDefinition);
+      // Transform the definition back to the format expected by the API
+      const reportData = {
+        id: currentDefinition.id,
+        name: currentDefinition.title,
+        description: currentDefinition.description,
+        vectorStoreId: currentDefinition.vectorStoreId || null,
+        status: currentDefinition.status || 'draft',
+        type: 'Custom',
+        // Transform elements to API format
+        content: {
+          elements: currentDefinition.elements
+        }
+      };
+
+      // Save the report using the API
+      const response = await axios.put(
+        getGatewayUrl(`/api/report_builder/reports/${reportId}`), 
+        reportData,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Report saved successfully:', response.data);
+      
       setSnackbar({
         open: true,
         message: 'Report saved successfully',
@@ -191,9 +252,11 @@ function ReportDesignerPage() {
       });
     } catch (error) {
       console.error("Failed to save report:", error);
+      setError(error.response?.data?.detail || 'Failed to save report');
+      
       setSnackbar({
         open: true,
-        message: 'Failed to save report',
+        message: `Failed to save report: ${error.response?.data?.detail || error.message}`,
         severity: 'error'
       });
     } finally {

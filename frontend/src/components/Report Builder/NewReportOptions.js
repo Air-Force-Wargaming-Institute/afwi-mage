@@ -8,10 +8,10 @@ import {
   ListItem, 
   ListItemText, 
   Divider, 
-  makeStyles 
+  makeStyles,
+  CircularProgress
 } from '@material-ui/core';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
-import { reportTemplates } from './reportTemplates'; // Add back the import
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -98,9 +98,16 @@ const useStyles = makeStyles((theme) => ({
       fontSize: '0.875rem',
     },
   },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing(2),
+    flexGrow: 1,
+  },
 }));
 
-function NewReportOptions({ onCreateNew, onCreateTemplate }) {
+function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [] }) {
   const classes = useStyles();
 
   const handleSelectTemplate = (template) => {
@@ -128,22 +135,29 @@ function NewReportOptions({ onCreateNew, onCreateTemplate }) {
       <Typography variant="subtitle1" gutterBottom className={classes.subtitle} align="left">
         From Template:
       </Typography>
-      <List className={classes.templateList} dense>
-        {reportTemplates.map((template) => (
-          <ListItem 
-            key={template.id} 
-            button 
-            className={classes.templateItem} 
-            onClick={() => handleSelectTemplate(template)}
-          >
-            <ListItemText 
-              primary={template.name} 
-              secondary={template.description} 
-              primaryTypographyProps={{ style: { fontWeight: 500 } }}
-            />
-          </ListItem>
-        ))}
-      </List>
+      
+      {templates.length === 0 ? (
+        <Box className={classes.loadingContainer}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : (
+        <List className={classes.templateList} dense>
+          {templates.map((template) => (
+            <ListItem 
+              key={template.id} 
+              button 
+              className={classes.templateItem} 
+              onClick={() => handleSelectTemplate(template)}
+            >
+              <ListItemText 
+                primary={template.name} 
+                secondary={template.description} 
+                primaryTypographyProps={{ style: { fontWeight: 500 } }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      )}
 
       <Divider className={classes.divider} />
 

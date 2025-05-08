@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   Paper, 
   Typography, 
@@ -7,13 +7,17 @@ import {
   ListItemText, 
   ListItemSecondaryAction, 
   IconButton, 
-  Box, 
+  Box,
+  CircularProgress,
+  Snackbar,
   makeStyles 
 } from '@material-ui/core';
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { GradientText } from '../../styles/StyledComponents';
-import { mockReports } from './mockReports';
+import { AuthContext } from '../../contexts/AuthContext';
+import axios from 'axios';
+import { getGatewayUrl } from '../../config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -64,56 +68,128 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: theme.palette.action.hover,
     },
   },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing(2),
+  },
+  errorMessage: {
+    color: theme.palette.error.main,
+    padding: theme.spacing(2),
+    textAlign: 'center',
+  },
 }));
 
 function PriorReportsList({ onViewEdit }) {
   const classes = useStyles();
-  const [reports, setReports] = useState(mockReports);
+  const { token } = useContext(AuthContext);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const fetchReports = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Use axios instead of fetch with proper headers
+      const response = await axios.get(getGatewayUrl('/api/report_builder/reports'), {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+      });
+      
+      setReports(response.data || []);
+    } catch (e) {
+      console.error("Failed to fetch reports:", e);
+      let errorMessage = "Unknown error occurred";
+      
+      if (e.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error("Error response data:", e.response.data);
+        console.error("Error response status:", e.response.status);
+        errorMessage = `Server error: ${e.response.status}`;
+        
+        if (e.response.status === 401 || e.response.status === 403) {
+          errorMessage = "Authentication error. Please log in again.";
+        }
+      } else if (e.request) {
+        // The request was made but no response was received
+        errorMessage = "No response from server";
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        errorMessage = e.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchReports = async () => {
-      // setLoading(true); // If using loading state
-      // setError(null); // If using error state
-      try {
-        const response = await fetch('/api/report_builder/reports');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setReports(data);
-      } catch (e) {
-        console.error("Failed to fetch reports:", e);
-        // setError(e.message); // If using error state
-        // setReports([]); // Clear reports or show an error message
-      } finally {
-        // setLoading(false); // If using loading state
-      }
-    };
-
-    fetchReports();
-  }, []); // Empty dependency array means this effect runs once on mount
+    if (token) {
+      fetchReports();
+    } else {
+      setError("Authentication required");
+      setLoading(false);
+    }
+  }, [token]);
 
   const handleDelete = async (reportId) => {
-    // For now, optimistic UI update.
-    // For backend deletion, you would uncomment and implement the following:
-    /*
     try {
-      const response = await fetch(`/api/report_builder/reports/${reportId}`, { method: 'DELETE' });
-      if (!response.ok) {
-        throw new Error('Failed to delete report from backend');
-      }
-      // If successful, then update UI. The local filter is one way.
-      // Another way is to re-fetch the list: fetchReports();
+      const response = await axios.delete(getGatewayUrl(`/api/report_builder/reports/${reportId}`), {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Update UI after successful deletion
       setReports(prev => prev.filter(report => report.id !== reportId));
+      setSnackbarMessage('Report deleted successfully');
+      setSnackbarOpen(true);
     } catch (e) {
       console.error("Failed to delete report:", e);
-      // Optionally revert UI change or show an error message to the user
-      // alert(`Error deleting report: ${e.message}`);
+      setSnackbarMessage(`Error deleting report: ${e.response?.status || e.message}`);
+      setSnackbarOpen(true);
     }
-    */
-    // Current behavior: Optimistic UI update only
-    setReports(prev => prev.filter(report => report.id !== reportId));
   };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
+  if (loading) {
+    return (
+      <Paper className={classes.root} elevation={3}>
+        <GradientText variant="h6" component="h2" gutterBottom>
+          Prior Reports
+        </GradientText>
+        <Box className={classes.loadingContainer}>
+          <CircularProgress />
+        </Box>
+      </Paper>
+    );
+  }
+
+  if (error) {
+    return (
+      <Paper className={classes.root} elevation={3}>
+        <GradientText variant="h6" component="h2" gutterBottom>
+          Prior Reports
+        </GradientText>
+        <Typography className={classes.errorMessage}>
+          Error loading reports: {error}
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
     <Paper className={classes.root} elevation={3}>
@@ -132,7 +208,23 @@ function PriorReportsList({ onViewEdit }) {
               >
                 <ListItemText
                   primary={report.name}
-                  secondary={report.description}
+                  secondary={
+                    <>
+                      {report.description}
+                      <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
+                        <span style={{ fontWeight: 500 }}>Status:</span> {report.status.charAt(0).toUpperCase() + report.status.slice(1)} 
+                        {' | '}
+                        <span style={{ fontWeight: 500 }}>Updated:</span> {new Date(report.updatedAt).toLocaleString(undefined, { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric', 
+                          hour: '2-digit', 
+                          minute: '2-digit', 
+                          hour12: false
+                        })}
+                      </Typography>
+                    </>
+                  }
                   primaryTypographyProps={{ style: { fontWeight: 500 } }}
                 />
                 <ListItemSecondaryAction>
@@ -152,6 +244,12 @@ function PriorReportsList({ onViewEdit }) {
           )}
         </List>
       </Box>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+      />
     </Paper>
   );
 }

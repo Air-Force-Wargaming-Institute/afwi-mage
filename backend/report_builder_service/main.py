@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import httpx # For making async HTTP requests
 import os
+import shutil
+from init_templates import init_templates
 
 app = FastAPI()
 
@@ -39,6 +41,21 @@ class Report(ReportBase):
     status: str = "draft"
     content: ReportContent
 
+# Template models
+class TemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+class TemplateCreate(TemplateBase):
+    content: ReportContent = Field(default_factory=ReportContent)
+
+class Template(TemplateBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    createdAt: str # ISO format string
+    updatedAt: str # ISO format string
+    content: ReportContent
+
 # New Pydantic model for our endpoint's response structure
 class ReportBuilderVectorStoreInfo(BaseModel):
     id: str
@@ -48,30 +65,95 @@ class GeneratedReportMarkdown(BaseModel):
     report_id: str
     markdown_content: str
 
-REPORTS_DATA_FILE = Path(__file__).parent / "reports_data.json"
+# Define directory structure
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+REPORTS_DIR = DATA_DIR / "reports"
+TEMPLATES_DIR = DATA_DIR / "templates"
+LEGACY_REPORTS_DATA_FILE = BASE_DIR / "reports_data.json"
 
-# In-memory database for reports, loaded from/saved to JSON file
-# Now Report is defined
-fake_reports_db: List[Report] = []
+# Ensure directories exist
+def ensure_directories():
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
-def load_reports_from_file() -> List[Report]:
-    if REPORTS_DATA_FILE.exists():
-        with open(REPORTS_DATA_FILE, "r") as f:
-            try:
-                data = json.load(f)
-                # Ensure Report model is fully defined before list comprehension
-                return [Report(**report_data) for report_data in data]
-            except json.JSONDecodeError:
-                return [] # Return empty list if file is corrupted or empty
-    return []
+# Create directories if they don't exist
+ensure_directories()
 
-def save_reports_to_file(reports: List[Report]):
-    with open(REPORTS_DATA_FILE, "w") as f:
-        json.dump([report.dict() for report in reports], f, indent=4)
+# Function to load a single report from a file
+def load_report_from_file(file_path: Path) -> Optional[Report]:
+    try:
+        with open(file_path, "r") as f:
+            report_data = json.load(f)
+            return Report(**report_data)
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"Error loading report from {file_path}: {e}")
+        return None
 
-# Load initial data when the app starts
-# Ensure load_reports_from_file uses the now-defined Report model
-fake_reports_db = load_reports_from_file()
+# Function to save a single report to a file
+def save_report_to_file(report: Report):
+    file_path = REPORTS_DIR / f"{report.id}.json"
+    with open(file_path, "w") as f:
+        json.dump(report.dict(), f, indent=4)
+
+# Function to load all reports from the reports directory
+def load_all_reports() -> List[Report]:
+    reports = []
+    for file_path in REPORTS_DIR.glob("*.json"):
+        report = load_report_from_file(file_path)
+        if report:
+            reports.append(report)
+    return reports
+
+# Template functions
+def load_template_from_file(file_path: Path) -> Optional[Template]:
+    try:
+        with open(file_path, "r") as f:
+            template_data = json.load(f)
+            return Template(**template_data)
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"Error loading template from {file_path}: {e}")
+        return None
+
+def save_template_to_file(template: Template):
+    file_path = TEMPLATES_DIR / f"{template.id}.json"
+    with open(file_path, "w") as f:
+        json.dump(template.dict(), f, indent=4)
+
+def load_all_templates() -> List[Template]:
+    templates = []
+    for file_path in TEMPLATES_DIR.glob("*.json"):
+        template = load_template_from_file(file_path)
+        if template:
+            templates.append(template)
+    return templates
+
+# Function to migrate legacy data if it exists
+def migrate_legacy_data():
+    if LEGACY_REPORTS_DATA_FILE.exists():
+        try:
+            with open(LEGACY_REPORTS_DATA_FILE, "r") as f:
+                legacy_data = json.load(f)
+                
+            # Save each report as an individual file
+            for report_data in legacy_data:
+                report = Report(**report_data)
+                save_report_to_file(report)
+                
+            # Backup and remove the legacy file
+            backup_path = LEGACY_REPORTS_DATA_FILE.with_suffix('.json.bak')
+            shutil.copy2(LEGACY_REPORTS_DATA_FILE, backup_path)
+            LEGACY_REPORTS_DATA_FILE.unlink()
+            
+            print(f"Successfully migrated legacy data to individual files. Backup created at {backup_path}")
+        except Exception as e:
+            print(f"Error migrating legacy data: {e}")
+
+# Migrate legacy data on startup
+migrate_legacy_data()
+
+# Initialize templates
+init_templates()
 
 # It's good practice to get service URLs from environment variables or a config service
 # Ensure this matches your docker-compose service name and port for embedding_service
@@ -106,6 +188,7 @@ async def get_vector_stores_for_report_builder():
         print(f"An unexpected error occurred: {exc}")
         raise HTTPException(status_code=500, detail="An internal server error occurred while fetching vector stores.")
 
+# Report endpoints
 @app.post("/api/report_builder/reports", response_model=Report)
 async def create_report(report_in: ReportCreate):
     from datetime import datetime
@@ -124,69 +207,70 @@ async def create_report(report_in: ReportCreate):
         status="draft",
         content=report_in.content
     )
-    fake_reports_db.append(new_report)
-    save_reports_to_file(fake_reports_db)
+    
+    # Save the report to its own file
+    save_report_to_file(new_report)
+    
     return new_report
 
 @app.get("/api/report_builder/reports", response_model=List[Report])
 async def get_reports():
-    # Simulate fetching all reports
-    return fake_reports_db
+    # Load all reports from individual files
+    return load_all_reports()
 
 @app.get("/api/report_builder/reports/{report_id}", response_model=Report)
 async def get_report(report_id: str):
-    for report in fake_reports_db:
-        if report.id == report_id:
-            return report
-    raise HTTPException(status_code=404, detail="Report not found")
+    report_path = REPORTS_DIR / f"{report_id}.json"
+    report = load_report_from_file(report_path)
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    return report
 
 @app.put("/api/report_builder/reports/{report_id}", response_model=Report)
 async def update_report(report_id: str, report_update: ReportCreate):
     from datetime import datetime
     now = datetime.utcnow().isoformat() + "Z"
-    for i, report in enumerate(fake_reports_db):
-        if report.id == report_id:
-            updated_data = report_update.dict(exclude_unset=True)
-            
-            current_report_data = report.dict()
-            
-            for key, value in updated_data.items():
-                if key == 'content' and isinstance(value, dict):
-                    current_report_data[key] = ReportContent(**value)
-                else:
-                    current_report_data[key] = value
-            
-            current_report_data['updatedAt'] = now
-            current_report_data['id'] = report_id
-            
-            updated_instance = Report(**current_report_data)
-            fake_reports_db[i] = updated_instance
-            save_reports_to_file(fake_reports_db)
-            return updated_instance
-            
-    raise HTTPException(status_code=404, detail="Report not found")
+    
+    report_path = REPORTS_DIR / f"{report_id}.json"
+    existing_report = load_report_from_file(report_path)
+    
+    if not existing_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    updated_data = report_update.dict(exclude_unset=True)
+    current_report_data = existing_report.dict()
+    
+    for key, value in updated_data.items():
+        if key == 'content' and isinstance(value, dict):
+            current_report_data[key] = ReportContent(**value)
+        else:
+            current_report_data[key] = value
+    
+    current_report_data['updatedAt'] = now
+    
+    updated_instance = Report(**current_report_data)
+    save_report_to_file(updated_instance)
+    
+    return updated_instance
 
 @app.delete("/api/report_builder/reports/{report_id}", status_code=204)
 async def delete_report(report_id: str):
-    global fake_reports_db
-    report_to_remove = None
-    for report in fake_reports_db:
-        if report.id == report_id:
-            report_to_remove = report
-            break
-    if not report_to_remove:
+    report_path = REPORTS_DIR / f"{report_id}.json"
+    
+    if not report_path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
-    fake_reports_db.remove(report_to_remove)
-    save_reports_to_file(fake_reports_db)
+    
+    # Delete the report file
+    report_path.unlink()
+    
     return
 
 @app.post("/api/report_builder/reports/{report_id}/generate", response_model=GeneratedReportMarkdown)
 async def generate_report_placeholder(report_id: str):
-    report_to_generate = None
-    for report_in_db in fake_reports_db:
-        if report_in_db.id == report_id:
-            report_to_generate = report_in_db
-            break
+    report_path = REPORTS_DIR / f"{report_id}.json"
+    report_to_generate = load_report_from_file(report_path)
     
     if not report_to_generate:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -223,6 +307,82 @@ async def generate_report_placeholder(report_id: str):
     full_markdown = "".join(markdown_parts) # Join without double newlines if parts already end with one
     
     return GeneratedReportMarkdown(report_id=report_id, markdown_content=full_markdown)
+
+# Template endpoints
+@app.post("/api/report_builder/templates", response_model=Template)
+async def create_template(template_in: TemplateCreate):
+    from datetime import datetime
+    now = datetime.utcnow().isoformat() + "Z"
+    template_id = str(uuid.uuid4())
+    
+    new_template = Template(
+        id=template_id,
+        name=template_in.name,
+        description=template_in.description,
+        category=template_in.category,
+        createdAt=now,
+        updatedAt=now,
+        content=template_in.content
+    )
+    
+    # Save the template to its own file
+    save_template_to_file(new_template)
+    
+    return new_template
+
+@app.get("/api/report_builder/templates", response_model=List[Template])
+async def get_templates():
+    # Load all templates from individual files
+    return load_all_templates()
+
+@app.get("/api/report_builder/templates/{template_id}", response_model=Template)
+async def get_template(template_id: str):
+    template_path = TEMPLATES_DIR / f"{template_id}.json"
+    template = load_template_from_file(template_path)
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return template
+
+@app.put("/api/report_builder/templates/{template_id}", response_model=Template)
+async def update_template(template_id: str, template_update: TemplateCreate):
+    from datetime import datetime
+    now = datetime.utcnow().isoformat() + "Z"
+    
+    template_path = TEMPLATES_DIR / f"{template_id}.json"
+    existing_template = load_template_from_file(template_path)
+    
+    if not existing_template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    updated_data = template_update.dict(exclude_unset=True)
+    current_template_data = existing_template.dict()
+    
+    for key, value in updated_data.items():
+        if key == 'content' and isinstance(value, dict):
+            current_template_data[key] = ReportContent(**value)
+        else:
+            current_template_data[key] = value
+    
+    current_template_data['updatedAt'] = now
+    
+    updated_instance = Template(**current_template_data)
+    save_template_to_file(updated_instance)
+    
+    return updated_instance
+
+@app.delete("/api/report_builder/templates/{template_id}", status_code=204)
+async def delete_template(template_id: str):
+    template_path = TEMPLATES_DIR / f"{template_id}.json"
+    
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    # Delete the template file
+    template_path.unlink()
+    
+    return
 
 @app.get("/api/report_builder/health")
 async def health_check():

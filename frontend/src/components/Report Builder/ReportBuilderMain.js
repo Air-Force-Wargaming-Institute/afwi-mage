@@ -6,8 +6,6 @@ import { AuthContext } from '../../contexts/AuthContext';
 import { useHistory } from 'react-router-dom';
 import { makeStyles, styled, useTheme } from '@material-ui/core/styles';
 import { GradientText } from '../../styles/StyledComponents';
-import { mockReports } from './mockReports';
-import { reportTemplates } from './reportTemplates';
 import axios from 'axios';
 import { getGatewayUrl } from '../../config';
 
@@ -110,27 +108,37 @@ const ReportBuilderMain = () => {
     const classes = useStyles();
     const theme = useTheme();
     const [reports, setReports] = useState([]);
+    const [templates, setTemplates] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         if (token) {
-            const fetchReports = async () => {
+            const fetchData = async () => {
                 setIsLoading(true);
                 setError(null);
                 try {
-                    const response = await axios.get(getGatewayUrl('/api/report_builder/reports'), {
+                    // Fetch reports
+                    const reportsResponse = await axios.get(getGatewayUrl('/api/report_builder/reports'), {
                         headers: { Authorization: `Bearer ${token}` },
                     });
-                    setReports(response.data || []);
+                    
+                    // Fetch templates
+                    const templatesResponse = await axios.get(getGatewayUrl('/api/report_builder/templates'), {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    
+                    setReports(reportsResponse.data || []);
+                    setTemplates(templatesResponse.data || []);
                 } catch (err) {
-                    console.error("Error fetching reports:", err);
-                    setError('Failed to fetch reports. Please try again.');
+                    console.error("Error fetching data:", err);
+                    setError('Failed to fetch data. Please try again.');
                     setReports([]);
+                    setTemplates([]);
                 }
                 setIsLoading(false);
             };
-            fetchReports();
+            fetchData();
         }
     }, [token]);
 
@@ -147,12 +155,16 @@ const ReportBuilderMain = () => {
             reportType = 'Template-based';
             reportName = `New from: ${templateToStore.name}`;
             reportDescription = templateToStore.description;
+            
+            // Transform template content to report content format if necessary
+            const templateContent = templateToStore.content || { elements: [] };
+            
             newReportData = {
                 name: reportName,
                 description: reportDescription,
                 type: reportType,
                 templateId: templateToStore.id,
-                content: templateToStore.structure || { elements: [] } 
+                content: templateContent
             };
         } else {
             newReportData = {
@@ -221,7 +233,7 @@ const ReportBuilderMain = () => {
     }
     
     if (isLoading && !authIsLoading) {
-        return <div>Loading reports...</div>;
+        return <div>Loading reports and templates...</div>;
     }
 
     if (error) {
@@ -241,7 +253,7 @@ const ReportBuilderMain = () => {
                             <NewReportOptions 
                                 onCreateNew={handleCreateReport}
                                 onCreateTemplate={() => history.push('/templates/new')}
-                                templates={reportTemplates}
+                                templates={templates}
                             />
                         </Box>
                     </Box>
@@ -269,8 +281,6 @@ const ReportBuilderMain = () => {
                         </Box>
                         <Box className={classes.contentWrapper}>
                             <PriorReportsList
-                                reports={reports}
-                                onDeleteReport={handleDeleteReport}
                                 onViewEdit={handleViewEdit}
                             />
                         </Box>
