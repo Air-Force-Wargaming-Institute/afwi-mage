@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Paper, 
   Typography, 
@@ -70,7 +70,48 @@ function PriorReportsList({ onViewEdit }) {
   const classes = useStyles();
   const [reports, setReports] = useState(mockReports);
 
-  const handleDelete = (reportId) => {
+  useEffect(() => {
+    const fetchReports = async () => {
+      // setLoading(true); // If using loading state
+      // setError(null); // If using error state
+      try {
+        const response = await fetch('/api/report_builder/reports');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setReports(data);
+      } catch (e) {
+        console.error("Failed to fetch reports:", e);
+        // setError(e.message); // If using error state
+        // setReports([]); // Clear reports or show an error message
+      } finally {
+        // setLoading(false); // If using loading state
+      }
+    };
+
+    fetchReports();
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  const handleDelete = async (reportId) => {
+    // For now, optimistic UI update.
+    // For backend deletion, you would uncomment and implement the following:
+    /*
+    try {
+      const response = await fetch(`/api/report_builder/reports/${reportId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error('Failed to delete report from backend');
+      }
+      // If successful, then update UI. The local filter is one way.
+      // Another way is to re-fetch the list: fetchReports();
+      setReports(prev => prev.filter(report => report.id !== reportId));
+    } catch (e) {
+      console.error("Failed to delete report:", e);
+      // Optionally revert UI change or show an error message to the user
+      // alert(`Error deleting report: ${e.message}`);
+    }
+    */
+    // Current behavior: Optimistic UI update only
     setReports(prev => prev.filter(report => report.id !== reportId));
   };
 

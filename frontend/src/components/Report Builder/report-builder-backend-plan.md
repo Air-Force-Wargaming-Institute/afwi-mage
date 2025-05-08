@@ -24,6 +24,7 @@ This plan focuses on the backend development for the Report Builder feature, bui
     *   [ ] (Deferred) Task: Ensure the `report_builder_service` in `docker-compose.yml` correctly connects to its own dedicated PostgreSQL database instance or schema.
 *   **As a Backend Developer, I want to ensure the existing CRUD API endpoints (`POST`, `GET`, `PUT`, `DELETE` for `/api/report_builder/reports`) correctly handle the detailed report definition structure with JSON file persistence so that the frontend can save and load full reports.**
     *   [X] Task: Test `POST /api/report_builder/reports` with a detailed report definition from the frontend (simulating a save from `ReportDesignerPage.js`), ensuring `reports_data.json` is updated.
+    *   [X] Task: Test `GET /api/report_builder/reports` to ensure it retrieves a list of all reports, suitable for the frontend's "Prior Reports" list.
     *   [X] Task: Test `GET /api/report_builder/reports/{report_id}` to ensure it retrieves the full, detailed structure.
     *   [X] Task: Test `PUT /api/report_builder/reports/{report_id}` to ensure it can update a report with a new detailed structure.
     *   [X] Task: Test `DELETE /api/report_builder/reports/{report_id}`.

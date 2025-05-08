@@ -1,5 +1,5 @@
 [
-    { 
+    {
         "name": "My First Detailed Report v2",
         "description": "A test report with various elements (content: null for generative).",
         "type": "Custom",
@@ -33,45 +33,6 @@
                     "type": "explicit",
                     "format": null,
                     "content": "## Conclusion\n\nThis concludes the report.",
-                    "instructions": null
-                }
-            ]
-        }
-    },
-    {
-        "name": "TSSG 2024 Wargame Report (from Mock)",
-        "description": "Analysis of trilateral military cooperation and cultural influences on decision-making.",
-        "type": "Custom",
-        "templateId": null,
-        "vectorStoreId": "",
-        "id": "29b44a54-64b4-4f0a-8637-0663f7022d11",
-        "createdAt": "2025-05-08T13:02:12.360136Z",
-        "updatedAt": "2025-05-08T13:02:12.360136Z",
-        "status": "draft",
-        "content": {
-            "elements": [
-                {
-                    "id": "b6a351fe-40d0-4c19-b173-a31f835b5b67",
-                    "title": "TSSG 2024 Wargame Report",
-                    "type": "explicit",
-                    "format": "h1",
-                    "content": "TSSG 2024 Wargame Report",
-                    "instructions": null
-                },
-                {
-                    "id": "d6f951c4-b62e-4875-bc60-a2dfa84e7477",
-                    "title": "Executive Summary",
-                    "type": "explicit",
-                    "format": "h2",
-                    "content": "Executive Summary",
-                    "instructions": null
-                },
-                {
-                    "id": "ef6250cc-1760-4f61-a5a8-cb0ed2a84d27",
-                    "title": "Purpose",
-                    "type": "explicit",
-                    "format": "paragraph",
-                    "content": "This report provides an overview of key objectives, game design, analysis findings, and opportunities for future research following the 2024 Trilateral Strategic Steering Group (TSSG) Wargame. The wargame aimed to characterize military cultural fluency and explore challenges in combined Air Force-level decision-making across allied French, UK, and US military participants.",
                     "instructions": null
                 }
             ]
@@ -158,7 +119,7 @@
                     "title": "Background",
                     "type": "explicit",
                     "format": "paragraph",
-                    "content": "The French Air Chief hosted the TSSG Wargame at École Militaire in Paris, France, from 28-31 May 2024. French, UK, and US Air Force officers gathered as allied collaborators to improve military cultural fluency and explore differences in decision-making approaches.",
+                    "content": "The French Air Chief hosted the TSSG Wargame at \u00c9cole Militaire in Paris, France, from 28-31 May 2024. French, UK, and US Air Force officers gathered as allied collaborators to improve military cultural fluency and explore differences in decision-making approaches.",
                     "instructions": null
                 },
                 {
@@ -370,6 +331,76 @@
                     "instructions": null
                 }
             ]
+        }
+    },
+    {
+        "name": "New from: Bullet Background Paper (BBP)",
+        "description": "A concise background paper with bullet points.",
+        "type": "Template-based",
+        "templateId": "bbp",
+        "vectorStoreId": null,
+        "id": "e1c6fa2c-2ab9-4c18-b772-207e345ab9b6",
+        "createdAt": "2025-05-08T15:25:36.088752Z",
+        "updatedAt": "2025-05-08T15:25:36.088752Z",
+        "status": "draft",
+        "content": {
+            "elements": []
+        }
+    },
+    {
+        "name": "New Custom Report",
+        "description": "A new report created from scratch.",
+        "type": "Custom",
+        "templateId": null,
+        "vectorStoreId": null,
+        "id": "12cdf862-6668-4d78-8e18-9142ea83ac17",
+        "createdAt": "2025-05-08T15:25:40.518496Z",
+        "updatedAt": "2025-05-08T15:25:40.518496Z",
+        "status": "draft",
+        "content": {
+            "elements": []
+        }
+    },
+    {
+        "name": "New Custom Report",
+        "description": "A new report created from scratch.",
+        "type": "Custom",
+        "templateId": null,
+        "vectorStoreId": null,
+        "id": "d067254f-22d1-4f11-afc2-e233ec9c96e1",
+        "createdAt": "2025-05-08T17:44:32.690400Z",
+        "updatedAt": "2025-05-08T17:44:32.690400Z",
+        "status": "draft",
+        "content": {
+            "elements": []
+        }
+    },
+    {
+        "name": "New from: Talking Paper (TP)",
+        "description": "A concise background paper with talking points.",
+        "type": "Template-based",
+        "templateId": "tp",
+        "vectorStoreId": null,
+        "id": "ee549870-ee83-40b7-a7e6-5e5333724011",
+        "createdAt": "2025-05-08T18:01:47.273350Z",
+        "updatedAt": "2025-05-08T18:01:47.273350Z",
+        "status": "draft",
+        "content": {
+            "elements": []
+        }
+    },
+    {
+        "name": "New from: Executive Summary",
+        "description": "A concise overview for decision-makers.",
+        "type": "Template-based",
+        "templateId": "exec_summary",
+        "vectorStoreId": null,
+        "id": "9c9ccd4d-fa7f-4ac5-8b74-ef4056520e6a",
+        "createdAt": "2025-05-08T18:19:18.889773Z",
+        "updatedAt": "2025-05-08T18:19:18.889773Z",
+        "status": "draft",
+        "content": {
+            "elements": []
         }
     }
 ]
