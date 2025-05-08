@@ -21,6 +21,8 @@ HF_TOKEN = os.getenv("HF_TOKEN", None)
 # WebSocket/Processing Config
 WEBSOCKET_BUFFER_SECONDS = int(os.getenv("WEBSOCKET_BUFFER_SECONDS", 5))
 DIARIZATION_MIN_CHUNK_MS = int(os.getenv("DIARIZATION_MIN_CHUNK_MS", 100))
+AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "webm")
+TARGET_SAMPLE_RATE = int(os.getenv("TARGET_SAMPLE_RATE", 16000))
 
 # Database URL
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@db:5432/transcriptiondb")
@@ -48,5 +50,7 @@ print(f"  Batch Size: {BATCH_SIZE}")
 print(f"  HF Token Provided: {'Yes' if HF_TOKEN else 'No'}")
 print(f"  WebSocket Buffer Duration: {WEBSOCKET_BUFFER_SECONDS}s")
 print(f"  Min Chunk Duration for Diarization: {DIARIZATION_MIN_CHUNK_MS}ms")
+print(f"  Audio Format: {AUDIO_FORMAT}")
+print(f"  Target Sample Rate: {TARGET_SAMPLE_RATE}Hz")
 print(f"  Database URL Configured: {'Yes' if DATABASE_URL else 'No'}")
 print(f"  Artifact Storage Path: {ARTIFACT_STORAGE_BASE_PATH}") 

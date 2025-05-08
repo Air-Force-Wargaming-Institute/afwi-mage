@@ -246,6 +246,11 @@ const RecordingControlPanel = () => {
   
   // WebSocket references
   const wsRef = useRef(null);
+  const isStreamingStateRef = useRef(isStreaming);
+
+  useEffect(() => {
+    isStreamingStateRef.current = isStreaming;
+  }, [isStreaming]);
 
   // --- WaveSurfer Initialization and Event Handling ---
   useEffect(() => {
@@ -630,15 +635,26 @@ const RecordingControlPanel = () => {
       // Handle data available events
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          // Add to local chunks storage
-          setAudioChunks(chunks => [...chunks, e.data]);
-          
-          // Stream to server if connected
-          streamAudioChunk(e.data);
+          setAudioChunks(localChunks => [...localChunks, e.data]);
+          // Directly use wsRef.current and the new isStreamingStateRef.current for the check
+          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !isStreamingStateRef.current) {
+            console.warn(
+              '[WebSocket] Attempted to send chunk while not connected/streaming (checked with refs).',
+              'WS ReadyState:', wsRef.current ? wsRef.current.readyState : 'No WS instance',
+              'isStreaming Ref:', isStreamingStateRef.current
+            );
+            return;
+          }
+          try {
+            wsRef.current.send(e.data);
+          } catch (error) {
+            console.error('[WebSocket] Error sending audio chunk:', error);
+            setApiError(`Failed to stream audio: ${error.message}`);
+            // Optionally show snackbar or dispatch error to context
+          }
         }
       };
       
-      // Ensure we have participants, or create a default one
       let currentParticipants = participants;
       if (currentParticipants.length === 0) {
         currentParticipants = [{
@@ -650,7 +666,6 @@ const RecordingControlPanel = () => {
         dispatch({ type: ACTIONS.SET_PARTICIPANTS, payload: currentParticipants });
       }
       
-      // Create API payload
       const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
       const apiPayload = {
         user_id: user?.username || 'unknown-user',
@@ -706,7 +721,7 @@ const RecordingControlPanel = () => {
         setSnackbarOpen(true);
       }
       
-      return recorder;
+      return recorder; // Return recorder even if API call failed for local recording
     } catch (error) {
       console.error('Error initializing recording:', error);
       
@@ -732,7 +747,8 @@ const RecordingControlPanel = () => {
     loadedSessionId, dispatch, token, user,
     audioFilename, eventMetadata, 
     selectedClassification, caveatType, customCaveat, 
-    participants, connectWebSocket, streamAudioChunk, uploadAndTranscribeAudio
+    participants, connectWebSocket,
+    audioStream 
   ]);
 
   const startRecording = useCallback(async () => {
@@ -857,10 +873,10 @@ const RecordingControlPanel = () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log('[WebSocket] Closing connection on stop...');
         wsRef.current.close(1000, "Recording stopped by user");
-        wsRef.current = null;
       }
+      setIsStreaming(false); 
+      isStreamingStateRef.current = false;
 
-      // Call the backend API to stop and finalize the session
       if (sessionToStop && token) {
         console.log(`[API] Attempting to stop session ${sessionToStop} on backend.`);
         setSnackbarMessage('Finalizing session on server...');
@@ -934,19 +950,6 @@ const RecordingControlPanel = () => {
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
           console.log('Audio also saved locally (backup).');
-
-          // The call to uploadAndTranscribeAudio is likely redundant now if the /stop 
-          // endpoint handles the complete processing and saving.
-          // Kept commented out for consideration if it has a different purpose.
-          /*
-          if (successfullyStoppedOnBackend) {
-             console.log("Session finalized on backend, skipping utility transcribe for full blob here.");
-          } else if (completeAudioBlob && completeAudioBlob.size > 0) {
-             console.warn("Session did not stop cleanly on backend, attempting utility transcribe as fallback.");
-             uploadAndTranscribeAudio(completeAudioBlob, `${currentAudioFilename}.webm`);
-          }
-          */
-
         } catch (saveError) {
           console.error('Error processing local audio blob:', saveError);
         }
@@ -961,20 +964,15 @@ const RecordingControlPanel = () => {
     } finally {
       setAudioChunks([]);
       setMediaRecorder(null);
-      setIsStreaming(false);
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
-      
-      // Consider dispatching an action to clean up for a new session, e.g.
-      // dispatch({ type: ACTIONS.START_NEW_SESSION }); 
-      // This would clear loadedSessionId and related data as per TranscriptionContext
     }
   }, [
-    loadedSessionId, mediaRecorder, recordingState, token, user, // Added user
+    loadedSessionId, mediaRecorder, recordingState, token, user,
     audioStream, dispatch, sessionId, 
     audioFilename, 
     audioChunks,
     uploadAndTranscribeAudio, 
-    setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen // Added snackbar setters
+    setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen
   ]);
 
   // --- Validation Logic ---
