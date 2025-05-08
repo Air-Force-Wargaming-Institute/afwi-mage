@@ -30,7 +30,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import '../../../App.css'; // Import App.css for styling
 import FileUploader from '../common/FileUploader';
-import SpreadsheetModal from '../common/SpreadsheetModal';
+import SpreadsheetModal from './SpreadsheetModal';
 import { toast, Toaster } from 'react-hot-toast';
 // Import styled components
 import {

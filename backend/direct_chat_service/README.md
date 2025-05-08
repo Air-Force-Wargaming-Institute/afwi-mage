@@ -1,0 +1,1 @@
+** Describes the Direct Chat Service **

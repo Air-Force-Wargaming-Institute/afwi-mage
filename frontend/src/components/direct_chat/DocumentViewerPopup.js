@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CircularProgress, Typography, Paper, Container } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import FilePreview from '../FilePreview'; // Adjust path as needed
+import FilePreview from '../common/FilePreview'; // Adjust path as needed
 import { AuthContext } from '../../contexts/AuthContext'; // Adjust path as needed
 
 const useStyles = makeStyles((theme) => ({

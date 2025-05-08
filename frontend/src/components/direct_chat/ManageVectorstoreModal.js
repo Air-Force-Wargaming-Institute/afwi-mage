@@ -17,7 +17,7 @@ import { Alert } from '@material-ui/lab';
 import CheckIcon from '@material-ui/icons/Check';
 import ErrorIcon from '@material-ui/icons/Error';
 import InfoIcon from '@material-ui/icons/Info';
-import DocumentSelector from '../vectorstore/DocumentSelector'; // Adjust path if needed
+import DocumentSelector from '../retriever_systems/vectorestores/DocumentSelector'; // Adjust path if needed
 import { getVectorStoreById, batchUpdateVectorStore, getJobStatus } from '../../services/vectorStoreService'; // Adjust path if needed
 import { AuthContext } from '../../contexts/AuthContext'; // Adjust path if needed
 
