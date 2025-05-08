@@ -15,6 +15,8 @@ import { makeStyles } from '@material-ui/core/styles';
 import { Add as AddIcon, Person as PersonIcon } from '@material-ui/icons';
 import { useTranscription, ACTIONS } from '../../contexts/TranscriptionContext'; // Assuming path is correct
 import { DeleteButton } from '../../styles/ActionButtons'; // Assuming path is correct
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   formSection: {

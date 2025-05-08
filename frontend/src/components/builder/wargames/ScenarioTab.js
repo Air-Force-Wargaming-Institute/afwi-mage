@@ -298,7 +298,10 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
 
   // Event handlers for form fields
   const handleNameChange = (e) => {
-    setEditedTitle(e.target.value);
+    onChange({
+      ...wargameData,
+      name: e.target.value
+    });
   };
 
   const startEditingTitle = () => {
@@ -599,43 +602,20 @@ function ScenarioTab({ wargameData, onChange, showExecutionChecklist = true, mov
   return (
     <div>
       <Box className={classes.titleEditContainer}>
-        {isEditingTitle ? (
-          <>
-            <TextField
-              variant="outlined"
-              size="small"
-              fullWidth
-              value={editedTitle}
-              onChange={handleNameChange}
-              className={classes.titleEdit}
-              placeholder="Enter scenario name"
-              autoFocus
-              inputProps={{
-                style: { 
-                  fontSize: '1.25rem',
-                  padding: '6px 10px'
-                }
-              }}
-            />
-            <IconButton size="small" onClick={saveTitle} color="primary">
-              <CheckIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" onClick={cancelEditTitle}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </>
-        ) : (
-          <>
-            <GradientText variant="h5" component="h1" className={classes.compactTitle}>
-              {wargameData?.name || 'Untitled Scenario'}
-            </GradientText>
-            <Tooltip title="Edit scenario name">
-              <IconButton size="small" className={classes.editIcon} onClick={startEditingTitle}>
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </>
-        )}
+        <TextField
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={wargameData?.name || ''}
+          onChange={handleNameChange}
+          placeholder="Enter scenario name"
+          inputProps={{
+            style: { 
+              fontSize: '1.25rem',
+              padding: '6px 10px'
+            }
+          }}
+        />
       </Box>
 
       {/* Main content in two-column layout */}

@@ -68,6 +68,7 @@ class VectorStoreLLMQueryRequest(BaseModel):
     score_threshold: float = 0.5
     use_llm: bool = True
     include_sources: bool = True
+    allowed_classifications: Optional[List[str]] = None
     
     model_config = {
         "extra": "ignore",
@@ -77,7 +78,8 @@ class VectorStoreLLMQueryRequest(BaseModel):
                 "top_k": 5,
                 "score_threshold": 0.5,
                 "use_llm": True,
-                "include_sources": True
+                "include_sources": True,
+                "allowed_classifications": ["UNCLASSIFIED", "SECRET"]
             }
         }
     }
@@ -203,22 +205,23 @@ async def llm_query_vectorstore(
             vectorstore_id,
             query_request.query,
             top_k=query_request.top_k,
-            score_threshold=query_request.score_threshold
+            score_threshold=query_request.score_threshold,
+            allowed_classifications=query_request.allowed_classifications
         )
         
         if not results:
             return VectorStoreLLMQueryResponse(
-                answer="No relevant information found for your query.",
+                answer="No relevant information found for your query within the allowed classification levels.",
                 sources=[],
                 raw_chunks=[]
             )
         
         # Log the metadata in the results to verify it's being preserved
-        logger.info(f"Found {len(results)} relevant chunks for query")
+        logger.info(f"Found {len(results)} relevant chunks for query with filter: {query_request.allowed_classifications}")
         for i, result in enumerate(results[:3]):  # Log first 3 results
             if "metadata" in result:
                 logger.info(f"Result {i} metadata: document_id={result['metadata'].get('document_id', 'unknown')}, "
-                           f"security_classification={result['metadata'].get('security_classification', 'UNCLASSIFIED')}, "
+                           f"chunk_classification={result['metadata'].get('chunk_classification', 'UNCLASSIFIED')}, "
                            f"filename={result['metadata'].get('filename', result['metadata'].get('original_filename', 'unknown'))}")
         
         # If LLM generation is requested
@@ -256,11 +259,11 @@ async def llm_query_vectorstore(
                         elif "original_filename" in metadata:
                             source["filename"] = metadata["original_filename"]
                         
-                        # Include security classification
-                        if "security_classification" in metadata:
+                        # Include *chunk* security classification (since this is what was filtered on)
+                        if "chunk_classification" in metadata:
+                            source["security_classification"] = metadata["chunk_classification"]
+                        elif "security_classification" in metadata:
                             source["security_classification"] = metadata["security_classification"]
-                        elif "content_security_classification" in metadata:
-                            source["security_classification"] = metadata["content_security_classification"]
                         else:
                             source["security_classification"] = "UNCLASSIFIED"
                             
@@ -280,7 +283,7 @@ async def llm_query_vectorstore(
                 raw_chunks=results if query_request.include_sources else None
             )
         else:
-            # If LLM is not used, just return the chunks
+            # If LLM is not used, just return the filtered chunks
             chunks_text = [result["text"] for result in results]
             
             return VectorStoreLLMQueryResponse(
@@ -455,7 +458,7 @@ def get_llm_response(prompt: str) -> str:
             url = f"{base_url}/chat/completions"
             
             # Use the specified model path
-            model = "/models/DeepHermes-3-Llama-3-8B-Preview"
+            model = "/models/DeepHermes-3-Llama-3-8B-Preview-abliterated"
             
             # Log the model and URL being used
             logger.info(f"Using vLLM API at {url} with model {model}")

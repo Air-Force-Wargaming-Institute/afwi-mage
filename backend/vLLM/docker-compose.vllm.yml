@@ -16,32 +16,19 @@ services:
       - HF_DATASETS_OFFLINE=1
       - TRANSFORMERS_OFFLINE=1
       - HF_HUB_OFFLINE=1
-      - CPU_OFFLOAD_GB=8
-      # GPU Allocation - 80% split across both GPUs
       - GPU_MEMORY_UTILIZATION=0.88
       - CUDA_VISIBLE_DEVICES=0,1
-      # - GPU_MEMORY_UTILIZATION=0.8
-      # - CUDA_VISIBLE_DEVICES=0,1
       - NCCL_P2P_DISABLE=1
-    shm_size: 8G
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              #count: 1
               count: 2
               capabilities: [gpu]
     networks:
       - app-network
     ipc: host
-    # command: >
-    #   --model /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
-    #   --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
-    #   --dtype=half
-    #   --gpu-memory-utilization=0.8
-    #   --max-model-len=65536
-    #   --tensor-parallel-size=2
     command: >
       --model /models/DeepHermes-3-Llama-3-8B-Preview-abliterated
       --tokenizer /models/DeepHermes-3-Llama-3-8B-Preview-abliterated

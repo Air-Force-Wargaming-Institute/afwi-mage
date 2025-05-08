@@ -15,6 +15,8 @@ import {
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import { useTranscription, ACTIONS } from '../../contexts/TranscriptionContext'; // Assuming path is correct
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   formSection: {

@@ -1,0 +1,12 @@
+{
+  "session_info": {
+    "id": "9d47bb4b-8295-46ef-9daa-181e3130aa29",
+    "name": "Regular Chat",
+    "created_at": "2025-05-06 22:25:16.273303",
+    "updated_at": "2025-05-07 16:05:37.793366",
+    "vectorstore": "91384521-389e-417f-996d-7150dd02df38"
+  },
+  "vectorstore": "91384521-389e-417f-996d-7150dd02df38",
+  "document_states": {},
+  "document_metadata": {}
+}

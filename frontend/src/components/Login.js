@@ -23,7 +23,7 @@ import { ActionButton } from '../styles/ActionButtons';
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    minHeight: '90vh ',
+    minHeight: '90vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -78,6 +78,22 @@ const useStyles = makeStyles((theme) => ({
     zIndex: 1,
     filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.45))',
   },
+  loginTitle: {
+    marginBottom: theme.spacing(4),
+    color: '#ffffff !important',
+    textAlign: 'center',
+    fontSize: '2rem',
+  },
+  loginSubtitle: {
+    marginBottom: theme.spacing(1),
+    color: '#ffffff !important',
+    textAlign: 'center',
+    fontSize: '1rem',
+  },
+  loginError: {
+    color: theme.palette.error.main,
+    marginTop: theme.spacing(2),
+  },
   loginPaper: {
     padding: theme.spacing(4),
     display: 'flex',
@@ -99,22 +115,6 @@ const useStyles = makeStyles((theme) => ({
   },
   loginSubmit: {
     margin: theme.spacing(3, 0, 0),
-  },
-  loginTitle: {
-    marginBottom: theme.spacing(4),
-    color: '#ffffff !important',
-    textAlign: 'center',
-    fontSize: '2rem',
-  },
-  loginSubtitle: {
-    marginBottom: theme.spacing(1),
-    color: '#ffffff !important',
-    textAlign: 'center',
-    fontSize: '1rem',
-  },
-  loginError: {
-    color: theme.palette.error.main,
-    marginTop: theme.spacing(2),
   },
   loginTextField: {
     marginBottom: theme.spacing(2),

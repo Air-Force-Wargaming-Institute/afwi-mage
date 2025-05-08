@@ -665,7 +665,7 @@ const SpreadsheetModal = ({ open, onClose, spreadsheetId, filename }) => {
     
     try {
       // Construct the download URL
-      let baseUrl = 'http://10.11.45.216:8020/api/workbench/spreadsheets'; //TODO: Implement the proper authentication for a download
+      let baseUrl = 'http://localhost:8020/api/workbench/spreadsheets'; //TODO: Implement the proper authentication for a download
       // If we have a context with apiBaseUrl, use it
       // if (apiBaseUrl) {
       //   baseUrl = apiBaseUrl.endsWith('/') 

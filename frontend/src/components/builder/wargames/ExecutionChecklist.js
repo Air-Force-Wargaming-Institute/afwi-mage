@@ -184,6 +184,7 @@ const ExecutionChecklist = ({ wargameData }) => {
   // Validate the wargame data whenever it changes
   useEffect(() => {
     if (wargameData) {
+      // Rerun validation to get the structured results
       const results = validateWargameData(wargameData);
       setValidationResults(results);
       
@@ -209,17 +210,30 @@ const ExecutionChecklist = ({ wargameData }) => {
         if (item.status === 'complete') completedItems++;
       });
       
-      // Count entity items (with multiplier for DIME sections)
-      if (results.entities.items) {
+      // Count entity items (DIME per entity) + 1 for overall relationships
+      if (results.entities.items && Object.keys(results.entities.items).length > 0) {
+        const numEntities = Object.keys(results.entities.items).length;
+        // Count DIME for each entity
+        totalItems += numEntities * 4; // 4 DIME sections per entity
         Object.values(results.entities.items).forEach(entity => {
-          // Count each DIME section plus relationships
-          totalItems += 5; // D, I, M, E, relationships
           if (entity.diplomacy === 'complete') completedItems++;
           if (entity.information === 'complete') completedItems++;
           if (entity.military === 'complete') completedItems++;
           if (entity.economic === 'complete') completedItems++;
-          if (entity.relationships === 'complete') completedItems++;
         });
+        
+        // Add 1 item for the overall relationship check
+        totalItems += 1;
+        // Check if relationships were determined complete by validateWargameData
+        // Infer this by checking if the entities section is complete OR
+        // if the entities message specifically mentions relationships being needed.
+        // A cleaner way might involve recalculating, but this uses the validation result.
+        const relationshipsAreComplete = results.entities.status === 'complete' || 
+             (results.entities.status === 'incomplete' && !results.entities.message?.includes('relationships need definition'));
+        
+        if (relationshipsAreComplete) {
+          completedItems++;
+        }
       }
       
       const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
@@ -229,6 +243,20 @@ const ExecutionChecklist = ({ wargameData }) => {
 
   // Helper function to validate wargame data
   const validateWargameData = (data) => {
+    // Define DIME fields that require enabled/approved checks
+    const dimeFieldsConfig = {
+      diplomacy: ['objectives', 'posture', 'keyInitiatives', 'prioritiesMatrix', 'redLines', 'treatyObligations', 'diplomaticResources', 'specialConsiderations'],
+      information: ['objectives', 'propagandaThemes', 'cyberTargets', 'strategicCommunicationFramework', 'intelCollectionPriorities', 'disinformationResilience', 'mediaLandscapeControl', 'specialConsiderations'],
+      military: [
+        'objectives', 'alertLevel', 'doctrine', 'forceStructureReadiness', 
+        'escalationLadder', 'decisionMakingProtocol', 'forceProjectionCapabilities', 
+        'defenseIndustrialCapacity', 'specialConsiderations',
+      ],
+      economic: ['objectives', 'tradeFocus', 'resourceDeps', 'sanctionsPolicy', 'economicWarfareTools', 'criticalInfrastructureResilience', 'strategicResourceAccess', 'financialSystemLeverage', 'technologyTransferControls', 'specialConsiderations']
+    };
+
+    const militaryDomainFields = ['land', 'sea', 'air', 'cyber', 'space'];
+
     // Initialize results structure
     const results = {
       overallStatus: 'incomplete',
@@ -289,50 +317,104 @@ const ExecutionChecklist = ({ wargameData }) => {
     if (data?.activatedEntities && data.activatedEntities.length > 0) {
       if (data.activatedEntities.length < 2) {
         results.entities.message = 'At least 2 nations/organizations required';
+        results.entities.status = 'incomplete';
       } else {
+        // Calculate required relationships
+        const numEntities = data.activatedEntities.length;
+        const requiredRelationships = (numEntities * (numEntities - 1)) / 2;
+        const definedRelationships = Object.values(data.nationRelationships || {}).filter(rel => rel?.type).length;
+        const relationshipsComplete = definedRelationships >= requiredRelationships;
+
         // For each entity, check DIME configuration
+        let allEntitiesFullyConfigured = true; // Tracks if all entities meet the new criteria
+
         data.activatedEntities.forEach(entity => {
           const entityResults = {
-            status: 'incomplete',
-            diplomacy: entity.configData?.diplomacy?.objectives ? 'complete' : 'incomplete',
-            information: entity.configData?.information?.objectives ? 'complete' : 'incomplete',
-            military: entity.configData?.military?.objectives ? 'complete' : 'incomplete',
-            economic: entity.configData?.economic?.objectives ? 'complete' : 'incomplete',
-            relationships: Object.keys(entity.configData?.relationships || {}).length > 0 ? 'complete' : 'incomplete',
+            status: 'incomplete', // Default to incomplete for the entity
+            diplomacy: 'incomplete',
+            information: 'incomplete',
+            military: 'incomplete',
+            economic: 'incomplete',
             message: ''
           };
-          
-          // Build message for incomplete sections
-          const incompleteSections = [];
-          if (entityResults.diplomacy === 'incomplete') incompleteSections.push('Diplomacy');
-          if (entityResults.information === 'incomplete') incompleteSections.push('Information');
-          if (entityResults.military === 'incomplete') incompleteSections.push('Military');
-          if (entityResults.economic === 'incomplete') incompleteSections.push('Economic');
-          if (entityResults.relationships === 'incomplete') incompleteSections.push('Relationships');
-          
-          if (incompleteSections.length > 0) {
-            entityResults.message = `Incomplete sections: ${incompleteSections.join(', ')}`;
-          } else {
-            entityResults.status = 'complete';
+
+          const entityConfigData = entity.configData || {};
+          const entityEnabledFields = entityConfigData.enabledFields || {};
+          const entityApprovedFields = entityConfigData.approvedFields || {};
+
+          let currentEntityDimeComplete = true;
+          const entityIncompleteDimeCategories = [];
+
+
+          for (const section of ['diplomacy', 'information', 'military', 'economic']) {
+            let sectionCategoryComplete = true;
+            const fieldsToCheck = dimeFieldsConfig[section];
+            const sectionEnabledFields = entityEnabledFields[section] || {};
+
+            for (const field of fieldsToCheck) {
+              const fieldEnabled = sectionEnabledFields[field] === undefined ? true : sectionEnabledFields[field];
+
+              if (fieldEnabled) {
+                const fieldApproved = entityApprovedFields[`${section}.${field}`] === true;
+                if (!fieldApproved) {
+                  sectionCategoryComplete = false;
+                  break; 
+                }
+              }
+            }
+
+            // Special handling for military.domainPosture
+            if (section === 'military' && sectionCategoryComplete) {
+              const militaryEnabledFields = entityEnabledFields.military || {};
+              const domainPostureGroupEnabled = militaryEnabledFields.domainPosture === undefined ? true : militaryEnabledFields.domainPosture;
+              
+              if (domainPostureGroupEnabled) { // Check if the whole domainPosture group is considered enabled
+                const domainPostureEnabledFields = militaryEnabledFields.domainPosture || {};
+                for (const domainField of militaryDomainFields) {
+                  const specificDomainFieldIsEnabled = domainPostureEnabledFields[domainField] === undefined ? true : domainPostureEnabledFields[domainField];
+                  if (specificDomainFieldIsEnabled) {
+                    const domainFieldApproved = entityApprovedFields[`military.domainPosture.${domainField}`] === true;
+                    if (!domainFieldApproved) {
+                      sectionCategoryComplete = false;
+                      break; 
+                    }
+                  }
+                }
+              }
+            }
+            
+            entityResults[section] = sectionCategoryComplete ? 'complete' : 'incomplete';
+            if (!sectionCategoryComplete) {
+              entityIncompleteDimeCategories.push(section.charAt(0).toUpperCase() + section.slice(1));
+              currentEntityDimeComplete = false; 
+            }
           }
           
-          // Add to results
+          if (currentEntityDimeComplete) {
+            entityResults.status = 'complete';
+          } else {
+            entityResults.status = 'incomplete';
+            // Ensure message reflects only DIME issues if relationships are separate
+            const dimeMessage = `Incomplete DIME sections: ${entityIncompleteDimeCategories.join(', ')}`;
+            entityResults.message = dimeMessage;
+            allEntitiesFullyConfigured = false; 
+          }
+          
           results.entities.items[entity.entityId] = entityResults;
         });
         
-        // Check if all entities are complete
-        const allEntitiesComplete = Object.values(results.entities.items).every(
-          entity => entity.status === 'complete'
-        );
-        
-        if (allEntitiesComplete) {
+        if (allEntitiesFullyConfigured && relationshipsComplete) {
           results.entities.status = 'complete';
         } else {
           results.entities.status = 'incomplete';
-          results.entities.message = 'Some entities have incomplete configuration';
+          const messages = [];
+          if (!allEntitiesFullyConfigured) messages.push('Some entities have incomplete DIME configurations (enabled elements must be approved and committed)');
+          if (!relationshipsComplete) messages.push(`${requiredRelationships - definedRelationships} relationships need definition`);
+          results.entities.message = messages.join('. ');
         }
       }
     } else {
+      results.entities.status = 'incomplete';
       results.entities.message = 'No nations/organizations selected';
     }
     
@@ -612,8 +694,8 @@ const ExecutionChecklist = ({ wargameData }) => {
             primary="Nations & Organizations" 
             secondary={
               validationResults.entities.status === 'complete'
-                ? 'All nations and organizations are fully configured'
-                : validationResults.entities.message || 'Some nations or organizations need configuration'
+                ? `All ${Object.keys(validationResults.entities.items).length} entities configured & relationships defined`
+                : validationResults.entities.message || 'Configuration incomplete'
             }
           />
           <ListItemSecondaryAction>
@@ -703,20 +785,6 @@ const ExecutionChecklist = ({ wargameData }) => {
                           }`}
                         >
                           {entity.economic === 'complete' ? 'Complete' : 'Incomplete'}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Box className={classes.dimeItem}>
-                        <Typography className={classes.dimeLabel}>Relationships:</Typography>
-                        <Typography 
-                          className={`${classes.dimeStatus} ${
-                            entity.relationships === 'complete' 
-                              ? classes.dimeComplete 
-                              : classes.dimeIncomplete
-                          }`}
-                        >
-                          {entity.relationships === 'complete' ? 'Complete' : 'Incomplete'}
                         </Typography>
                       </Box>
                     </Grid>

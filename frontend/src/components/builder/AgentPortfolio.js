@@ -1373,7 +1373,7 @@ function AgentPortfolio() {
         <DialogContent className={classes.infoDialogContent}>
           <Typography variant="body1">{infoDialogContent.content}</Typography>
           <Box mt={2}>
-            <Link href="http://10.11.45.216:3000/multi-agent/builder/user-guide" target="_blank" color="primary">
+            <Link href="http://localhost:3000/multi-agent/builder/user-guide" target="_blank" color="primary">
               Learn more in the Multi-Agent Portal User Guide
             </Link>
           </Box>

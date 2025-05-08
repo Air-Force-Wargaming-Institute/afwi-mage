@@ -22,7 +22,10 @@ export const ACTIONS = {
   SET_PREVIOUS_SESSIONS: 'SET_PREVIOUS_SESSIONS',
   SET_LOADED_SESSION_ID: 'SET_LOADED_SESSION_ID',
   LOAD_SESSION_DATA: 'LOAD_SESSION_DATA', // Action to load all data for a selected session
-  START_NEW_SESSION: 'START_NEW_SESSION' // Action to clear loaded session and reset relevant fields
+  START_NEW_SESSION: 'START_NEW_SESSION', // Action to clear loaded session and reset relevant fields
+  // Actions for tracking changes
+  SET_IS_DIRTY: 'SET_IS_DIRTY',
+  MARK_SESSION_SAVED: 'MARK_SESSION_SAVED' // Resets dirty flag and updates initial data
 };
 
 // Define recorder states
@@ -72,7 +75,10 @@ const initialState = {
   // New state for session browsing
   previousSessions: [], // Will hold list like [{ id: '...', name: '...', date: '...' }, ...]
   loadedSessionId: null, // ID of the session currently loaded in the right panel
-  audioUrl: null // URL for playback when a session is loaded
+  audioUrl: null, // URL for playback when a session is loaded
+  // State for tracking unsaved changes in loaded sessions
+  initialLoadedData: null, // Stores the state when LOAD_SESSION_DATA was dispatched
+  isDirty: false // Flag to indicate if changes have been made since load/save
 };
 
 // Reducer function to handle state updates
@@ -186,6 +192,24 @@ const transcriptionReducer = (state, action) => {
         recordingState: RECORDING_STATES.STOPPED, // Assume loaded session is stopped
         recordingTime: 0, // Reset timer
         error: null,
+        // Store initial loaded data for comparison and reset dirty flag
+        isDirty: false,
+        initialLoadedData: {
+            audioFilename: loadedData.session_name || '',
+            transcriptionText: loadedData.transcription_text || '',
+            participants: loadedData.participants || [],
+            eventMetadata: loadedData.event_metadata ? { /* same structure as above */
+                wargame_name: loadedData.event_metadata.wargame_name || '',
+                scenario: loadedData.event_metadata.scenario || '',
+                phase: loadedData.event_metadata.phase || '',
+                location: loadedData.event_metadata.location || '',
+                organization: loadedData.event_metadata.organization || '',
+            } : initialState.eventMetadata,
+            classification: loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION',
+            caveatType: loadedData.event_metadata?.caveat_type || null,
+            customCaveat: loadedData.event_metadata?.custom_caveat || '',
+            // Markers are generally not editable directly in this flow
+        }
       };
 
     case ACTIONS.START_NEW_SESSION:
@@ -197,8 +221,35 @@ const transcriptionReducer = (state, action) => {
         availableMarkerTypes: preservedMarkerTypesNew,
         previousSessions: preservedPreviousSessions,
         // Ensure loadedSessionId is cleared
-        loadedSessionId: null
+        loadedSessionId: null,
+        // Clear initial data and dirty flag
+        initialLoadedData: null,
+        isDirty: false
       };
+
+    // Reducers for dirty state
+    case ACTIONS.SET_IS_DIRTY:
+        // Only set dirty if a session is actually loaded
+        if (state.loadedSessionId) {
+            return { ...state, isDirty: action.payload };
+        }
+        return state; // No change if no session loaded
+        
+    case ACTIONS.MARK_SESSION_SAVED:
+        // Reset dirty flag and update initialLoadedData to current state
+        return {
+            ...state,
+            isDirty: false,
+            initialLoadedData: {
+                audioFilename: state.audioFilename,
+                transcriptionText: state.transcriptionText,
+                participants: state.participants,
+                eventMetadata: state.eventMetadata,
+                classification: state.classification,
+                caveatType: state.caveatType,
+                customCaveat: state.customCaveat,
+            }
+        };
 
     default:
       return state;

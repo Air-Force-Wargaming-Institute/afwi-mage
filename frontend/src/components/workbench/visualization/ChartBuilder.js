@@ -30,7 +30,6 @@ import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import FakePlotImage from '../../../assets/FakePlot.png'; // Import the fake plot image
 import '../../../App.css'; // Import App.css for styling
 
 // Import styled components
@@ -52,34 +51,6 @@ import {
   DownloadButton,
   CopyButton
 } from '../../../styles/ActionButtons';
-
-// Sample mock visualization for development mode
-const SAMPLE_VISUALIZATION_CODE = `import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import numpy as np
-
-# Create sample data
-months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-product_a = [1000, 1500, 1200, 2000, 1800, 2200, 1500, 1800, 2000, 2300, 1900, 2100]
-product_b = [800, 1200, 1500, 1800, 2000, 2300, 1600, 1900, 2200, 2500, 1800, 2000]
-product_c = [1200, 1300, 1100, 1400, 1600, 1900, 1300, 1500, 1700, 1900, 1500, 1700]
-
-# Create the visualization
-plt.figure(figsize=(12, 8))
-
-# Create line plots for each product
-plt.plot(months, product_a, marker='o', linewidth=2, color='#223b8f', label='Product A')
-plt.plot(months, product_b, marker='s', linewidth=2, color='#1a8693', label='Product B')
-plt.plot(months, product_c, marker='^', linewidth=2, color='#ff9d9d', label='Product C')
-
-# Add title and labels
-plt.title('Sales Across Different Products', fontsize=16)
-plt.xlabel('Months', fontsize=12)
-plt.ylabel('Sales ($100k)', fontsize=12)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()`;
 
 // Code editor component - can be replaced with a more robust solution
 const CodeEditor = ({ code, setCode, readOnly }) => {
@@ -134,34 +105,69 @@ const ChartBuilder = () => {
     visualizations,
     extractDataContext,
     generateVisualization,
-    executeVisualizationCode
+    executeVisualizationCode,
+    editingVisualization,
+    setEditingVisualization
   } = useContext(WorkbenchContext);
   
   const containerClasses = useContainerStyles();
-  const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState('');
   const [selectedChartType, setSelectedChartType] = useState('line');
   const [dataContext, setDataContext] = useState(null);
   const [vizRequest, setVizRequest] = useState('');
-  const [visualizationCode, setVisualizationCode] = useState(SAMPLE_VISUALIZATION_CODE);
-  const [codeResult, setCodeResult] = useState({ status: 'idle', error: null });
+  const [visualizationTitle, setVisualizationTitle] = useState('');
+  const [visualizationCode, setVisualizationCode] = useState('# Python code will appear here after generation...');
+  const [codeResult, setCodeResult] = useState({ status: 'idle', data: null, error: null });
   const [localError, setLocalError] = useState(null);
   const [useSeaborn, setUseSeaborn] = useState(true);
   const [selectedStyle, setSelectedStyle] = useState('default');
   const [selectedPalette, setSelectedPalette] = useState('Set1');
-  const [sampleFiles, setSampleFiles] = useState([
-    { id: 'sample-1', name: 'sales_data_2023.xlsx', description: 'Q1-Q4 Sales by Region' },
-    { id: 'sample-2', name: 'inventory_2023.csv', description: 'Inventory levels by warehouse' },
-    { id: 'sample-3', name: 'financial_metrics.xlsx', description: 'Financial performance metrics' }
-  ]);
+  const [isExecutingCode, setIsExecutingCode] = useState(false);
   
   // Fetch data on component mount
   useEffect(() => {
-    // Fetch spreadsheets only once when component mounts
     fetchSpreadsheets();
-    // Empty dependency array means this only runs once on mount
-    // DO NOT add fetchSpreadsheets to dependencies or it will cause infinite loops
   }, []);
+  
+  // Effect to load editingVisualization into local state
+  useEffect(() => {
+    if (editingVisualization) {
+      setSelectedFile(editingVisualization.spreadsheet_id || '');
+      setSelectedChartType(editingVisualization.visualization_type || 'line');
+      setVizRequest(editingVisualization.prompt || '');
+      setVisualizationTitle(editingVisualization.title || '');
+      setVisualizationCode(editingVisualization.code || '# Code not available for loaded visualization');
+      setUseSeaborn(editingVisualization.use_seaborn !== undefined ? editingVisualization.use_seaborn : true);
+      setSelectedStyle(editingVisualization.style || 'default');
+      setSelectedPalette(editingVisualization.color_palette || 'Set1');
+      
+      setCodeResult({
+        status: 'success',
+        data: {
+            id: editingVisualization.id,
+            title: editingVisualization.title,
+            code: editingVisualization.code,
+            image_url: editingVisualization.image_url,
+            data_url: editingVisualization.data_url,
+            prompt: editingVisualization.prompt,
+            visualization_type: editingVisualization.visualization_type,
+            spreadsheet_id: editingVisualization.spreadsheet_id
+        },
+        error: null
+      });
+    } else {
+      setSelectedFile('');
+      setSelectedChartType('line');
+      setVizRequest('');
+      setVisualizationTitle('');
+      setVisualizationCode('# Python code will appear here after generation...');
+      setUseSeaborn(true);
+      setSelectedStyle('default');
+      setSelectedPalette('Set1');
+      setDataContext(null);
+      setCodeResult({ status: 'idle', data: null, error: null });
+    }
+  }, [editingVisualization]);
   
   // Extract data context when selected file changes
   useEffect(() => {
@@ -178,50 +184,58 @@ const ChartBuilder = () => {
   // Handle file selection
   const handleFileSelected = async (fileId) => {
     setSelectedFile(fileId);
-    setCodeResult({status: 'idle', data: null});
+    setCodeResult({status: 'idle', data: null, error: null});
     // Data context will be extracted by the useEffect that depends on selectedFile
   };
   
   // Handle tab change
   const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+    // setTabValue(newValue); // Removed tabs, so this function might be unnecessary
   };
   
   // Handle visualization generation
   const handleGenerateVisualization = async () => {
     setLocalError(null);
-    setCodeResult({status: 'loading', data: null});
+    setCodeResult({status: 'loading', data: null, error: null});
+    setIsExecutingCode(false);
     
     const request = {
       spreadsheet_id: selectedFile,
       visualization_type: selectedChartType,
-      description: vizRequest,
-      preferences: {
-        use_seaborn: useSeaborn,
-        style: selectedStyle,
-        color_palette: selectedPalette
-      }
+      prompt: vizRequest,
+      title: visualizationTitle,
+      use_seaborn: useSeaborn,
+      style: selectedStyle,
+      color_palette: selectedPalette,
+      data_context: dataContext
     };
     
     try {
       const result = await generateVisualization(request);
       setVisualizationCode(result.code);
+      setVisualizationTitle(result.title || visualizationTitle);
       setCodeResult({
         status: 'success',
-        data: result
+        data: result,
+        error: null
       });
     } catch (err) {
       console.error('Error generating visualization:', err);
-      setLocalError('Failed to generate visualization: ' + err.message);
-      setCodeResult({status: 'error', data: null});
+      const errorMsg = 'Failed to generate visualization: ' + (err.response?.data?.detail || err.message);
+      setLocalError(errorMsg);
+      setCodeResult({status: 'error', data: null, error: errorMsg});
     }
   };
   
   // Handle code execution after manual edits
   const handleRunCode = async () => {
-    if (!codeResult.data || !visualizationCode) return;
+    if (!codeResult.data?.id || !visualizationCode) {
+        setLocalError("Cannot run code: Missing visualization context or code. Please generate first.");
+        return;
+    }
     
-    setCodeResult({...codeResult, status: 'loading'});
+    setLocalError(null);
+    setIsExecutingCode(true);
     
     try {
       const result = await executeVisualizationCode(
@@ -229,36 +243,76 @@ const ChartBuilder = () => {
         visualizationCode
       );
       
-      setCodeResult({
+      setCodeResult(prevResult => ({
+        ...prevResult,
         status: 'success',
+        error: null,
         data: {
-          ...codeResult.data,
-          image_url: result.image_url
+          ...prevResult.data,
+          image_url: result.image_url,
+          data_url: result.data_url,
+          code: visualizationCode
         }
-      });
+      }));
     } catch (err) {
       console.error('Error executing code:', err);
-      setLocalError('Failed to execute code: ' + err.message);
-      setCodeResult({...codeResult, status: 'error'});
+      const errorMsg = 'Failed to execute code: ' + (err.response?.data?.detail || err.response?.data?.error || err.message);
+      setLocalError(errorMsg);
+      setCodeResult(prevResult => ({ ...prevResult, status: 'error', error: errorMsg }));
+    } finally {
+      setIsExecutingCode(false);
     }
+  };
+  
+  // Handle exporting the visualization
+  const handleExportVisualization = () => {
+    if (!codeResult.data?.data_url) {
+      alert("No visualization available to export.");
+      return;
+    }
+    
+    const link = document.createElement('a');
+    link.href = codeResult.data.data_url;
+    // Suggest a filename - you could make this more dynamic using the title or prompt
+    link.download = codeResult.data.title ? `${codeResult.data.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png` : 'visualization.png';
+    document.body.appendChild(link); // Required for Firefox
+    link.click();
+    document.body.removeChild(link);
   };
   
   // Render data context information
   const renderDataContext = () => {
     if (!dataContext) return null;
+    // Add a check for column_schema before accessing its length
     if (dataContext.loading) return <CircularProgress size={20} />;
     if (dataContext.error) return <Alert severity="error">{dataContext.error}</Alert>;
     
+    // Ensure dataContext.column_schema exists and is an array before rendering details
+    if (!dataContext.column_schema || !Array.isArray(dataContext.column_schema)) {
+        // Optionally return null or a loading/error indicator if schema is not ready
+        // console.warn("DataContext received without column_schema array.");
+        return (
+            <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
+                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                  File Analysis Summary
+                </Typography>
+                 <Typography variant="body2" color="text.secondary">
+                     {dataContext.file_info?.name || 'Loading...'}: Analyzing columns...
+                 </Typography>
+            </SubtleGlowPaper>
+        );
+    }
+
     return (
       <SubtleGlowPaper sx={{ mt: 2, mb: 2, p: 2 }}>
         <Typography variant="subtitle2" fontWeight="600" gutterBottom>
           File Analysis Summary
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.schema.length} columns
+          {dataContext.file_info.name}: {dataContext.row_count} rows, {dataContext.column_schema.length} columns
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Columns: {dataContext.schema.map(col => col.name).join(', ')}
+          Columns: {dataContext.column_schema.map(col => col.name).join(', ')}
         </Typography>
       </SubtleGlowPaper>
     );
@@ -289,12 +343,22 @@ const ChartBuilder = () => {
 
   return (
     <div style={{ marginTop: '-10px' }}>
-      <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 1 }}>
-        Data Visualization
-      </GradientText>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <GradientText variant="h3" component="h1" gutterBottom className="section-title" sx={{ fontSize: '2.2rem', fontWeight: 600, mb: 0 }}>
+          Data Visualization
+        </GradientText>
+        <Button 
+          variant="outlined" 
+          onClick={() => setEditingVisualization(null)}
+          size="small"
+          sx={{ mb: 1 }}
+        >
+          Clear Form / New
+        </Button>
+      </Box>
       
       <Typography variant="body1" sx={{ mt: -1, mb: 2 }}>
-        Create visualizations from Excel data using natural language requests.
+        Create visualizations from Excel data using natural language requests or load one from the gallery.
       </Typography>
       
       {renderConnectionError()}
@@ -312,6 +376,7 @@ const ChartBuilder = () => {
                 <FormControl fullWidth sx={{
                   '& .MuiInputLabel-root': {
                     color: 'rgba(255, 255, 255, 0.7)',
+                    whiteSpace: 'normal',
                     '&.Mui-focused': {
                       color: 'primary.main',
                     }
@@ -369,7 +434,18 @@ const ChartBuilder = () => {
                       <em>Select a file</em>
                     </MenuItem>
                     {/* Actual spreadsheets would be populated here */}
-                    <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem>
+                    {/* <MenuItem value="sample_data">Sample Sales Data (2023)</MenuItem> */}
+                    {spreadsheets && spreadsheets.length > 0 ? (
+                      spreadsheets.map((sheet) => (
+                        <MenuItem key={sheet.id} value={sheet.id}>
+                          {sheet.filename || sheet.original_filename || sheet.id} {/* Display name, fallback to ID */}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>
+                        {isLoading ? 'Loading spreadsheets...' : (connectionError ? 'Backend unavailable' : 'No spreadsheets uploaded')}
+                      </MenuItem>
+                    )}
                   </Select>
                 </FormControl>
                 {renderDataContext()}
@@ -378,10 +454,49 @@ const ChartBuilder = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Describe the visualization you want"
+                  label="Title (Optional)"
+                  placeholder="Enter a title for your visualization"
+                  value={visualizationTitle}
+                  onChange={(e) => setVisualizationTitle(e.target.value)}
+                  disabled={connectionError}
+                  sx={{
+                    mb: 2,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: theme => theme.shape?.borderRadius || 10,
+                      backgroundColor: '#121212',
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '1px',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '2px',
+                      },
+                      '& fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      whiteSpace: 'normal',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      }
+                    },
+                    '& .MuiInputBase-input': {
+                      color: 'white',
+                    },
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Simply describe the visualization you want. Consider the following elements in your prompt: [CHART TYPE] / [COLUMNS OF INTEREST] / [POSSIBLE FILTERS]"
                   placeholder={connectionError ? 
                     "Backend connection required for visualization generation" : 
-                    "E.g., Create a line chart showing sales by product across months"}
+                    "E.g., Create a [CHART TYPE] showing [DATA] by [CATEGORY] across [TIME PERIOD]. "}
                   multiline
                   rows={4}
                   value={vizRequest}
@@ -405,12 +520,14 @@ const ChartBuilder = () => {
                     },
                     '& .MuiInputLabel-root': {
                       color: 'rgba(255, 255, 255, 0.7)',
+                      whiteSpace: 'normal',
                       '&.Mui-focused': {
                         color: 'primary.main',
                       }
                     },
                     '& .MuiInputBase-input': {
                       color: 'white',
+                      whiteSpace: 'pre-wrap',
                     },
                   }}
                 />
@@ -420,6 +537,7 @@ const ChartBuilder = () => {
                 <FormControl fullWidth style={{ marginBottom: '16px' }} sx={{
                   '& .MuiInputLabel-root': {
                     color: 'rgba(255, 255, 255, 0.7)',
+                    whiteSpace: 'normal',
                     '&.Mui-focused': {
                       color: 'primary.main',
                     }
@@ -502,6 +620,7 @@ const ChartBuilder = () => {
                     <FormControl fullWidth sx={{
                       '& .MuiInputLabel-root': {
                         color: 'rgba(255, 255, 255, 0.7)',
+                        whiteSpace: 'normal',
                         '&.Mui-focused': {
                           color: 'primary.main',
                         }
@@ -567,6 +686,7 @@ const ChartBuilder = () => {
                     <FormControl fullWidth sx={{
                       '& .MuiInputLabel-root': {
                         color: 'rgba(255, 255, 255, 0.7)',
+                        whiteSpace: 'normal',
                         '&.Mui-focused': {
                           color: 'primary.main',
                         }
@@ -675,29 +795,6 @@ const ChartBuilder = () => {
               borderRadius: theme => theme.shape.borderRadius - theme.custom?.borderWidth?.thin/2 || 1.5,
             }
           }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              aria-label="visualization tabs"
-              sx={{ 
-                mb: 2,
-                '& .MuiTab-root': {
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  '&.Mui-selected': {
-                    color: 'primary.main',
-                  },
-                  fontWeight: 500
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: 'primary.main',
-                  height: '3px'
-                }
-              }}
-            >
-              <Tab icon={<CodeIcon />} label="Code" />
-              <Tab icon={<VisibilityIcon />} label="Visualization" />
-            </Tabs>
-            
             {localError && (
               <Alert 
                 severity="error" 
@@ -727,85 +824,105 @@ const ChartBuilder = () => {
               </Alert>
             )}
             
-            {tabValue === 0 && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
-                    Python Visualization Code
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRunCode}
-                    disabled={!visualizationCode || codeResult.status === 'loading'}
-                    sx={{ 
-                      boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
-                      transition: theme => theme.custom?.transition || 'all 0.3s ease',
-                      '&:hover': {
-                        boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                  >
-                    Run Code
-                  </Button>
-                </Box>
-                <CodeEditor 
-                  code={visualizationCode || (connectionError ? 
-                    "# Backend connection required to generate visualization code\n# Please start the backend services and reload this page" : 
-                    "")} 
-                  setCode={setVisualizationCode}
-                  readOnly={connectionError}
+            <Box mb={3}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="600" color="primary.light">
+                  Visualization Preview
+                </Typography>
+                <DownloadButton
+                  onClick={handleExportVisualization}
+                  tooltip="Export Visualization as PNG"
+                  disabled={!codeResult.data?.data_url || connectionError}
                 />
               </Box>
-            )}
-            
-            {tabValue === 1 && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight="600" color="primary.light">
-                    Visualization Preview
+              
+              <SubtleGlowPaper sx={{ 
+                mt: 1,
+                p: 0, 
+                overflow: 'hidden',
+                backgroundColor: '#1A1A1A',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                minHeight: '300px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {codeResult.status === 'loading' ? (
+                  <CircularProgress size={40} />
+                ) : codeResult.status === 'error' ? (
+                  <Alert severity="error" sx={{ width: '100%', justifyContent: 'center' }}>
+                    {localError || "Failed to generate or execute visualization."}
+                  </Alert>
+                ) : codeResult.data?.data_url ? (
+                  <Box sx={{ width: '100%' }}>
+                    <img
+                      src={codeResult.data.data_url} 
+                      alt={codeResult.data.title || "Generated Visualization"}
+                      style={{ 
+                        display: 'block',
+                        width: '100%', 
+                        height: 'auto', 
+                        maxHeight: '500px', 
+                        objectFit: 'contain' 
+                      }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        const titleToShow = codeResult.data?.title || visualizationTitle || "visualization";
+                        setLocalError(`Failed to load image for ${titleToShow}. It might be generating or unavailable.`);
+                        if (codeResult.data) {
+                            setCodeResult(prev => ({...prev, data: {...prev.data, data_url: null, image_url: null}}));
+                        }
+                      }}
+                    />
+                    <Box sx={{ p: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {codeResult.data?.title || vizRequest || "Generated visualization based on your request."} 
+                      </Typography>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    {connectionError ? "Backend connection needed." : "Generate a visualization to see the preview."}
                   </Typography>
-                  <DownloadButton
-                    onClick={() => alert('Export functionality would be implemented here')}
-                    tooltip="Export Visualization"
-                    disabled={(!dataContext || connectionError)}
-                  />
-                </Box>
-                
-                {/* Visualization Output */}
-                <SubtleGlowPaper sx={{ 
-                  mt: 3, 
-                  p: 0, 
-                  overflow: 'hidden',
-                  backgroundColor: '#1A1A1A',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '8px'
-                }}>
-                  {dataContext && dataContext.loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
-                      <CircularProgress size={40} />
-                    </Box>
-                  ) : dataContext && dataContext.error ? (
-                    <Alert severity="error">{dataContext.error}</Alert>
-                  ) : (
-                    <Box>
-                      <img
-                        src={FakePlotImage}
-                        alt="Generated visualization"
-                        style={{ width: '100%', height: 'auto', maxHeight: '500px', objectFit: 'contain' }}
-                      />
-                      <Box sx={{ p: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {vizRequest || "Sales data across different products showing monthly trends"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
-                </SubtleGlowPaper>
+                )}
+              </SubtleGlowPaper>
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+              <Button 
+                variant="contained" 
+                size="small"
+                startIcon={isExecutingCode ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                onClick={handleRunCode}
+                disabled={!visualizationCode || codeResult.status === 'loading' || isExecutingCode}
+                sx={{ 
+                  boxShadow: theme => theme.custom?.boxShadow || '0 4px 10px rgba(0, 0, 0, 0.3)',
+                  transition: theme => theme.custom?.transition || 'all 0.3s ease',
+                  '&:hover': {
+                    boxShadow: theme => theme.custom?.boxShadowLarge || '0 8px 16px rgba(0, 0, 0, 0.4)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+              >
+                {isExecutingCode ? 'Running...' : 'Run Code'}
+              </Button>
+            </Box>
+
+            <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="600" color="primary.light">
+                  Python Visualization Code
+                </Typography>
               </Box>
-            )}
+              <CodeEditor 
+                code={visualizationCode || (connectionError ? 
+                  "# Backend connection required to generate visualization code\\n# Please start the backend services and reload this page" : 
+                  "")} 
+                setCode={setVisualizationCode}
+                readOnly={connectionError}
+              />
+            </Box>
           </GradientBorderPaper>
         </Grid>
       </Grid>

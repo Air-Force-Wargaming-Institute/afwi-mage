@@ -23,7 +23,7 @@ import { DocumentLibraryProvider } from './contexts/DocumentLibraryContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { HILChatProvider } from './contexts/HILChatContext';
 import { TranscriptionProvider } from './contexts/TranscriptionContext';
-import DirectChat from './components/DirectChat';
+import DirectChat from './components/direct_chat/DirectChat.js';
 import { DirectChatProvider } from './contexts/DirectChatContext';
 import WorkbenchDashboard from './components/workbench/WorkbenchDashboard';
 import { WorkbenchProvider } from './contexts/WorkbenchContext';
@@ -36,6 +36,9 @@ import { Box, CssBaseline } from '@material-ui/core';
 import { StyledContainer } from './styles/StyledComponents';
 import backgroundImage from './assets/background.jpg';
 import WargameBuilder from './components/builder/wargames/WargameBuilder';
+import ReportBuilderMain from './components/Report Builder/ReportBuilderMain';
+import ReportDesignerPage from './components/Report Builder/ReportDesignerPage';
+import DocumentViewerPopup from './components/direct_chat/DocumentViewerPopup';
 
 // Create a component to handle authenticated routes
 const AuthenticatedRoutes = () => {
@@ -133,6 +136,15 @@ const AuthenticatedRoutes = () => {
           <Route path="/wargame-builder">
             {user ? <WargameBuilder /> : <Redirect to="/login" />}
           </Route>
+          <Route path="/report-builder">
+            {user ? <ReportBuilderMain /> : <Redirect to="/login" />}
+          </Route>
+          <Route exact path="/report-designer">
+            {user ? <ReportDesignerPage /> : <Redirect to="/login" />}
+          </Route>
+          <Route path="/report-designer/:reportId">
+            {user ? <ReportDesignerPage /> : <Redirect to="/login" />}
+          </Route>
           
           {/* Root path redirects to login if not authenticated, home if authenticated */}
           <Route exact path="/">
@@ -189,6 +201,9 @@ function App() {
                                 <RecordTranscribeStandalone />
                               </Box>
                             </Route>
+
+                            {/* Add route for DocumentViewerPopup */}
+                            <Route path="/view-document" component={DocumentViewerPopup} />
 
                             {/* All other routes go through the standard authenticated layout */}
                             <Route path="/">

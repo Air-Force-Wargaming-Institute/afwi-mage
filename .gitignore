@@ -43,6 +43,7 @@ Thumbs.db
 /models/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
+!/data/wargames/*.json
 
 # Keep the TEAM-TEMPLATE directory
 !/data/builder/AGENTS/system_agents/*
