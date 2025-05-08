@@ -343,18 +343,8 @@ const RecordingControlPanel = () => {
   const connectWebSocket = useCallback((streamingUrl) => {
     if (!streamingUrl || loadedSessionId) return null;
     
-    // Check for token before attempting connection
-    if (!token) {
-        setApiError("WebSocket connection failed: Authentication token not found.");
-        setNetworkStatus('offline');
-        setSnackbarMessage("Cannot connect: Auth token missing.");
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-        return null;
-    }
-
     // Append token as query parameter
-    const wsUrlWithToken = `${streamingUrl}?token=${token}`;
+    const wsUrl = streamingUrl;
 
     try {
       // Close existing WebSocket if any
@@ -363,13 +353,13 @@ const RecordingControlPanel = () => {
         wsRef.current.close(1000, "Client initiated reconnect"); 
       }
       
-      console.log(`[WebSocket] Attempting to connect to: ${wsUrlWithToken}`);
+      console.log(`[WebSocket] Attempting to connect to: ${wsUrl}`);
       setNetworkStatus('connecting'); // Update status
       setSnackbarMessage('Connecting to transcription service...');
       setSnackbarSeverity('info');
       setSnackbarOpen(true);
 
-      const ws = new WebSocket(wsUrlWithToken); 
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws; // Assign early to allow cleanup
       
       ws.onopen = () => {
@@ -506,7 +496,7 @@ const RecordingControlPanel = () => {
       }
       return null;
     }
-  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState, token]);
+  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState]);
   
   // Function to stream audio chunks to server
   const streamAudioChunk = useCallback((audioChunk) => {
@@ -843,7 +833,7 @@ const RecordingControlPanel = () => {
       setApiError(`Failed to resume session: ${error.message}`);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to sync resume state with server.' });
     }
-  }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token]);
+  }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token, setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
 
   const stopRecording = useCallback(async () => {
     if (loadedSessionId || !mediaRecorder || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) return;
@@ -851,76 +841,140 @@ const RecordingControlPanel = () => {
     const sessionToStop = sessionId; // Capture session ID before potential state changes
     const currentAudioFilename = audioFilename || 'Untitled_Recording'; // Capture filename
 
+    // Prepare to call the session stop endpoint
+    let successfullyStoppedOnBackend = false; 
+
     try {
       // Stop the media recorder
-      mediaRecorder.stop();
+      mediaRecorder.stop(); // This will trigger the final ondataavailable if any pending data
       dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.STOPPED });
       
-      // Stop all audio tracks
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
         setAudioStream(null);
       }
       
-      // Close WebSocket connection cleanly
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log('[WebSocket] Closing connection on stop...');
-        wsRef.current.close(1000, "Recording stopped by user"); // Close with normal code
-        wsRef.current = null; // Clear ref immediately
+        wsRef.current.close(1000, "Recording stopped by user");
+        wsRef.current = null;
+      }
+
+      // Call the backend API to stop and finalize the session
+      if (sessionToStop && token) {
+        console.log(`[API] Attempting to stop session ${sessionToStop} on backend.`);
+        setSnackbarMessage('Finalizing session on server...');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+
+        try {
+          const stopSessionUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/stop`);
+          const requestBody = {
+            // Provide filenames as per StopSessionRequest schema
+            audio_filename: currentAudioFilename, // Backend will add .webm if needed or use this as base
+            transcription_filename: currentAudioFilename, // Backend will add .txt or use this as base
+            // Other StopSessionRequest fields (like classification, output_formats, etc.)
+            // can be added here if needed by the frontend to override backend defaults.
+          };
+          
+          const response = await fetch(stopSessionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[API] Error stopping session ${sessionToStop}:`, response.status, errorText);
+            setApiError(`Failed to finalize session on server: ${errorText || response.statusText}`);
+            setSnackbarMessage(`Server error finalizing session: ${errorText || response.statusText}`);
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+            // successfullyStoppedOnBackend remains false
+          } else {
+            const result = await response.json();
+            console.log(`[API] Session ${sessionToStop} stopped successfully on backend:`, result);
+            setSnackbarMessage('Session finalized and saved on server.');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
+            successfullyStoppedOnBackend = true;
+            
+            dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
+          }
+        } catch (apiStopError) {
+          console.error(`[API] Network or other error stopping session ${sessionToStop}:`, apiStopError);
+          setApiError(`Network error finalizing session: ${apiStopError.message}`);
+          setSnackbarMessage(`Network error finalizing session: ${apiStopError.message}`);
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+          // successfullyStoppedOnBackend remains false
+        }
+      } else {
+        console.warn('[API] No session ID or token available to stop session on backend.');
+        setSnackbarMessage('No active server session to stop. Local recording only.');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
       }
       
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
           const downloadUrl = URL.createObjectURL(completeAudioBlob);
-          
-          // Display in waveform for visualization
           if (wavesurferRef.current) {
             wavesurferRef.current.loadBlob(completeAudioBlob);
           }
-          
-          // Create download link
           const a = document.createElement('a');
           a.href = downloadUrl;
-          a.download = `${currentAudioFilename}.webm`; // Use captured filename
+          a.download = `${currentAudioFilename}.webm`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
-          
-          console.log('Audio saved locally');
+          console.log('Audio also saved locally (backup).');
 
-          // --- Call the new utility transcription function ---
-          if (completeAudioBlob && completeAudioBlob.size > 0) {
-            // Use the original session name (audioFilename) for the uploaded file if available
-            uploadAndTranscribeAudio(completeAudioBlob, `${currentAudioFilename}.webm`);
+          // The call to uploadAndTranscribeAudio is likely redundant now if the /stop 
+          // endpoint handles the complete processing and saving.
+          // Kept commented out for consideration if it has a different purpose.
+          /*
+          if (successfullyStoppedOnBackend) {
+             console.log("Session finalized on backend, skipping utility transcribe for full blob here.");
+          } else if (completeAudioBlob && completeAudioBlob.size > 0) {
+             console.warn("Session did not stop cleanly on backend, attempting utility transcribe as fallback.");
+             uploadAndTranscribeAudio(completeAudioBlob, `${currentAudioFilename}.webm`);
           }
-          // --- End of call ---
+          */
 
         } catch (saveError) {
-          console.error('Error saving audio locally:', saveError);
+          console.error('Error processing local audio blob:', saveError);
         }
       } else {
         console.warn("No audio data was recorded to save locally.");
       }
-    } catch (error) {
-      console.error('Error stopping session:', error);
+
+    } catch (error) { 
+      console.error('Error stopping recording process:', error);
       setApiError(`Failed to stop recording: ${error.message}`);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to stop recording: ' + error.message });
     } finally {
-      // Clean up resources
       setAudioChunks([]);
       setMediaRecorder(null);
       setIsStreaming(false);
-      // Clear the sender function from context on stop
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
+      
+      // Consider dispatching an action to clean up for a new session, e.g.
+      // dispatch({ type: ACTIONS.START_NEW_SESSION }); 
+      // This would clear loadedSessionId and related data as per TranscriptionContext
     }
   }, [
-    loadedSessionId, mediaRecorder, recordingState, token,
+    loadedSessionId, mediaRecorder, recordingState, token, user, // Added user
     audioStream, dispatch, sessionId, 
-    audioFilename, selectedClassification, caveatType, customCaveat, 
+    audioFilename, 
     audioChunks,
-    uploadAndTranscribeAudio
+    uploadAndTranscribeAudio, 
+    setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen // Added snackbar setters
   ]);
 
   // --- Validation Logic ---

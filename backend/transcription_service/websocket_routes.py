@@ -28,15 +28,15 @@ logger = logging.getLogger(__name__)
 
 # --- START EDIT ---
 # Placeholder function for token validation (replace with actual logic)
-async def validate_token(token: str) -> bool:
-    """Placeholder for actual token validation logic."""
-    # if not token:
-    #     return False
-    # # In a real scenario, decode JWT, call auth service, etc.
-    # logger.debug(f"Validating token (length: {len(token)})...") # Basic check
-    # # For now, just check if it's not empty
-    # return len(token) > 10 # Example: Simple length check
-    return True
+# async def validate_token(token: str) -> bool:
+#     """Placeholder for actual token validation logic."""
+#     # if not token:
+#     #     return False
+#     # # In a real scenario, decode JWT, call auth service, etc.
+#     # logger.debug(f"Validating token (length: {len(token)})...") # Basic check
+#     # # For now, just check if it's not empty
+#     # return len(token) > 10 # Example: Simple length check
+#     return True
 # --- END EDIT ---
 
 # Constants
@@ -274,15 +274,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     # --- Validation and Setup ---
     db: AsyncSession = None # Initialize db variable
     # --- START EDIT ---
-    # Extract token from query parameters
-    token = websocket.query_params.get("token")
-    logger.debug(f"[{session_id}] WebSocket connection attempt. Token provided: {'Yes' if token else 'No'}")
+    # # Extract token from query parameters
+    # token = websocket.query_params.get("token")
+    # logger.debug(f"[{session_id}] WebSocket connection attempt. Token provided: {'Yes' if token else 'No'}")
 
-    # Validate token
-    if not await validate_token(token):
-        logger.warning(f"[{session_id}] WebSocket connection rejected due to invalid/missing token.")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
-        return
+    # # Validate token
+    # if not await validate_token(token):
+    #     logger.warning(f"[{session_id}] WebSocket connection rejected due to invalid/missing token.")
+    #     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
+    #     return
+    logger.info(f"[{session_id}] WebSocket connection attempt. Token validation skipped for this endpoint.")
     # --- END EDIT ---
 
     try:
