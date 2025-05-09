@@ -861,6 +861,125 @@ const RecordingControlPanel = () => {
     }
   }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token, setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
 
+  // Function to re-transcribe the final audio file for better accuracy
+  const retranscribeFinalAudio = useCallback(async (sessionId, completeAudioBlob) => {
+    if (!sessionId || !token) {
+      console.error('[FinalTranscription] Missing session ID or token');
+      return;
+    }
+    
+    if (!completeAudioBlob || completeAudioBlob.size === 0) {
+      console.error('[FinalTranscription] Missing or empty audio blob');
+      return;
+    }
+
+    try {
+      console.log(`[FinalTranscription] Starting final transcription of audio blob: ${(completeAudioBlob.size / 1024).toFixed(2)} KB`);
+      
+      setSnackbarMessage('Performing final transcription for improved accuracy...');
+      setSnackbarSeverity('info');
+      setSnackbarOpen(true);
+      
+      // Create a FormData object with the audio blob
+      const formData = new FormData();
+      formData.append('file', completeAudioBlob, `session_${sessionId}.webm`);
+      
+      // Send to the transcribe-file endpoint
+      console.log('[FinalTranscription] Sending audio blob to transcribe-file endpoint...');
+      const transcribeResponse = await fetch(getGatewayUrl('/api/transcription/transcribe-file'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!transcribeResponse.ok) {
+        const errorText = await transcribeResponse.text();
+        throw new Error(`Failed to transcribe audio: ${transcribeResponse.status} - ${errorText}`);
+      }
+      
+      // Parse the JSON response
+      console.log('[FinalTranscription] Received response from transcribe-file endpoint');
+      const transcribeResult = await transcribeResponse.json();
+      console.log('[FinalTranscription] Response parsed:', transcribeResult);
+      
+      // Check if segments are present in the response
+      if (!transcribeResult.segments || !Array.isArray(transcribeResult.segments) || transcribeResult.segments.length === 0) {
+        console.warn('[FinalTranscription] No segments found in transcription result:', transcribeResult);
+        setSnackbarMessage('Final transcription produced no text segments');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      console.log(`[FinalTranscription] Received ${transcribeResult.segments.length} segments`);
+      console.log('[FinalTranscription] First segment:', transcribeResult.segments[0]);
+      console.log('[FinalTranscription] Last segment:', transcribeResult.segments[transcribeResult.segments.length - 1]);
+      
+      // Process segments into text
+      const sortedSegments = [...transcribeResult.segments].sort((a, b) => (a.start || 0) - (b.start || 0));
+      
+      let fullText = '';
+      sortedSegments.forEach(segment => {
+        if (segment.text) {
+          const speakerLabel = segment.speaker && segment.speaker !== 'UNKNOWN' 
+            ? `${segment.speaker}: ` 
+            : '';
+          
+          fullText += `${speakerLabel}${segment.text.trim()}\n`;
+        }
+      });
+      
+      if (!fullText) {
+        console.warn('[FinalTranscription] Generated transcript text is empty');
+        setSnackbarMessage('Final transcription produced no text');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      console.log(`[FinalTranscription] Generated transcript text (${fullText.length} chars):`);
+      console.log(fullText.substring(0, 200) + (fullText.length > 200 ? '...' : ''));
+      
+      // Update UI
+      console.log('[FinalTranscription] Updating UI with new transcript text');
+      dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: fullText });
+      
+      // Update database
+      console.log('[FinalTranscription] Updating database with new transcript text');
+      const updateResponse = await fetch(getGatewayUrl(`/api/transcription/sessions/${sessionId}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          full_transcript_text: fullText
+        })
+      });
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Failed to update transcript in database: ${updateResponse.status} - ${errorText}`);
+      }
+      
+      const updateResult = await updateResponse.json();
+      console.log('[FinalTranscription] Database update successful:', updateResult);
+      
+      setSnackbarMessage('Final transcript updated with enhanced accuracy');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('[FinalTranscription] Error:', error);
+      setApiError(`Final transcription issue: ${error.message}`);
+      setSnackbarMessage(`Final transcript update had an issue: ${error.message}`);
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+    }
+  }, [token, dispatch, setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
+
   const stopRecording = useCallback(async () => {
     if (loadedSessionId || !mediaRecorder || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) return;
     
@@ -869,6 +988,7 @@ const RecordingControlPanel = () => {
 
     // Prepare to call the session stop endpoint
     let successfullyStoppedOnBackend = false; 
+    let recordedAudioBlob = null; // To store the complete audio blob for re-transcription
 
     try {
       // Stop the media recorder
@@ -948,6 +1068,8 @@ const RecordingControlPanel = () => {
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
+          recordedAudioBlob = completeAudioBlob; // Save for re-transcription
+          
           const downloadUrl = URL.createObjectURL(completeAudioBlob);
           if (wavesurferRef.current) {
             wavesurferRef.current.loadBlob(completeAudioBlob);
@@ -960,6 +1082,14 @@ const RecordingControlPanel = () => {
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
           console.log('Audio also saved locally (backup).');
+          
+          // After successful stop and backend processing, re-transcribe the audio
+          if (successfullyStoppedOnBackend && recordedAudioBlob && sessionToStop) {
+            // Give the backend a moment to finalize everything
+            setTimeout(() => {
+              retranscribeFinalAudio(sessionToStop, recordedAudioBlob);
+            }, 1000);
+          }
         } catch (saveError) {
           console.error('Error processing local audio blob:', saveError);
         }
@@ -982,7 +1112,8 @@ const RecordingControlPanel = () => {
     audioFilename, 
     audioChunks,
     uploadAndTranscribeAudio, 
-    setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen
+    setApiError, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen,
+    retranscribeFinalAudio // Add the new function to dependencies
   ]);
 
   // --- Validation Logic ---
