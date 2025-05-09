@@ -9,6 +9,7 @@ from typing import Dict, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert # For upsert if needed
+from sqlalchemy.orm.attributes import flag_modified
 
 from schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema, OutputFormatPreferencesSchema
 # Import the DB model and session getter
@@ -83,8 +84,8 @@ class SessionManager:
          """Retrieves session data as a dictionary by ID."""
          session = await self.get_session(db, session_id)
          if session:
-             # Convert ORM object to dict - Adjust fields as needed for API responses
-             return {
+             logger.info(f"get_session_dict: Raw session.markers for {session_id}: {session.markers}")
+             session_data_to_return = {
                  "session_id": str(session.session_id),
                  "user_id": session.user_id,
                  "session_name": session.session_name,
@@ -102,6 +103,8 @@ class SessionManager:
                  "transcript_storage_path": session.transcript_storage_path,
                  "full_transcript_text": session.full_transcript_text,
              }
+             logger.info(f"get_session_dict: Dict being returned for {session_id}: {session_data_to_return}")
+             return session_data_to_return
          return None
 
     async def update_session_status(self, db: AsyncSession, session_id: str, status: str) -> bool:
@@ -149,15 +152,19 @@ class SessionManager:
             try:
                 marker_id = str(uuid.uuid4()) # Generate unique ID for the marker
                 marker_data["marker_id"] = marker_id
-                marker_data["added_at"] = datetime.utcnow() # Record when added
+                marker_data["added_at"] = datetime.utcnow().isoformat() # Record when added, as ISO string
 
                 # Ensure markers field is initialized as a list
                 if session.markers is None:
                     session.markers = []
                 
-                # SQLAlchemy detects changes to mutable JSON lists/dicts
-                session.markers.append(marker_data)
-                
+                # More forceful way to ensure SQLAlchemy detects the change
+                current_markers = list(session.markers or []) # Create a new list, or copy existing
+                current_markers.append(marker_data)
+                session.markers = current_markers # Reassign the entire list
+                # flag_modified might still be good practice, but reassignment is a stronger signal
+                flag_modified(session, "markers")
+
                 session.last_update = datetime.utcnow()
                 await db.commit()
                 logger.info(f"Added marker {marker_id} to session {session_id} in DB.")
@@ -180,13 +187,20 @@ class SessionManager:
                     "marker_type": "speaker_tag_event", # Specific type
                     "speaker_id": speaker_id,
                     "timestamp": timestamp,
-                    "added_at": datetime.utcnow()
+                    "added_at": datetime.utcnow().isoformat() # As ISO string
                 }
                 
+                # Ensure markers field is initialized as a list
                 if session.markers is None:
                     session.markers = []
                 
-                session.markers.append(event_data)
+                # More forceful way to ensure SQLAlchemy detects the change
+                current_speaker_events = list(session.markers or []) # Create a new list, or copy existing
+                current_speaker_events.append(event_data)
+                session.markers = current_speaker_events # Reassign the entire list
+                # flag_modified might still be good practice, but reassignment is a stronger signal
+                flag_modified(session, "markers")
+
                 session.last_update = datetime.utcnow()
                 await db.commit()
                 logger.info(f"Added speaker tag event for speaker {speaker_id} at {timestamp}s to session {session_id} in DB.")

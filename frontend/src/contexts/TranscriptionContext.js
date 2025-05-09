@@ -200,12 +200,17 @@ const transcriptionReducer = (state, action) => {
       // Payload should be the full session object fetched from the API
       // (matching structure in Get Session Details plan)
       const loadedData = action.payload;
+      // Transform markers from backend to ensure they have an 'id' field
+      const processedMarkers = (loadedData.markers || []).map(backendMarker => ({
+        ...backendMarker,
+        id: backendMarker.marker_id || `marker-fallback-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` // Use marker_id as id, provide a robust fallback
+      }));
       return {
         ...state,
         loadedSessionId: loadedData.session_id,
         sessionId: loadedData.session_id, // Set the active sessionId as well
         audioFilename: loadedData.session_name || '', // Use session_name or fallback
-        transcriptionText: loadedData.transcription_text || '',
+        transcriptionText: loadedData.full_transcript_text || '', // Corrected from transcription_text to full_transcript_text
         participants: loadedData.participants || [],
         eventMetadata: loadedData.event_metadata ? {
             wargame_name: loadedData.event_metadata.wargame_name || '',
@@ -218,7 +223,7 @@ const transcriptionReducer = (state, action) => {
         classification: loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION',
         caveatType: loadedData.event_metadata?.caveat_type || null,
         customCaveat: loadedData.event_metadata?.custom_caveat || '',
-        markers: loadedData.markers || [],
+        markers: processedMarkers, // Use the transformed markers
         audioUrl: loadedData.audio_url || null, // Store audio URL for playback
         recordingState: RECORDING_STATES.STOPPED, // Assume loaded session is stopped
         recordingTime: 0, // Reset timer
@@ -227,7 +232,7 @@ const transcriptionReducer = (state, action) => {
         isDirty: false,
         initialLoadedData: {
             audioFilename: loadedData.session_name || '',
-            transcriptionText: loadedData.transcription_text || '',
+            transcriptionText: loadedData.full_transcript_text || '', // Corrected here as well
             participants: loadedData.participants || [],
             eventMetadata: loadedData.event_metadata ? { /* same structure as above */
                 wargame_name: loadedData.event_metadata.wargame_name || '',
@@ -240,6 +245,18 @@ const transcriptionReducer = (state, action) => {
             caveatType: loadedData.event_metadata?.caveat_type || null,
             customCaveat: loadedData.event_metadata?.custom_caveat || '',
             // Markers are generally not editable directly in this flow
+            // --- START EDIT ---
+            // Ensure initialLoadedData also reflects the processed markers if it needs to track them
+            // For simplicity, let's assume the comparison for isDirty primarily focuses on editable fields
+            // and markers are loaded as is from the backend structure for initial comparison, 
+            // or if a deep comparison on markers is needed, they should be processed here too.
+            // Given the current setup, the `isDirty` check in RecordTranscribe.js doesn't deep compare markers.
+            // So, storing backend structure markers in initialLoadedData is fine, or processedMarkers if consistent comparison is key.
+            // Let's keep initialLoadedData storing the processed form for consistency if markers were part of the dirty check.
+            // However, the provided isDirty check doesn't compare markers, so it might not be strictly necessary to process them for initialLoadedData.
+            // For safety and potential future comparisons, we can process them.
+            markers: processedMarkers, 
+            // --- END EDIT ---
         }
       };
 
