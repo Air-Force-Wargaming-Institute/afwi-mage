@@ -10,7 +10,11 @@ import {
   Box,
   CircularProgress,
   Snackbar,
-  makeStyles 
+  makeStyles,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel
 } from '@material-ui/core';
 import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
@@ -89,6 +93,7 @@ function PriorReportsList({ onViewEdit }) {
   const [error, setError] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [sortOption, setSortOption] = useState('updatedDesc');
 
   const fetchReports = async () => {
     setLoading(true);
@@ -140,6 +145,29 @@ function PriorReportsList({ onViewEdit }) {
       setLoading(false);
     }
   }, [token]);
+
+  // Apply sorting to the reports
+  const getSortedReports = () => {
+    if (!reports || reports.length === 0) return [];
+    
+    const sortedReports = [...reports];
+    
+    switch (sortOption) {
+      case 'nameAsc':
+        return sortedReports.sort((a, b) => a.name.localeCompare(b.name));
+      case 'nameDesc':
+        return sortedReports.sort((a, b) => b.name.localeCompare(a.name));
+      case 'updatedAsc':
+        return sortedReports.sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+      case 'updatedDesc':
+      default:
+        return sortedReports.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    }
+  };
+
+  const handleSortChange = (event) => {
+    setSortOption(event.target.value);
+  };
 
   const handleDelete = async (reportId) => {
     try {
@@ -193,13 +221,30 @@ function PriorReportsList({ onViewEdit }) {
 
   return (
     <Paper className={classes.root} elevation={3}>
-      <GradientText variant="h6" component="h2" gutterBottom>
-        Prior Reports
-      </GradientText>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+        <GradientText variant="h6" component="h2" gutterBottom>
+          Prior Reports
+        </GradientText>
+        <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
+          <InputLabel id="sort-reports-label">Sort By</InputLabel>
+          <Select
+            labelId="sort-reports-label"
+            id="sort-reports"
+            value={sortOption}
+            onChange={handleSortChange}
+            label="Sort By"
+          >
+            <MenuItem value="updatedDesc">Most Recently Updated</MenuItem>
+            <MenuItem value="updatedAsc">Least Recently Updated</MenuItem>
+            <MenuItem value="nameAsc">Name (A-Z)</MenuItem>
+            <MenuItem value="nameDesc">Name (Z-A)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       <Box className={classes.listContainer}>
         <List disablePadding>
           {reports && reports.length > 0 ? (
-            reports.map((report) => (
+            getSortedReports().map((report) => (
               <ListItem 
                 key={report.id} 
                 button 

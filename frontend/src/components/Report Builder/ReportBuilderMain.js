@@ -224,6 +224,58 @@ const ReportBuilderMain = () => {
         setIsLoading(false);
     };
 
+    const handleCreateTemplate = async () => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            // Create a basic template shell
+            const templateData = {
+                name: "New Template",
+                description: "",
+                category: "Custom",
+                content: {
+                    elements: []
+                }
+            };
+            
+            // Send the template to the backend
+            const response = await axios.post(
+                getGatewayUrl('/api/report_builder/templates'), 
+                templateData,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            
+            const newTemplate = response.data;
+            setTemplates(prev => [...prev, newTemplate]);
+            
+            // Open the template editor in the ReportDesignerPage
+            window.open(`/report-designer/${newTemplate.id}?isTemplate=true`, '_blank', 'width=1200,height=800');
+            
+        } catch (err) {
+            console.error("Error creating template:", err);
+            setError('Failed to create template. Please try again.');
+        }
+        
+        setIsLoading(false);
+    };
+
+    // Add a function to fetch templates
+    const fetchTemplates = async () => {
+        try {
+            const templatesResponse = await axios.get(getGatewayUrl('/api/report_builder/templates'), {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            setTemplates(templatesResponse.data || []);
+        } catch (err) {
+            console.error("Error fetching templates:", err);
+            // Optionally show an error message
+        }
+    };
+
     if (authIsLoading) {
         return <div>Loading authentication...</div>;
     }
@@ -252,8 +304,9 @@ const ReportBuilderMain = () => {
                         <Box className={classes.contentWrapper}>
                             <NewReportOptions 
                                 onCreateNew={handleCreateReport}
-                                onCreateTemplate={() => history.push('/templates/new')}
+                                onCreateTemplate={handleCreateTemplate}
                                 templates={templates}
+                                refreshTemplates={fetchTemplates}
                             />
                         </Box>
                     </Box>

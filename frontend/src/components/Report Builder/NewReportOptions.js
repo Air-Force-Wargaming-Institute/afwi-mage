@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useContext } from 'react';
 import { 
   Paper, 
   Typography, 
@@ -7,11 +7,18 @@ import {
   List, 
   ListItem, 
   ListItemText, 
+  ListItemSecondaryAction,
+  IconButton,
   Divider, 
   makeStyles,
-  CircularProgress
+  CircularProgress,
+  Snackbar
 } from '@material-ui/core';
+import DeleteIcon from '@material-ui/icons/Delete';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
+import { AuthContext } from '../../contexts/AuthContext';
+import axios from 'axios';
+import { getGatewayUrl } from '../../config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -107,11 +114,106 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [] }) {
+function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refreshTemplates }) {
   const classes = useStyles();
+  const { token } = useContext(AuthContext);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Sort templates to show system templates at the top
+  const getSortedTemplates = () => {
+    if (!templates || templates.length === 0) return [];
+    
+    return [...templates].sort((a, b) => {
+      // First sort by category - system templates (non-Custom) go first
+      if (a.category === 'Custom' && b.category !== 'Custom') return 1;
+      if (a.category !== 'Custom' && b.category === 'Custom') return -1;
+      
+      // If same category type, sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
+  };
 
   const handleSelectTemplate = (template) => {
     onCreateNew({ type: 'template', data: template });
+  };
+
+  const handleDeleteTemplate = async (event, templateId) => {
+    // Stop event propagation to prevent template selection
+    event.stopPropagation();
+    
+    // Find the template to check if it's a system template
+    const templateToDelete = templates.find(t => t.id === templateId);
+    
+    // Prevent deletion of system templates (those with category other than "Custom")
+    if (!templateToDelete || templateToDelete.category !== 'Custom') {
+      setSnackbarMessage('System templates cannot be deleted');
+      setSnackbarOpen(true);
+      return;
+    }
+    
+    try {
+      // Update the UI first for a more responsive experience
+      // Note: This is just visual - the refreshTemplates will update with actual data from server
+      const updatedTemplatesList = getSortedTemplates().filter(t => t.id !== templateId);
+      const templatesList = document.querySelector(`.${classes.templateList}`);
+      
+      // Find and remove the template item from the DOM for immediate feedback
+      const templateItem = document.querySelector(`[data-template-id="${templateId}"]`);
+      if (templateItem) {
+        // Add a fade-out animation
+        templateItem.style.transition = 'opacity 0.3s ease';
+        templateItem.style.opacity = '0';
+        
+        // Wait for animation to complete
+        setTimeout(() => {
+          // Call API to delete the template
+          axios.delete(getGatewayUrl(`/api/report_builder/templates/${templateId}`), {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          .then(() => {
+            // Show success message
+            setSnackbarMessage('Template deleted successfully');
+            setSnackbarOpen(true);
+            
+            // Refresh templates to ensure data consistency
+            if (refreshTemplates) {
+              refreshTemplates();
+            }
+          })
+          .catch(error => {
+            console.error('Error deleting template:', error);
+            setSnackbarMessage('Error deleting template');
+            setSnackbarOpen(true);
+            
+            // Refresh to restore state on error
+            if (refreshTemplates) {
+              refreshTemplates();
+            }
+          });
+        }, 300); // Match transition duration
+      } else {
+        // Fallback if DOM manipulation fails
+        await axios.delete(getGatewayUrl(`/api/report_builder/templates/${templateId}`), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        setSnackbarMessage('Template deleted successfully');
+        setSnackbarOpen(true);
+        
+        if (refreshTemplates) {
+          refreshTemplates();
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      setSnackbarMessage('Error deleting template');
+      setSnackbarOpen(true);
+    }
+  };
+  
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -142,18 +244,42 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [] }) {
         </Box>
       ) : (
         <List className={classes.templateList} dense>
-          {templates.map((template) => (
+          {getSortedTemplates().map((template) => (
             <ListItem 
-              key={template.id} 
+              key={template.id}
+              data-template-id={template.id}
               button 
               className={classes.templateItem} 
               onClick={() => handleSelectTemplate(template)}
             >
               <ListItemText 
                 primary={template.name} 
-                secondary={template.description} 
+                secondary={
+                  <>
+                    {template.description}
+                    <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
+                      <span style={{ fontWeight: 500 }}>Category:</span> {template.category}
+                    </Typography>
+                  </>
+                }
                 primaryTypographyProps={{ style: { fontWeight: 500 } }}
               />
+              {template.category === 'Custom' && (
+                <ListItemSecondaryAction>
+                  <IconButton 
+                    edge="end" 
+                    aria-label="delete" 
+                    onClick={(e) => handleDeleteTemplate(e, template.id)}
+                    size="small"
+                    style={{ 
+                      padding: 10,
+                      marginRight: 8 
+                    }}
+                  >
+                    <DeleteIcon style={{ fontSize: 20 }} />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              )}
             </ListItem>
           ))}
         </List>
@@ -168,10 +294,16 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [] }) {
         onClick={onCreateTemplate}
         className={classes.button}
         style={{ marginTop: 'auto' }}
-        disabled={true}
       >
-        Create New Template (Coming Soon)
+        Create New Template
       </Button>
+      
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+      />
     </Paper>
   );
 }

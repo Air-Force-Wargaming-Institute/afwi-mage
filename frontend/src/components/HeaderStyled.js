@@ -273,6 +273,9 @@ function HeaderStyled() {
       setActiveTab('retrieval');
     } else if (location.pathname.startsWith('/document-library')) {
       setActiveTab('document-library');
+    } else if (location.pathname.startsWith('/report-builder')) {
+      // Treat Report Builder as part of the multi-agent section
+      setActiveTab('multi-agent');
     }
   }, [location.pathname]);
 

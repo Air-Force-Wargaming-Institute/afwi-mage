@@ -210,6 +210,11 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
   const [vectorStores, setVectorStores] = React.useState(mockVectorStores);
   const [collapsedElements, setCollapsedElements] = useState({});
   const [editingTitle, setEditingTitle] = useState(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+  const isTemplate = definition?.isTemplate || false;
+  
+  console.log('ReportConfigPanel - isTemplate:', isTemplate); // Debug logging
+  console.log('ReportConfigPanel - definition:', definition); // Debug logging
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -329,17 +334,24 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
   const handleTitleClick = (elementId, e) => {
     e.stopPropagation();
     setEditingTitle(elementId);
+    // Set the initial editing value to the current title (or empty string if null)
+    const element = definition?.elements?.find(el => el.id === elementId);
+    setEditingTitleValue(element?.title || '');
   };
 
-  const handleTitleChange = (elementId, newTitle) => {
-    handleElementChange(elementId, 'title', newTitle);
+  const handleTitleChange = (e) => {
+    setEditingTitleValue(e.target.value);
+  };
+
+  const saveTitleChange = (elementId) => {
+    handleElementChange(elementId, 'title', editingTitleValue);
     setEditingTitle(null);
   };
 
   const handleTitleKeyPress = (e, elementId) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      setEditingTitle(null);
+      saveTitleChange(elementId);
     }
   };
 
@@ -359,10 +371,10 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
     <Box className={classes.root}>
       <Box className={classes.configSection}>
         <GradientText variant="h6" component="h2" gutterBottom>
-          Report Configuration
+          {isTemplate ? 'Template Configuration' : 'Report Configuration'}
         </GradientText>
         <TextField 
-          label="Report Title" 
+          label={isTemplate ? "Template Title" : "Report Title"} 
           name="title" 
           value={definition?.title || ''} 
           onChange={handleInputChange} 
@@ -372,7 +384,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
           size="small"
         />
         <TextField 
-          label="Report Description" 
+          label={isTemplate ? "Template Description" : "Report Description"} 
           name="description" 
           value={definition?.description || ''} 
           onChange={handleInputChange} 
@@ -383,26 +395,28 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
           rows={2}
           size="small"
         />
-        <FormControl fullWidth margin="dense" variant="outlined" size="small">
-          <InputLabel>Vector Store</InputLabel>
-          <Select
-            value={definition?.vectorStoreId || ''}
-            onChange={handleVectorStoreChange}
-            label="Vector Store"
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {vectorStores.map(vs => (
-              <MenuItem key={vs.id} value={vs.id}>{vs.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {!isTemplate && (
+          <FormControl fullWidth margin="dense" variant="outlined" size="small">
+            <InputLabel>Vector Store</InputLabel>
+            <Select
+              value={definition?.vectorStoreId || ''}
+              onChange={handleVectorStoreChange}
+              label="Vector Store"
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {vectorStores.map(vs => (
+                <MenuItem key={vs.id} value={vs.id}>{vs.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Box>
 
       <Box className={classes.sectionHeader}>
         <GradientText variant="h6" component="h2">
-          Report Elements
+          {isTemplate ? 'Template Elements' : 'Report Elements'}
         </GradientText>
         <Button
           size="small"
@@ -437,9 +451,9 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
                 {editingTitle === element.id ? (
                   <TextField
                     className={classes.elementTitleInput}
-                    value={element.title || `Element ${index + 1}`}
-                    onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
-                    onBlur={() => setEditingTitle(null)}
+                    value={editingTitleValue}
+                    onChange={handleTitleChange}
+                    onBlur={() => saveTitleChange(element.id)}
                     onKeyPress={(e) => handleTitleKeyPress(e, element.id)}
                     onClick={(e) => e.stopPropagation()}
                     autoFocus
