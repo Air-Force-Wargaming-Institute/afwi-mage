@@ -540,10 +540,23 @@ const RecordTranscribe = () => {
   //   }
   // }, [transcriptionText]); // Scroll when text changes
 
-  // Determine if fields should be disabled (Keep - used by multiple sections)
   // Disable forms ONLY if actively recording or paused, allow editing loaded sessions
   const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
   
+  // --- START EDIT ---
+  // Determine if the RealtimeTaggingPanel should be read-only
+  // It should be interactive (not read-only) ONLY when actively recording a NEW session.
+  // It should be read-only if:
+  //  - Viewing a loaded session (loadedSessionId is true)
+  //  - Recording is paused
+  //  - Recording is inactive/stopped
+  const isTaggingPanelReadOnly =
+    !!loadedSessionId || // If a session is loaded, it's read-only for tagging
+    recordingState === RECORDING_STATES.PAUSED ||
+    recordingState === RECORDING_STATES.INACTIVE ||
+    recordingState === RECORDING_STATES.STOPPED;
+  // --- END EDIT ---
+
   // Construct the full classification string for display (Keep)
   const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
 
@@ -681,7 +694,7 @@ const RecordTranscribe = () => {
 
                   {/* Realtime Tagging Panel */}
                   <Box sx={{ px: 1.5, pb: 1 }}>
-                    <RealtimeTaggingPanel isReadOnly={isFormDisabled} />
+                    <RealtimeTaggingPanel isReadOnly={isTaggingPanelReadOnly} />
                   </Box>
 
                   <Divider sx={{ mx: 2 }}/>
