@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { 
   Box, 
   Typography, 
@@ -25,6 +25,9 @@ import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import FormatListBulletedIcon from '@material-ui/icons/FormatListBulleted';
 import FormatListNumberedIcon from '@material-ui/icons/FormatListNumbered';
 import { GradientText, SubtleGlowPaper } from '../../styles/StyledComponents';
+import { getGatewayUrl } from '../../config';
+import axios from 'axios';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -197,17 +200,13 @@ const formatOptions = [
   // Add more formats like blockquote, code block if needed
 ];
 
-// Mock data for vector stores
-const mockVectorStores = [
-  { id: 'vs1', name: 'General Knowledge Base' },
-  { id: 'vs2', name: 'Project Blue Book Docs' },
-  { id: 'vs3', name: 'Historical Ops Data' },
-];
-
 function ReportConfigPanel({ definition, onChange, currentReportId }) {
   const classes = useStyles();
   const theme = useTheme();
-  const [vectorStores, setVectorStores] = React.useState(mockVectorStores);
+  const { token } = useContext(AuthContext);
+  const [vectorStores, setVectorStores] = useState([]);
+  const [isLoadingVectorStores, setIsLoadingVectorStores] = useState(false);
+  const [vectorStoreError, setVectorStoreError] = useState(null);
   const [collapsedElements, setCollapsedElements] = useState({});
   const [editingTitle, setEditingTitle] = useState(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
@@ -248,6 +247,35 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
       }
     }
   }, [definition, onChange, currentReportId]);
+
+  // Load vector stores from API
+  useEffect(() => {
+    const fetchVectorStores = async () => {
+      if (!token) return; // Skip if no token available
+      
+      setIsLoadingVectorStores(true);
+      setVectorStoreError(null);
+      try {
+        const response = await axios.get(
+          getGatewayUrl('/api/report_builder/vector_stores'),
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        setVectorStores(response.data);
+      } catch (error) {
+        console.error('Error fetching vector stores:', error);
+        setVectorStoreError(error.response?.data?.detail || error.message);
+        setVectorStores([]);
+      } finally {
+        setIsLoadingVectorStores(false);
+      }
+    };
+    
+    fetchVectorStores();
+  }, [token]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -399,16 +427,36 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
           <FormControl fullWidth margin="dense" variant="outlined" size="small">
             <InputLabel>Vector Store</InputLabel>
             <Select
-              value={definition?.vectorStoreId || ''}
+              value={vectorStores.length === 0 ? "none_available" : (definition?.vectorStoreId || '')}
               onChange={handleVectorStoreChange}
               label="Vector Store"
+              disabled={isLoadingVectorStores || vectorStores.length === 0}
             >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {vectorStores.map(vs => (
-                <MenuItem key={vs.id} value={vs.id}>{vs.name}</MenuItem>
-              ))}
+              {isLoadingVectorStores && (
+                <MenuItem disabled value="loading">
+                  <em>Loading vector stores...</em>
+                </MenuItem>
+              )}
+              {vectorStoreError && (
+                <MenuItem disabled value="error">
+                  <em>Error loading vector stores</em>
+                </MenuItem>
+              )}
+              {vectorStores.length === 0 && (
+                <MenuItem disabled value="none_available">
+                  <em>None Available</em>
+                </MenuItem>
+              )}
+              {vectorStores.length > 0 && (
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+              )}
+              {vectorStores.length > 0 && 
+                vectorStores.map(vs => (
+                  <MenuItem key={vs.id} value={vs.id}>{vs.name}</MenuItem>
+                ))
+              }
             </Select>
           </FormControl>
         )}

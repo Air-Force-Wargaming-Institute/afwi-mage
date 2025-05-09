@@ -1,13 +1,20 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any, Literal, Union
 import uuid
 import json
 from pathlib import Path
-import httpx # For making async HTTP requests
+import httpx
 import os
 import shutil
+import logging
+from datetime import datetime
 from init_templates import init_templates
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("report_builder_service")
 
 app = FastAPI()
 
@@ -64,6 +71,27 @@ class ReportBuilderVectorStoreInfo(BaseModel):
 class GeneratedReportMarkdown(BaseModel):
     report_id: str
     markdown_content: str
+    has_errors: bool = False
+    generation_errors: Optional[List[Dict[str, Any]]] = None
+
+# Add new error response models for structured error handling
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    
+class ErrorResponse(BaseModel):
+    error: bool = True
+    detail: ErrorDetail
+    timestamp: str
+
+# Constants for error codes
+class ErrorCodes:
+    REPORT_NOT_FOUND = "REPORT_NOT_FOUND"
+    VECTOR_STORE_ERROR = "VECTOR_STORE_ERROR"
+    MAGE_SERVICE_ERROR = "MAGE_SERVICE_ERROR"
+    GENERATION_FAILED = "GENERATION_FAILED"
+    INVALID_REPORT_STRUCTURE = "INVALID_REPORT_STRUCTURE"
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
 
 # Define directory structure
 BASE_DIR = Path(__file__).parent
@@ -158,6 +186,9 @@ init_templates()
 # It's good practice to get service URLs from environment variables or a config service
 # Ensure this matches your docker-compose service name and port for embedding_service
 EMBEDDING_SERVICE_BASE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding_service:8006")
+
+# Define LLM service URL from environment variable with default fallback
+MAGE_LLM_SERVICE_URL = os.getenv("MAGE_LLM_SERVICE_URL", "http://generation_service:8003")
 
 @app.get("/api/report_builder/vector_stores", response_model=List[ReportBuilderVectorStoreInfo])
 async def get_vector_stores_for_report_builder():
@@ -267,46 +298,285 @@ async def delete_report(report_id: str):
     
     return
 
-@app.post("/api/report_builder/reports/{report_id}/generate", response_model=GeneratedReportMarkdown)
-async def generate_report_placeholder(report_id: str):
-    report_path = REPORTS_DIR / f"{report_id}.json"
-    report_to_generate = load_report_from_file(report_path)
+@app.post("/api/report_builder/reports/{report_id}/generate", response_model=Union[GeneratedReportMarkdown, ErrorResponse])
+async def generate_report(report_id: str):
+    """
+    Generate a report using MAGE LLM service for the 'generative' elements.
     
-    if not report_to_generate:
-        raise HTTPException(status_code=404, detail="Report not found")
-
-    markdown_parts = [] # Initialize a list to hold parts of the markdown
-    markdown_parts.append(f"# {report_to_generate.name}\n")
-
-    if report_to_generate.description:
-        markdown_parts.append(f"{report_to_generate.description}\n\n") # Add extra newline for spacing after description
-
-    for element in report_to_generate.content.elements:
-        if element.title:
-            markdown_parts.append(f"## {element.title}\n")
+    Args:
+        report_id (str): The ID of the report to generate
         
-        if element.type == 'explicit':
-            if element.content:
-                markdown_parts.append(f"{element.content}\n")
-        elif element.type == 'generative':
-            # Construct mock content for generative elements
-            mock_content = f"*[Placeholder for AI Generation]*\n"
-            if element.instructions:
-                mock_content += f"*Instructions: {element.instructions}*\n"
-            else:
-                mock_content += f"*Instructions: N/A*\n"
+    Returns:
+        GeneratedReportMarkdown: The generated report markdown content
+        
+    Raises:
+        HTTPException: If report not found or generation fails
+    """
+    now = datetime.utcnow().isoformat() + "Z"  # For error timestamps
+    
+    try:
+        # Load the report definition
+        report_path = REPORTS_DIR / f"{report_id}.json"
+        report_to_generate = load_report_from_file(report_path)
+        
+        if not report_to_generate:
+            logger.warning(f"Report with ID {report_id} not found")
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.REPORT_NOT_FOUND,
+                    message=f"Report with ID {report_id} not found"
+                ),
+                timestamp=now
+            )
+
+        # Check if the report has a vector store ID but the vector store doesn't exist
+        if report_to_generate.vectorStoreId:
+            try:
+                # Verify that the vector store exists by making a call to the embedding service
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{report_to_generate.vectorStoreId}")
+                    if response.status_code == 404:
+                        logger.warning(f"Report {report_id} references non-existent vector store ID: {report_to_generate.vectorStoreId}")
+                        return ErrorResponse(
+                            detail=ErrorDetail(
+                                code=ErrorCodes.VECTOR_STORE_ERROR,
+                                message=f"Vector store with ID {report_to_generate.vectorStoreId} not found"
+                            ),
+                            timestamp=now
+                        )
+                    response.raise_for_status()
+            except httpx.RequestError as e:
+                logger.error(f"Error connecting to embedding service: {str(e)}")
+                return ErrorResponse(
+                    detail=ErrorDetail(
+                        code=ErrorCodes.VECTOR_STORE_ERROR,
+                        message=f"Could not connect to embedding service to verify vector store: {str(e)}"
+                    ),
+                    timestamp=now
+                )
+            except httpx.HTTPStatusError as e:
+                # Only return an error if it's not a 404 (already handled above)
+                if e.response.status_code != 404:
+                    logger.error(f"Embedding service error: {str(e)}")
+                    return ErrorResponse(
+                        detail=ErrorDetail(
+                            code=ErrorCodes.VECTOR_STORE_ERROR,
+                            message=f"Embedding service returned an error: {str(e)}"
+                        ),
+                        timestamp=now
+                    )
+
+        # Check MAGE service availability
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{MAGE_LLM_SERVICE_URL}/api/generation/health")
+                response.raise_for_status()
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
+            logger.error(f"MAGE service is not available: {str(e)}")
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.MAGE_SERVICE_ERROR,
+                    message=f"MAGE service is not available. Please try again later."
+                ),
+                timestamp=now
+            )
+
+        logger.info(f"Generating report for ID: {report_id}")
+        markdown_parts = []  # Initialize a list to hold parts of the markdown
+        markdown_parts.append(f"# {report_to_generate.name}\n")
+
+        if report_to_generate.description:
+            markdown_parts.append(f"{report_to_generate.description}\n\n")  # Add extra newline for spacing after description
+
+        # Track any errors encountered during generation
+        generation_errors = []
+
+        # Process each element in the report
+        logger.info(f"Processing {len(report_to_generate.content.elements)} elements")
+        for element in report_to_generate.content.elements:
+            if element.title:
+                markdown_parts.append(f"## {element.title}\n")
             
-            if report_to_generate.vectorStoreId:
-                mock_content += f"*Using Vector Store ID: {report_to_generate.vectorStoreId}*\n"
-            else:
-                mock_content += f"*Vector Store ID: None linked*\n"
-            markdown_parts.append(mock_content)
-        
-        markdown_parts.append("\n") # Add a blank line for spacing after each element section
+            if element.type == 'explicit':
+                # For explicit elements, directly use the content
+                if element.content:
+                    markdown_parts.append(f"{element.content}\n")
+            elif element.type == 'generative':
+                try:
+                    # For generative elements, call MAGE service
+                    logger.info(f"Generating content for element ID: {element.id}")
+                    generated_content = await generate_element_content(
+                        element, 
+                        report_to_generate.vectorStoreId,
+                        previous_content="".join(markdown_parts)  # Pass previously generated content as context
+                    )
+                    markdown_parts.append(f"{generated_content}\n")
+                except Exception as e:
+                    # Log the specific error but continue with a placeholder
+                    logger.error(f"Error generating content for element {element.id}: {str(e)}", exc_info=True)
+                    
+                    # Categorize the error
+                    error_message = str(e)
+                    error_code = ErrorCodes.GENERATION_FAILED
+                    
+                    if "Error connecting to MAGE service" in error_message:
+                        error_code = ErrorCodes.MAGE_SERVICE_ERROR
+                    elif "Vector store" in error_message:
+                        error_code = ErrorCodes.VECTOR_STORE_ERROR
+                    
+                    # Add to the list of errors
+                    generation_errors.append({
+                        "element_id": element.id,
+                        "element_title": element.title or "Untitled Element",
+                        "error_code": error_code,
+                        "error_message": error_message
+                    })
+                    
+                    # Add a placeholder indicating the error
+                    error_placeholder = f"*[Error generating AI content: {error_message}]*\n"
+                    if element.instructions:
+                        error_placeholder += f"*Instructions: {element.instructions}*\n"
+                    markdown_parts.append(error_placeholder)
+            
+            markdown_parts.append("\n")  # Add a blank line for spacing after each element section
 
-    full_markdown = "".join(markdown_parts) # Join without double newlines if parts already end with one
+        full_markdown = "".join(markdown_parts)  # Join without double newlines if parts already end with one
+        
+        # If we had generation errors, log them but still return the partial report
+        if generation_errors:
+            error_summary = ", ".join([f"{e['element_title']}" for e in generation_errors])
+            logger.warning(f"Report generation completed with {len(generation_errors)} errors in elements: {error_summary}")
+            
+            # Return a successful response but include error information
+            response = GeneratedReportMarkdown(
+                report_id=report_id, 
+                markdown_content=full_markdown,
+                generation_errors=generation_errors,
+                has_errors=True
+            )
+            
+            return response
+        else:
+            logger.info(f"Successfully generated report for ID: {report_id}")
+            return GeneratedReportMarkdown(report_id=report_id, markdown_content=full_markdown)
     
-    return GeneratedReportMarkdown(report_id=report_id, markdown_content=full_markdown)
+    except Exception as e:
+        logger.error(f"Unexpected error generating report {report_id}: {str(e)}", exc_info=True)
+        
+        # Determine the most appropriate error code based on the exception
+        error_code = ErrorCodes.UNKNOWN_ERROR
+        error_message = f"An unexpected error occurred while generating the report: {str(e)}"
+        
+        if "MAGE service" in str(e):
+            error_code = ErrorCodes.MAGE_SERVICE_ERROR
+            error_message = f"Error with MAGE service: {str(e)}"
+        elif "Vector store" in str(e):
+            error_code = ErrorCodes.VECTOR_STORE_ERROR
+            error_message = f"Error with vector store: {str(e)}"
+        elif "not found" in str(e).lower():
+            error_code = ErrorCodes.REPORT_NOT_FOUND
+            error_message = f"Report not found: {str(e)}"
+        
+        return ErrorResponse(
+            detail=ErrorDetail(
+                code=error_code,
+                message=error_message
+            ),
+            timestamp=now
+        )
+
+async def generate_element_content(element: ReportElement, vector_store_id: Optional[str], previous_content: str = "") -> str:
+    """
+    Generate content for a report element using MAGE LLM service.
+    
+    Args:
+        element: The report element to generate content for
+        vector_store_id: Optional ID of vector store to use for context
+        previous_content: Previously generated content for context
+        
+    Returns:
+        str: The generated content
+        
+    Raises:
+        Exception: If generation fails
+    """
+    if not element.instructions:
+        logger.warning(f"No instructions provided for generative element ID: {element.id}")
+        return "*[No instructions provided for AI generation]*"
+    
+    try:
+        # Prepare the prompt for MAGE
+        prompt = f"""Generate content for a report section with the following instructions:
+        
+Instructions: {element.instructions}
+
+This content will be part of a larger report. Here is the content generated so far:
+{previous_content}
+
+Please generate markdown-formatted content for this section that follows the instructions.
+"""
+
+        # Add vector store context if available
+        if vector_store_id:
+            logger.info(f"Using vector store ID: {vector_store_id} for element ID: {element.id}")
+            prompt += f"\nPlease use information from vector store with ID: {vector_store_id}"
+            
+        # Call MAGE service
+        logger.info(f"Calling MAGE service for element ID: {element.id}")
+        async with httpx.AsyncClient(timeout=120.0) as client:  # 2-minute timeout
+            url = f"{MAGE_LLM_SERVICE_URL}/api/generation/text"
+            
+            payload = {
+                "prompt": prompt,
+                "max_tokens": 1500,  # Reasonable limit for a report section
+                "temperature": 0.7,  # Balanced between creative and consistent
+            }
+            
+            # If vector store is specified, add it to the payload
+            if vector_store_id:
+                payload["vector_store_id"] = vector_store_id
+                
+            logger.debug(f"Sending request to MAGE at URL: {url}")
+            response = await client.post(url, json=payload)
+            response.raise_for_status()  # Raise HTTP errors
+            
+            result = response.json()
+            logger.debug(f"Received response from MAGE for element ID: {element.id}")
+            
+            # Extract the generated content
+            if "text" in result:
+                return result["text"]
+            elif "content" in result:
+                return result["content"]
+            elif "message" in result:
+                return result["message"]
+            else:
+                logger.error(f"Unexpected response format from MAGE service: {result}")
+                raise ValueError("Unexpected response format from MAGE service")
+                
+    except httpx.RequestError as exc:
+        # Network-related errors
+        error_msg = f"Error connecting to MAGE service: {str(exc)}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+        
+    except httpx.HTTPStatusError as exc:
+        # HTTP response errors (4XX, 5XX)
+        status_code = exc.response.status_code
+        try:
+            error_detail = exc.response.json()
+            error_msg = f"MAGE service returned HTTP {status_code}: {error_detail.get('detail', str(exc))}"
+        except:
+            error_msg = f"MAGE service returned HTTP {status_code}: {str(exc)}"
+        
+        logger.error(error_msg)
+        raise Exception(error_msg)
+        
+    except Exception as e:
+        # Any other unexpected errors
+        error_msg = f"Unexpected error during content generation: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)
 
 # Template endpoints
 @app.post("/api/report_builder/templates", response_model=Template)
@@ -387,6 +657,48 @@ async def delete_template(template_id: str):
 @app.get("/api/report_builder/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Add global exception handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Global HTTP exception handler for FastAPI exceptions"""
+    now = datetime.utcnow().isoformat() + "Z"
+    
+    # Map HTTP status codes to our error codes
+    error_code = ErrorCodes.UNKNOWN_ERROR
+    if exc.status_code == 404:
+        error_code = ErrorCodes.REPORT_NOT_FOUND
+    
+    logger.warning(f"HTTP Exception {exc.status_code}: {str(exc.detail)}")
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            detail=ErrorDetail(
+                code=error_code,
+                message=str(exc.detail)
+            ),
+            timestamp=now
+        ).dict()
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Global exception handler for all uncaught exceptions"""
+    now = datetime.utcnow().isoformat() + "Z"
+    
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            detail=ErrorDetail(
+                code=ErrorCodes.UNKNOWN_ERROR,
+                message=f"Internal server error: {str(exc)}"
+            ),
+            timestamp=now
+        ).dict()
+    )
 
 @app.get("")
 async def root():

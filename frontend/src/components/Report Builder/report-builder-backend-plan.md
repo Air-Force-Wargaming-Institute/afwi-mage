@@ -54,18 +54,18 @@ This plan focuses on the backend development for the Report Builder feature, bui
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want the `report_builder_service` to communicate with MAGE (LLM Service) to generate content for a single "generative" report element.**
-    *   [ ] Task: Identify the MAGE service endpoint and API contract for text generation.
-    *   [ ] Task: In the `/api/report_builder/reports/{report_id}/generate` endpoint (or a new, more granular one if preferred, e.g., `/generate_section`), for each "generative" element:
-        *   [ ] Task: Construct a prompt for MAGE, including the element's `instructions`.
-        *   [ ] Task: If a `vectorStoreId` is linked to the report, retrieve relevant context/data from that vector store (details of vector store querying TBD, may involve another service call).
-        *   [ ] Task: Include previously generated report content (if any, and as per context window strategy) in the prompt.
-        *   [ ] Task: Call the MAGE service with the complete prompt.
+    *   [X] Task: Identify the MAGE service endpoint and API contract for text generation.
+    *   [X] Task: In the `/api/report_builder/reports/{report_id}/generate` endpoint (or a new, more granular one if preferred, e.g., `/generate_section`), for each "generative" element:
+        *   [X] Task: Construct a prompt for MAGE, including the element's `instructions`.
+        *   [X] Task: If a `vectorStoreId` is linked to the report, retrieve relevant context/data from that vector store (details of vector store querying TBD, may involve another service call).
+        *   [X] Task: Include previously generated report content (if any, and as per context window strategy) in the prompt.
+        *   [X] Task: Call the MAGE service with the complete prompt.
 *   **As a Backend Developer, I want the `/generate` endpoint to assemble the full report Markdown, incorporating MAGE-generated content for "generative" sections and user-defined content for "explicit" sections.**
-    *   [ ] Task: Iterate through all report elements. For "explicit" elements, format their content as Markdown. For "generative" elements, use the content returned by MAGE.
-    *   [ ] Task: Return the complete assembled Markdown string as the API response.
+    *   [X] Task: Iterate through all report elements. For "explicit" elements, format their content as Markdown. For "generative" elements, use the content returned by MAGE.
+    *   [X] Task: Return the complete assembled Markdown string as the API response.
 *   **As a Backend Developer, I want to implement robust error handling for the generation process, including MAGE service errors or vector store access issues.**
-    *   [ ] Task: Implement try-catch blocks for external service calls.
-    *   [ ] Task: Return informative error messages to the frontend if generation fails.
+    *   [X] Task: Implement try-catch blocks for external service calls.
+    *   [X] Task: Return informative error messages to the frontend if generation fails.
 
 ## Phase 4: Templates and Export Functionality
 
@@ -74,9 +74,9 @@ This plan focuses on the backend development for the Report Builder feature, bui
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want to define and manage report templates on the backend so they can be served to the frontend.**
-    *   [ ] Task: Decide on a storage mechanism for templates (e.g., predefined JSON files within the service, or a database table).
-    *   [ ] Task: Create `GET /api/report_builder/templates` endpoint to list available templates (name, description, ID).
-    *   [ ] Task: Create `GET /api/report_builder/templates/{template_id}` endpoint to retrieve a specific template's full structure.
+    *   [X] Task: Decide on a storage mechanism for templates (e.g., predefined JSON files within the service, or a database table).
+    *   [X] Task: Create `GET /api/report_builder/templates` endpoint to list available templates (name, description, ID).
+    *   [X] Task: Create `GET /api/report_builder/templates/{template_id}` endpoint to retrieve a specific template's full structure.
     *   [ ] Task: (Frontend will need to adapt `ReportBuilderMain.js` to fetch these instead of using `reportTemplates.js` directly).
 *   **As a Backend Developer, I want to implement an API endpoint to convert the generated Markdown report into a Microsoft Word document.**
     *   [ ] Task: Research and choose a suitable library for Markdown to Word conversion (e.g., Pandoc, python-docx).
