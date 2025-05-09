@@ -13,6 +13,7 @@ import '../../App.css'; // Import App.css for styling
 import SpreadsheetViewer from './spreadsheet/SpreadsheetViewer';
 import SpreadsheetTools from './spreadsheet/SpreadsheetTools';
 import ChartBuilder from './visualization/ChartBuilder';
+import ChartGallery from './visualization/ChartGallery'; // Import ChartGallery
 
 // Styled components for modern UI
 const GradientBorderPaper = styled(Paper)(({ theme }) => ({
@@ -350,7 +351,15 @@ const WorkbenchDashboard = () => {
       case 'column-transform':
         return <SpreadsheetTools />;
       case 'visualization':
-        return <ChartBuilder />;
+        // Render both ChartBuilder and ChartGallery
+        return (
+          <>
+            <ChartBuilder />
+            <Box sx={{ mt: 4 }}> {/* Add margin between builder and gallery */}
+              <ChartGallery />
+            </Box>
+          </>
+        );
       default:
         return renderWelcomeDashboard();
     }

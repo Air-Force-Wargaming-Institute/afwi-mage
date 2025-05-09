@@ -1,0 +1,23 @@
+{
+  "id": "9fa7eb8c-ccde-4432-8e21-75c25829caa4",
+  "name": "NATO",
+  "description": "NATO",
+  "embedding_model": "nomic-embed-text:latest",
+  "embedding_dimension": 768,
+  "chunk_size": 1000,
+  "chunk_overlap": 100,
+  "file_count": 1,
+  "created_at": "2025-05-05T15:53:57.130984",
+  "updated_at": "2025-05-05T15:53:57.130984",
+  "files": [
+    {
+      "filename": "2023-10-09 Survey of PRC Drone Swarm Inventions.pdf",
+      "original_path": "2023-10-09 Survey of PRC Drone Swarm Inventions.pdf",
+      "staging_path": "/app/doc_staging/2023-10-09 Survey of PRC Drone Swarm Inventions.pdf",
+      "file_type": ".pdf",
+      "document_id": "doc_61325f4e-8e69-41de-b4c4-faef3bb8d10b",
+      "size_bytes": 1235718,
+      "added_at": "2025-05-05T15:53:55.901261"
+    }
+  ]
+}

@@ -151,6 +151,17 @@ http:
         - "auth-middleware"
         - "security-headers"
         - "rate-limit-upload"
+
+    # Transcription Service Router
+    transcription-router: 
+      rule: "PathPrefix(`/api/transcription`) || Path(`/api/transcription/health`)"
+      service: "transcription-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "auth-middleware"
+        - "security-headers"
       
     # Core Service Router
     core-router:
@@ -388,6 +399,13 @@ http:
           - url: "http://report_builder_service:8019"
         healthCheck:
           path: "/api/report_builder/health"
+          
+    transcription-service:
+      loadBalancer:
+        servers:
+          - url: "http://transcription:8021"
+        healthCheck:
+          path: "/api/transcription/health"
           interval: "120s"
           timeout: "5s"
           followRedirects: true

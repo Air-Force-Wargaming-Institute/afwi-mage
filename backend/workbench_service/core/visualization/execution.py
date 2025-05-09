@@ -21,7 +21,7 @@ import io
 import base64
 from typing import Dict, Any, Optional, List, Tuple
 
-from config import WORKBENCH_SPREADSHEETS_DIR
+from config import WORKBENCH_SPREADSHEETS_DIR, get_config
 
 logger = logging.getLogger("workbench_service")
 
@@ -38,7 +38,11 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
         Dictionary containing execution results (success, image URL, etc.)
     """
     # Set up output directory for visualizations 
-    output_dir = Path(WORKBENCH_SPREADSHEETS_DIR) / "visualizations"
+    # Use WORKBENCH_DIR from config directly for the parent
+    config = get_config()
+    workbench_dir = Path(config.get('WORKBENCH_DIR'))
+    output_dir = workbench_dir / "visualizations"
+    # output_dir = Path(WORKBENCH_SPREADSHEETS_DIR) / "visualizations"
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate a filename for this visualization output
@@ -85,7 +89,7 @@ async def execute_visualization_code(visualization_id: str, code: str, data_cont
             # to serve files from the output directory
             # Instead of a public URL served by FastAPI, we'll use the filename for reference
             # public_url = f"/api/workbench/visualizations/{visualization_id}/image/{output_filename}"
-            file_reference_path = f"/app/data/workbench/spreadsheets/visualizations/{output_filename}"
+            file_reference_path = f"/app/data/workbench/visualizations/{output_filename}"
 
             return {
                 "success": True,

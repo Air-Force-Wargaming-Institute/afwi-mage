@@ -981,6 +981,17 @@ async def list_vectorstores():
         logger.error(f"Error listing vectorstores: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list vectorstores.")
 
+# Endpoint to get specific session metadata
+@router.get("/api/direct_chat/chat/session/{session_id}/metadata")
+async def get_session_metadata(session_id: str, user_id: str = DEFAULT_USER):
+    logger.info(f"Fetching metadata for session: {session_id}, user: {user_id}")
+    metadata = await load_session_metadata_async(session_id, user_id)
+    if not metadata:
+        logger.warning(f"Metadata not found for session {session_id}")
+        raise HTTPException(status_code=404, detail=f"Metadata not found for session {session_id}")
+    # Return the full metadata dictionary
+    return metadata
+
 @router.put("/api/direct_chat/chat/session/{session_id}/vectorstore")
 async def set_session_vectorstore(
     session_id: str,

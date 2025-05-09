@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import axios from 'axios';
 import { AuthContext } from './AuthContext';
 import { getApiUrl,getGatewayUrl } from '../config';
+// Remove mock import
+// import FakePlotImage from '../assets/FakePlot.png'; 
 
 export const WorkbenchContext = createContext();
 
@@ -17,10 +19,19 @@ export const WorkbenchProvider = ({ children }) => {
   const [connectionError, setConnectionError] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
   const [visualizations, setVisualizations] = useState([]);
+  const [galleryVisualizations, setGalleryVisualizations] = useState([]);
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [jobs, setJobs] = useState([]);
   const [activeJobId, setActiveJobId] = useState(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [editingVisualization, setEditingVisualization] = useState(null);
+
+  // Helper function to join URL paths correctly
+  const joinPaths = (base, path) => {
+    return base.endsWith('/') 
+      ? `${base}${path.startsWith('/') ? path.substring(1) : path}`
+      : `${base}${path.startsWith('/') ? path : '/' + path}`;
+  };
 
   // Column transformation persistent state
   const [transformationState, setTransformationState] = useState(() => {
@@ -183,12 +194,78 @@ export const WorkbenchProvider = ({ children }) => {
     }
   }, [apiBaseUrl, connectionError]); // Add connectionError dependency
 
-  // Helper function to join URL paths correctly
-  const joinPaths = (base, path) => {
-    return base.endsWith('/') 
-      ? `${base}${path.startsWith('/') ? path.substring(1) : path}`
-      : `${base}${path.startsWith('/') ? path : '/' + path}`;
-  };
+  // Fetch list of saved visualizations for the gallery
+  const fetchGalleryVisualizations = useCallback(async () => {
+    console.log("Fetching gallery visualizations...");
+    setIsLoading(true); 
+    setError(null);
+
+    // --- ACTUAL IMPLEMENTATION --- 
+    try {
+      const url = joinPaths(apiBaseUrl, 'api/workbench/visualizations/list');
+      const response = await axios.get(getGatewayUrl(url), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      // Assuming the response data is the array of visualizations
+      // Add error handling for image loading later if needed
+      setGalleryVisualizations(response.data || []); 
+      setIsLoading(false);
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching gallery visualizations:', error);
+      if (error.message === 'Network Error' || error.code === 'ECONNREFUSED') {
+        setConnectionError(true);
+        setError('Cannot connect to backend services.');
+      } else {
+        setError('Failed to load visualization gallery.');
+      }
+      setGalleryVisualizations([]); // Clear gallery on error
+      setIsLoading(false);
+      throw error;
+    }
+    // --- END ACTUAL IMPLEMENTATION ---
+  }, [apiBaseUrl, token, joinPaths]); // Added joinPaths to dependencies
+
+  // Delete a specific visualization
+  const deleteVisualization = useCallback(async (visualizationId) => {
+    console.log(`Deleting visualization ${visualizationId}...`);
+    setIsLoading(true); // Indicate loading
+    setError(null);
+
+    // --- ACTUAL IMPLEMENTATION --- 
+    try {
+      const url = joinPaths(apiBaseUrl, `api/workbench/visualizations/${visualizationId}`);
+      const response = await axios.delete(getGatewayUrl(url), {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      // Remove from local state upon successful deletion
+      setGalleryVisualizations(prev => prev.filter(viz => viz.id !== visualizationId));
+      setIsLoading(false);
+      return response.data; // Assuming backend returns { success: true, ... }
+    } catch (error) {
+      console.error(`Error deleting visualization ${visualizationId}:`, error);
+      if (error.message === 'Network Error' || error.code === 'ECONNREFUSED') {
+        setConnectionError(true);
+        setError('Cannot connect to backend services.');
+      } else {
+        setError('Failed to delete visualization.');
+      }
+      setIsLoading(false);
+      throw error;
+    }
+    // --- END ACTUAL IMPLEMENTATION ---
+  }, [apiBaseUrl, token, joinPaths]); // Added joinPaths to dependencies
+
+  // Load a visualization for editing
+  const loadVisualizationForEditing = useCallback((visualizationData) => {
+    setEditingVisualization(visualizationData);
+    setActiveView('visualize'); // Switch to the chart builder view
+    console.log('Loading visualization for editing:', visualizationData);
+  }, [setActiveView, setEditingVisualization]);
 
   // Transform spreadsheet columns with AI assistance
   const transformSpreadsheet = useCallback(async (spreadsheetId, transformationParams, options = {}) => {
@@ -620,6 +697,9 @@ export const WorkbenchProvider = ({ children }) => {
         return prev;
       });
       
+      // Fetch updated gallery visualizations
+      await fetchGalleryVisualizations();
+      
       return newVisualization;
     } catch (error) {
       console.error('Error generating visualization:', error);
@@ -632,7 +712,7 @@ export const WorkbenchProvider = ({ children }) => {
       setIsLoading(false);
       throw error;
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, token, fetchGalleryVisualizations]);
   
   // Execute visualization code
   const executeVisualizationCode = useCallback(async (visualizationId, code) => {
@@ -799,9 +879,11 @@ export const WorkbenchProvider = ({ children }) => {
       apiBaseUrl,
       analysisResults,
       visualizations,
+      galleryVisualizations,
       jobs,
       activeJobId,
       transformationState,
+      editingVisualization,
       setSelectedTool,
       setActiveView,
       fetchSpreadsheets,
@@ -817,6 +899,8 @@ export const WorkbenchProvider = ({ children }) => {
       deleteSpreadsheet,
       updateSpreadsheet,
       clearError,
+      fetchGalleryVisualizations,
+      deleteVisualization,
       transformSpreadsheet,
       getJobStatus,
       listJobs,
@@ -825,11 +909,15 @@ export const WorkbenchProvider = ({ children }) => {
       setActiveJobId,
       updateTransformationState,
       resetTransformationState,
-      initialCheckDone
+      initialCheckDone,
+      loadVisualizationForEditing,
+      setEditingVisualization
     }}>
       {children}
     </WorkbenchContext.Provider>
   );
 };
+
+// Remove the import comment at the bottom too if it exists
 
 export default WorkbenchProvider; 

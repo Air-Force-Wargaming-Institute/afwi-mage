@@ -46,7 +46,7 @@ VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "http://host.docker.internal:800
 
 # LLM configuration
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower() # 'ollama' or 'vllm'
-DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "/models/DeepSeek-R1-Distill-Llama-8B-abliterated")
+DEFAULT_LLM_MODEL = os.environ.get("DEFAULT_LLM_MODEL", "/models/DeepHermes-3-Llama-3-8B-Preview-abliterated")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("DEFAULT_EMBEDDING_MODEL", "nomic-embed-text")
 
 # Job configuration

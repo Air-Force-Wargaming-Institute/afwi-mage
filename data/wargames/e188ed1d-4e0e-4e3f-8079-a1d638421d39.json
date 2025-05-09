@@ -1,0 +1,1353 @@
+{
+  "id": "e188ed1d-4e0e-4e3f-8079-a1d638421d39",
+  "name": "Dual Theater Global Crisis",
+  "description": "Near-simultaneous crises erupt in INDOPACOM (China-Taiwan tension) and EUCOM (Russia-Baltics skirmishes). The US and allies must confront limited military bandwidth, prioritization dilemmas, and potential opportunistic moves by North Korea or Iran.",
+  "designer": null,
+  "securityClassification": null,
+  "roadToWar": "Background:\nIn 2027, the global security landscape fractures. In the Indo-Pacific, the Chinese Communist Party accelerates pressure on Taiwan through aggressive naval maneuvers and \u201cgrey zone\u201d operations. A disputed Taiwanese coast guard incident spirals into blockade conditions.\n\nSimultaneously, in Europe, Russia initiates a surprise buildup along NATO\u2019s northeastern frontier, exploiting a contested political transition in Latvia. False-flag provocations stir unrest in Daugavpils and Narva, backed by covert Wagner-style actors.\n\nWashington faces an impossible dilemma: divide forces, or risk giving up initiative in one theater. North Korea and Iran sense the moment and begin missile demonstrations, testing air defenses and alliance cohesion.\n\nKey Actors & Starting Posture:\nUnited States:\nGlobal alert posture. INDOPACOM has carrier strike groups near Taiwan; EUCOM scrambles rapid reaction forces. Cyber and space assets stretched across both AORs. Interagency crisis cells activated.\n\nChina (PRC):\nPLA Navy postures near Taiwan Strait. Strategic ambiguity is leveraged; no full mobilization declared. Political messaging suggests \u201cTaiwan's reintegration is inevitable.\u201d\n\nRussia:\nForce posture ambiguous\u2014\u201ctraining exercises\u201d near Latvia. Political provocations push Baltic governments to request NATO rapid deployment. Russian media fuels ethnic tensions.\n\nNATO/EU Allies:\nDeep concern, but varying political will. The Baltics, Poland, and the UK advocate firm response. Southern Europe pushes for diplomatic caution.\n\nTaiwan:\nUnder economic and cyber siege. Mobilizes reserves and hardens coastal defenses. Public morale high but wavering.\n\nNational Objectives:\nUnited States:\nPrevent adversary gains in either theater without overextension. Demonstrate global command agility and uphold alliance credibility.\n\nChina:\nAdvance Taiwan reunification agenda without sparking US kinetic engagement. Shape global narrative in China's favor.\n\nRussia:\nTest NATO resolve, peel off weaker states diplomatically, and reclaim influence in the Baltics.\n\nNATO/Taiwan:\nPrevent war, maintain sovereignty, and sustain alliance unity under high pressure.\n\nDIME Integration:\nDiplomacy: UN Security Council paralyzed. US initiates bilateral engagements with Japan, UK, Germany. NATO Council convened in emergency session.\n\nInformation: Coordinated propaganda from Russia and China. AI-generated forgeries and deepfakes accelerate confusion.\n\nMilitary: Competing demands on global ISR, lift capacity, and C2 bandwidth. Pressure to prioritize one theater risks losing the other.\n\nEconomic: Sanctions and export controls tighten. Global markets rattle; energy and semiconductor disruptions begin.",
+  "researchObjectives": [
+    "Strategic Force Allocation and Prioritization in Multi-Theater Conflict: Explore trade-offs and decision-making frameworks for allocating limited ISR, strike, and naval assets between EUCOM and INDOPACOM during simultaneous crises.",
+    "Risks of Adversary Opportunism and Coalition Fragmentation: Assess the probability and impact of third-party opportunistic behavior (e.g., Iran, DPRK) exploiting overstretched US/global force posture.",
+    "Limits of Joint Global Command and Control (C2): Stress-test existing C2 structures and interoperability across commands for synchronizing rapid, multi-domain responses in separate theaters.",
+    "Crisis Communication and Strategic Messaging: Evaluate the effectiveness of US and allied messaging in deterring escalation without provocation or miscalculation, especially across different cultures and doctrines.",
+    "Thresholds for Escalation and Reassurance of Allies: Identify how quickly conventional crises can escalate and what measures can reassure allies without triggering overcommitment or entrapment."
+  ],
+  "numberOfIterations": 5,
+  "numberOfMoves": 10,
+  "timeHorizon": null,
+  "wargameStartDate": null,
+  "selectedVectorstore": null,
+  "selectedDatabase": null,
+  "approvedFields": {
+    "roadToWar": false,
+    "description": true,
+    "researchObjectives": true,
+    "wargameParameters": true
+  },
+  "activatedEntities": [
+    {
+      "entityId": "US",
+      "entityName": "United States of America",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Preserve freedom of navigation in the Taiwan Strait while deterring Chinese aggression",
+            "Reinforce NATO alliance cohesion and credibility in response to Russian provocations",
+            "Prevent escalation to direct military confrontation in either theater",
+            "Maintain global leadership through coordinated response to simultaneous crises"
+          ],
+          "posture": "Forward-leaning engagement balancing firmness with restraint across multiple theaters. The US positions itself as the indispensable guarantor of international order while carefully managing escalation dynamics in both Europe and the Indo-Pacific.",
+          "keyInitiatives": "Dual Theater Crisis Response Framework; Indo-Pacific Maritime Security Coalition; NATO Eastern Flank Reinforcement Program; Integrated Deterrence Implementation; Strategic Communication Coordination Center; Global Partner Reassurance Initiative.",
+          "prioritiesMatrix": "Primary: Crisis de-escalation without surrendering core interests. Secondary: Alliance reassurance and cohesion maintenance. Tertiary: Global messaging demonstrating U.S. resolve and capability across multiple theaters.",
+          "redLines": "Direct military attack on US forces or assets; Invasion of Taiwan; Territorial incursion into NATO member states; Deliberate targeting causing significant civilian casualties; WMD employment or proliferation under crisis conditions.",
+          "treatyObligations": "NATO Article 5 collective defense commitment; Taiwan Relations Act security provisions; Bilateral defense treaties with Japan, South Korea, and the Philippines; UN Charter obligations; Strategic Arms Reduction Treaty provisions.",
+          "diplomaticResources": "Global alliance network spanning both theaters; Intelligence sharing arrangements across Five Eyes and regional partners; Economic and security assistance leverage; UN Security Council permanent membership; Unmatched convening power for crisis response.",
+          "specialConsiderations": "Internal political constraints limit deployment sustainability in both theaters simultaneously. Prioritization decisions between European and Indo-Pacific commitments risk creating perceptions of abandonment among affected allies. Diplomatic messaging must balance multiple audiences with divergent priorities."
+        },
+        "information": {
+          "objectives": [
+            "Project global resolve and capability to respond effectively across multiple theaters",
+            "Counter Russian and Chinese disinformation regarding US overextension and declining power",
+            "Maintain allied cohesion through coordinated messaging across multiple crisis zones",
+            "Shape adversary perception of US willingness to accept costs despite simultaneous crises"
+          ],
+          "propagandaThemes": "American leadership as essential for global stability; Coordinated adversary opportunism threatening international order; Democratic resilience against authoritarian pressure; Technological and military superiority despite multiple challenges; Alliance unity across diverse regions.",
+          "cyberTargets": "Russian hybrid warfare infrastructure; Chinese maritime operations command networks; North Korean and Iranian opportunistic capabilities; Adversary perception management systems; Critical alliance coordination networks for defensive protection.",
+          "strategicCommunicationFramework": "Coordinated messaging across governmental entities emphasizing capability and resolve. Tailored approaches for European and Indo-Pacific audiences with presidential communications establishing global narratives. Regular intelligence declassification to demonstrate awareness of adversary actions.",
+          "intelCollectionPriorities": "Adversary coordination across theaters; Military mobilization indicators; Cyber preparation of the battlefield; Leadership intentions across all crisis actors; Third-party opportunistic preparation; Nuclear forces posture shifts.",
+          "disinformationResilience": "Rapid response teams for multi-theater narrative management; Pre-emptive exposure of potential false-flag operations; Intelligence sharing with allies on disinformation threats; Platform engagement strategies for crisis-specific content moderation.",
+          "mediaLandscapeControl": "Limited direct control but strategic engagement with major outlets in both theaters. Consistent background briefings establishing context. Embedded reporting selectively enabled to showcase capability and readiness. Rapid fact-checking mechanisms for crisis-related claims.",
+          "specialConsiderations": "Simultaneous information operations across different cultural and linguistic regions strain coordination capabilities. Adversary messaging highlighting perceived US overextension requires tailored counter-narratives by theater while maintaining global consistency."
+        },
+        "military": {
+          "objectives": [
+            "Deter escalation in both European and Indo-Pacific theaters simultaneously",
+            "Demonstrate credible military capability despite geographic distribution challenges",
+            "Maintain critical readiness despite stretched assets across multiple combatant commands",
+            "Prepare for potential opportunistic actions from secondary adversaries while engaged in dual crises"
+          ],
+          "alertLevel": "Global Defense Condition 3",
+          "doctrine": "Dynamic force employment across multiple theaters with emphasis on integrated deterrence. US military leverages technological superiority, alliance force contributions, and strategic agility to compensate for limitations of simultaneous engagement.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Naval forces at maximum deployment tempo with Carrier Strike Groups positioned in both theaters; Air Force strategic assets at heightened readiness; Army prepositioned stocks activated in both Europe and Pacific; Space assets fully operational with enhanced resilience measures; Cyber Command at maximum operational tempo across all adversary-focused teams.",
+          "escalationLadder": "1. Enhanced ISR and indications & warning posture; 2. Visible force posture adjustments and strategic messaging; 3. Deployment of additional deterrent forces to threatened areas; 4. Limited defensive operations against immediate threats; 5. Theater-specific combat operations; 6. Cross-theater coordinated combat operations; 7. Maximum conventional force employment; 8. Nuclear signaling and potential employment.",
+          "decisionMakingProtocol": "National Security Council in continuous crisis session; Secretary of Defense granted emergency authorities; Joint Chiefs prioritizing cross-theater allocation decisions; Combatant Commanders delegated enhanced operational flexibility with explicit boundaries; Nuclear command and control at enhanced readiness.",
+          "forceProjectionCapabilities": "Strategic airlift operating at maximum sustainable capacity; Maritime prepositioning capabilities fully activated; Global strike assets at heightened readiness; Special operations forces deployed to key crisis regions; Amphibious Ready Groups positioned near potential flashpoints.",
+          "defenseIndustrialCapacity": "Accelerated munitions production for high-demand capabilities; Strategic reserve drawdown authorized; Expedited maintenance cycles for critical platforms; Defense Production Act authorities prepared for activation; Supply chain vulnerabilities receiving priority mitigation.",
+          "domainPosture": {
+            "land": "Army prepositioned stocks activated in Europe and Pacific; Brigade Combat Teams at heightened readiness for deployment; Army Corps headquarters elements forward deployed; National Guard validation for federal mobilization accelerated; Army Special Operations at maximum deployment capacity.",
+            "sea": "Carrier Strike Groups forward deployed to both EUCOM and INDOPACOM with reduced maintenance cycle; Attack submarines distributed across both theaters with emphasis on sea denial; Maritime prepositioning ships activated; Naval special warfare deployed to key maritime chokepoints; Amphibious Ready Groups positioned off critical littoral areas.",
+            "air": "Bomber task forces conducting rotational presence in both theaters; Fighter squadrons at heightened readiness with expeditionary capability; Strategic airlift prioritized for critical force deployment; Tanker support distributed to enable multi-theater operations; ISR platforms operating at maximum sustainable operational tempo.",
+            "cyber": "Offensive cyber operations authorized under enhanced authorities; Hunt forward teams deployed to critical partner networks; Defensive cyber operations at maximum tempo; Counter-information operation capabilities fully activated; Joint Cyber Centers established in affected combatant commands.",
+            "space": "Space domain awareness at maximum collection posture; GPS resilience enhanced; Communication satellites configured for crisis operations; ISR space assets prioritized for crisis regions; Counter-space defensive measures at heightened readiness."
+          },
+          "specialConsiderations": "Force allocation decisions between EUCOM and INDOPACOM present acute risk management challenges with potential alliance credibility implications. Historically unprecedented levels of simultaneous deployment require accepting readiness risks in non-engaged theaters and potential vulnerabilities to opportunistic third-party actors."
+        },
+        "economic": {
+          "objectives": [
+            "Deploy coordinated economic pressure across Russian and Chinese interests simultaneously",
+            "Shield domestic economy and global markets from crisis-induced disruptions",
+            "Mobilize allied economic burden-sharing across both theaters",
+            "Prepare financial system for potential weaponization by adversaries"
+          ],
+          "tradeFocus": "Critical supply chain resilience; Targeted export controls on advanced technologies; Energy market stabilization; Semiconductor and critical mineral security; Alternative trade route development for affected regions.",
+          "resourceDeps": "Global market confidence during instability; Strategic petroleum reserve capacity; Rare earth minerals and semiconductor production; Defense industrial base surge capacity; Coalition financial burden-sharing.",
+          "sanctionsPolicy": "Graduated implementation targeting key adversary vulnerabilities; Coordination with allied financial systems; Humanitarian impact mitigation; Secondary sanction enforcement; Exceptions management for essential resource flows.",
+          "economicWarfareTools": "SWIFT access limitations; Foreign asset freezes; Technology export restrictions; Targeted sectoral sanctions; Central bank asset restrictions; Global financial institution coordination; Critical infrastructure investment restrictions.",
+          "criticalInfrastructureResilience": "Financial system cyber defenses enhanced; Energy distribution networks hardened; Transportation hubs under increased protection; Communication networks resilience improved; Defense industrial base security prioritized.",
+          "strategicResourceAccess": "Strategic petroleum reserve release coordination; Semiconductor production prioritization; Rare earth elements stockpile management; Military-critical material supply chain security; Energy diversification acceleration.",
+          "financialSystemLeverage": "Dollar clearing restrictions for targeted entities; International financial institution voting influence; Capital market access limitations; Foreign exchange market monitoring; Banking sector crisis resilience measures.",
+          "technologyTransferControls": "Enhanced export control enforcement for both theaters; Critical technology protection framework; International technical standard cooperation; Research security programs; Foreign investment screening intensification.",
+          "specialConsiderations": "Simultaneous economic pressure across Eurasian powers risks driving adversary cooperation and alternative financial system development. Domestic economic impacts from dual crisis management create political sustainability challenges. Differing allied economic interests between theaters complicate coordinated response."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "CN",
+      "entityName": "China",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Advance Taiwan reunification agenda by exploiting perceived US overextension",
+            "Deepen strategic coordination with Russia to compound American challenges",
+            "Fracture US alliance systems through targeted diplomatic pressure",
+            "Position China as responsible stakeholder despite crisis escalation"
+          ],
+          "posture": "Calibrated assertiveness with strategic opportunism. China presents a facade of reasonable restraint while systematically exploiting the US two-theater dilemma to advance core sovereignty claims and regional dominance.",
+          "keyInitiatives": "Cross-Strait Reunification Advancement Framework; China-Russia Comprehensive Strategic Coordination; Global South Alternative Leadership Platform; Asia for Asians Security Concept; Selective Economic Pressure Campaign; International Law Reinterpretation Initiative.",
+          "prioritiesMatrix": "Primary: Taiwan reunification progress while avoiding direct US military confrontation. Secondary: Weakening US alliance credibility in Indo-Pacific. Tertiary: Positioning China as responsible alternative to US leadership amid global instability.",
+          "redLines": "Direct US military intervention in Taiwan; Formation of formal anti-China coalition structures in Asia; Foreign military presence within Taiwan; Intentional violations of Chinese territorial waters or airspace; Public diplomatic recognition of Taiwan independence.",
+          "treatyObligations": "UN Charter principles of sovereignty; Bilateral strategic partnership with Russia; ASEAN dialogue partnership commitments; Shanghai Cooperation Organization security mechanisms; Various bilateral economic arrangements throughout Global South.",
+          "diplomaticResources": "Economic leverage through trade relationships; Belt and Road Initiative infrastructure dependencies; United Front operations worldwide; UN system influence and Security Council veto; Extensive diplomatic network emphasizing Global South partnerships.",
+          "specialConsiderations": "China balances opportunistic advancement of Taiwan objectives against risk of premature military confrontation with the US. Leadership seeks to exploit the US two-theater challenge without crossing thresholds that would unite and focus American response despite competing priorities."
+        },
+        "information": {
+          "objectives": [
+            "Portray US as declining power overextended across multiple theaters",
+            "Shape global narrative of inevitable Taiwan reunification as historical necessity",
+            "Fragment US alliance solidarity through targeted messaging to vulnerable partners",
+            "Position China as responsible actor forced to respond to provocations"
+          ],
+          "propagandaThemes": "American decline and imperial overreach; Taiwan as internal matter and historical Chinese territory; Asian security requiring Asian solutions; Western hypocrisy and double standards; China's peaceful rise despite provocation; Russian-Chinese cooperation as stabilizing force.",
+          "cyberTargets": "Taiwan government and military networks; US Indo-Pacific Command communications; Regional allied defense coordination systems; Global media and information platforms; Financial market information systems; Social media influence operations infrastructure.",
+          "strategicCommunicationFramework": "Coordinated messaging across state media, diplomatic channels, and controlled social media emphasizing US provocations and Chinese restraint. Differentiated approaches for domestic audience (nationalism) versus international audience (peaceful resolution). Military signaling carefully calibrated to avoid triggering direct intervention.",
+          "intelCollectionPriorities": "US force distribution and readiness states; Taiwan defense preparations; Japanese and regional allied commitment indicators; US-NATO coordination mechanisms; Russia-NATO escalation parameters; Social media sentiment in target countries.",
+          "disinformationResilience": "Great Firewall information control; Multiple redundant communication channels; Content control through platform cooperation; Overwhelming volume approach to narrative dissemination; Deniable third-party amplification through proxies.",
+          "mediaLandscapeControl": "Complete control of domestic information environment; Strategic use of Western platform access; Growing influence through proxies in target countries; Sophisticated use of apparent pluralism while maintaining core narratives.",
+          "specialConsiderations": "Chinese information operations carefully calibrate military signaling to maximize psychological pressure while avoiding thresholds that could trigger US intervention despite competing priorities. Operations exploit perceived American distraction while preparing domestic audience for potential escalation."
+        },
+        "military": {
+          "objectives": [
+            "Establish de facto blockade conditions around Taiwan without declaring formal blockade",
+            "Demonstrate amphibious and cross-strait invasion capability without committing to execution",
+            "Coordinate military pressure with Russian operations to maximize US force allocation dilemmas",
+            "Prepare for potential opportunistic Taiwan seizure if US becomes critically overextended"
+          ],
+          "alertLevel": "Heightened Combat Readiness",
+          "doctrine": "Gray zone operations with calibrated conventional demonstrations. PLA emphasizes maritime pressure, airspace violations, and invasion rehearsals while maintaining deniable escalation thresholds and preparations for rapid transition to kinetic operations.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Eastern and Southern Theater Commands at highest readiness level; Strategic Rocket Force at enhanced alert; Naval forces conducting unprecedented deployment tempo; Air Force operating continuous Taiwan Strait presence; Strategic Support Force maximizing cyber and electronic warfare operations.",
+          "escalationLadder": "1. Increased maritime and air presence around Taiwan; 2. Deliberate incursions into Taiwan's ADIZ and territorial waters; 3. Exercise activity simulating blockade operations; 4. Limited cyber and electronic warfare operations; 5. Maritime exclusion zone declarations; 6. Kinetic warning operations against vessels approaching Taiwan; 7. Limited precision strikes against Taiwan military assets; 8. Full-scale invasion operations.",
+          "decisionMakingProtocol": "Central Military Commission direct control; President Xi's personal authority; Theater Command coordination through Joint Operations Command Center; Crisis response mechanisms fully activated; Strategic communications with Russian military leadership established.",
+          "forceProjectionCapabilities": "Naval task forces deployed throughout First Island Chain; Amphibious forces conducting visible loading operations; Strategic airlift prepared for rapid deployment; Maritime militia activated throughout region; Island base infrastructure fully operational.",
+          "defenseIndustrialCapacity": "Defense production shifted to wartime readiness status; Strategic reserves activated; Critical component stockpiling accelerated; Supply chain vulnerability mitigation implemented; Civilian production dual-use conversion planning activated.",
+          "domainPosture": {
+            "land": "Amphibious forces at highest readiness displaying loading and embarkation activities; Army Group Armies conducting mobilization exercises; Artillery units deployed to coastal positions; Special operations forces prepared for Taiwan infiltration; Strategic reserves repositioned toward eastern regions.",
+            "sea": "Naval forces conducting sustained presence operations throughout Taiwan Strait and First Island Chain; Carrier groups demonstrating power projection capability; Submarine force deployed for sea denial operations; Maritime militia activated for gray zone operations; Naval aviation conducting continuous presence missions.",
+            "air": "Air defense identification zone enforcement maximized; Strategic bomber overflights of sensitive areas; Fighter deployments to forward airfields completed; Transport aviation prepared for paratroop operations; Unmanned aerial systems conducting persistent surveillance.",
+            "cyber": "Offensive operations against Taiwan infrastructure and military networks; Preparations for disruption of US regional command and control; Defensive hardening against potential US cyber response; Electronic warfare units deployed to coastal regions; Strategic Support Force at maximum operational tempo.",
+            "space": "Surveillance constellation focused on US force movements; Navigation warfare capabilities activated; Communications security enhanced; Counter-space capabilities at heightened readiness; Intelligence collection maximized on US space-based assets."
+          },
+          "specialConsiderations": "Chinese military operations carefully balance demonstration of capability against premature commitment to kinetic action. Theater commands coordinate with Russian counterparts while preparing opportunistic escalation if US force allocation provides strategic opening for Taiwan operations."
+        },
+        "economic": {
+          "objectives": [
+            "Pressure Taiwan through targeted economic coercion without triggering broader disruption",
+            "Exploit Western economic vulnerabilities during dual crisis management",
+            "Accelerate de-dollarization through coordinated actions with Russia",
+            "Position Belt and Road Initiative as stability alternative during global uncertainty"
+          ],
+          "tradeFocus": "Selective export restrictions to Taiwan; Strategic commodity stockpiling; Critical technology acquisition despite restrictions; Alternative market development for sanctioned goods; Belt and Road leverage expansion in vulnerable regions.",
+          "resourceDeps": "Semiconductor supply chain resilience; Energy security through Russian partnership; Rare earth processing dominance; Military-industrial self-sufficiency acceleration; Food security stockpiling.",
+          "sanctionsPolicy": "Selective counter-sanctions against Western critical dependencies; Alternative payment system acceleration; Technical compliance while developing workarounds; Humanitarian exemption exploitation; Strategic embargo threats against critical Taiwan exports.",
+          "economicWarfareTools": "Taiwan trade restrictions; Targeted tourism and education suspensions; Selective market access restrictions; Currency manipulation; Critical supply chain leverage; Strategic resource export controls; Foreign direct investment conditionality.",
+          "criticalInfrastructureResilience": "Supply chain diversification from potential sanctions exposure; Financial system isolation capabilities; Industrial production resilience measures; Energy supply security through Russian agreements; Technological independence acceleration.",
+          "strategicResourceAccess": "Rare earth element export leverage; Critical component manufacturing capacity; Energy import diversification with Russian priority; Strategic material stockpiling; Taiwan-dependent industries vulnerability exploitation.",
+          "financialSystemLeverage": "Accelerated CIPS (Cross-Border Interbank Payment System) development; Digital yuan deployment expansion; Foreign reserves diversification; Gold accumulation; Selective capital control implementation.",
+          "technologyTransferControls": "Strategic technology acquisition prioritization; Foreign intellectual property selective implementation; Critical technology reverse engineering acceleration; Dual-use technology development with Russia; Technology protection regulations.",
+          "specialConsiderations": "Chinese economic operations balance pressure on Taiwan with avoiding global economic disruption that could shift international sentiment against China. Leadership coordinates with Russia on de-dollarization while preparing economic resilience measures against potential US-led sanctions."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "RU",
+      "entityName": "Russia",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Test NATO cohesion during period of US strategic distraction",
+            "Advance Russian influence in Baltic states through hybrid warfare",
+            "Coordinate strategic timing with Chinese actions to maximize US dilemmas",
+            "Create opportunities for sanctions relief through crisis negotiation"
+          ],
+          "posture": "Calculated opportunism with denial and ambiguity. Russia projects reasonable security concerns while exploiting the US two-theater dilemma to advance revisionist objectives in its near abroad through hybrid warfare and political subversion.",
+          "keyInitiatives": "Baltic Russian Minority Protection Framework; NATO Cohesion Stress Test; Strategic Coordination with China; Narrative Warfare Against Western Alliances; European Energy Vulnerability Exploitation; Selective Diplomatic Engagement.",
+          "prioritiesMatrix": "Primary: Establishing zones of privileged influence in Baltic states through hybrid mechanisms. Secondary: Fragmenting NATO cohesion during US distraction. Tertiary: Building negotiation leverage for sanctions relief and Western concessions.",
+          "redLines": "Direct NATO conventional attack on Russian territory; Nuclear weapons deployment to Baltic states; Preemptive strikes against Russian forces; Shooting down of Russian aircraft in ambiguous contexts; Foreign military intervention in Belarus.",
+          "treatyObligations": "UN Charter provisions selectively interpreted; Strategic partnership with China; Bilateral security agreements with Belarus; Collective Security Treaty Organization leadership; Union State obligations with Belarus.",
+          "diplomaticResources": "UN Security Council veto power; Energy leverage over European states; Information warfare capabilities; Covert operatives within Baltic Russian minorities; Strategic partnership with China; Wagner Group and proxy forces.",
+          "specialConsiderations": "Russian diplomatic operations carefully balance opportunistic advancement of Baltic influence against risk of unifying NATO response. Coordination with China creates unprecedented strategic dilemma for US while maintaining plausible deniability regarding formal alliance."
+        },
+        "information": {
+          "objectives": [
+            "Generate political instability in Baltic states through targeted disinformation",
+            "Undermine NATO cohesion by highlighting US strategic overextension",
+            "Create conditions for deniable proxy operations through false flag provocations",
+            "Shape domestic Russian narrative justifying potential escalation"
+          ],
+          "propagandaThemes": "NATO encirclement of Russia; Discrimination against Russian-speaking minorities; Western hypocrisy and double standards; US imperial overreach; NATO abandonment of Eastern allies; European independence from US control; Russia as defender of traditional values; Inevitable multipolar world order.",
+          "cyberTargets": "Baltic state government networks; NATO coordination systems; Critical infrastructure in target regions; US-Europe communication channels; Regional financial systems; Political opposition groups and media outlets; Public opinion formation channels.",
+          "strategicCommunicationFramework": "Multi-layered approach with distinct messaging for Russian domestic audience (security threats requiring strong response), Baltic Russian minorities (protection narrative), Western European public (peace and diplomacy), and Global South (multipolar world order). Coordinated deployment across state media, proxy outlets, social media, and covert channels.",
+          "intelCollectionPriorities": "NATO force deployment indicators; US-Europe strategic communication; Baltic state internal political stability; Far-right and far-left extremist mobilization potential; Chinese operational timeline coordination; Public opinion trends in key European states.",
+          "disinformationResilience": "Layered deniability architecture; Multiple redundant channels; Rapid narrative adaptation capability; Algorithmic amplification through social media manipulation; Proxies and cutouts for attribution evasion; Deep fake and synthetic media deployment.",
+          "mediaLandscapeControl": "Complete control of domestic information space; RT and Sputnik international reach; Extensive network of seemingly independent outlets; Covert funding of sympathetic Western voices; Social media troll factory operations; Cultural and linguistic penetration in target regions.",
+          "specialConsiderations": "Russian information operations carefully sequence provocations and narratives to coincide with Chinese pressure on Taiwan, creating maximum decision-making complexity for US leadership. Operations in Baltic states emphasize plausible deniability while preparing Russian public for potential escalation."
+        },
+        "military": {
+          "objectives": [
+            "Generate strategic ambiguity through 'training exercises' near Baltic borders",
+            "Establish covert presence in Baltic states through deniable proxy forces",
+            "Demonstrate rapid mobilization capability while avoiding NATO Article 5 triggers",
+            "Coordinate timing with Chinese military pressure to maximize US force allocation dilemmas"
+          ],
+          "alertLevel": "Heightened Combat Readiness",
+          "doctrine": "Strategic ambiguity with hybrid warfare emphasis. Russian military employs maskirovka, proxy forces, and conventional demonstrations while maintaining nuclear signaling and plausible deniability for destabilization activities.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Western Military District at highest readiness; Northern Fleet on enhanced alert; Airborne Forces (VDV) at rapid deployment readiness; Strategic Rocket Forces maintaining normal-plus posture; Kaliningrad forces reinforced; Wagner and proxy forces activated in theater.",
+          "escalationLadder": "1. Military exercises near Baltic borders; 2. Covert proxy activation in Baltic Russian communities; 3. Limited cyber and electronic warfare operations; 4. Provocative air and maritime incursions; 5. 'Volunteer' force deployment in response to 'civil unrest'; 6. Limited direct action against Baltic forces responding to provocations; 7. Formal intervention justified as protection operation; 8. Nuclear signaling through exercises or deployments.",
+          "decisionMakingProtocol": "Presidential authority through National Security Council; General Staff direct operational control; FSB coordination of hybrid and proxy operations; Strategic coordination channel with Chinese military leadership; Dual command structure for deniable operations.",
+          "forceProjectionCapabilities": "Rapid reaction forces prepared for short-notice deployment; Mechanized units positioned near Baltic borders; Naval forces deployed in Baltic Sea; Air defense bubbles expanded from Kaliningrad; Strategic aviation conducting patrol missions; Unconventional warfare teams pre-positioned.",
+          "defenseIndustrialCapacity": "Accelerated munitions production; Reserve equipment reactivation; Strategic stockpile redistribution to forward areas; Critical component prioritization; Civilian transportation sector quasi-mobilization; Maintenance cycles expedited for key systems.",
+          "domainPosture": {
+            "land": "Combined arms formations conducting 'exercises' near Baltic borders; VDV and special forces at highest readiness; Artillery systems forward deployed; Engineering units prepared for rapid advancement; Proxy forces embedded with Baltic Russian minorities.",
+            "sea": "Baltic Fleet at enhanced operational tempo; Northern Fleet strategic assets at heightened readiness; Naval infantry prepared for littoral operations; Mine warfare capabilities activated; Naval special operations deployed to theater.",
+            "air": "Air defense identification zone enforcement aggressive; Strategic bomber presence increased; Fighter and attack aviation deployed to forward airfields; Transport aviation prepared for rapid reaction; Electronic warfare aircraft in continuous operation.",
+            "cyber": "Offensive operations against Baltic state critical infrastructure; NATO command and control network penetration attempts; Information operation support to hybrid activities; Electronic warfare units deployed to borders; GPS/navigation warfare capability activated.",
+            "space": "Reconnaissance satellites prioritized for NATO force tracking; Communications security enhanced; Navigation warfare capability ready; Intelligence collection on US space-based assets maximized; Counter-space measures at increased readiness."
+          },
+          "specialConsiderations": "Russian military operations carefully sequence provocations to align with Chinese pressure on Taiwan, creating maximum resource allocation challenges for US and NATO. Actions calibrated to remain below Article 5 threshold while preparing for potential opportunistic escalation if US response proves inadequate due to two-theater demands."
+        },
+        "economic": {
+          "objectives": [
+            "Leverage energy dependencies to discourage European support for Baltic states",
+            "Accelerate alternative financial systems with China to mitigate Western sanctions",
+            "Generate economic pressure on vulnerable Baltic economies through selective measures",
+            "Create conditions for sanctions relief through managed crisis escalation and de-escalation"
+          ],
+          "tradeFocus": "Energy exports as geopolitical leverage; Critical technology acquisition despite sanctions; Alternative market development with China and Global South; Strategic resource export control; Transactional relationships with European economic partners.",
+          "resourceDeps": "Energy export infrastructure security; Alternative payment mechanisms; Sanctions circumvention networks; Critical technology smuggling channels; Strategic reserve access; Military-industrial self-sufficiency.",
+          "sanctionsPolicy": "Calibrated counter-sanctions against vulnerable European sectors; Strategic embargo threats; Agricultural export limitations; Transit restrictions; Selective visa and investment restrictions against Baltic states.",
+          "economicWarfareTools": "Energy supply manipulation (volumes, prices, reliability); Financial and capital flow restrictions; Transit and transportation disruptions; Targeted economic pressure on Baltic Russian businesses; State-sponsored smuggling and sanctions evasion; Covert economic sabotage.",
+          "criticalInfrastructureResilience": "Energy export infrastructure hardening; Financial system isolation capabilities; Internet sovereignty implementation; Strategic transportation network security; Defense industrial base protection; GLONASS independence from Western systems.",
+          "strategicResourceAccess": "Energy weaponization capability; Agricultural export control; Rare metals export leverage; Military technology indigenization; Alternative supply chains through China and partners; Strategic reserves management.",
+          "financialSystemLeverage": "Alternative payment systems with China; Gold accumulation; Foreign currency diversification; Cryptocurrency development; Selective capital controls; Banking system isolation capacity; Foreign asset protection mechanisms.",
+          "technologyTransferControls": "Critical technology acquisition through cutouts; Intellectual property selective implementation; Technological espionage prioritization; Defense technology indigenization; Dual-use technology cooperation with China; Digital sovereignty implementation.",
+          "specialConsiderations": "Russian economic operations carefully balance pressure on European energy dependencies against provoking unified sanctions response. Leadership coordinates with China on financial alternatives while implementing selective economic pressure on Baltic states to complement hybrid warfare activities."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "TW",
+      "entityName": "Taiwan",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Secure concrete US military support despite competing demands in Europe",
+            "Build international coalition condemning Chinese coercion",
+            "Maintain de facto sovereignty while avoiding irreversible provocation",
+            "Ensure continued international access despite potential blockade conditions"
+          ],
+          "posture": "Resilient pragmatism with strategic ambiguity. Taiwan maintains formal restraint while building international support, emphasizing democratic values and economic importance while avoiding actions that could trigger Chinese invasion during US distraction.",
+          "keyInitiatives": "US-Taiwan Defense Prioritization Dialogue; Democratic Resilience Alliance; Semiconductor Supply Chain Leverage Strategy; Global Economic Security Partnership; Strategic Communications Campaign; International Humanitarian Access Framework.",
+          "prioritiesMatrix": "Primary: Ensuring credible US military deterrent despite European distractions. Secondary: Building international coalition against Chinese coercion. Tertiary: Maintaining economic functionality amid growing blockade conditions.",
+          "redLines": "Chinese military landing on Taiwan territory; Complete naval blockade implementation; Missile strikes against Taiwanese cities or infrastructure; Cyber attacks causing major civilian casualties; Chemical or biological attacks.",
+          "treatyObligations": "Taiwan Relations Act (US); Trade agreements with various partners; Standards compliance within semiconductor industry; Diplomatic recognition from limited nations; Tacit security arrangements with US and regional partners.",
+          "diplomaticResources": "Semiconductor industry leverage; Democratic governance credibility; Diaspora networks in key countries; Bipartisan US congressional support; Technical expertise in critical industries; Formal diplomatic relations with 14 countries.",
+          "specialConsiderations": "Taiwan faces unique diplomatic challenge of securing defense commitments from a potentially overextended US while avoiding actions that could provide China with pretext for invasion during period of maximum American vulnerability. Balancing resistance against provocation requires carefully calibrated diplomatic approach."
+        },
+        "information": {
+          "objectives": [
+            "Reinforce Taiwan's image as a vibrant democracy under threat",
+            "Counter Chinese narratives about US abandonment and inevitable reunification",
+            "Maintain domestic morale and cohesion during escalating pressure",
+            "Highlight economic importance of Taiwan to global technology supply chains"
+          ],
+          "propagandaThemes": "Democratic resilience against authoritarian aggression; Taiwan as responsible stakeholder in international community; Semiconductor industry as global critical infrastructure; Chinese aggression causing regional instability; International rules-based order under threat; Economic impact of conflict on global economy.",
+          "cyberTargets": "Chinese disinformation networks; Social media influence operations; Domestic critical infrastructure defense; Civil emergency communication systems; Global media engagement platforms; Economic resilience messaging networks.",
+          "strategicCommunicationFramework": "Coordinated messaging targeting multiple audiences: domestic (resilience and unity), US/allies (security commitment reinforcement), global business (economic stability assurances), and international community (rules-based order defense). Communications emphasize restraint and democratic values while highlighting Chinese aggression.",
+          "intelCollectionPriorities": "Chinese military preparations for invasion; PLA Navy blockade intentions; US force deployment decisions amid competing theaters; Japanese and regional allied support indicators; Cyber threat indicators; Economic warfare preparations against Taiwan.",
+          "disinformationResilience": "Digital literacy campaigns; Real-time disinformation monitoring systems; Rapid response debunking capability; Social media platform engagement; Emergency broadcasting contingencies; Civil society fact-checking networks.",
+          "mediaLandscapeControl": "Vibrant free press with crisis coordination mechanisms; Emergency broadcasting system preparedness; International media engagement strategy; Digital resilience partnerships with platforms; Crisis communication training for officials; Community engagement through local media.",
+          "specialConsiderations": "Taiwan information operations must balance raising international alarm about Chinese aggression against triggering panic or defeatism domestically. Communications carefully calibrated to secure international support without providing China with pretexts for escalation during period of US strategic distraction."
+        },
+        "military": {
+          "objectives": [
+            "Demonstrate credible deterrence capability despite Chinese numerical superiority",
+            "Develop capacity to withstand initial Chinese assault until US intervention",
+            "Harden critical infrastructure against precision strikes and cyber attacks",
+            "Prepare civilian population for resilience during potential blockade or attack"
+          ],
+          "alertLevel": "Maximum Defense Readiness",
+          "doctrine": "Asymmetric defense with distributed denial capability. Taiwan emphasizes 'porcupine strategy' with focus on anti-access systems, resilience through dispersal, and ability to inflict unacceptable costs on invading forces while maintaining civilian protection.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Armed forces fully mobilized with reserves activation; Navy deployed to counter blockade operations; Air Force maintaining defensive counter-air operations; Coastal defense systems at highest readiness; Air defense networks fully activated; Cyber defense at maximum alert; Civil defense system mobilization.",
+          "escalationLadder": "1. Enhanced surveillance and defensive posture; 2. Reserve mobilization and critical infrastructure hardening; 3. Limited defensive counter-air operations; 4. Anti-access systems activation against blockade; 5. Defensive fires against immediate threats; 6. Full-spectrum defense against invasion; 7. Distributed resistance operations if main defense breached.",
+          "decisionMakingProtocol": "National Security Council in continuous session; President with emergency powers; Joint Operations Command activated; Civil-military response coordination center operational; Continuity of government measures implemented; Direct communication channel with US Indo-Pacific Command.",
+          "forceProjectionCapabilities": "Limited to territorial defense operations; Coastal anti-ship missile deployments; Mobile air defense systems; Defensive counter-air operations; Harbor denial capabilities; Underground facility networks; Resilient command and control systems.",
+          "defenseIndustrialCapacity": "Maintenance prioritization for critical systems; Limited domestic production acceleration; Strategic reserves deployment; Civil infrastructure dual-use adaptation; Emergency repair capabilities enhancement; Stockpile distribution to hardened facilities.",
+          "domainPosture": {
+            "land": "Ground forces deployed to defend critical landing zones; Urban defense preparations in key cities; Mountain and interior defensive positions prepared; Special forces positioned for asymmetric operations; Combat engineers preparing defensive obstacles; Reserve forces mobilized to local defense positions.",
+            "sea": "Naval forces conducting counter-blockade operations; Coastal defense missile systems at highest readiness; Harbor defense systems activated; Naval special operations prepared for asymmetric response; Mine warfare capabilities deployed; Small boat swarm tactics prepared.",
+            "air": "Air defense network at maximum readiness; Fighter aircraft conducting defensive counter-air from hardened shelters; Mobile SAM systems deployed; UAV surveillance operations continuous; Transport aircraft dispersed to auxiliary fields; Helicopter forces prepared for rapid response.",
+            "cyber": "Defensive operations protecting critical infrastructure; Intelligence gathering on Chinese cyber intentions; Information systems hardened against attack; Backup systems activated; Military network segregation implemented; Civilian infrastructure protection measures enhanced.",
+            "space": "Reliance on allied space-based assets; Commercial satellite communications backup systems; Alternative positioning systems activated; Intelligence gathering through partner space capabilities; Emergency communications redundancy established."
+          },
+          "specialConsiderations": "Taiwan military operations emphasize resilience and asymmetric advantage to maximize time window for potential US intervention despite competing European crisis. Forces prioritize imposing unacceptable costs on potential invasion while avoiding provocations that could trigger Chinese attack during period of US strategic distraction."
+        },
+        "economic": {
+          "objectives": [
+            "Leverage semiconductor industry as strategic asset to maintain international support",
+            "Prepare economic resilience for potential blockade conditions",
+            "Secure supply chains for critical resources during extended crisis",
+            "Minimize economic disruption during heightened military readiness"
+          ],
+          "tradeFocus": "Semiconductor exports as strategic leverage; Critical resource import security; Alternative shipping arrangements development; Digital service exports enhancement; Contingency trade relationships with allies.",
+          "resourceDeps": "Energy (95% imported); Food security (part-dependent on imports); Critical manufacturing inputs; Advanced technology components; Global financial system access; Maritime shipping lanes.",
+          "sanctionsPolicy": "Limited formal sanctions capability; High-tech export controls to China; Strategic resource allocation systems; Foreign investment monitoring; Banking sector cooperation with allied financial restrictions.",
+          "economicWarfareTools": "Semiconductor supply prioritization for allies; Intellectual property leverage; Technical standards influence; Critical component export management; Professional diaspora coordination; Information sharing on Chinese economic vulnerabilities.",
+          "criticalInfrastructureResilience": "Energy grid hardening and redundancy; Water resource security; Telecommunications network protection; Financial system cyber defense; Food distribution system preparation; Healthcare system surge capacity development.",
+          "strategicResourceAccess": "Strategic petroleum reserve enhancement; Food stockpile augmentation; Industrial material reserves expansion; Pharmaceutical supplies stockpiling; Emergency resource management system activation; Port diversification for critical imports.",
+          "financialSystemLeverage": "Foreign currency reserves management; International banking relationship reinforcement; Digital payment system resilience; Foreign asset protection mechanisms; Alternative transaction channels with allies; Anti-money laundering cooperation with partners.",
+          "technologyTransferControls": "Semiconductor intellectual property protection; Enhanced export controls implementation; Critical manufacturing know-how security; Talent retention programs; Research security protocols; Foreign investment screening in strategic sectors.",
+          "specialConsiderations": "Taiwan's economic strategy leverages its critical position in global semiconductor supply chains while preparing for potential isolation during blockade conditions. Economic resilience planning emphasizes stockpiling critical resources and developing alternative shipping arrangements while maintaining semiconductor production as global strategic leverage."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "NATO",
+      "entityName": "NATO",
+      "entityType": "organization",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Maintain alliance cohesion despite divergent threat perceptions between Eastern and Southern flanks",
+            "Demonstrate credible collective defense in response to Russian provocations in Baltic states",
+            "Coordinate burden-sharing with US during period of competing global priorities",
+            "Prevent Russia from exploiting transatlantic divisions during US strategic distraction"
+          ],
+          "posture": "Forward defense with graduated response options. NATO balances firm deterrence against Russian provocations while maintaining decision-making cohesion across 30+ member states with diverse threat perceptions and domestic political constraints.",
+          "keyInitiatives": "Enhanced Forward Presence Reinforcement; Baltic Air Policing Surge; Rapid Reaction Force Activation; Strategic Communications Coordination Cell; Cyber Defense Mutual Assistance; NATO-EU Defense Cooperation Framework; Defense Capacity Building for Baltic Partners.",
+          "prioritiesMatrix": "Primary: Article 5 credibility in face of Russian hybrid warfare. Secondary: Maintaining political cohesion despite member state prioritization differences. Tertiary: Supporting US global posture while ensuring European security is not compromised.",
+          "redLines": "Direct Russian military attack on NATO territory; Cyber attack with effects comparable to kinetic operation; Use of chemical, biological or nuclear weapons; Deliberate targeting of civilian infrastructure; Violating territorial sovereignty of member states.",
+          "treatyObligations": "North Atlantic Treaty Article 5 collective defense commitment; EU mutual defense clause for EU members; Enhanced Forward Presence commitments; Various status of forces agreements; Strategic concept implementation requirements; Defense spending commitments.",
+          "diplomaticResources": "Brussels headquarters diplomatic network; Parliamentary Assembly; Science for Peace programs; Partnership for Peace framework; Mediterranean Dialogue; Istanbul Cooperation Initiative; Global Partners program; Crisis response consultation mechanisms.",
+          "specialConsiderations": "Decision-making requires consensus among 30+ members with varying threat perceptions. Southern members prioritize Mediterranean migration and terrorism while Eastern members focus on Russian threat. US strategic bandwidth limitations create anxiety about alliance credibility during competing global priorities."
+        },
+        "information": {
+          "objectives": [
+            "Maintain alliance narrative coherence despite member state communication variations",
+            "Counter Russian disinformation targeting Baltic Russian-speaking populations",
+            "Project unity and resolve despite potential force allocation challenges",
+            "Document and expose hybrid warfare tactics while maintaining proportional response"
+          ],
+          "propagandaThemes": "Alliance unity and solidarity; Democratic resilience against authoritarianism; Rules-based international order; NATO's 70+ year success in collective security; Proportional and defensive posture; Diplomatic preference with military readiness; Technological and operational superiority.",
+          "cyberTargets": "Russian hybrid warfare infrastructure; Disinformation networks targeting Baltic populations; Critical infrastructure protection systems; Command and control resilience; Intelligence sharing platforms; Strategic communication coordination networks.",
+          "strategicCommunicationFramework": "Coordinated member state messaging with NATO Strategic Communications Center of Excellence leadership. Tailored approaches for different audiences: Baltic populations, broader European public, international community, and potential adversaries. Emphasis on transparency while protecting operational security.",
+          "intelCollectionPriorities": "Russian military mobilization indicators; Wagner Group and proxy force deployments; Command and control patterns suggesting coordinated action with China; Cyber attack preparation; Disinformation campaign architecture; Baltic ethnic Russian sentiment indicators.",
+          "disinformationResilience": "StratCom Centre of Excellence support to member nations; Allied rapid response fact-checking network; Coordinated attribution policy for information operations; Pre-bunking of anticipated narrative themes; Multiple language reality-checking platforms.",
+          "mediaLandscapeControl": "Limited direct control but coordinated press engagement strategy across member nations. Military information support operations within ethical and legal constraints. Transparent background briefings for credibility maintenance. Social media monitoring and engagement through official channels.",
+          "specialConsiderations": "Member nations maintain sovereign strategic communication approaches, creating coordination challenges. Messaging must balance deterrence credibility with unnecessary escalation. Russian-speaking populations in Baltic states require specialized outreach sensitive to cultural context."
+        },
+        "military": {
+          "objectives": [
+            "Demonstrate credible conventional deterrence against Russian aggression in Baltics",
+            "Maintain rapid response capability despite potential US force limitations",
+            "Enhance interoperability between national forces for cohesive crisis response",
+            "Prepare for hybrid warfare defense while maintaining Article 5 credibility"
+          ],
+          "alertLevel": "Enhanced Vigilance",
+          "doctrine": "Active deterrence with graduated response options. NATO emphasizes forward defense, interoperability, and multinational formations while maintaining escalation dominance and conventional superiority for territorial defense.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Enhanced Forward Presence battlegroups reinforced; Very High Readiness Joint Task Force activated; NATO Response Force at heightened alert; Air policing missions doubled; Standing Maritime Groups redeployed to Baltic and Black Seas; Integrated Air and Missile Defense on elevated status; Multinational Corps Northeast commanding regional operations.",
+          "escalationLadder": "1. Enhanced intelligence collection and sharing; 2. Diplomatic demarches and consultations; 3. Defensive force posture adjustments; 4. Deployment of rapid reaction components; 5. Activation of graduated response plans; 6. Limited defensive operations; 7. Article 5 collective defense implementation; 8. Full-spectrum allied operations.",
+          "decisionMakingProtocol": "North Atlantic Council in permanent session; Military Committee providing continuous advice; SACEUR granted predetermined authorities; National capitals maintaining continuous secure communications; SHAPE coordinating multinational response options; Defense ministers in regular emergency consultation.",
+          "forceProjectionCapabilities": "Very High Readiness Joint Task Force deployable within days; Strategic airlift coordinated through Heavy Airlift Wing; Rapid Air Mobility clearance procedures activated; Host Nation Support agreements implemented; Multinational logistics coordination centers activated; Movement Coordination Centre Europe facilitating strategic transport.",
+          "defenseIndustrialCapacity": "National defense industry production surged where possible; NATO Support and Procurement Agency coordinating critical munitions; Strategic sharing of maintenance capabilities for key platforms; Accelerated implementation of NATO-EU defense industrial cooperation; Expedited foreign military sales processing for critical capabilities.",
+          "domainPosture": {
+            "land": "Enhanced Forward Presence battlegroups at combat readiness; NATO Response Force land component on shortened deployment notice; Multinational Division North commanding Baltic defense preparations; National home defense forces mobilized in forward states; Corps-level formations conducting deployment readiness activities; Prepositioned equipment stocks activated.",
+            "sea": "Standing NATO Maritime Groups redeployed to Baltic and Black Seas; Mine countermeasure vessels forward deployed; Anti-submarine warfare capabilities enhanced in critical regions; Maritime patrol aircraft coverage intensified; Naval striking groups at increased readiness; Baltic maritime coordination enhanced with Sweden and Finland.",
+            "air": "Baltic Air Policing missions significantly increased; Southern Air Policing simultaneously maintained; AWACS providing continuous surveillance coverage; Strategic airlift prioritized to reinforcement operations; Integrated Air and Missile Defense Network at heightened alert; Air-to-air refueling capacity positioned for sustained operations.",
+            "cyber": "NATO Cyber Operations Centre at full operational capability; Cyber Rapid Reaction teams deployed to vulnerable allies; Joint intelligence fusion for cyber indicators; Critical infrastructure protection enhanced; Offensive cyber capabilities prepared under policy constraints; Information sharing with industry partners maximized.",
+            "space": "Allied space support coordination through NATO Space Centre; Commercial imagery acquisition accelerated; Satellite communications resilience enhanced; GPS/positioning warfare countermeasures implemented; Space domain awareness sharing maximized; Alternative navigation capabilities prepared."
+          },
+          "specialConsiderations": "NATO force generation faces challenges from competing national priorities and limited high-readiness capabilities. US force allocation between European and Pacific theaters creates potential gaps requiring European allies to assume greater responsibility. Decision-making consensus requirements may delay rapid response in ambiguous hybrid scenarios."
+        },
+        "economic": {
+          "objectives": [
+            "Maintain economic resilience of frontline states facing Russian pressure",
+            "Coordinate sanctions implementation despite varying member state dependencies",
+            "Secure defense industrial capacity for sustained crisis or conflict",
+            "Provide economic reassurance to deter Russian economic coercion"
+          ],
+          "tradeFocus": "Energy security diversification; Defense industrial cooperation; Critical supply chain resilience; Cross-border infrastructure protection; Sanctions coordination; Strategic stockpile management; Black Sea commercial shipping security.",
+          "resourceDeps": "Russian energy imports for several members; US security guarantees and material support; Industrial production capacity for munitions replenishment; Critical minerals and components for defense systems; Information sharing networks; Transportation infrastructure.",
+          "sanctionsPolicy": "Coordinated restrictive measures against Russian entities and individuals; Strategic sectors targeting approach; Humanitarian impact mitigation; Proportional response to escalation; Financial system restrictions; Technology transfer prohibitions; Diplomatic-economic response coordination.",
+          "economicWarfareTools": "Asset freezes for responsible individuals and entities; Financial market restrictions; Export controls on dual-use technologies; Energy import diversification incentives; Critical infrastructure investment screening; Defense industrial base protection; Supply chain resilience funding.",
+          "criticalInfrastructureResilience": "Energy network security enhanced; Transportation node protection increased; Financial system cyber defense prioritized; Telecommunications redundancy established; Public health system surge capacity prepared; Food and water security measures implemented.",
+          "strategicResourceAccess": "Strategic energy reserves coordination; Defense material stockpile sharing agreements; Critical raw materials acquisition partnerships; Medical supply reserve management; Semiconductor and technology component prioritization; Industrial capacity sharing arrangements.",
+          "financialSystemLeverage": "Coordinated banking restrictions implementation; European Central Bank crisis stabilization measures; Financial intelligence sharing; Anti-money laundering enforcement intensification; Cross-border capital flow monitoring; Payment system security enhancement.",
+          "technologyTransferControls": "Enhanced export control enforcement; Critical technology protection coordination; Research security guidelines implementation; Foreign investment screening intensification; Technical standards cooperation; Supply chain security verification; Intellectual property protection.",
+          "specialConsiderations": "Member states have significantly different Russian economic dependencies, particularly in energy sector, creating uneven impact from sanctions implementation. Defense industrial capacity varies dramatically between allies, requiring burden-sharing arrangements for sustainability. Economic response coordination complicated by both EU and NATO membership overlaps but differing authorities."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "KP",
+      "entityName": "North Korea",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Exploit US strategic distraction to advance nuclear and missile capabilities",
+            "Leverage alliance with China and Russia for sanctions relief and economic support",
+            "Drive wedges between US and regional allies through provocative but calibrated actions",
+            "Gain international recognition and legitimacy as nuclear weapons state"
+          ],
+          "posture": "Calibrated belligerence with strategic opportunism. North Korea adopts a deliberately provocative stance while carefully avoiding thresholds that would trigger direct military response, exploiting US attention divided between multiple theaters.",
+          "keyInitiatives": "Strategic Weapons Testing Program; China-DPRK Economic Lifeline Enhancement; US-ROK Alliance Stress Test; Maximum Pressure Sanctions Evasion Framework; International Recognition Campaign; Strategic Deception Operations; Regime Survival Guarantee Protocol.",
+          "prioritiesMatrix": "Primary: Regime preservation and security guarantees through strategic deterrence. Secondary: Relief from economic sanctions during period of US distraction. Tertiary: International recognition of status as strategic power with nuclear capability.",
+          "redLines": "Direct military attack on North Korean territory; Crippling sanctions threatening regime stability; Military exercises explicitly simulating decapitation strikes; Violation of airspace by military aircraft; Attempted regime change operations; Naval blockade of territorial waters.",
+          "treatyObligations": "Treaty of Friendship, Cooperation and Mutual Assistance with China (though ambiguously interpreted); Various economic agreements with China and Russia; UN membership obligations (selectively observed); Armistice agreement ending Korean War (frequently violated); Non-proliferation obligations (rejected).",
+          "diplomaticResources": "Limited diplomatic presence in select countries; UN Mission in New York; Strategic relationships with China and Russia; Connections with sympathetic non-aligned nations; Proliferation networks for sanctions evasion; Diaspora communities in strategic locations.",
+          "specialConsiderations": "North Korean diplomatic strategy navigates complex constraints, claiming sovereign rights to develop deterrent capabilities while seeking economic relief and international legitimacy. Leadership capitalizes on US strategic distraction to create diplomatic leverage without triggering unified international response."
+        },
+        "information": {
+          "objectives": [
+            "Project image of strategic deterrent credibility through missile demonstration",
+            "Exploit perceived US overextension to undermine regional confidence in American security guarantees",
+            "Maintain domestic control through intensified propaganda about external threats",
+            "Shape international narrative that portrays North Korea as rational security-seeking state"
+          ],
+          "propagandaThemes": "American imperial aggression and decline; North Korean technological supremacy; Supreme Leader's strategic genius; Inevitable victory over Western imperialism; Korean self-reliance and juche ideology; Righteous struggle against hostile encirclement; Nuclear capability as historic achievement; Chinese and Russian brotherhood.",
+          "cyberTargets": "South Korean critical infrastructure and defense networks; Japanese government systems; US Indo-Pacific Command communications; Regional financial systems; Cryptocurrency exchanges and financial institutions; Defense industrial base entities; Western media organizations.",
+          "strategicCommunicationFramework": "Absolute control of domestic information environment with strategic external messaging. Differentiated approaches for domestic population (regime strength), Chinese/Russian partners (strategic coordination), and international audience (deterrence credibility). Messaging maximizes perception of capability while minimizing provocation thresholds.",
+          "intelCollectionPriorities": "US force disposition in region during crisis; South Korean military readiness indicators; Japanese defense preparations; Chinese diplomatic signals regarding international responses; Sanctions enforcement gaps; Cyber vulnerability identification; International financial system access points.",
+          "disinformationResilience": "Complete domestic information environment control; Multiple redundant communication channels; External messaging through state media exclusively; Digital persona operations for international platforms; Denial and ambiguity regarding operations attribution.",
+          "mediaLandscapeControl": "Total monopoly on domestic information. Korean Central News Agency as exclusive external voice. Strategic use of select foreign journalists for guided access. Social media operations through proxy entities. Complete censorship of external information sources.",
+          "specialConsiderations": "North Korean information operations must balance provocative messaging that projects deterrent credibility with avoiding messaging that could trigger direct military response. Domestic propaganda requires maintaining crisis atmosphere without creating panic. External messaging calibrated to exploit US attention divided between multiple theaters."
+        },
+        "military": {
+          "objectives": [
+            "Demonstrate advanced missile capabilities during period of US strategic distraction",
+            "Enhance nuclear deterrent credibility through strategic weapons testing",
+            "Present credible threat to regional allies while avoiding direct US military response",
+            "Prepare opportunistic limited actions if US becomes critically overextended"
+          ],
+          "alertLevel": "Heightened Combat Readiness",
+          "doctrine": "Asymmetric deterrence with strategic provocation. North Korea emphasizes nuclear and missile capabilities to ensure regime survival while leveraging conventional forces as regional threat to gain strategic advantage during great power competition.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Strategic Rocket Force at enhanced alert; Nuclear weapons preparation cycle accelerated; Conventional artillery within range of Seoul at combat readiness; Submarine force deployed for missile launch demonstrations; Special operations forces at heightened readiness; Cyber warfare units conducting continuous operations.",
+          "escalationLadder": "1. Enhanced strategic weapons testing; 2. Artillery and short-range missile demonstrations; 3. Naval provocations in contested waters; 4. Medium-range missile demonstrations; 5. Simulated nuclear exercises; 6. ICBM or SLBM tests; 7. Atmospheric or underground nuclear test; 8. Limited conventional provocations near boundaries.",
+          "decisionMakingProtocol": "Supreme Leader's direct authority through National Defense Commission; Military command structure on heightened alert status; Special security measures for leadership; Communication with Chinese and Russian military leadership through secure channels; Nuclear command and control at elevated readiness.",
+          "forceProjectionCapabilities": "Medium and intermediate-range ballistic missiles operational; Mobile missile launcher deployments; Special forces infiltration capabilities; Conventional artillery threat to Seoul metropolitan area; Limited naval special operations capacity; Cyber attack capabilities against regional targets; Limited nuclear strike capability.",
+          "defenseIndustrialCapacity": "Military production prioritized despite sanctions constraints; Strategic weapons components stockpiled; Sanctions evasion networks for critical technologies; Foreign currency reserves redirected to military requirements; Illegal procurement networks activated; Domestic production capabilities maximized within technical constraints.",
+          "domainPosture": {
+            "land": "Conventional forces maintaining hardened defensive positions; Artillery units deployed within range of Seoul; Special forces prepared for limited infiltration operations; Mobile missile units dispersed to firing positions; Tunnel networks fully operational; Border security forces at highest readiness.",
+            "sea": "Limited submarine force deployed for missile launch demonstrations; Coastal defense vessels at combat readiness; Naval special operations units prepared for limited provocations; Mine warfare capability prepared; Maritime infiltration assets positioned; Naval bases at heightened security status.",
+            "air": "Air defense network at maximum alert; Limited air force maintained at defensive readiness; Transport aviation prepared for special forces operations; Unmanned aerial vehicles deployed for intelligence collection; Anti-air missile systems at combat readiness.",
+            "cyber": "Offensive cyber operations against regional targets; Intelligence collection on US command and control communications; South Korean critical infrastructure targeting; Defensive measures for regime security networks; Information warfare operations supporting strategic deception; Cryptocurrency theft operations for sanctions evasion.",
+            "space": "Limited indigenous capability but intelligence collection on adversary space-based assets; GPS/navigation warfare capability deployed; Counter-space electronic warfare systems operational; Ballistic missile testing with near-space trajectory demonstrations."
+          },
+          "specialConsiderations": "North Korean military operations carefully calibrated to demonstrate capability without triggering unmanageable escalation. Strategic weapons testing timed to exploit US attention divided between Europe and Taiwan crises, while maintaining plausible deniability regarding coordination with China and Russia."
+        },
+        "economic": {
+          "objectives": [
+            "Exploit international crisis to evade sanctions through expanded illicit networks",
+            "Secure critical resources through enhanced partnership with China and Russia",
+            "Generate foreign currency through intensified cyber theft operations",
+            "Maintain regime economic stability despite continued international pressure"
+          ],
+          "tradeFocus": "Illicit resource exports to China; Sanctions evasion networks; Cryptocurrency acquisition; Dual-use technology imports; Luxury goods procurement for elite loyalty; Food and energy imports for critical needs; Arms exports to conflict zones.",
+          "resourceDeps": "Chinese food and energy imports; Russian technical expertise; Global cryptocurrency markets; International financial system vulnerabilities; Maritime shipping access; Cyber infrastructure access; Foreign technology smuggling networks.",
+          "sanctionsPolicy": "Counter-sanctions largely symbolic; Strategic resource hoarding; Elite insulation from economic hardship; Domestic propaganda framing sanctions as imperialist aggression; Selective use of humanitarian appeals for sanctions relief; Technical compliance obfuscation.",
+          "economicWarfareTools": "Cryptocurrency theft operations; Cyber financial system targeting; Illicit shipping networks; Front company proliferation; Money laundering through diplomatic channels; Intellectual property theft; Counterfeit currency production; Arms sales to embargoed regimes.",
+          "criticalInfrastructureResilience": "Energy system hardening against potential strikes; Food distribution prioritization for military and elite; Communications redundancy for regime security; Transportation network military prioritization; Financial system isolation capabilities; Medical supply reserves for leadership.",
+          "strategicResourceAccess": "Coal and rare earth element stockpiles; Petroleum reserves prioritization; Agricultural production for minimum subsistence; Military supply chains protected; Multiple currency reserves including cryptocurrency; Elite consumption requirements secured.",
+          "financialSystemLeverage": "Cryptocurrency operations for sanctions evasion; International banking system exploitation through shell companies; Overseas financial representatives in friendly countries; Hard currency hoarding; Alternative payment mechanisms with strategic partners; Foreign currency reserves management for regime security.",
+          "technologyTransferControls": "Illicit procurement networks for strategic technologies; Restricted foreign technology access to trusted actors; Reverse engineering capabilities for critical systems; Joint ventures with front companies for technology acquisition; Cyber espionage for industrial secrets; Knowledge transfer restrictions within controlled economy.",
+          "specialConsiderations": "North Korean economic operations navigate severe constraints imposed by sanctions while exploiting gaps created by international crisis distraction. Leadership prioritizes regime-sustaining economic activities while accepting broader economic hardship as necessary cost for strategic autonomy and deterrence capability."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    },
+    {
+      "entityId": "IR",
+      "entityName": "Iran",
+      "entityType": "nation",
+      "isConfigured": false,
+      "isCustom": false,
+      "configData": {
+        "generalConfig": {
+          "supportingDocuments": []
+        },
+        "diplomacy": {
+          "objectives": [
+            "Exploit US strategic distraction to advance regional influence in Middle East",
+            "Strengthen strategic partnership with Russia and China as counterbalance to US",
+            "Accelerate nuclear program advancement while international attention is diverted",
+            "Reduce sanctions pressure through opportunistic diplomacy and circumvention"
+          ],
+          "posture": "Strategic opportunism with calibrated asymmetric pressure. Iran leverages US distraction between European and Indo-Pacific theaters to advance regional objectives while maintaining plausible deniability through proxy forces and carefully managing escalation thresholds.",
+          "keyInitiatives": "Axis of Resistance Expansion; Nuclear Threshold Advancement Program; Anti-US Regional Coalition Building; Strategic Partnership with Russia and China; Revolutionary Guard Expeditionary Operations; Sanctions Resistance Framework; Strategic Deterrence Enhancement.",
+          "prioritiesMatrix": "Primary: Regional power projection through proxy network enhancement. Secondary: Nuclear program advancement to threshold capability. Tertiary: Sanctions relief through combination of diplomatic leverage and evasion networks.",
+          "redLines": "Direct military attack on Iranian territory; Assassination of senior leadership; Severe economic blockade threatening regime stability; Permanent US military presence in Iraq; Foreign military support for domestic opposition; Israeli military action against nuclear facilities.",
+          "treatyObligations": "JCPOA nuclear agreement (partially abandoned); UN Charter membership; NAM (Non-Aligned Movement) commitments; SCO (Shanghai Cooperation Organization) cooperation framework; Strategic cooperation agreement with China; Military coordination with Russia; Various regional security arrangements.",
+          "diplomaticResources": "Extensive proxy network throughout Middle East; Strategic partnership with Russia and China; Revolutionary Guard Quds Force operations; Energy leverage with neighboring states; Religious soft power through Shia communities; Diplomatic presence in key countries despite sanctions; UN mission in New York.",
+          "specialConsiderations": "Iranian diplomatic strategy carefully balances multiple contradictory imperatives: advancing revolutionary ideology while seeking pragmatic sanctions relief; maintaining deterrent credibility while avoiding triggering unified international response. US distraction provides unique opportunity to recalibrate regional position."
+        },
+        "information": {
+          "objectives": [
+            "Project image of regional resistance leader against US imperialism",
+            "Exploit US strategic overextension to undermine regional confidence in American security guarantees",
+            "Shape narrative of inevitable US withdrawal from Middle East",
+            "Maintain domestic control by focusing public attention on external threats"
+          ],
+          "propagandaThemes": "American imperial decline and overextension; Islamic revolutionary resistance; Self-reliance against Western domination; Zionist conspiracy against Muslim world; Iranian scientific achievement despite sanctions; Regional leadership and protection of oppressed; Defense of Palestinian cause; Religious and civilizational duty.",
+          "cyberTargets": "US military communications and command networks; Gulf state government systems; Israeli critical infrastructure; Regional energy infrastructure; Financial institutions supporting sanctions; Western media organizations; Diaspora opposition groups; Defense industrial base entities.",
+          "strategicCommunicationFramework": "Differentiated messaging across audiences: domestic (resistance and steadfastness), regional (Islamic leadership and anti-imperialism), and international (rational actor seeking security). Multi-channel approach through state media, allied outlets, proxy organizations, and social media operations. Messaging calibrated to exploit perceived US weakness during dual crises.",
+          "intelCollectionPriorities": "US force disposition changes in CENTCOM; Gulf state security posture; Israeli military preparations; European sanctions enforcement intentions; Russian and Chinese crisis response coordination; Regional diplomatic signals regarding US reliability; Sanctions enforcement gaps; Cyber vulnerability identification.",
+          "disinformationResilience": "Strict domestic information control; Multiple redundant communication channels; Revolutionary Guard intelligence network; Proxy media ecosystem throughout region; Religious authority communications structure; Cyber defense operations against Western influence campaigns.",
+          "mediaLandscapeControl": "Tight control of domestic information through state media and internet filtering; PressTV and other international outlets for external messaging; Proxy media organizations throughout region; Social media operations through Revolutionary Guard cyber units; Religious sermon networks for messaging amplification.",
+          "specialConsiderations": "Iranian information operations must balance provocative anti-US messaging that solidifies regional leadership with avoiding triggering unified international response during sensitive nuclear advancement. Opportunistic messaging exploits perception of US overextension while preparing domestic audience for potential escalation if operations discovered."
+        },
+        "military": {
+          "objectives": [
+            "Demonstrate asymmetric deterrence capability while US is strategically distracted",
+            "Enhance proxy force operations throughout region while avoiding attribution",
+            "Advance missile capabilities and naval disruption potential in Persian Gulf",
+            "Prepare for opportunistic gains if US forces significantly reduced in region"
+          ],
+          "alertLevel": "Heightened Readiness",
+          "doctrine": "Asymmetric warfare with strategic depth. Iran emphasizes layered deterrence through combination of proxy forces, missile capabilities, naval disruption potential, and nuclear threshold status while maintaining plausible deniability for regional operations.",
+          "doctrineFiles": [],
+          "forceStructureReadiness": "Revolutionary Guards at enhanced alert status; Missile forces at heightened readiness; Naval forces conducting increased operational tempo in Persian Gulf; Proxy forces activated across regional theaters; Cyber warfare units at maximum operational status; Nuclear program activities accelerated; Air defense network at elevated alert.",
+          "escalationLadder": "1. Enhanced intelligence collection and proxy force preparation; 2. Limited proxy force operations with deniability; 3. Cyber operations against regional targets; 4. Naval harassment operations in Gulf; 5. Missile demonstrations and exercises; 6. Direct proxy force attacks against US regional interests; 7. Limited direct action with plausible deniability; 8. Overt military operations if regime threatened.",
+          "decisionMakingProtocol": "Supreme Leader's ultimate authority through Supreme National Security Council; IRGC command structure on heightened alert; Quds Force coordinating regional proxy operations; Strategic communications with Russian and Chinese military leadership; Nuclear program security measures enhanced; Command bunkers fully operational.",
+          "forceProjectionCapabilities": "Regional proxy force network across Iraq, Syria, Lebanon, Yemen; Medium and intermediate-range ballistic missiles operational; Maritime disruption capacity in Persian Gulf; Drone and loitering munition capabilities; Special operations forces for limited direct action; Cyber attack capabilities against regional infrastructure; Naval mining capability.",
+          "defenseIndustrialCapacity": "Defense production prioritized despite sanctions constraints; Missile component production accelerated; Drone manufacturing expanded; Smuggling networks for critical technologies activated; Revolutionary Guard technical universities mobilized; Domestic arms production maximized; Reverse engineering capabilities leveraged.",
+          "domainPosture": {
+            "land": "Revolutionary Guard ground forces at heightened readiness; Regular army in defensive posture; Proxy forces throughout region activated for potential operations; Border security reinforced; Critical infrastructure protection enhanced; Basij militia prepared for domestic security; Special forces units prepared for deployment.",
+            "sea": "Naval forces conducting increased presence operations in Persian Gulf; Fast attack craft deployed for potential swarm tactics; Mine-laying capability readied; IRGC naval units at combat readiness; Submarines at enhanced patrol status; Anti-ship missile batteries prepared; Maritime harassment tactics rehearsed.",
+            "air": "Air defense network at maximum readiness; Limited air force maintained in dispersed posture; Transport aviation prepared for proxy force support; Drone units deployed for reconnaissance and potential strikes; Anti-air missile systems at combat readiness; Ballistic missile forces at heightened alert.",
+            "cyber": "Offensive cyber operations against regional targets; Intelligence collection on US command and control; Critical infrastructure targeting capability enhanced; Defensive measures for regime security networks; Information warfare operations supporting strategic messaging; Financial system cyber operations for sanctions evasion.",
+            "space": "Limited indigenous capability but intelligence collection on adversary space-based assets; GPS/navigation warfare capability deployed; Counter-space electronic warfare systems operational; Satellite communications interception enhanced; Space program activities publicly highlighted for prestige."
+          },
+          "specialConsiderations": "Iranian military operations carefully calibrated to advance regional objectives while avoiding thresholds that would unite international response during period of US strategic distraction. Revolutionary Guard maintains parallel military structure with special focus on asymmetric capabilities and expeditionary operations through proxy forces."
+        },
+        "economic": {
+          "objectives": [
+            "Expand sanctions evasion networks during period of reduced US enforcement capacity",
+            "Deepen economic integration with China and Russia as sanctions alternative",
+            "Secure critical technology access through enhanced smuggling operations",
+            "Maintain regime economic stability despite continued international pressure"
+          ],
+          "tradeFocus": "Oil exports through grey market channels; Strategic partnership with China; Military technology acquisition from Russia; Regional trade expansion through Iraq and Turkey; Smuggling networks enhancement; Sanctions evasion mechanisms; Barter arrangements with commodity-focused economies.",
+          "resourceDeps": "Oil export revenue; Chinese investment and technology transfer; Russian military and nuclear technology; Smuggling networks for sanctioned goods; Regional trade access through proximate states; Cyber access to financial systems; Illicit procurement networks.",
+          "sanctionsPolicy": "Counter-sanctions primarily symbolic; Regional economic pressure on US allies; Smuggling networks expansion; Humanitarian exemption exploitation; Technical compliance obfuscation; Sanctions narrative framing as illegal aggression; Multiple alternative payment mechanisms.",
+          "economicWarfareTools": "Regional proxy economic leverage; Grey market oil sales; Dual-use technology proliferation; Strategic shipping disruption potential; Cryptocurrency operations; Front company proliferation; Money laundering through regional trading partners; Selective market access as leverage.",
+          "criticalInfrastructureResilience": "Energy infrastructure hardening; Revolutionary Guard protection of key facilities; Communications redundancy for regime security; Transportation network military access prioritization; Financial system isolation capabilities; Medical supply resilience; Food security strategic reserves.",
+          "strategicResourceAccess": "Oil and gas reserves security; Gold and foreign currency reserves diversification; Critical technology smuggling networks; Military supply chains protection; Alternative market access arrangements; Strategic minerals stockpiling; Water resource security measures.",
+          "financialSystemLeverage": "Alternative payment mechanisms with strategic partners; Regional financial hub development; Cryptocurrency operations for sanctions evasion; Banking system isolation capability; Hard currency reserves management; Black market exchange operations; Informal hawala networks maintenance.",
+          "technologyTransferControls": "Illicit procurement networks for strategic technologies; Restricted foreign technology access to trusted entities; Reverse engineering capabilities for critical systems; Joint ventures with Chinese and Russian partners; Academic cooperation for dual-use research; Revolutionary Guard technical universities; Knowledge transfer restrictions.",
+          "specialConsiderations": "Iranian economic strategy navigates severe constraints imposed by maximum pressure sanctions while exploiting enforcement gaps created by US strategic distraction. Leadership prioritizes regime-sustaining economic activities while advancing key strategic capabilities despite international isolation."
+        },
+        "approvedFields": {},
+        "enabledFields": {
+          "generalConfig": {
+            "supportingDocuments": true
+          },
+          "diplomacy": {
+            "objectives": true,
+            "posture": true,
+            "keyInitiatives": true,
+            "prioritiesMatrix": true,
+            "redLines": true,
+            "treatyObligations": true,
+            "diplomaticResources": true,
+            "specialConsiderations": true
+          },
+          "information": {
+            "objectives": true,
+            "propagandaThemes": true,
+            "cyberTargets": true,
+            "strategicCommunicationFramework": true,
+            "intelCollectionPriorities": true,
+            "disinformationResilience": true,
+            "mediaLandscapeControl": true,
+            "specialConsiderations": true
+          },
+          "military": {
+            "objectives": true,
+            "alertLevel": true,
+            "doctrine": true,
+            "forceStructureReadiness": true,
+            "escalationLadder": true,
+            "decisionMakingProtocol": true,
+            "forceProjectionCapabilities": true,
+            "defenseIndustrialCapacity": true,
+            "domainPosture": {
+              "land": true,
+              "sea": true,
+              "air": true,
+              "cyber": true,
+              "space": true
+            },
+            "specialConsiderations": true
+          },
+          "economic": {
+            "objectives": true,
+            "tradeFocus": true,
+            "resourceDeps": true,
+            "sanctionsPolicy": true,
+            "economicWarfareTools": true,
+            "criticalInfrastructureResilience": true,
+            "strategicResourceAccess": true,
+            "financialSystemLeverage": true,
+            "technologyTransferControls": true,
+            "specialConsiderations": true
+          }
+        }
+      }
+    }
+  ],
+  "customEntities": [],
+  "nationRelationships": {
+    "US_CN": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "US_RU": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "US_TW": {
+      "type": "partner",
+      "notes": ""
+    },
+    "US_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "US_KP": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "US_IR": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "CN_RU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_TW": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "CN_NATO": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "CN_KP": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_IR": {
+      "type": "partner",
+      "notes": ""
+    },
+    "RU_TW": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "RU_NATO": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "RU_KP": {
+      "type": "partner",
+      "notes": ""
+    },
+    "RU_IR": {
+      "type": "partner",
+      "notes": ""
+    },
+    "TW_NATO": {
+      "type": "partner",
+      "notes": ""
+    },
+    "TW_KP": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "TW_IR": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "NATO_KP": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "NATO_IR": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "KP_IR": {
+      "type": "partner",
+      "notes": ""
+    },
+    "CN_US": {
+      "type": "enemy",
+      "notes": ""
+    },
+    "RU_US": {
+      "type": "enemy",
+      "notes": ""
+    },
+    "TW_US": {
+      "type": "ally",
+      "notes": ""
+    },
+    "NATO_US": {
+      "type": "ally",
+      "notes": ""
+    },
+    "KP_US": {
+      "type": "enemy",
+      "notes": ""
+    },
+    "IR_US": {
+      "type": "enemy",
+      "notes": ""
+    },
+    "NATO_RU": {
+      "type": "enemy",
+      "notes": ""
+    },
+    "KP_RU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "IR_RU": {
+      "type": "partner",
+      "notes": ""
+    },
+    "NATO_TW": {
+      "type": "partner",
+      "notes": ""
+    },
+    "KP_TW": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "IR_TW": {
+      "type": "neutral",
+      "notes": ""
+    },
+    "KP_NATO": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "IR_NATO": {
+      "type": "adversary",
+      "notes": ""
+    },
+    "IR_KP": {
+      "type": "neutral",
+      "notes": ""
+    }
+  },
+  "conflictTheaters": [
+    {
+      "cocomId": "AFRICOM",
+      "name": "US Africa Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#3F51B5"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#F44336"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "CENTCOM",
+      "name": "US Central Command",
+      "description": "A secondary theater where Iran is opportunistically exploiting US focus on INDOPACOM and EUCOM to advance regional objectives and potentially threaten partners.",
+      "isActive": true,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "US",
+          "supportingNationIds": [
+            "NATO",
+            "TW"
+          ],
+          "colorCode": "#34A853"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "IR",
+          "supportingNationIds": [
+            "KP",
+            "RU",
+            "CN"
+          ],
+          "colorCode": "#FBBC05"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": true,
+        "SOCOM": true,
+        "STRATCOM": false,
+        "TRANSCOM": true
+      }
+    },
+    {
+      "cocomId": "EUCOM",
+      "name": "US European Command",
+      "description": "The EUCOM theater focuses on Russian provocations near NATO's northeastern frontier, particularly in Latvia and Estonia, involving hybrid warfare tactics and potential military action.",
+      "isActive": true,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "NATO",
+          "supportingNationIds": [
+            "US"
+          ],
+          "colorCode": "#673AB7"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "RU",
+          "supportingNationIds": [
+            "CN",
+            "KP"
+          ],
+          "colorCode": "#FF9800"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": true,
+        "SOCOM": true,
+        "STRATCOM": true,
+        "TRANSCOM": true
+      }
+    },
+    {
+      "cocomId": "INDOPACOM",
+      "name": "US Indo-Pacific Command",
+      "description": "The INDOPACOM theater centers on China's pressure campaign against Taiwan, including naval provocations, blockade conditions, and potential amphibious operations.",
+      "isActive": true,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "US",
+          "supportingNationIds": [
+            "TW"
+          ],
+          "colorCode": "#00BCD4"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "CN",
+          "supportingNationIds": [
+            "KP",
+            "RU"
+          ],
+          "colorCode": "#FF5722"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": true,
+        "SOCOM": true,
+        "STRATCOM": true,
+        "TRANSCOM": true
+      }
+    },
+    {
+      "cocomId": "NORTHCOM",
+      "name": "US Northern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#9C27B0"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#FFC107"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SOUTHCOM",
+      "name": "US Southern Command",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#009688"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#E91E63"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    },
+    {
+      "cocomId": "SPACECOM_GEO",
+      "name": "US Space Command (Geographic)",
+      "description": "",
+      "isActive": false,
+      "sides": [
+        {
+          "id": "side1",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#009688"
+        },
+        {
+          "id": "side2",
+          "leadNationId": "",
+          "supportingNationIds": [],
+          "colorCode": "#E91E63"
+        }
+      ],
+      "functionalCocoms": {
+        "CYBERCOM": false,
+        "SOCOM": false,
+        "STRATCOM": false,
+        "TRANSCOM": false
+      }
+    }
+  ],
+  "createdAt": "2025-05-06T20:33:42.658622",
+  "modifiedAt": "2025-05-06T22:04:59.176877",
+  "lastExecuted": null
+}

@@ -253,7 +253,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 chat_model = VLLMOpenAIChat(
     openai_api_base="http://localhost:8000/v1",
     openai_api_key="EMPTY",
-    model_name="DeepSeek-R1-Distill-Llama-8B-abliterated",
+    model_name="DeepHermes-3-Llama-3-8B-Preview-abliterated",
     temperature=0.7,
     max_tokens=1024
 )

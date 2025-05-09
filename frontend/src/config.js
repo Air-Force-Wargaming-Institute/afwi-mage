@@ -13,6 +13,7 @@ const API_URLS = {
   DIRECT_CHAT: `${API_BASE_URL}:${process.env.REACT_APP_DIRECT_CHAT_SERVICE_PORT}`,
   WORKBENCH: `${API_BASE_URL}:${process.env.REACT_APP_WORKBENCH_SERVICE_PORT || '8020'}`,
   REPORT_BUILDER: `${API_BASE_URL}:${process.env.REACT_APP_REPORT_BUILDER_SERVICE_PORT || '8019'}`,
+  TRANSCRIPTION: `${API_BASE_URL}:${process.env.REACT_APP_TRANSCRIPTION_SERVICE_PORT || '8021'}`,
 };
 
 export const getApiUrl = (service, endpoint) => {

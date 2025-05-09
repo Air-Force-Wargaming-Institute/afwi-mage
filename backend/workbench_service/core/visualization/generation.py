@@ -33,18 +33,19 @@ async def generate_visualization_code(
     Returns:
         Python code for generating the visualization
     """
-    logger.info(f"Generating visualization code for prompt: {prompt}")
+    logger.info(f"Generating visualization code for prompt: {prompt} (use_seaborn={use_seaborn})")
     
     # Get LLM client
     llm = get_llm_client()
     
     spreadsheet_name = spreadsheet_id + '.xlsx'
 
-    # Build the prompt with comprehensive data context
+    # Build the prompt with comprehensive data context, passing the use_seaborn flag
     system_prompt = _build_system_prompt(use_seaborn)
     user_prompt = _build_user_prompt(prompt, spreadsheet_name, use_seaborn, data_context)
     
     try:
+        # Pass all necessary info, including use_seaborn, to the generation function
         code = await _generate_vis_code(system_prompt, user_prompt, use_seaborn, spreadsheet_name, data_context)
         return code
     except Exception as e:
@@ -52,28 +53,52 @@ async def generate_visualization_code(
         raise
 
 def _build_system_prompt(use_seaborn: bool) -> str:
-    """Build the system prompt for the LLM."""
-    library = "Matplotlib"
+    """Build the system prompt for the LLM, tailored by use_seaborn flag."""
     
-    return f"""You are an expert data visualization Python programmer who specializes in creating clear, 
-informative, and visually appealing charts using {library}. Your task is to write Python code 
-that creates the visualization described in the user's request based on their data.
+    if use_seaborn:
+        library_preference = "You should **strongly prefer Seaborn** for plotting, as it generally produces more aesthetically pleasing results with less code. Use Matplotlib for customization only when Seaborn doesn't provide a direct way."
+        style_guidance = "Use `sns.set_theme(style='whitegrid')` or a similar modern Seaborn theme. Choose an appropriate Seaborn color palette (like 'viridis', 'plasma', 'Set2') that ensures good color contrast and differentiation."
+        library_import = "import seaborn as sns"
+    else:
+        library_preference = "You **must use only Matplotlib** for plotting. Do not import or use Seaborn."
+        style_guidance = "Use `plt.style.use('seaborn-v0_8-whitegrid')` or `plt.style.use('ggplot')` for a modern look. Define a list of distinct, visually appealing colors if plotting multiple series/categories manually."
+        library_import = "" # No extra import needed
 
-Follow these guidelines:
-1. Generate complete, executable Python code, ensuring that the code is self-contained and can be run directly. Make your variables one single word, no spaces
-2. Use pandas to load and process Excel data
-3. The Excel files always exist in the '/app/data/workbench/spreadsheets/' directory. Make sure you use this absolute path as a prefix to the filename
-4. Make sure that the Excel files have the correct file extension of '.xlsx'. This extension needs to either be part of the filename variable, or appended to the filename variable when you attempt to use pandas to load the file
-5. Use only matplotlib for visualization
-6. Include appropriate labels, titles, and styling
-7. Always use a new color for each line in a line chart, bar in a bar chart, slice in a pie chart, etc. Never duplicate colors.
-8. Handle errors gracefully
-9. Follow best practices for data visualization
-10. Use the actual column names from the data
-11. Write clean, well-commented code
+    return f"""You are an expert Python data visualization programmer tasked with creating **clear, modern, informative, and visually appealing charts**. 
+Your goal is to translate a user's request and provided data context into executable Python code that generates the best possible visualization.
 
-The code must be complete and self-contained. Place all of your thoughts and comments to the user about how the python code you cretaed works using placeholder in-line comments such as "# these values are the values of the column 'column_name'" or "# this is the code that creates the styling for the chart".
-It is crucial that you ONLY return the Python code with no additional explanation before or after and you will be punalized if you return anything other than the Python code.
+**Core Task:** Write a complete, self-contained Python script using pandas for data loading and Matplotlib/Seaborn for plotting.
+
+**Key Instructions & Constraints:**
+
+1.  **Library Usage:** {library_preference}
+    ```python
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np 
+    {library_import}
+    ```
+2.  **Data Loading:**
+    *   Load data using pandas: `pd.read_excel(...)`.
+    *   The Excel file path is **ALWAYS** `/app/data/workbench/spreadsheets/FILENAME.xlsx`. Replace FILENAME with the provided spreadsheet name.
+    *   Use the actual column names provided in the data context.
+3.  **Visualization Quality (CRITICAL):**
+    *   **Clarity:** Ensure titles are prominent (e.g., bold, larger font), axes are clearly labeled, and legends are used correctly.
+    *   **Data Labels:** Add data labels directly to plots where it enhances readability (e.g., on bar charts, pie slices). Format them concisely (e.g., `f'{{value:.1f}}'` or `f'{{percentage:.0f}}%'`).
+    *   **Modern Aesthetics:** {style_guidance}
+    *   **Figure Size:** Use `plt.figure(figsize=(10, 6))` or `plt.figure(figsize=(12, 7))` (or similar appropriate dimensions) to ensure the plot is not cramped.
+    *   **Layout:** **ALWAYS** include `plt.tight_layout()` at the end before any potential `plt.show()` or save command to prevent labels/titles from overlapping.
+    *   **Color:** Ensure distinct colors for different categories/series. Avoid default color cycles if they are not visually distinct.
+4.  **Code Quality:**
+    *   Write clean, readable code with meaningful variable names.
+    *   Include concise comments explaining **key decisions** or complex parts of the code, not just restating the obvious.
+    *   Handle potential data issues gracefully (e.g., check if required columns exist before plotting).
+5.  **Output:**
+    *   **YOU MUST ONLY RETURN THE RAW PYTHON CODE.** 
+    *   Do **NOT** include any explanations, introductory text, concluding remarks, or markdown formatting (like ```python ... ```) around the code.
+    *   The code should generate the plot; do **not** include `plt.show()` unless specifically requested for a different purpose.
+
+Adhere strictly to these instructions, especially the output format. Failure to return only the raw Python code will result in penalization.
 """
 
 def _build_user_prompt(

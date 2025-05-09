@@ -160,10 +160,15 @@ class ConflictTheaterSide(BaseModel):
     colorCode: Optional[str] = None
 
 class ConflictTheater(BaseModel):
-    id: str
-    name: str
+    cocomId: str = Field(..., description="ID of the Geographic COCOM (e.g., AFRICOM)")
+    name: str # User-editable display name, defaulting to COCOM name
     description: Optional[str] = None
-    sides: List[ConflictTheaterSide] = []
+    isActive: bool = False
+    sides: List[ConflictTheaterSide] = Field(default_factory=lambda: [
+        ConflictTheaterSide(id='side1', leadNationId=None, supportingNationIds=[], colorCode=None),
+        ConflictTheaterSide(id='side2', leadNationId=None, supportingNationIds=[], colorCode=None)
+    ])
+    functionalCocoms: Dict[str, bool] = Field(default_factory=dict, description="Activation status map for Functional COCOMs (e.g., {'CYBERCOM': True})")
 
 class WargameBuild(BaseModel):
     id: str
