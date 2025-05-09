@@ -409,7 +409,17 @@ const RecordingControlPanel = () => {
             // Dispatch action to update transcription in context
             // Assuming TranscriptionContext handles appending/updating segments
             if (data.segments && Array.isArray(data.segments)) {
+               // Enhanced logging to debug transcription updates
+               console.log('[WebSocket] Received transcription segments:', 
+                 data.segments.length, 
+                 'segments. First segment:', 
+                 data.segments[0], 
+                 'Last segment:', 
+                 data.segments[data.segments.length - 1]
+               );
+               
                dispatch({ type: ACTIONS.APPEND_TRANSCRIPTION_SEGMENTS, payload: data.segments });
+               console.log('[WebSocket] Dispatched APPEND_TRANSCRIPTION_SEGMENTS action');
             } else {
                 console.warn('[WebSocket] Received transcription_update without valid segments array:', data);
             }

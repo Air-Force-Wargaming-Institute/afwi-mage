@@ -142,6 +142,15 @@ const TranscriptionDisplay = () => {
     }
   }, [transcriptionText]);
   
+  // Debug useEffect to log transcription text changes
+  useEffect(() => {
+    console.log('[TranscriptionDisplay] transcriptionText updated:', 
+      transcriptionText ? 
+      `${transcriptionText.length} chars, starts with: "${transcriptionText.substring(0, 50)}${transcriptionText.length > 50 ? '...' : ''}"` : 
+      'empty'
+    );
+  }, [transcriptionText]);
+  
   // Helper function for retry
   const handleRetryConnection = () => {
     if (loadedSessionId && error) {

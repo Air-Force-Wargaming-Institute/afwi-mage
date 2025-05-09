@@ -18,6 +18,7 @@ export const ACTIONS = {
   REMOVE_MARKER: 'REMOVE_MARKER',
   ADD_CUSTOM_MARKER_TYPE: 'ADD_CUSTOM_MARKER_TYPE',
   RESET_STATE: 'RESET_STATE',
+  APPEND_TRANSCRIPTION_SEGMENTS: 'APPEND_TRANSCRIPTION_SEGMENTS',
   // New actions for session browsing
   SET_PREVIOUS_SESSIONS: 'SET_PREVIOUS_SESSIONS',
   SET_LOADED_SESSION_ID: 'SET_LOADED_SESSION_ID',
@@ -148,6 +149,36 @@ const transcriptionReducer = (state, action) => {
         ...state,
         availableMarkerTypes: [...state.availableMarkerTypes, newCustomMarkerType]
       };
+    case ACTIONS.APPEND_TRANSCRIPTION_SEGMENTS: 
+      // Process the segments array and update transcriptionText
+      console.log('[TranscriptionContext] Processing segments update:', action.payload);
+      
+      if (!action.payload || !Array.isArray(action.payload) || action.payload.length === 0) {
+        console.warn('[TranscriptionContext] Received empty or invalid segments array');
+        return state;
+      }
+      
+      // Sort segments by start time to ensure correct order
+      const sortedSegments = [...action.payload].sort((a, b) => (a.start || 0) - (b.start || 0));
+      
+      // Create the full transcript text by concatenating all segment texts
+      let fullText = '';
+      sortedSegments.forEach(segment => {
+        if (segment.text) {
+          // Add speaker label if available
+          const speakerLabel = segment.speaker && segment.speaker !== 'UNKNOWN' 
+            ? `${segment.speaker}: ` 
+            : '';
+          
+          // Append the segment text with speaker label and a newline
+          fullText += `${speakerLabel}${segment.text.trim()}\n`;
+        }
+      });
+      
+      console.log('[TranscriptionContext] Generated transcript text:', fullText);
+      
+      // Return updated state with the new transcription text
+      return { ...state, transcriptionText: fullText };
     case ACTIONS.RESET_STATE:
       // Preserve custom marker types but reset everything else
       const preservedMarkerTypes = state.availableMarkerTypes;
