@@ -438,6 +438,7 @@ services:
       - PORT=8019
       - PYTHONUNBUFFERED=1
       - EMBEDDING_SERVICE_URL=http://embedding:8006
+      - MAGE_LLM_SERVICE_URL=http://generation:8003
 
   # report_service:
   #   build:

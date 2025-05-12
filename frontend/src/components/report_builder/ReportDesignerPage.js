@@ -414,23 +414,107 @@ function ReportDesignerPage() {
   };
 
   const handleExportFormat = async (format) => {
-    const reportText = getReportText();
-    const reportTitle = currentDefinition.title || 'report';
-    let fileContent, fileType, fileExtension;
-    
-    switch (format) {
-      case 'txt':
-        fileContent = reportText;
-        fileType = 'text/plain';
-        fileExtension = 'txt';
-        break;
-      case 'md':
-        fileContent = reportText;
-        fileType = 'text/markdown';
-        fileExtension = 'md';
-        break;
-      case 'html':
-        fileContent = `<!DOCTYPE html>
+    try {
+      // Special case for Word export - use backend endpoint
+      if (format === 'docx') {
+        setSnackbar({
+          open: true,
+          message: 'Preparing Word document, please wait...',
+          severity: 'info'
+        });
+        
+        // Call the backend Word export endpoint
+        const response = await axios.get(
+          getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/export/word`),
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            },
+            responseType: 'blob'  // Important: we want a binary response
+          }
+        );
+        
+        // Create a blob from the response
+        const blob = new Blob([response.data], { 
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+        });
+        
+        // Get filename suggestion
+        const contentDisposition = response.headers['content-disposition'];
+        const suggestedName = contentDisposition
+          ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+          : `${currentDefinition.title.replace(/\s+/g, '_')}.docx`;
+        
+        // Check if the File System Access API is available
+        if ('showSaveFilePicker' in window) {
+          // Use the File System Access API
+          const options = {
+            suggestedName,
+            types: [{
+              description: 'Word Document',
+              accept: {
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+              }
+            }]
+          };
+          
+          // Show the file picker
+          const fileHandle = await window.showSaveFilePicker(options);
+          
+          // Get a writable stream
+          const writable = await fileHandle.createWritable();
+          
+          // Write the blob to the file
+          await writable.write(blob);
+          
+          // Close the stream
+          await writable.close();
+          
+          setSnackbar({
+            open: true,
+            message: 'Report exported as DOCX successfully',
+            severity: 'success'
+          });
+        } else {
+          // Fallback to the old method for browsers that don't support the File System Access API
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = suggestedName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          setSnackbar({
+            open: true,
+            message: 'Report exported as DOCX (saved to downloads folder)',
+            severity: 'success'
+          });
+        }
+        
+        handleExportMenuClose();
+        return;
+      }
+      
+      const reportText = getReportText();
+      const reportTitle = currentDefinition.title || 'report';
+      let fileContent, fileType, fileExtension;
+      
+      switch (format) {
+        case 'txt':
+          fileContent = reportText;
+          fileType = 'text/plain';
+          fileExtension = 'txt';
+          break;
+        case 'md':
+          fileContent = reportText;
+          fileType = 'text/markdown';
+          fileExtension = 'md';
+          break;
+        case 'html':
+          fileContent = `<!DOCTYPE html>
 <html>
 <head>
   <title>${reportTitle}</title>
@@ -452,27 +536,26 @@ function ReportDesignerPage() {
   }).join('\n')}
 </body>
 </html>`;
-        fileType = 'text/html';
-        fileExtension = 'html';
-        break;
-      case 'json':
-        fileContent = JSON.stringify(currentDefinition, null, 2);
-        fileType = 'application/json';
-        fileExtension = 'json';
-        break;
-      default:
-        fileContent = reportText;
-        fileType = 'text/plain';
-        fileExtension = 'txt';
-    }
-    
-    // Create a blob for our content
-    const blob = new Blob([fileContent], { type: fileType });
-    
-    // Suggested file name
-    const suggestedName = `${reportTitle.replace(/\s+/g, '_')}.${fileExtension}`;
-    
-    try {
+          fileType = 'text/html';
+          fileExtension = 'html';
+          break;
+        case 'json':
+          fileContent = JSON.stringify(currentDefinition, null, 2);
+          fileType = 'application/json';
+          fileExtension = 'json';
+          break;
+        default:
+          fileContent = reportText;
+          fileType = 'text/plain';
+          fileExtension = 'txt';
+      }
+      
+      // Create a blob for our content
+      const blob = new Blob([fileContent], { type: fileType });
+      
+      // Suggested file name
+      const suggestedName = `${reportTitle.replace(/\s+/g, '_')}.${fileExtension}`;
+      
       // Check if the File System Access API is available
       if ('showSaveFilePicker' in window) {
         // Use the File System Access API
@@ -583,6 +666,7 @@ function ReportDesignerPage() {
               <MenuItem onClick={() => handleExportFormat('md')}>Markdown (.md)</MenuItem>
               <MenuItem onClick={() => handleExportFormat('html')}>HTML (.html)</MenuItem>
               <MenuItem onClick={() => handleExportFormat('json')}>JSON (.json)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('docx')}>Word (.docx)</MenuItem>
             </Menu>
             <IconButton edge="end" onClick={handleClose}>
               <CloseIcon />

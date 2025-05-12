@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Literal, Union
+from typing import List, Optional, Dict, Any, Literal, Union, BinaryIO
 import uuid
 import json
 from pathlib import Path
@@ -10,7 +10,10 @@ import os
 import shutil
 import logging
 from datetime import datetime
+import tempfile
+import subprocess
 from init_templates import init_templates
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -703,5 +706,202 @@ async def general_exception_handler(request, exc):
 @app.get("")
 async def root():
     return {"message": "Report Builder Service is running"}
+
+# New model for Word export options
+class WordExportOptions(BaseModel):
+    force_regenerate: bool = False
+    include_title_page: bool = True
+    
+@app.get("/api/report_builder/reports/{report_id}/export/word")
+async def export_report_to_word(report_id: str, options: WordExportOptions = None):
+    """
+    Export a report to Microsoft Word (.docx) format
+    
+    Args:
+        report_id: The ID of the report to export
+        options: Optional export options
+        
+    Returns:
+        FileResponse: The generated Word document as a downloadable file
+        
+    Raises:
+        HTTPException: If report not found or export fails
+    """
+    now = datetime.utcnow().isoformat() + "Z"  # For error timestamps
+    
+    # Use default options if none provided
+    if options is None:
+        options = WordExportOptions()
+    
+    try:
+        # Step 1: Load the report definition
+        report_path = REPORTS_DIR / f"{report_id}.json"
+        report = load_report_from_file(report_path)
+        
+        if not report:
+            logger.warning(f"Report with ID {report_id} not found")
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.REPORT_NOT_FOUND,
+                    message=f"Report with ID {report_id} not found"
+                ),
+                timestamp=now
+            )
+        
+        markdown_content = None
+        
+        # Step 2: Generate the report if needed or forced
+        if options.force_regenerate:
+            logger.info(f"Forced regeneration of report {report_id} for Word export")
+            # Call the existing generate_report function to get fresh content
+            generation_result = await generate_report(report_id)
+            
+            # Check if we got an error response
+            if hasattr(generation_result, 'error') and generation_result.error:
+                return generation_result  # Return the error response
+            
+            markdown_content = generation_result.markdown_content
+        else:
+            # Try to find the existing generated report content
+            # First check if we already have a cached/stored version of the generated report
+            report_content_path = REPORTS_DIR / f"{report_id}_generated.md"
+            
+            if report_content_path.exists():
+                logger.info(f"Using existing generated content for report {report_id}")
+                with open(report_content_path, "r", encoding="utf-8") as f:
+                    markdown_content = f.read()
+            else:
+                # No existing content, generate it
+                logger.info(f"No existing content found, generating report {report_id} for Word export")
+                generation_result = await generate_report(report_id)
+                
+                # Check if we got an error response
+                if hasattr(generation_result, 'error') and generation_result.error:
+                    return generation_result  # Return the error response
+                
+                markdown_content = generation_result.markdown_content
+                
+                # Save the generated content for future use
+                with open(report_content_path, "w", encoding="utf-8") as f:
+                    f.write(markdown_content)
+        
+        # Step 3: Convert the markdown to DOCX using pandoc
+        try:
+            # Import pypandoc here to handle import errors gracefully
+            import pypandoc
+        except ImportError:
+            logger.error("pypandoc is not installed. Please install it to use Word export functionality.")
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.UNKNOWN_ERROR,
+                    message="Word export is currently unavailable. The server is missing required dependencies."
+                ),
+                timestamp=now
+            )
+            
+        try:
+            # Create a persistent temporary directory that won't be auto-deleted
+            # NOTE: We don't use a context manager here to prevent premature deletion
+            temp_dir = tempfile.mkdtemp()
+            
+            # Create temp file paths
+            temp_md_path = Path(temp_dir) / f"{report_id}.md"
+            temp_docx_path = Path(temp_dir) / f"{report_id}.docx"
+            
+            # Write markdown to temp file
+            with open(temp_md_path, "w", encoding="utf-8") as f:
+                f.write(markdown_content)
+            
+            # Use pypandoc to convert from markdown to docx
+            # Setup additional options for pandoc
+            pandoc_args = []
+            
+            # Add a title page if requested
+            if options.include_title_page:
+                # Extract report details for title page
+                pandoc_args.extend([
+                    "--metadata", f"title={report.name}",
+                ])
+                
+                if report.description:
+                    pandoc_args.extend([
+                        "--metadata", f"subtitle={report.description}",
+                    ])
+                
+                # Add current date to title page
+                today = datetime.now().strftime("%B %d, %Y")
+                pandoc_args.extend([
+                    "--metadata", f"date={today}",
+                ])
+            
+            # Convert the markdown to docx
+            logger.info(f"Converting report {report_id} to DOCX using pypandoc")
+            pypandoc.convert_file(
+                str(temp_md_path),
+                "docx",
+                outputfile=str(temp_docx_path),
+                extra_args=pandoc_args
+            )
+            
+            # Check if the conversion was successful
+            if not temp_docx_path.exists():
+                raise Exception("Word document generation failed")
+            
+            # Step 4: Return the file as a downloadable response
+            safe_filename = f"{report.name.replace(' ', '_')}.docx"
+            
+            logger.info(f"Successfully exported report {report_id} to Word document")
+            
+            # Create the response
+            response = FileResponse(
+                path=str(temp_docx_path),
+                filename=safe_filename,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            
+            # Schedule cleanup function to run in background after response is sent
+            # Wait a few seconds before cleaning up to ensure the file is fully served
+            async def delayed_cleanup():
+                await asyncio.sleep(10)  # Wait 10 seconds before cleanup
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    logger.info(f"Cleaned up temporary directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary directory: {temp_dir}, error: {str(e)}")
+                    
+            # Replace the original cleanup task with our delayed version
+            asyncio.create_task(delayed_cleanup())
+            
+            return response
+                
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Pandoc conversion error: {str(e)}", exc_info=True)
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.UNKNOWN_ERROR,
+                    message=f"Word document conversion failed: {str(e)}"
+                ),
+                timestamp=now
+            )
+        except Exception as e:
+            logger.error(f"Error in Word export conversion: {str(e)}", exc_info=True)
+            return ErrorResponse(
+                detail=ErrorDetail(
+                    code=ErrorCodes.UNKNOWN_ERROR,
+                    message=f"Word document generation failed: {str(e)}"
+                ),
+                timestamp=now
+            )
+            
+    except Exception as e:
+        logger.error(f"Unexpected error exporting report {report_id} to Word: {str(e)}", exc_info=True)
+        return ErrorResponse(
+            detail=ErrorDetail(
+                code=ErrorCodes.UNKNOWN_ERROR,
+                message=f"An unexpected error occurred during Word export: {str(e)}"
+            ),
+            timestamp=now
+        )
 
 # Add other report builder related endpoints here 
