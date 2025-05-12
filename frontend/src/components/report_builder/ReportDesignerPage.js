@@ -131,110 +131,233 @@ function ReportDesignerPage() {
   const [currentDefinition, setCurrentDefinition] = useState(getDefaultReport());
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [isNewTemplate, setIsNewTemplate] = useState(false);
+  const [isNewReport, setIsNewReport] = useState(false);
 
   useEffect(() => {
-    if (reportId && token) {
+    if (token) {
       setIsLoading(true);
       setError(null);
       
-      // Check if we're editing a template
+      // Check URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const isTemplate = urlParams.get('isTemplate') === 'true';
+      const fromTemplate = urlParams.get('fromTemplate') === 'true';
       
-      console.log('Template mode:', isTemplate); // Debug logging
+      console.log('Template mode:', isTemplate);
+      console.log('From template mode:', fromTemplate);
       
-      // Determine the API endpoint based on whether we're editing a template or report
-      const endpoint = isTemplate 
-        ? getGatewayUrl(`/api/report_builder/templates/${reportId}`)
-        : getGatewayUrl(`/api/report_builder/reports/${reportId}`);
-      
-      // Fetch the report or template from the API
-      axios.get(endpoint, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      })
-      .then(response => {
-        const data = response.data;
-        
-        // Transform the API response to the format expected by ReportConfigPanel
-        if (data) {
-          // Extract elements from the report/template content
-          const elements = data.content?.elements || [];
-          
-          // Transform elements to add required properties and IDs
-          const transformedElements = elements.map((element, index) => {
-            const baseElementWithId = {
-              ...element,
-              id: element.id || `element-${reportId}-${index}-${Date.now()}`,
-              // Ensure format is set
-              format: element.format || 'paragraph'
-            };
-            
-            // Handle nested elements like sections if they exist
-            if (element.type === 'section' && element.elements) { 
-              const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
-                ...subElement,
-                id: subElement.id || `subElement-${reportId}-${index}-${subIndex}-${Date.now()}`,
-                format: subElement.format || 'paragraph'
-              }));
-              return { ...baseElementWithId, elements: subElementsWithIds };
-            }
-            
-            return baseElementWithId;
-          });
-
-          // Set the definition with proper mapping of API data
-          setCurrentDefinition({
-            id: data.id,
-            title: isTemplate ? data.name : data.name,
-            description: data.description,
-            elements: transformedElements,
-            vectorStoreId: data.vectorStoreId || '',
-            status: data.status || 'draft',
-            isTemplate: isTemplate
-          });
-        } else {
-          setCurrentDefinition(prevDef => ({
-            ...getDefaultReport(),
-            id: reportId,
-            isTemplate: isTemplate
-          }));
-        }
-      })
-      .catch(err => {
-        console.error(`Error fetching ${isTemplate ? 'template' : 'report'}:`, err);
-        setError(err.response?.data?.detail || `Failed to load ${isTemplate ? 'template' : 'report'}`);
-        
-        // Create a new template/report if API call fails
-        if (isTemplate) {
-          // For new templates, initialize with empty content
-          setCurrentDefinition({
-            id: reportId,
-            title: 'New Template',
-            description: '',
-            elements: [],
-            isTemplate: true
-          });
-        } else {
-          // Fallback to default report if API call fails
-          setCurrentDefinition(prevDef => ({
-            ...getDefaultReport(),
-            id: reportId,
-            isTemplate: isTemplate
-          }));
-        }
-      })
-      .finally(() => {
+      // If there's no reportId but isTemplate is true, we're creating a new template
+      if (!reportId && isTemplate) {
+        console.log('Creating new template - no reportId');
+        setIsNewTemplate(true);
+        setCurrentDefinition({
+          id: null,
+          title: 'New Template',
+          description: '',
+          elements: [],
+          isTemplate: true
+        });
+        setHasUnsavedChanges(true);
         setIsLoading(false);
-      });
+        return;
+      }
+      
+      // If there's no reportId but not a template, we're creating a new report
+      if (!reportId && !isTemplate) {
+        console.log('Creating new report - no reportId');
+        setIsNewReport(true);
+        
+        // Check if this is a template-based report
+        if (fromTemplate) {
+          console.log('Creating from template');
+          try {
+            // Get the template from session storage
+            const templateData = JSON.parse(sessionStorage.getItem('selectedTemplate'));
+            
+            if (templateData) {
+              // Extract elements from the template content
+              const elements = templateData.content?.elements || [];
+              
+              // Transform elements to add required properties and IDs
+              const transformedElements = elements.map((element, index) => {
+                const baseElementWithId = {
+                  ...element,
+                  id: element.id || `element-new-${index}-${Date.now()}`,
+                  // Ensure format is set
+                  format: element.format || 'paragraph'
+                };
+                
+                // Handle nested elements like sections if they exist
+                if (element.type === 'section' && element.elements) { 
+                  const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
+                    ...subElement,
+                    id: subElement.id || `subElement-new-${index}-${subIndex}-${Date.now()}`,
+                    format: subElement.format || 'paragraph'
+                  }));
+                  return { ...baseElementWithId, elements: subElementsWithIds };
+                }
+                
+                return baseElementWithId;
+              });
+              
+              // Create a new report definition based on the template
+              setCurrentDefinition({
+                id: null,
+                title: `New from: ${templateData.name}`,
+                description: templateData.description || '',
+                elements: transformedElements,
+                templateId: templateData.id,
+                type: 'Template-based',
+                isTemplate: false
+              });
+              
+              console.log('Set template-based report definition');
+            }
+          } catch (e) {
+            console.error("Error loading template from session storage:", e);
+            // Fall back to empty report if template loading fails
+            setCurrentDefinition({
+              ...getDefaultReport(),
+              title: 'New Custom Report'
+            });
+          }
+        } else {
+          // Just a standard custom report
+          setCurrentDefinition({
+            ...getDefaultReport(),
+            title: 'New Custom Report'
+          });
+        }
+        
+        setHasUnsavedChanges(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If we have a reportId, fetch the existing report or template
+      if (reportId) {
+        // Determine the API endpoint based on whether we're editing a template or report
+        const endpoint = isTemplate 
+          ? getGatewayUrl(`/api/report_builder/templates/${reportId}`)
+          : getGatewayUrl(`/api/report_builder/reports/${reportId}`);
+        
+        // Fetch the report or template from the API
+        axios.get(endpoint, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+        .then(response => {
+          const data = response.data;
+          
+          // Transform the API response to the format expected by ReportConfigPanel
+          if (data) {
+            // Extract elements from the report/template content
+            const elements = data.content?.elements || [];
+            
+            // Transform elements to add required properties and IDs
+            const transformedElements = elements.map((element, index) => {
+              const baseElementWithId = {
+                ...element,
+                id: element.id || `element-${reportId}-${index}-${Date.now()}`,
+                // Ensure format is set
+                format: element.format || 'paragraph'
+              };
+              
+              // Handle nested elements like sections if they exist
+              if (element.type === 'section' && element.elements) { 
+                const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
+                  ...subElement,
+                  id: subElement.id || `subElement-${reportId}-${index}-${subIndex}-${Date.now()}`,
+                  format: subElement.format || 'paragraph'
+                }));
+                return { ...baseElementWithId, elements: subElementsWithIds };
+              }
+              
+              return baseElementWithId;
+            });
+
+            // Set the definition with proper mapping of API data
+            setCurrentDefinition({
+              id: data.id,
+              title: isTemplate ? data.name : data.name,
+              description: data.description,
+              elements: transformedElements,
+              vectorStoreId: data.vectorStoreId || '',
+              status: data.status || 'draft',
+              isTemplate: isTemplate
+            });
+            
+            // Reset unsaved changes flag after initial load
+            setHasUnsavedChanges(false);
+          } else {
+            setCurrentDefinition(prevDef => ({
+              ...getDefaultReport(),
+              id: reportId,
+              isTemplate: isTemplate
+            }));
+            
+            // Reset unsaved changes flag for new report/template
+            setHasUnsavedChanges(false);
+          }
+        })
+        .catch(err => {
+          console.error(`Error fetching ${isTemplate ? 'template' : 'report'}:`, err);
+          setError(err.response?.data?.detail || `Failed to load ${isTemplate ? 'template' : 'report'}`);
+          
+          // Create a new template/report if API call fails
+          if (isTemplate) {
+            // For new templates, initialize with empty content
+            setCurrentDefinition({
+              id: reportId,
+              title: 'New Template',
+              description: '',
+              elements: [],
+              isTemplate: true
+            });
+          } else {
+            // Fallback to default report if API call fails
+            setCurrentDefinition(prevDef => ({
+              ...getDefaultReport(),
+              id: reportId,
+              isTemplate: isTemplate
+            }));
+          }
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [reportId, token]);
+
+  // Add beforeunload event listener to warn users about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        // Standard way to show a confirmation dialog when closing/refreshing the page
+        const message = 'You have unsaved changes. Are you sure you want to leave?';
+        e.returnValue = message; // For older browsers
+        return message; // For modern browsers
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   const handleDefinitionChange = (newDefinition) => {
     // Ensure the isTemplate flag is preserved
@@ -245,10 +368,13 @@ function ReportDesignerPage() {
       ...newDefinition,
       isTemplate: isTemplate || newDefinition.isTemplate
     });
+    
+    // Set flag for unsaved changes
+    setHasUnsavedChanges(true);
   };
 
   const handleSave = async () => {
-    if (!currentDefinition || !token) return;
+    if (!token) return;
     
     setIsSaving(true);
     setError(null);
@@ -259,7 +385,6 @@ function ReportDesignerPage() {
       
       // Transform the definition back to the format expected by the API
       const apiData = {
-        id: currentDefinition.id,
         name: currentDefinition.title,
         description: currentDefinition.description,
         // Include template-specific fields
@@ -268,7 +393,8 @@ function ReportDesignerPage() {
         ...(!isTemplate && {
           vectorStoreId: currentDefinition.vectorStoreId || null,
           status: currentDefinition.status || 'draft',
-          type: 'Custom'
+          type: currentDefinition.type || 'Custom',
+          ...(currentDefinition.templateId && { templateId: currentDefinition.templateId })
         }),
         // Transform elements to API format
         content: {
@@ -276,24 +402,111 @@ function ReportDesignerPage() {
         }
       };
 
-      // Determine endpoint based on whether we're saving a template or report
-      const endpoint = isTemplate
-        ? getGatewayUrl(`/api/report_builder/templates/${reportId}`)
-        : getGatewayUrl(`/api/report_builder/reports/${reportId}`);
+      let response;
       
-      // Save using the API
-      const response = await axios.put(
-        endpoint, 
-        apiData,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+      // If it's a new template (no id), create it
+      if (isNewTemplate && isTemplate) {
+        // Create a new template
+        response = await axios.post(
+          getGatewayUrl('/api/report_builder/templates'),
+          apiData,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+        
+        // Update the definition with the new ID
+        setCurrentDefinition(prev => ({
+          ...prev,
+          id: response.data.id
+        }));
+        
+        // No longer a new template
+        setIsNewTemplate(false);
+        
+        // Update the URL to include the new ID
+        window.history.replaceState(
+          null, 
+          '', 
+          `/report-designer/${response.data.id}?isTemplate=true`
+        );
+        
+        console.log('New template created:', response.data);
+      } 
+      // If it's a new report (no id), create it
+      else if (isNewReport && !isTemplate) {
+        // Create a new report
+        response = await axios.post(
+          getGatewayUrl('/api/report_builder/reports'),
+          apiData,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        // Update the definition with the new ID
+        setCurrentDefinition(prev => ({
+          ...prev,
+          id: response.data.id
+        }));
+        
+        // No longer a new report
+        setIsNewReport(false);
+        
+        // Update the URL to include the new ID
+        const fromTemplateParam = currentDefinition.templateId ? `&templateKey=${currentDefinition.templateId}` : '';
+        window.history.replaceState(
+          null, 
+          '', 
+          `/report-designer/${response.data.id}${fromTemplateParam}`
+        );
+        
+        console.log('New report created:', response.data);
+      }
+      else {
+        // Determine endpoint based on whether we're saving a template or report
+        const endpoint = isTemplate
+          ? getGatewayUrl(`/api/report_builder/templates/${currentDefinition.id}`)
+          : getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}`);
+        
+        // Update existing template/report
+        response = await axios.put(
+          endpoint, 
+          apiData,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
       
       console.log(`${isTemplate ? 'Template' : 'Report'} saved successfully:`, response.data);
+      
+      // Reset the unsaved changes flag after successful save
+      setHasUnsavedChanges(false);
+      
+      // Notify the parent window (opener) that a save occurred
+      if (window.opener && !window.opener.closed) {
+        try {
+          // Tell the parent window to refresh its data
+          window.opener.postMessage({ 
+            type: 'REPORT_BUILDER_SAVE', 
+            itemType: isTemplate ? 'template' : 'report',
+            itemId: response.data.id
+          }, window.location.origin);
+          console.log('Notified parent window of save');
+        } catch (e) {
+          console.error('Failed to notify parent window:', e);
+        }
+      }
       
       setSnackbar({
         open: true,
@@ -315,6 +528,14 @@ function ReportDesignerPage() {
   };
 
   const handleClose = () => {
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmLeave = window.confirm('You have unsaved changes. Are you sure you want to leave?');
+      if (!confirmLeave) {
+        return; // Stay on the page if user cancels
+      }
+    }
+    
     // Redirect to reports by default or handle according to what's being edited
     if (currentDefinition.isTemplate) {
       window.close(); // Close the window since it was opened in a new window
@@ -333,84 +554,6 @@ function ReportDesignerPage() {
 
   const handleExportMenuClose = () => {
     setExportMenuAnchor(null);
-  };
-
-  const handleSaveAsTemplate = async () => {
-    // Prompt for template information
-    const templateName = window.prompt("Enter template name:", currentDefinition.title || "New Template");
-    if (!templateName) {
-      handleExportMenuClose();
-      return; // User cancelled
-    }
-
-    const templateDescription = window.prompt("Enter template description (optional):", currentDefinition.description || "");
-    
-    setIsSaving(true);
-    setError(null);
-    
-    try {
-      // Transform the current report definition to a template
-      const templateData = {
-        name: templateName,
-        description: templateDescription || "",
-        category: "Custom",
-        content: {
-          elements: currentDefinition.elements || []
-        }
-      };
-      
-      // Send to the backend
-      const response = await axios.post(
-        getGatewayUrl('/api/report_builder/templates'), 
-        templateData,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      console.log('Template created successfully:', response.data);
-      
-      setSnackbar({
-        open: true,
-        message: 'Report saved as template successfully',
-        severity: 'success'
-      });
-    } catch (error) {
-      console.error("Failed to save as template:", error);
-      
-      setSnackbar({
-        open: true,
-        message: `Failed to save as template: ${error.response?.data?.detail || error.message}`,
-        severity: 'error'
-      });
-    } finally {
-      setIsSaving(false);
-      handleExportMenuClose();
-    }
-  };
-
-  const getReportText = () => {
-    if (!currentDefinition || !currentDefinition.elements) return '';
-    
-    return currentDefinition.elements.map(element => {
-      if (element.type === 'explicit') {
-        let content = element.content || '';
-        if (element.format && element.format.startsWith('h')) {
-          const level = parseInt(element.format.substring(1), 10) || 1;
-          const prefix = '#'.repeat(level) + ' ';
-          return prefix + content;
-        } else if (element.format === 'bulletList') {
-          return content.split('\n').map(line => `- ${line}`).join('\n');
-        } else if (element.format === 'numberedList') {
-          return content.split('\n').map((line, i) => `${i+1}. ${line}`).join('\n');
-        }
-        return content;
-      }
-      return '';
-    }).filter(Boolean).join('\n\n');
   };
 
   const handleExportFormat = async (format) => {
@@ -615,6 +758,84 @@ function ReportDesignerPage() {
     handleExportMenuClose();
   };
 
+  const handleSaveAsTemplate = async () => {
+    // Prompt for template information
+    const templateName = window.prompt("Enter template name:", currentDefinition.title || "New Template");
+    if (!templateName) {
+      handleExportMenuClose();
+      return; // User cancelled
+    }
+
+    const templateDescription = window.prompt("Enter template description (optional):", currentDefinition.description || "");
+    
+    setIsSaving(true);
+    setError(null);
+    
+    try {
+      // Transform the current report definition to a template
+      const templateData = {
+        name: templateName,
+        description: templateDescription || "",
+        category: "Custom",
+        content: {
+          elements: currentDefinition.elements || []
+        }
+      };
+      
+      // Send to the backend
+      const response = await axios.post(
+        getGatewayUrl('/api/report_builder/templates'), 
+        templateData,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Template created successfully:', response.data);
+      
+      setSnackbar({
+        open: true,
+        message: 'Report saved as template successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error("Failed to save as template:", error);
+      
+      setSnackbar({
+        open: true,
+        message: `Failed to save as template: ${error.response?.data?.detail || error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsSaving(false);
+      handleExportMenuClose();
+    }
+  };
+
+  const getReportText = () => {
+    if (!currentDefinition || !currentDefinition.elements) return '';
+    
+    return currentDefinition.elements.map(element => {
+      if (element.type === 'explicit') {
+        let content = element.content || '';
+        if (element.format && element.format.startsWith('h')) {
+          const level = parseInt(element.format.substring(1), 10) || 1;
+          const prefix = '#'.repeat(level) + ' ';
+          return prefix + content;
+        } else if (element.format === 'bulletList') {
+          return content.split('\n').map(line => `- ${line}`).join('\n');
+        } else if (element.format === 'numberedList') {
+          return content.split('\n').map((line, i) => `${i+1}. ${line}`).join('\n');
+        }
+        return content;
+      }
+      return '';
+    }).filter(Boolean).join('\n\n');
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
@@ -631,6 +852,7 @@ function ReportDesignerPage() {
             {currentDefinition.isTemplate 
               ? `Template: ${currentDefinition.title || 'New Template'}`
               : `Report: ${currentDefinition.title || 'New Report'}`}
+            {hasUnsavedChanges && ' *'}
           </Typography>
           <Box>
             <Button
@@ -699,4 +921,4 @@ function ReportDesignerPage() {
   );
 }
 
-export default ReportDesignerPage; 
+export default ReportDesignerPage;
