@@ -77,7 +77,7 @@ This plan focuses on the backend development for the Report Builder feature, bui
     *   [X] Task: Decide on a storage mechanism for templates (e.g., predefined JSON files within the service, or a database table).
     *   [X] Task: Create `GET /api/report_builder/templates` endpoint to list available templates (name, description, ID).
     *   [X] Task: Create `GET /api/report_builder/templates/{template_id}` endpoint to retrieve a specific template's full structure.
-    *   [ ] Task: (Frontend will need to adapt `ReportBuilderMain.js` to fetch these instead of using `reportTemplates.js` directly).
+    *   [X] Task: (Frontend will need to adapt `ReportBuilderMain.js` to fetch these instead of using `reportTemplates.js` directly).
 *   **As a Backend Developer, I want to implement an API endpoint to convert the generated Markdown report into a Microsoft Word document.**
     *   [X] Task: Research and choose a suitable library for Markdown to Word conversion (e.g., Pandoc, python-docx).
     *   [X] Task: Create `GET /api/report_builder/reports/{report_id}/export/word` endpoint.

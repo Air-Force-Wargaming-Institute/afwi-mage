@@ -1,0 +1,153 @@
+# Report Builder - LLM Integration Plan
+
+## 1. Goal
+
+This document outlines the plan for integrating MAGE's Large Language Model (LLM) capabilities into the Report Builder feature. The primary focus is on defining how the LLM will be tasked to generate content for specific report sections ("Generative Sections"), leveraging patterns and mechanisms similar to those used in the MAGE Direct Chat feature. This plan builds upon the foundation laid out in `report-builder-backend-plan.md`, particularly Phase 3.
+
+## 2. Core Concept: LLM-Powered Section Generation
+
+The Report Builder allows users to define reports composed of different sections (`ReportElement`). Sections can be of type "Explicit" (user-defined static content) or "Generative". For "Generative" sections, the user provides instructions, and the system leverages an LLM, contextual information from a linked vector store, and the preceding report content to generate the section's Markdown content.
+
+## 3. Parallels with Direct Chat Tasking
+
+The LLM tasking process in the Report Builder aims to mirror the interaction model of the `DirectChat` component for consistency and leveraging existing MAGE infrastructure where applicable:
+
+| Feature Element       | Report Builder (`report_builder_service`)                  | Direct Chat (`direct_chat_service`)                      | Analogy                                    |
+| :-------------------- | :--------------------------------------------------------- | :------------------------------------------------------- | :----------------------------------------- |
+| **User Directive**    | `ReportElement.instructions` for a "Generative" section    | User's text message input                              | The core request/task for the LLM.         |
+| **External Knowledge** | Data retrieved from the linked `Report.vectorStoreId`      | Data retrieved from selected Knowledge Sources (vector stores) | Providing domain-specific context.         |
+| **Session Context**   | Content of previously generated sections in the *current* report | History of the current chat conversation                 | Maintaining coherence and flow.            |
+| **Orchestrator**      | `report_builder_service`                                   | `direct_chat_service`                                    | Service responsible for preparing the call. |
+| **LLM Interaction**   | Call to MAGE `Generation Service` (or similar endpoint)    | Call to LLM backend (e.g., `vllm_chat.py` endpoint)      | Executing the LLM generation task.       |
+| **System Guidance**   | Pre-defined system prompts specific to report section generation | System prompts defining the chatbot's persona/role       | Setting overall behavior for the LLM.    |
+
+## 4. Phased Implementation Plan
+
+### Phase 1: Foundational LLM Connection
+
+**Goal:** Establish the basic communication pathway between `report_builder_service` and the `Generation Service` for a single generative section, without complex context, and ensure generated content is saved.
+
+**User Stories & Tasks:**
+
+*   **As a Backend Developer, I want `report_builder_service` to identify a "Generative" section and prepare a basic prompt containing system instructions and user instructions.**
+    *   [x] Task: Implement logic in the `/generate` endpoint to iterate through sections.
+    *   [x] Task: Define standard system instructions for report section generation.
+*   **As a Backend Developer, I want `report_builder_service` to successfully call a designated MAGE `Generation Service` endpoint with the basic prompt.**
+    *   [x] Task: Finalize the choice of the target MAGE service/endpoint for generation (Confirm if a generic `Generation Service` exists or if `direct_chat_service`/`vllm_chat.py` needs adaptation/direct use).
+    *   [x] Task: Define the *initial* basic API contract (endpoint, method, minimal request/response) between `report_builder_service` and the chosen Generation Service.
+    *   [x] Task: Implement the API call from `report_builder_service`.
+*   **As a Backend Developer, I want `report_builder_service` to receive the LLM's response from the `Generation Service` and integrate it into the report structure.**
+    *   [ ] Task: Implement logic to place the received `generated_text` into the corresponding `ReportElement.content`.
+    *   [x] Task: Implement the assembly of the final report Markdown from all sections (mixing explicit and basic generated content).
+*   **As a Backend Developer, I want to ensure that the generated content for "Generative" sections is saved persistently (in `reports_data.json`) along with the report definition so that users can view and edit previously generated reports.**
+    *   [ ] Task: Verify/Update Pydantic models (`ReportElement`, `Report`) to confirm `content` is persisted for all section types.
+    *   [ ] Task: Verify/Update `save_reports_to_file` and `load_reports_from_file` logic to correctly handle storing and retrieving generated `content` for "Generative" sections.
+
+### Phase 2: Context-Aware Generation
+
+**Goal:** Enhance the generation process by incorporating context from both the linked vector store and preceding report sections.
+
+**User Stories & Tasks:**
+
+*   **As a Backend Developer, I want the `Generation Service` (or its delegate like `embedding_service`) to retrieve relevant context from the specified `vectorStoreId` based on the user instructions.**
+    *   [ ] Task: Update the API contract to include `vector_store_id`.
+    *   [ ] Task: Implement the context retrieval logic within the Generation Service (or coordinate with `embedding_service`), using `vectorStoreId` and `user_instructions` to perform similarity search.
+*   **As a Backend Developer, I want the `Generation Service` to incorporate the retrieved vector store context into the final prompt sent to the LLM.**
+    *   [ ] Task: Implement prompt assembly logic within the Generation Service to combine system prompt, user instructions, retrieved context, and (later) preceding context.
+*   **As a Backend Developer, I want `report_builder_service` to gather preceding report content (up to a defined limit) and pass it to the `Generation Service`.**
+    *   [ ] Task: Develop a strategy for managing context length (e.g., last N sections, token count limit, summarization).
+    *   [ ] Task: Implement the logic in `report_builder_service` to collect the appropriate preceding content.
+    *   [ ] Task: Update the API contract to include `preceding_context`.
+*   **As a Backend Developer, I want the `Generation Service` to include the preceding report context in the final LLM prompt.**
+    *   [ ] Task: Update the prompt assembly logic in the Generation Service to include the `preceding_context`.
+
+### Phase 3: Robustness and Configuration
+
+**Goal:** Ensure the integration is reliable, handles errors gracefully, is properly configured, and supports enhanced user interactions like section regeneration.
+
+**User Stories & Tasks:**
+
+*   **As a Backend Developer, I want comprehensive error handling implemented in `report_builder_service` for the entire generation workflow.**
+    *   [ ] Task: Implement try-catch blocks around the API call to the Generation Service.
+    *   [ ] Task: Handle potential errors during context gathering.
+    *   [ ] Task: Handle timeouts and non-2xx responses from the Generation Service.
+*   **As a Backend Developer, I want informative error messages propagated back to the frontend when generation fails.**
+    *   [ ] Task: Define standard error responses for generation failures.
+    *   [ ] Task: Ensure `report_builder_service` returns appropriate HTTP status codes and error details in the response body.
+*   **As a User, I want to trigger regeneration for a specific AI-generated section so I can get a different version based on the current report context (including any edits I've made).**
+    *   [ ] Task: Define a new API endpoint (e.g., `POST /api/report_builder/reports/{report_id}/sections/{section_index_or_id}/regenerate`).
+    *   [ ] Task: Implement frontend UI element (e.g., "Regenerate" button) for generated sections.
+    *   [ ] Task: Implement frontend logic to send the *current* report state (or relevant parts) and trigger the regeneration API call.
+    *   [ ] Task: Implement backend logic for the `regenerate_section` endpoint:
+        *   Accept current report context (potentially the full edited Markdown).
+        *   Identify the target section and its original `instructions`.
+        *   Gather preceding context based on the *provided current state*.
+        *   Call the Generation Service with instructions, current context, and `vectorStoreId`.
+        *   Return the newly generated content for *only* the requested section.
+    *   [ ] Task: Implement frontend logic to update the specific section's content upon successful regeneration.
+*   **As a Backend Developer, I want the necessary configuration (e.g., `Generation Service` URL) added to `report_builder_service` and managed appropriately.**
+    *   [ ] Task: Add configuration settings (e.g., in `config.py` or environment variables) for the Generation Service endpoint URL.
+*   **As a Backend Developer, I want the full API contract, including authentication/authorization, finalized and documented.**
+    *   [ ] Task: Define and document the final, stable API contract (see Section 5) incorporating all fields (`system_prompt`, `user_instructions`, `preceding_context`, `vector_store_id`, `generation_config`).
+    *   [ ] Task: Clarify and implement authentication/authorization mechanisms for the API endpoint.
+
+## 5. API Considerations (`report_builder_service` -> `Generation Service`)
+
+_(This section remains as a reference for the final contract developed through the phases)_
+
+A potential **final** API contract for the Generation Service endpoint used by the Report Builder:
+
+*   **Endpoint:** TBD (e.g., `/api/generation/generate_report_section`)
+*   **Method:** `POST`
+*   **Request Body:**
+    '''json
+    {
+      "system_prompt": "...",
+      "user_instructions": "...", // From ReportElement.instructions
+      "preceding_context": "...", // Markdown from previous sections
+      "vector_store_id": "...",   // ID for context retrieval
+      "generation_config": {      // Optional LLM parameters
+        "max_new_tokens": 1024,
+        "temperature": 0.7
+        // ... other params
+      }
+      // Potentially report metadata like title, overall goal?
+    }
+    '''
+*   **Response Body (Success):**
+    '''json
+    {
+      "generated_text": "..." // Generated Markdown content for the section
+    }
+    '''
+*   **Response Body (Error):** Standard MAGE error format.
+
+## 6. Open Questions
+
+_(Moved from previous Section 7)_
+
+*   Should the Generation Service perform the vector store query, or should `report_builder_service` do it and pass the results? (Current plan: Generation Service does it).
+*   What is the optimal strategy for including preceding report context within token limits? (Needs decision in Phase 2).
+*   How are errors from the vector store search surfaced back through the Generation Service to the `report_builder_service`? (Needs clarification in Phase 3 error handling).
+
+## 7. Key Context and Code Locations
+
+Development of the features outlined in this plan will primarily involve components within the following directories:
+
+*   **Report Builder Frontend:** `frontend/src/components/report_builder/`
+    *   Contains UI components like `ReportDesignerPage.js`, `ReportConfigPanel.js`, `ReportPreviewPanel.js`.
+    *   Will require updates for triggering generation/regeneration and displaying results.
+*   **Report Builder Backend:** `backend/report_builder_service/`
+    *   Contains the core logic (`main.py`) for managing report definitions, handling API requests (`/generate`, `/regenerate_section`), orchestrating calls to the Generation Service, and interacting with data storage.
+*   **Report Builder Data:** `backend/report_builder_service/data/` (or wherever `reports_data.json` is stored)
+    *   Location of persisted report definitions, including generated content.
+*   **Direct Chat Frontend:** `frontend/src/components/direct_chat/`
+    *   Reference for UI patterns related to LLM interaction (e.g., `DirectChat.js`).
+*   **Direct Chat Backend:** `backend/direct_chat_service/`
+    *   Reference for backend patterns related to LLM tasking (`app.py`), prompt construction, context management, and interaction with LLM services (`vllm_chat.py`).
+*   **Generation Service / LLM Endpoint:** TBD (e.g., could be within `direct_chat_service`, a dedicated `generation_service`, or another MAGE component)
+    *   The service responsible for receiving prompts, retrieving vector context, interacting with the base LLM, and returning generated text.
+*   **Embedding Service:** `backend/embedding_service/` (Potentially)
+    *   May be involved indirectly if the Generation Service delegates vector store querying.
+
+This phased plan provides a structured approach for integrating LLM assistance into the Report Builder, ensuring consistency with existing MAGE patterns like Direct Chat and allowing for incremental development and testing. 

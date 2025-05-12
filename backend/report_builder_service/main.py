@@ -19,6 +19,14 @@ import asyncio
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("report_builder_service")
 
+# --- LLM Integration Constants ---
+REPORT_SECTION_SYSTEM_PROMPT = (
+    "You are an AI assistant tasked with generating a specific section of a technical report. "
+    "Use the provided user instructions and any accompanying context to create accurate and relevant content. "
+    "Ensure your output is formatted in plain Markdown."
+)
+# --- End LLM Integration Constants ---
+
 app = FastAPI()
 
 # Define Pydantic models first
@@ -186,12 +194,11 @@ migrate_legacy_data()
 # Initialize templates
 init_templates()
 
-# It's good practice to get service URLs from environment variables or a config service
 # Ensure this matches your docker-compose service name and port for embedding_service
 EMBEDDING_SERVICE_BASE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding_service:8006")
 
-# Define LLM service URL from environment variable with default fallback
-MAGE_LLM_SERVICE_URL = os.getenv("MAGE_LLM_SERVICE_URL", "http://generation_service:8003")
+# Placeholder for the MAGE Generation Service URL
+GENERATION_SERVICE_BASE_URL = os.getenv("GENERATION_SERVICE_URL", "http://generation_service:8003")
 
 @app.get("/api/report_builder/vector_stores", response_model=List[ReportBuilderVectorStoreInfo])
 async def get_vector_stores_for_report_builder():
@@ -303,6 +310,9 @@ async def delete_report(report_id: str):
 
 @app.post("/api/report_builder/reports/{report_id}/generate", response_model=Union[GeneratedReportMarkdown, ErrorResponse])
 async def generate_report(report_id: str):
+    # --- START DEBUG ---
+    # logger.info(f"--- DEBUG: Entering generate_report for ID: {report_id} ---")
+    # --- END DEBUG ---
     """
     Generate a report using MAGE LLM service for the 'generative' elements.
     
@@ -318,9 +328,13 @@ async def generate_report(report_id: str):
     now = datetime.utcnow().isoformat() + "Z"  # For error timestamps
     
     try:
+        # logger.info(f"--- DEBUG: Inside try block for report ID: {report_id} ---") # Add another debug log
+
         # Load the report definition
         report_path = REPORTS_DIR / f"{report_id}.json"
+        # logger.info(f"--- DEBUG: Attempting to load report from: {report_path} ---") # Add another debug log
         report_to_generate = load_report_from_file(report_path)
+        # logger.info(f"--- DEBUG: Report loaded: {'Exists' if report_to_generate else 'Not Found'} ---") # Add another debug log
         
         if not report_to_generate:
             logger.warning(f"Report with ID {report_id} not found")
@@ -332,6 +346,7 @@ async def generate_report(report_id: str):
                 timestamp=now
             )
 
+        # --- START DEBUG: Temporarily comment out service checks ---
         # Check if the report has a vector store ID but the vector store doesn't exist
         if report_to_generate.vectorStoreId:
             try:
@@ -372,7 +387,7 @@ async def generate_report(report_id: str):
         # Check MAGE service availability
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{MAGE_LLM_SERVICE_URL}/api/generation/health")
+                response = await client.get(f"{GENERATION_SERVICE_BASE_URL}/api/generation/health")
                 response.raise_for_status()
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(f"MAGE service is not available: {str(e)}")
@@ -383,6 +398,7 @@ async def generate_report(report_id: str):
                 ),
                 timestamp=now
             )
+        # --- END DEBUG: Temporarily comment out service checks ---
 
         logger.info(f"Generating report for ID: {report_id}")
         markdown_parts = []  # Initialize a list to hold parts of the markdown
@@ -405,43 +421,70 @@ async def generate_report(report_id: str):
                 if element.content:
                     markdown_parts.append(f"{element.content}\n")
             elif element.type == 'generative':
+                # --- LLM Integration Phase 1, Story 2: Call Generation Service ---
+                logger.info(f"Found generative element ID: {element.id}, Title: {element.title}")
+                logger.info(f"  System Prompt: {REPORT_SECTION_SYSTEM_PROMPT}") # Log the system prompt
+                logger.info(f"  User Instructions: {element.instructions}") # Log user instructions
+
+                # --- LLM Integration Phase 1, Story 2: Call Generation Service ---
+                full_prompt = f"{REPORT_SECTION_SYSTEM_PROMPT}\\n\\nUser Instructions:\\n{element.instructions}"
+                generated_content = None
+                error_message = None
+
                 try:
-                    # For generative elements, call MAGE service
-                    logger.info(f"Generating content for element ID: {element.id}")
-                    generated_content = await generate_element_content(
-                        element, 
-                        report_to_generate.vectorStoreId,
-                        previous_content="".join(markdown_parts)  # Pass previously generated content as context
-                    )
-                    markdown_parts.append(f"{generated_content}\n")
+                    async with httpx.AsyncClient(timeout=120.0) as client: # Use a longer timeout for generation
+                        payload = {"prompt": full_prompt}
+                        url = f"{GENERATION_SERVICE_BASE_URL}/api/generation/text"
+                        logger.info(f"Calling Generation Service at: {url} for element {element.id}")
+                        response = await client.post(url, json=payload)
+
+                        if response.status_code == 200:
+                            response_data = response.json()
+                            generated_content = response_data.get("generated_text")
+                            if generated_content:
+                                logger.info(f"Successfully received generated content for element {element.id}.")
+                                # We will use this content in the next user story.
+                            else:
+                                logger.warning(f"Generation service response for {element.id} missing 'generated_text'. Response: {response.text}")
+                                error_message = "Generation service response format incorrect."
+                        else:
+                            logger.error(f"Generation service call failed for element {element.id}. Status: {response.status_code}, Response: {response.text}")
+                            error_message = f"Generation service failed with status {response.status_code}."
+                            response.raise_for_status() # Raise an exception for non-200 responses
+
+                except httpx.RequestError as e:
+                    logger.error(f"Could not connect to Generation Service for element {element.id}: {str(e)}")
+                    error_message = f"Could not connect to Generation Service: {str(e)}"
+                except httpx.HTTPStatusError as e:
+                    # Already logged above, just re-capture message if needed
+                    if not error_message:
+                        error_message = f"Generation service failed with status {e.response.status_code}."
                 except Exception as e:
-                    # Log the specific error but continue with a placeholder
-                    logger.error(f"Error generating content for element {element.id}: {str(e)}", exc_info=True)
-                    
-                    # Categorize the error
-                    error_message = str(e)
-                    error_code = ErrorCodes.GENERATION_FAILED
-                    
-                    if "Error connecting to MAGE service" in error_message:
-                        error_code = ErrorCodes.MAGE_SERVICE_ERROR
-                    elif "Vector store" in error_message:
-                        error_code = ErrorCodes.VECTOR_STORE_ERROR
-                    
-                    # Add to the list of errors
+                    logger.error(f"An unexpected error occurred during generation call for element {element.id}: {str(e)}", exc_info=True)
+                    error_message = f"Unexpected error during generation: {str(e)}"
+
+                # Placeholder logic remains for now, using the result of the API call (or error)
+                if generated_content:
+                    # --- LLM Integration Phase 1, Story 3: Integrate Content ---
+                    # Instead of a placeholder, append the actual generated content
+                    logger.info(f"Integrating generated content for element {element.id}")
+                    markdown_parts.append(f"{generated_content}\n")
+                    # --- End LLM Integration Phase 1, Story 3 ---
+                else:
+                    # If the call failed or content was missing, log and use error placeholder
+                    error_placeholder = f"*[/Placeholder: Error calling Generation Service for '{element.title or 'Untitled'}'. {error_message or 'Unknown error'}]*\\n"
+                    markdown_parts.append(error_placeholder)
+                    # Optionally collect these errors like the commented-out section below
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
-                        "error_code": error_code,
-                        "error_message": error_message
+                        "error_code": ErrorCodes.GENERATION_FAILED, # Or MAGE_SERVICE_ERROR
+                        "error_message": error_message or "Unknown generation error"
                     })
-                    
-                    # Add a placeholder indicating the error
-                    error_placeholder = f"*[Error generating AI content: {error_message}]*\n"
-                    if element.instructions:
-                        error_placeholder += f"*Instructions: {element.instructions}*\n"
-                    markdown_parts.append(error_placeholder)
-            
-            markdown_parts.append("\n")  # Add a blank line for spacing after each element section
+
+                # --- End LLM Integration Phase 1, Story 2 ---
+
+            markdown_parts.append("\n")  # Fix double backslash for spacing line
 
         full_markdown = "".join(markdown_parts)  # Join without double newlines if parts already end with one
         
@@ -527,7 +570,7 @@ Please generate markdown-formatted content for this section that follows the ins
         # Call MAGE service
         logger.info(f"Calling MAGE service for element ID: {element.id}")
         async with httpx.AsyncClient(timeout=120.0) as client:  # 2-minute timeout
-            url = f"{MAGE_LLM_SERVICE_URL}/api/generation/text"
+            url = f"{GENERATION_SERVICE_BASE_URL}/api/generation/text"
             
             payload = {
                 "prompt": prompt,
