@@ -37,13 +37,30 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
     *   [x] Task: Define the *initial* basic API contract (endpoint, method, minimal request/response) between `report_builder_service` and the chosen Generation Service.
     *   [x] Task: Implement the API call from `report_builder_service`.
 *   **As a Backend Developer, I want `report_builder_service` to receive the LLM's response from the `Generation Service` and integrate it into the report structure.**
-    *   [ ] Task: Implement logic to place the received `generated_text` into the corresponding `ReportElement.content`.
+    *   [x] Task: Implement logic to place the received `generated_text` into the corresponding `ReportElement.content`.
     *   [x] Task: Implement the assembly of the final report Markdown from all sections (mixing explicit and basic generated content).
 *   **As a Backend Developer, I want to ensure that the generated content for "Generative" sections is saved persistently (in `reports_data.json`) along with the report definition so that users can view and edit previously generated reports.**
-    *   [ ] Task: Verify/Update Pydantic models (`ReportElement`, `Report`) to confirm `content` is persisted for all section types.
-    *   [ ] Task: Verify/Update `save_reports_to_file` and `load_reports_from_file` logic to correctly handle storing and retrieving generated `content` for "Generative" sections.
+    *   [x] Task: Verify/Update Pydantic models (`ReportElement`, `Report`) to confirm `content` is persisted for all section types.
+    *   [x] Task: Verify/Update `save_reports_to_file` and `load_reports_from_file` logic to correctly handle storing and retrieving generated `content` for "Generative" sections.
 
-### Phase 2: Context-Aware Generation
+### Phase 2: Frontend Display & Export Refinement
+
+**Goal:** Update the frontend report preview to clearly differentiate user instructions from AI-generated content for "Generative" sections. Also, to ensure that the final exported report is clean, containing only the specified content (explicit content or AI-generated content) without any instructional text or UI labels.
+
+**User Stories & Tasks:**
+
+*   **As a User, when viewing a report in the preview panel, I want to see my specific instructions for "Generative" sections clearly displayed, followed by the AI's output, so I can easily compare the request with the result.**
+    *   [x] Task (Frontend): Modify the `ReportPreviewPanel.js` component (or equivalent) to iterate through report elements.
+    *   [x] Task (Frontend): For "Generative" elements, display a section like:
+        *   "Instructions for MAGE: `element.instructions`"
+        *   "Output from MAGE: `element.ai_generated_content`" (if available).
+    *   [x] Task (Frontend): For "Explicit" elements, display `element.content` as usual.
+    *   [x] Task (Frontend): If `element.ai_generated_content` is not yet available for a "Generative" section (or if generation failed), clearly indicate this in the preview (e.g., show only "Instructions for MAGE: `element.instructions`" and a message like "[AI content not yet generated]").
+*   **As a User, I want the final exported report (e.g., Word document) to contain *only* the actual content of the sections, meaning `element.content` for "Explicit" sections and `element.ai_generated_content` for "Generative" sections, without any "Instructions for MAGE" or "Output from MAGE" labels or the instructions themselves.**
+    *   [x] Task (Backend/Verification): Verify that the existing export functionality (e.g., the `/export/word` endpoint in `main.py` which uses the `markdown_content` from `generate_report` or a cached file) correctly assembles the report using only `element.ai_generated_content` for "Generative" sections and `element.content` for "Explicit" sections. (Current backend logic for `generate_report` already produces a fairly clean `markdown_content`, so this might primarily be a confirmation task or minor adjustment if needed).
+    *   [x] Task (Backend/Verification): Ensure report titles and descriptions are included in the export as appropriate, but not the instructional scaffolding for generative sections.
+
+### Phase 3: Context-Aware Generation
 
 **Goal:** Enhance the generation process by incorporating context from both the linked vector store and preceding report sections.
 
@@ -61,7 +78,7 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 *   **As a Backend Developer, I want the `Generation Service` to include the preceding report context in the final LLM prompt.**
     *   [ ] Task: Update the prompt assembly logic in the Generation Service to include the `preceding_context`.
 
-### Phase 3: Robustness and Configuration
+### Phase 4: Robustness and Configuration
 
 **Goal:** Ensure the integration is reliable, handles errors gracefully, is properly configured, and supports enhanced user interactions like section regeneration.
 

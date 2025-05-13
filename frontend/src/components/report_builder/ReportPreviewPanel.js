@@ -8,7 +8,8 @@ import {
   CircularProgress,
   LinearProgress,
   TextField,
-  Snackbar
+  Snackbar,
+  Divider
 } from '@material-ui/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -110,11 +111,42 @@ const useStyles = makeStyles((theme) => ({
       marginBottom: '0.5em',
     },
   },
+  instructionsSection: {
+    background: theme.palette.action.hover,
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1, 2),
+    marginBottom: theme.spacing(2),
+  },
+  outputSection: {
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1, 2),
+    marginBottom: theme.spacing(2),
+    background: theme.palette.background.paper,
+  },
+  generativeSectionHeader: {
+    fontSize: '0.9rem',
+    fontWeight: 500,
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(1),
+  },
+  pendingGeneration: {
+    fontStyle: 'italic',
+    color: theme.palette.text.disabled,
+  }
 }));
 
-// Placeholder for generated content - replace with actual API call result
-const generateMockContent = (instructions) => {
-  return `<!-- START MAGE GENERATED CONTENT -->\nInstructions for MAGE: "${instructions}"\n<!-- END MAGE GENERATED CONTENT -->`;
+// Updated function to format generative content
+const formatGenerativeContent = (element) => {
+  const instructions = element.instructions || '';
+  const content = element.content || '';
+  
+  // Return both instructions and content
+  return {
+    instructions,
+    content
+  };
 };
 
 // Updated function to format explicit content
@@ -139,7 +171,7 @@ const formatExplicitContent = (contentInput, format = 'paragraph') => {
     case 'h6':
       return `###### ${content.trim()}`;
     case 'paragraph':
-      return content; // ReactMarkdown with remarkBreaks will handle line breaks within paragraphs
+      return content; // Return content without modifications
     case 'bulletList':
       return lines.map(line => `- ${line}`).join('\n'); // No need to trim here, preserve indentation if any
     case 'numberedList':
@@ -155,10 +187,13 @@ function ReportPreviewPanel({ definition, onContentChange }) {
   const [editText, setEditText] = useState('');
   const [error, setError] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [originalDefinition, setOriginalDefinition] = useState(null);
+  const [elementsMetadata, setElementsMetadata] = useState([]);
 
   useEffect(() => {
     if (definition && definition.elements) {
-      const markdown = definition.elements.map(element => {
+      // We'll collect all formatted elements but handle Markdown differently for display vs. editing
+      const formattedElements = definition.elements.map(element => {
         if (element.type === 'explicit') {
           // For headings, if content is empty, consider using element.title.
           // However, ReportConfigPanel is now designed to place heading text in element.content.
@@ -168,117 +203,167 @@ function ReportPreviewPanel({ definition, onContentChange }) {
             // Fallback for headings if content is truly empty but title exists
             contentToFormat = element.title;
           }
-          return formatExplicitContent(contentToFormat, element.format);
+          // Format the content for display in the editor
+          return {
+            type: 'explicit',
+            id: element.id,
+            markdown: formatExplicitContent(contentToFormat, element.format)
+          };
         } else if (element.type === 'generative') {
-          return generateMockContent(element.instructions || `Generate content for: ${element.title || 'this element'}`);
+          const { instructions, content } = formatGenerativeContent(element);
+          return {
+            type: 'generative',
+            id: element.id,
+            instructions,
+            ai_generated_content: element.ai_generated_content || ''
+          };
         }
-        return ''; // Should not happen if elements always have a valid type
-      }).filter(Boolean).join('\n\n'); // Join elements with double newline for markdown paragraph spacing
+        return null; // Should not happen if elements always have a valid type
+      }).filter(Boolean);
+
+      // For editing mode, just join everything with double newlines
+      const editableMarkdown = formattedElements.map(elem => {
+        if (elem.type === 'explicit') {
+          return `<!-- SECTION START -->\n${elem.markdown}\n<!-- SECTION END -->`;
+        } else {
+          // For generative elements, include special markers to identify sections later
+          return `<!-- SECTION START -->\n<!-- INSTRUCTIONS START -->\n${elem.instructions}\n<!-- INSTRUCTIONS END -->\n\n<!-- AI CONTENT START -->\n${elem.ai_generated_content || '[AI content not yet generated]'}\n<!-- AI CONTENT END -->\n<!-- SECTION END -->`;
+        }
+      }).join('\n\n');
       
-      setEditText(markdown);
+      // Add hidden metadata that can be used when saving
+      const elementsMetadata = formattedElements.map(elem => ({
+        id: elem.id,
+        type: elem.type
+      }));
+      
+      // Store the metadata separately
+      setEditText(editableMarkdown);
+      setElementsMetadata(elementsMetadata);
     } else {
       setEditText('');
     }
   }, [definition]);
 
   const handleEditClick = () => {
+    // Store the original definition for cancellation
+    setOriginalDefinition(JSON.parse(JSON.stringify(definition)));
     setIsEditing(true);
   };
 
   const handleSaveClick = () => {
-    setIsEditing(false);
-    if (onContentChange) {
-      // Parse the markdown back into the mockReports structure
-      const lines = editText.split('\n');
-      const elements = [];
-      let currentElement = null;
-      let currentSection = null;
+    if (!onContentChange || !definition) {
+      setIsEditing(false);
+      return;
+    }
 
-      lines.forEach(line => {
-        if (line.startsWith('# ')) {
-          if (currentElement) elements.push(currentElement);
-          currentElement = {
-            type: 'header',
-            content: line.slice(2)
-          };
-        } else if (line.startsWith('## ')) {
-          if (currentSection) elements.push(currentSection);
-          currentSection = {
-            type: 'section',
-            title: line.slice(3),
-            elements: []
-          };
-        } else if (line.startsWith('- ')) {
-          if (!currentSection) {
-            currentSection = {
-              type: 'section',
-              title: 'Unnamed Section',
-              elements: []
-            };
+    try {
+      // Make a deep copy of the original definition to modify
+      const updatedDefinition = JSON.parse(JSON.stringify(definition));
+      
+      // Split the text by sections using the section markers
+      const sections = editText.split('<!-- SECTION START -->').filter(Boolean);
+      
+      // Process each section
+      sections.forEach((section, index) => {
+        if (index >= updatedDefinition.elements.length) return;
+        
+        const element = updatedDefinition.elements[index];
+        const cleanSection = section.split('<!-- SECTION END -->')[0].trim();
+        
+        if (element.type === 'explicit') {
+          // For explicit elements, get the content directly
+          let cleanedContent = cleanSection;
+          
+          // Remove markdown formatting if it exists for headings
+          if (element.format && element.format.match(/^h[1-6]$/)) {
+            const headingLevel = parseInt(element.format.substring(1));
+            const hashPrefix = '#'.repeat(headingLevel) + ' ';
+            if (cleanedContent.startsWith(hashPrefix)) {
+              cleanedContent = cleanedContent.substring(hashPrefix.length);
+            }
           }
-          const bulletList = currentSection.elements.find(e => e.type === 'bulletList');
-          if (bulletList) {
-            bulletList.items.push(line.slice(2));
-          } else {
-            currentSection.elements.push({
-              type: 'bulletList',
-              items: [line.slice(2)]
-            });
+          
+          element.content = cleanedContent;
+        } else if (element.type === 'generative') {
+          // For generative elements, parse instructions and AI content
+          const instructionsMatch = cleanSection.split('<!-- INSTRUCTIONS START -->')[1]?.split('<!-- INSTRUCTIONS END -->')[0]?.trim();
+          const aiContentMatch = cleanSection.split('<!-- AI CONTENT START -->')[1]?.split('<!-- AI CONTENT END -->')[0]?.trim();
+          
+          if (instructionsMatch) {
+            element.instructions = instructionsMatch;
           }
-        } else if (line.trim()) {
-          if (!currentSection) {
-            currentSection = {
-              type: 'section',
-              title: 'Unnamed Section',
-              elements: []
-            };
-          }
-          const paragraph = currentSection.elements.find(e => e.type === 'paragraph');
-          if (paragraph) {
-            paragraph.content += '\n' + line;
-          } else {
-            currentSection.elements.push({
-              type: 'paragraph',
-              content: line
-            });
+          
+          if (aiContentMatch) {
+            // Only update if not the placeholder and if content actually changed
+            if (aiContentMatch !== '[AI content not yet generated]') {
+              element.ai_generated_content = aiContentMatch;
+              
+              // Explicitly removing this flag ensures the backend treats this as a real content update
+              if (element.hasOwnProperty('pendingGeneration')) {
+                delete element.pendingGeneration;
+              }
+            }
           }
         }
       });
-
-      if (currentElement) elements.push(currentElement);
-      if (currentSection) elements.push(currentSection);
-
-      onContentChange({
-        ...definition,
-        elements
-      });
+      
+      onContentChange(updatedDefinition);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error parsing edited content:', err);
+      setError('Error saving changes. Please check your edits and try again.');
+      setSnackbarOpen(true);
     }
   };
 
   const handleCancelClick = () => {
+    // Restore the original definition
     setIsEditing(false);
-    setEditText(definition ? definition.elements.map(element => {
-      switch (element.type) {
-        case 'header':
-          return `# ${element.content}`;
-        case 'section':
-          return [
-            `## ${element.title}`,
-            ...element.elements.map(subElement => {
-              switch (subElement.type) {
-                case 'bulletList':
-                  return subElement.items.map(item => `- ${item}`).join('\n');
-                case 'paragraph':
-                  return subElement.content;
-                default:
-                  return '';
-              }
-            }).filter(Boolean)
-          ].join('\n\n');
-        default:
-          return '';
-      }
-    }).filter(Boolean).join('\n\n') : '');
+    
+    if (originalDefinition) {
+      // Regenerate the edit text from the original definition
+      const formattedElements = originalDefinition.elements.map(element => {
+        if (element.type === 'explicit') {
+          let contentToFormat = element.content || '';
+          if (!element.content && element.title && element.format && element.format.match(/^h[1-6]$/)) {
+            contentToFormat = element.title;
+          }
+          // Format the content using the original definition's formatting
+          return {
+            type: 'explicit',
+            id: element.id,
+            markdown: formatExplicitContent(contentToFormat, element.format)
+          };
+        } else if (element.type === 'generative') {
+          const { instructions, content } = formatGenerativeContent(element);
+          return {
+            type: 'generative',
+            id: element.id,
+            instructions,
+            ai_generated_content: element.ai_generated_content || ''
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+      const editableMarkdown = formattedElements.map(elem => {
+        if (elem.type === 'explicit') {
+          return `<!-- SECTION START -->\n${elem.markdown}\n<!-- SECTION END -->`;
+        } else {
+          return `<!-- SECTION START -->\n<!-- INSTRUCTIONS START -->\n${elem.instructions}\n<!-- INSTRUCTIONS END -->\n\n<!-- AI CONTENT START -->\n${elem.ai_generated_content || '[AI content not yet generated]'}\n<!-- AI CONTENT END -->\n<!-- SECTION END -->`;
+        }
+      }).join('\n\n');
+      
+      // Update metadata for proper saving
+      const elementsMetadata = formattedElements.map(elem => ({
+        id: elem.id,
+        type: elem.type
+      }));
+      
+      setEditText(editableMarkdown);
+      setElementsMetadata(elementsMetadata);
+    }
   };
 
   const handleEditorChange = (e) => {
@@ -287,6 +372,106 @@ function ReportPreviewPanel({ definition, onContentChange }) {
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
+  };
+
+  // Render each element according to its type
+  const renderElements = () => {
+    if (!definition || !definition.elements || definition.elements.length === 0) {
+      return <Typography variant="body2" color="textSecondary">No elements defined yet.</Typography>;
+    }
+
+    return definition.elements.map((element, index) => {
+      if (element.type === 'explicit') {
+        // Render explicit content as before
+        let contentToFormat = element.content || '';
+        if (!element.content && element.title && element.format && element.format.match(/^h[1-6]$/)) {
+          contentToFormat = element.title;
+        }
+        
+        // Format the content for display purposes only
+        const formattedContent = formatExplicitContent(contentToFormat, element.format);
+        
+        return (
+          <Box key={element.id || index} mb={2}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkBreaks]}
+              components={{
+                code({ node, inline, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      style={materialDark}
+                      language={match[1]}
+                      PreTag="div"
+                      {...props}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                }
+              }}
+            >
+              {formattedContent}
+            </ReactMarkdown>
+          </Box>
+        );
+      } else if (element.type === 'generative') {
+        // Render generative content with instructions and output
+        // IMPORTANT: Never use element.content for generative elements, only use element.ai_generated_content
+        return (
+          <Box key={element.id || index} mb={3}>
+            <Box className={classes.instructionsSection}>
+              <Typography className={classes.generativeSectionHeader}>
+                Instructions for MAGE:
+              </Typography>
+              <Typography variant="body2">{element.instructions || 'No instructions provided'}</Typography>
+            </Box>
+            
+            <Box className={classes.outputSection}>
+              <Typography className={classes.generativeSectionHeader}>
+                Output from MAGE:
+              </Typography>
+              
+              {element.ai_generated_content ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  components={{
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      return !inline && match ? (
+                        <SyntaxHighlighter
+                          style={materialDark}
+                          language={match[1]}
+                          PreTag="div"
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      ) : (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+                  }}
+                >
+                  {element.ai_generated_content}
+                </ReactMarkdown>
+              ) : (
+                <Typography className={classes.pendingGeneration}>
+                  [AI content not yet generated]
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        );
+      }
+      return null;
+    });
   };
 
   return (
@@ -329,30 +514,7 @@ function ReportPreviewPanel({ definition, onContentChange }) {
               Edit
             </Button>
             <Box className={classes.markdown}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
-                components={{
-                  code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || '');
-                    return !inline && match ? (
-                      <SyntaxHighlighter
-                        style={materialDark}
-                        language={match[1]}
-                        PreTag="div"
-                        {...props}
-                      >
-                        {String(children).replace(/\n$/, '')}
-                      </SyntaxHighlighter>
-                    ) : (
-                      <code className={className} {...props}>
-                        {children}
-                      </code>
-                    );
-                  }
-                }}
-              >
-                {editText}
-              </ReactMarkdown>
+              {renderElements()}
             </Box>
           </>
         )}

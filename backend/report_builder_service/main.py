@@ -37,6 +37,7 @@ class ReportElement(BaseModel):
     format: Optional[str] = None
     content: Optional[str] = None
     instructions: Optional[str] = None
+    ai_generated_content: Optional[str] = None
 
 class ReportContent(BaseModel):
     elements: List[ReportElement] = Field(default_factory=list)
@@ -236,6 +237,33 @@ async def create_report(report_in: ReportCreate):
     now = datetime.utcnow().isoformat() + "Z"
     report_id = str(uuid.uuid4())
     
+    # Process the report content to ensure separation between explicit and generative content
+    if report_in.content and report_in.content.elements:
+        processed_elements = []
+        for element in report_in.content.elements:
+            # Make a copy of the element
+            element_dict = element.dict(exclude_unset=True)
+            
+            # Process based on element type
+            if element.type == 'explicit':
+                # For explicit elements, ensure ai_generated_content is explicitly set to None
+                element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+            elif element.type == 'generative':
+                # For generative elements, ensure ai_generated_content is present (either with value or None)
+                if 'ai_generated_content' not in element_dict:
+                    element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+            else:
+                # Unknown type, ensure ai_generated_content is at least null
+                element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+        
+        # Create a new content object with processed elements
+        content = ReportContent(elements=processed_elements)
+    else:
+        content = report_in.content
+    
     new_report = Report(
         id=report_id,
         name=report_in.name,
@@ -246,7 +274,7 @@ async def create_report(report_in: ReportCreate):
         createdAt=now,
         updatedAt=now,
         status="draft",
-        content=report_in.content
+        content=content
     )
     
     # Save the report to its own file
@@ -283,11 +311,89 @@ async def update_report(report_id: str, report_update: ReportCreate):
     updated_data = report_update.dict(exclude_unset=True)
     current_report_data = existing_report.dict()
     
-    for key, value in updated_data.items():
-        if key == 'content' and isinstance(value, dict):
-            current_report_data[key] = ReportContent(**value)
-        else:
-            current_report_data[key] = value
+    # Handle content separately to ensure proper element type handling
+    if 'content' in updated_data and isinstance(updated_data['content'], dict):
+        if 'elements' in updated_data['content']:
+            # Create a new elements list
+            new_elements = []
+            
+            # Process each element from the update
+            for updated_element in updated_data['content']['elements']:
+                # If this is an update to an existing element, find the original
+                original_element = None
+                if 'id' in updated_element:
+                    for existing_element in current_report_data['content']['elements']:
+                        if existing_element['id'] == updated_element['id']:
+                            original_element = existing_element
+                            break
+                
+                # Handle the element based on its type
+                if updated_element.get('type') == 'explicit':
+                    # For explicit elements, only update content and other properties
+                    # Always ensure ai_generated_content is null for explicit elements
+                    if original_element:
+                        # Start with original and update with new values
+                        element_copy = original_element.copy()
+                        for key, value in updated_element.items():
+                            element_copy[key] = value
+                        # Ensure ai_generated_content is explicitly set to None
+                        element_copy['ai_generated_content'] = None
+                        new_elements.append(element_copy)
+                    else:
+                        # New element, just add it
+                        # Ensure ai_generated_content is explicitly set to None
+                        element_copy = updated_element.copy()
+                        element_copy['ai_generated_content'] = None
+                        new_elements.append(element_copy)
+                        
+                elif updated_element.get('type') == 'generative':
+                    # For generative elements, carefully handle instructions and ai_generated_content
+                    if original_element:
+                        # Start with original and update with new values
+                        element_copy = original_element.copy()
+                        
+                        # Update each field from the updated element
+                        for key, value in updated_element.items():
+                            # Always update ai_generated_content if explicitly provided, even if null
+                            # This allows the frontend to clear the content if needed
+                            if key == 'ai_generated_content':
+                                # Only update if the value is provided (could be null/None to clear it)
+                                if key in updated_element:
+                                    element_copy[key] = value
+                            else:
+                                # Always update other fields
+                                element_copy[key] = value
+                        
+                        # Ensure ai_generated_content is present (even if null)
+                        if 'ai_generated_content' not in element_copy:
+                            element_copy['ai_generated_content'] = None
+                        
+                        new_elements.append(element_copy)
+                    else:
+                        # New generative element
+                        element_copy = updated_element.copy()
+                        # Ensure ai_generated_content is present (even if null)
+                        if 'ai_generated_content' not in element_copy:
+                            element_copy['ai_generated_content'] = None
+                        new_elements.append(element_copy)
+                else:
+                    # Unknown type, ensure ai_generated_content is at least null
+                    element_copy = updated_element.copy()
+                    element_copy['ai_generated_content'] = None
+                    new_elements.append(element_copy)
+            
+            # Replace elements list
+            current_report_data['content']['elements'] = new_elements
+            
+        # Update any other content fields
+        for key, value in updated_data['content'].items():
+            if key != 'elements':
+                current_report_data['content'][key] = value
+    else:
+        # Update other fields normally
+        for key, value in updated_data.items():
+            if key != 'content':
+                current_report_data[key] = value
     
     current_report_data['updatedAt'] = now
     
@@ -468,6 +574,7 @@ async def generate_report(report_id: str):
                     # --- LLM Integration Phase 1, Story 3: Integrate Content ---
                     # Instead of a placeholder, append the actual generated content
                     logger.info(f"Integrating generated content for element {element.id}")
+                    element.ai_generated_content = generated_content # Store in the new dedicated field
                     markdown_parts.append(f"{generated_content}\n")
                     # --- End LLM Integration Phase 1, Story 3 ---
                 else:
@@ -488,6 +595,9 @@ async def generate_report(report_id: str):
 
         full_markdown = "".join(markdown_parts)  # Join without double newlines if parts already end with one
         
+        # Save the updated report with the generated content back to the file
+        save_report_to_file(report_to_generate)
+
         # If we had generation errors, log them but still return the partial report
         if generation_errors:
             error_summary = ", ".join([f"{e['element_title']}" for e in generation_errors])
@@ -631,6 +741,33 @@ async def create_template(template_in: TemplateCreate):
     now = datetime.utcnow().isoformat() + "Z"
     template_id = str(uuid.uuid4())
     
+    # Process the template content to ensure consistent element structure
+    if template_in.content and template_in.content.elements:
+        processed_elements = []
+        for element in template_in.content.elements:
+            # Make a copy of the element
+            element_dict = element.dict(exclude_unset=True)
+            
+            # Process based on element type
+            if element.type == 'explicit':
+                # For explicit elements, ensure ai_generated_content is explicitly set to None
+                element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+            elif element.type == 'generative':
+                # For generative elements, ensure ai_generated_content is present (either with value or None)
+                if 'ai_generated_content' not in element_dict:
+                    element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+            else:
+                # Unknown type, ensure ai_generated_content is at least null
+                element_dict['ai_generated_content'] = None
+                processed_elements.append(ReportElement(**element_dict))
+        
+        # Create a new content object with processed elements
+        content = ReportContent(elements=processed_elements)
+    else:
+        content = template_in.content
+    
     new_template = Template(
         id=template_id,
         name=template_in.name,
@@ -638,7 +775,7 @@ async def create_template(template_in: TemplateCreate):
         category=template_in.category,
         createdAt=now,
         updatedAt=now,
-        content=template_in.content
+        content=content
     )
     
     # Save the template to its own file
@@ -677,7 +814,32 @@ async def update_template(template_id: str, template_update: TemplateCreate):
     
     for key, value in updated_data.items():
         if key == 'content' and isinstance(value, dict):
-            current_template_data[key] = ReportContent(**value)
+            # Process content separately to ensure proper element handling
+            if 'elements' in value:
+                new_elements = []
+                for element in value['elements']:
+                    element_copy = element.copy()
+                    
+                    # Ensure ai_generated_content field consistency based on element type
+                    if element_copy.get('type') == 'explicit':
+                        element_copy['ai_generated_content'] = None
+                    elif element_copy.get('type') == 'generative':
+                        if 'ai_generated_content' not in element_copy:
+                            element_copy['ai_generated_content'] = None
+                    else:
+                        element_copy['ai_generated_content'] = None
+                        
+                    new_elements.append(element_copy)
+                
+                # Update the elements list
+                current_template_data['content']['elements'] = new_elements
+                
+                # Update any other content fields
+                for content_key, content_value in value.items():
+                    if content_key != 'elements':
+                        current_template_data['content'][content_key] = content_value
+            else:
+                current_template_data[key] = ReportContent(**value)
         else:
             current_template_data[key] = value
     
@@ -816,13 +978,9 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
             else:
                 # No existing content, generate it
                 logger.info(f"No existing content found, generating report {report_id} for Word export")
-                generation_result = await generate_report(report_id)
                 
-                # Check if we got an error response
-                if hasattr(generation_result, 'error') and generation_result.error:
-                    return generation_result  # Return the error response
-                
-                markdown_content = generation_result.markdown_content
+                # Use a clean report generation function that only includes actual content
+                markdown_content = await generate_export_markdown(report)
                 
                 # Save the generated content for future use
                 with open(report_content_path, "w", encoding="utf-8") as f:
@@ -946,5 +1104,48 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
             ),
             timestamp=now
         )
+
+async def generate_export_markdown(report: Report) -> str:
+    """
+    Generate clean markdown content for export purposes.
+    This version only includes AI-generated content for generative sections, not instructions.
+    
+    Args:
+        report: The report definition to use
+        
+    Returns:
+        str: Clean markdown content for export
+    """
+    logger.info(f"Generating export-ready markdown for report: {report.id}")
+    markdown_parts = []  # Initialize a list to hold parts of the markdown
+    
+    # Add report title and description
+    markdown_parts.append(f"# {report.name}\n")
+    
+    if report.description:
+        markdown_parts.append(f"{report.description}\n\n")  # Add extra newline for spacing after description
+
+    # Process each element in the report
+    logger.info(f"Processing {len(report.content.elements)} elements for export")
+    for element in report.content.elements:
+        if element.title:
+            markdown_parts.append(f"## {element.title}\n")
+        
+        if element.type == 'explicit':
+            # For explicit elements, directly use the content
+            if element.content:
+                markdown_parts.append(f"{element.content}\n")
+        elif element.type == 'generative':
+            # For generative elements, use the generated content if available
+            if element.ai_generated_content:
+                # Use the AI-generated content directly (no instructions)
+                markdown_parts.append(f"{element.ai_generated_content}\n")
+            else:
+                # If no generated content yet, leave an indicator
+                markdown_parts.append("*[Content not yet generated]*\n")
+
+        markdown_parts.append("\n")  # Add spacing
+    
+    return "".join(markdown_parts)  # Join all parts together
 
 # Add other report builder related endpoints here 

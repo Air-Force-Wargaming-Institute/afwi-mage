@@ -27,7 +27,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h1",
                     "content": "Executive Summary",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -35,7 +36,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Key Points",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -43,7 +45,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Main findings\nCritical issues\nRecommendations",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -51,7 +54,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Background",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -59,7 +63,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Brief context and purpose of the report",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -67,7 +72,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Conclusions",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -75,7 +81,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Key conclusions and next steps",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 }
             ]
         }
@@ -93,7 +100,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h1",
                     "content": "Bullet Background Paper",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -101,7 +109,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Issue",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -109,7 +118,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Clear statement of the issue",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -117,7 +127,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Background",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -125,7 +136,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Historical context\nCurrent situation\nKey stakeholders",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -133,7 +145,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Analysis",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -141,7 +154,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Key factors\nImplications\nRisks",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 }
             ]
         }
@@ -159,7 +173,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h1",
                     "content": "Background Paper",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -167,7 +182,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Introduction",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -175,7 +191,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Purpose and scope of the paper",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -183,7 +200,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Historical Context",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -191,7 +209,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Detailed historical background",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -199,7 +218,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Current Situation",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -207,7 +227,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "paragraph",
                     "content": "Analysis of current circumstances",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -215,7 +236,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Recommendations",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -223,7 +245,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Proposed actions\nImplementation plan\nExpected outcomes",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 }
             ]
         }
@@ -241,7 +264,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h1",
                     "content": "Talking Paper",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -249,7 +273,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Key Messages",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -257,7 +282,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Main points to convey\nSupporting evidence\nCall to action",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -265,7 +291,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Talking Points",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -273,7 +300,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Point 1 with supporting data\nPoint 2 with supporting data\nPoint 3 with supporting data",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -281,7 +309,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "h2",
                     "content": "Q&A Preparation",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -289,7 +318,8 @@ TEMPLATES = [
                     "type": "explicit",
                     "format": "bulletList",
                     "content": "Anticipated questions\nPrepared responses\nAdditional resources",
-                    "instructions": None
+                    "instructions": None,
+                    "ai_generated_content": None
                 }
             ]
         }

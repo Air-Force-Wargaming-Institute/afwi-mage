@@ -292,6 +292,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
     format: 'paragraph',
     content: '',
     instructions: '',
+    ai_generated_content: null
   });
 
   const handleAddElement = () => {
@@ -308,9 +309,41 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
   };
 
   const handleElementChange = (elementId, field, value) => {
-    const newElements = (definition?.elements || []).map(el => 
-      el.id === elementId ? { ...el, [field]: value } : el
-    );
+    const newElements = (definition?.elements || []).map(el => {
+      if (el.id === elementId) {
+        const updatedElement = { ...el, [field]: value };
+        
+        // Special handling when switching between element types
+        if (field === 'type') {
+          if (value === 'explicit') {
+            // Don't clear any fields when switching to explicit
+            // Just ensure the required fields exist
+            if (updatedElement.ai_generated_content === undefined) {
+              updatedElement.ai_generated_content = null;
+            }
+            if (updatedElement.instructions === undefined) {
+              updatedElement.instructions = '';
+            }
+          } else if (value === 'generative') {
+            // Don't clear any fields when switching to generative
+            // Just ensure the required fields exist
+            if (updatedElement.content === undefined) {
+              updatedElement.content = '';
+            }
+            if (updatedElement.instructions === undefined) {
+              updatedElement.instructions = '';
+            }
+            if (updatedElement.ai_generated_content === undefined) {
+              updatedElement.ai_generated_content = null;
+            }
+          }
+        }
+        
+        return updatedElement;
+      }
+      return el;
+    });
+    
     onChange({ ...definition, elements: newElements });
   };
 
