@@ -416,9 +416,6 @@ async def delete_report(report_id: str):
 
 @app.post("/api/report_builder/reports/{report_id}/generate", response_model=Union[GeneratedReportMarkdown, ErrorResponse])
 async def generate_report(report_id: str):
-    # --- START DEBUG ---
-    # logger.info(f"--- DEBUG: Entering generate_report for ID: {report_id} ---")
-    # --- END DEBUG ---
     """
     Generate a report using MAGE LLM service for the 'generative' elements.
     
@@ -434,13 +431,9 @@ async def generate_report(report_id: str):
     now = datetime.utcnow().isoformat() + "Z"  # For error timestamps
     
     try:
-        # logger.info(f"--- DEBUG: Inside try block for report ID: {report_id} ---") # Add another debug log
-
         # Load the report definition
         report_path = REPORTS_DIR / f"{report_id}.json"
-        # logger.info(f"--- DEBUG: Attempting to load report from: {report_path} ---") # Add another debug log
         report_to_generate = load_report_from_file(report_path)
-        # logger.info(f"--- DEBUG: Report loaded: {'Exists' if report_to_generate else 'Not Found'} ---") # Add another debug log
         
         if not report_to_generate:
             logger.warning(f"Report with ID {report_id} not found")
@@ -452,7 +445,6 @@ async def generate_report(report_id: str):
                 timestamp=now
             )
 
-        # --- START DEBUG: Temporarily comment out service checks ---
         # Check if the report has a vector store ID but the vector store doesn't exist
         if report_to_generate.vectorStoreId:
             try:
@@ -504,7 +496,6 @@ async def generate_report(report_id: str):
                 ),
                 timestamp=now
             )
-        # --- END DEBUG: Temporarily comment out service checks ---
 
         logger.info(f"Generating report for ID: {report_id}")
         markdown_parts = []  # Initialize a list to hold parts of the markdown
@@ -515,83 +506,139 @@ async def generate_report(report_id: str):
 
         # Track any errors encountered during generation
         generation_errors = []
+        
+        # --- NEW: Keep track of preceding content for context ---
+        preceding_contents = []  # List to keep track of previous content
+        TOKEN_LIMIT = 4000  # Maximum token limit for preceding context (adjust based on your model)
+        
+        # Track the length of each section's content in estimated tokens
+        # Rough estimate: 1 token ≈ 4 characters in English 
+        def estimate_tokens(text):
+            return len(text) // 4
+        
+        # Function to get preceding content within token limit
+        def get_preceding_content(tokens_limit=TOKEN_LIMIT):
+            """
+            Retrieves and formats previous report section content to serve as context for the current section generation.
+            
+            This function:
+            1. Collects content from previously processed sections (explicit or AI-generated)
+            2. Prioritizes most recent sections first (reversed order)
+            3. Enforces a token limit to prevent context overflow
+            4. When needed, truncates content to fit within token limits
+            
+            Args:
+                tokens_limit (int): Maximum number of tokens to include in context
 
+            Returns:
+                str: Formatted context string containing previous section content within token limits
+            """
+            combined = ""
+            total_tokens = 0
+            
+            # Iterate through previous content in reverse order (most recent first)
+            for content in reversed(preceding_contents):
+                content_tokens = estimate_tokens(content)
+                
+                # If adding this content would exceed the limit, stop
+                if total_tokens + content_tokens > tokens_limit:
+                    # If we haven't added anything yet, take a portion of this section
+                    if total_tokens == 0:
+                        # Take what we can fit within the limit
+                        # Very rough calculation - just truncate based on estimated character count
+                        chars_to_take = tokens_limit * 4
+                        partial_content = content[:chars_to_take] + "... [truncated]"
+                        combined = partial_content
+                    break
+                
+                # Add this content to the total
+                if combined:
+                    combined = content + "\n\n" + combined
+                else:
+                    combined = content
+                    
+                total_tokens += content_tokens
+                
+                # If we've reached the limit, stop
+                if total_tokens >= tokens_limit:
+                    break
+                    
+            return combined
+        
         # Process each element in the report
         logger.info(f"Processing {len(report_to_generate.content.elements)} elements")
-        for element in report_to_generate.content.elements:
+        for i, element in enumerate(report_to_generate.content.elements):
+            element_markdown = ""
+            
+            # Add element title to the markdown if it exists
             if element.title:
-                markdown_parts.append(f"## {element.title}\n")
+                element_markdown += f"## {element.title}\n"
             
             if element.type == 'explicit':
                 # For explicit elements, directly use the content
                 if element.content:
-                    markdown_parts.append(f"{element.content}\n")
+                    element_markdown += f"{element.content}\n"
+                    
+                    # Add this content to our preceding context if not empty
+                    if element.content.strip():
+                        section_content = f"## {element.title or 'Untitled Section'}\n{element.content}"
+                        preceding_contents.append(section_content)
+                        logger.debug(f"Added explicit content to preceding context. Total sections: {len(preceding_contents)}")
+                    
             elif element.type == 'generative':
-                # --- LLM Integration Phase 1, Story 2: Call Generation Service ---
-                logger.info(f"Found generative element ID: {element.id}, Title: {element.title}")
-                logger.info(f"  System Prompt: {REPORT_SECTION_SYSTEM_PROMPT}") # Log the system prompt
-                logger.info(f"  User Instructions: {element.instructions}") # Log user instructions
-
-                # --- LLM Integration Phase 1, Story 2: Call Generation Service ---
-                full_prompt = f"{REPORT_SECTION_SYSTEM_PROMPT}\\n\\nUser Instructions:\\n{element.instructions}"
-                generated_content = None
-                error_message = None
-
+                # Get preceding content for context
+                previous_content = get_preceding_content()
+                logger.info(f"Using {estimate_tokens(previous_content)} tokens of preceding content for element {i+1} ({element.id})")
+                
+                # Log how many sections are being used as context
+                if preceding_contents:
+                    logger.info(f"Using content from {len(preceding_contents)} previous section(s) as context")
+                    
+                # Generate content for this element
+                logger.info(f"Generating content for element ID: {element.id}, Title: {element.title or 'Untitled'}")
+                
                 try:
-                    async with httpx.AsyncClient(timeout=120.0) as client: # Use a longer timeout for generation
-                        payload = {"prompt": full_prompt}
-                        url = f"{GENERATION_SERVICE_BASE_URL}/api/generation/text"
-                        logger.info(f"Calling Generation Service at: {url} for element {element.id}")
-                        response = await client.post(url, json=payload)
-
-                        if response.status_code == 200:
-                            response_data = response.json()
-                            generated_content = response_data.get("generated_text")
-                            if generated_content:
-                                logger.info(f"Successfully received generated content for element {element.id}.")
-                                # We will use this content in the next user story.
-                            else:
-                                logger.warning(f"Generation service response for {element.id} missing 'generated_text'. Response: {response.text}")
-                                error_message = "Generation service response format incorrect."
-                        else:
-                            logger.error(f"Generation service call failed for element {element.id}. Status: {response.status_code}, Response: {response.text}")
-                            error_message = f"Generation service failed with status {response.status_code}."
-                            response.raise_for_status() # Raise an exception for non-200 responses
-
-                except httpx.RequestError as e:
-                    logger.error(f"Could not connect to Generation Service for element {element.id}: {str(e)}")
-                    error_message = f"Could not connect to Generation Service: {str(e)}"
-                except httpx.HTTPStatusError as e:
-                    # Already logged above, just re-capture message if needed
-                    if not error_message:
-                        error_message = f"Generation service failed with status {e.response.status_code}."
+                    # Use our enhanced generate_element_content function
+                    generated_content = await generate_element_content(
+                        element=element,
+                        vector_store_id=report_to_generate.vectorStoreId,
+                        previous_content=previous_content
+                    )
+                    
+                    if generated_content:
+                        # Store the generated content
+                        element.ai_generated_content = generated_content
+                        element_markdown += f"{generated_content}\n"
+                        
+                        # Add this content to our preceding context
+                        section_content = f"## {element.title or 'Untitled Section'}\n{generated_content}"
+                        preceding_contents.append(section_content)
+                        logger.debug(f"Added generated content to preceding context. Total sections: {len(preceding_contents)}")
+                    else:
+                        error_message = "Generation returned empty content"
+                        logger.warning(f"Empty content generated for element {element.id}")
+                        element_markdown += f"*[Error: {error_message}]*\n"
+                        generation_errors.append({
+                            "element_id": element.id,
+                            "element_title": element.title or "Untitled Element",
+                            "error_code": ErrorCodes.GENERATION_FAILED,
+                            "error_message": error_message
+                        })
+                        
                 except Exception as e:
-                    logger.error(f"An unexpected error occurred during generation call for element {element.id}: {str(e)}", exc_info=True)
-                    error_message = f"Unexpected error during generation: {str(e)}"
-
-                # Placeholder logic remains for now, using the result of the API call (or error)
-                if generated_content:
-                    # --- LLM Integration Phase 1, Story 3: Integrate Content ---
-                    # Instead of a placeholder, append the actual generated content
-                    logger.info(f"Integrating generated content for element {element.id}")
-                    element.ai_generated_content = generated_content # Store in the new dedicated field
-                    markdown_parts.append(f"{generated_content}\n")
-                    # --- End LLM Integration Phase 1, Story 3 ---
-                else:
-                    # If the call failed or content was missing, log and use error placeholder
-                    error_placeholder = f"*[/Placeholder: Error calling Generation Service for '{element.title or 'Untitled'}'. {error_message or 'Unknown error'}]*\\n"
-                    markdown_parts.append(error_placeholder)
-                    # Optionally collect these errors like the commented-out section below
+                    error_message = f"Error generating content: {str(e)}"
+                    logger.error(error_message, exc_info=True)
+                    element_markdown += f"*[Error: {error_message}]*\n"
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
-                        "error_code": ErrorCodes.GENERATION_FAILED, # Or MAGE_SERVICE_ERROR
-                        "error_message": error_message or "Unknown generation error"
+                        "error_code": ErrorCodes.GENERATION_FAILED,
+                        "error_message": error_message
                     })
 
-                # --- End LLM Integration Phase 1, Story 2 ---
-
-            markdown_parts.append("\n")  # Fix double backslash for spacing line
+            # Add spacing and append this element's markdown to the full report
+            element_markdown += "\n"
+            markdown_parts.append(element_markdown)
 
         full_markdown = "".join(markdown_parts)  # Join without double newlines if parts already end with one
         
@@ -661,21 +708,126 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
         return "*[No instructions provided for AI generation]*"
     
     try:
-        # Prepare the prompt for MAGE
-        prompt = f"""Generate content for a report section with the following instructions:
+        # Initialize context variable
+        context_from_vectorstore = ""
+        has_context = False
+        context_quality = "none"  # Can be "none", "low", or "high"
         
-Instructions: {element.instructions}
-
-This content will be part of a larger report. Here is the content generated so far:
-{previous_content}
-
-Please generate markdown-formatted content for this section that follows the instructions.
-"""
-
-        # Add vector store context if available
+        # Retrieve context from vector store if available
         if vector_store_id:
-            logger.info(f"Using vector store ID: {vector_store_id} for element ID: {element.id}")
-            prompt += f"\nPlease use information from vector store with ID: {vector_store_id}"
+            logger.info(f"Retrieving context from vector store ID: {vector_store_id} for element ID: {element.id}")
+            try:
+                # Call embedding service to retrieve relevant chunks
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    query_payload = {
+                        "query": element.instructions,
+                        "top_k": 5,  # Retrieve top 5 most relevant chunks
+                        "score_threshold": 0.7  # Only include chunks with relevance score above 0.7
+                    }
+                    
+                    url = f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{vector_store_id}/query"
+                    logger.info(f"Calling Embedding Service at: {url}")
+                    
+                    response = await client.post(url, json=query_payload)
+                    
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        results = response_data.get("results", [])
+                        
+                        if results:
+                            logger.info(f"Retrieved {len(results)} context chunks from vector store")
+                            
+                            # Check quality of results based on scores
+                            high_quality_results = [r for r in results if r.get("score", 0) > 0.8]
+                            if high_quality_results:
+                                context_quality = "high"
+                            else:
+                                context_quality = "low"
+                                
+                            # Format the chunks into a numbered list for easier reference by the LLM
+                            context_chunks = []
+                            for i, result in enumerate(results, 1):
+                                text = result.get("text", "").strip()
+                                # Add source info if available
+                                source = result.get("metadata", {}).get("source", "")
+                                if source:
+                                    context_chunks.append(f"[{i}] (Source: {source})\n{text}")
+                                else:
+                                    context_chunks.append(f"[{i}]\n{text}")
+                                    
+                            context_from_vectorstore = "\n\n".join(context_chunks)
+                            has_context = True
+                        else:
+                            logger.warning(f"No relevant context found in vector store {vector_store_id}")
+                    else:
+                        logger.error(f"Embedding service call failed. Status: {response.status_code}, Response: {response.text}")
+            except Exception as e:
+                logger.error(f"Error retrieving context from vector store: {str(e)}", exc_info=True)
+                # We continue even if context retrieval fails - just with empty context
+        
+        # Build a structured prompt with clear sections
+        # 1. System instruction (role definition)
+        system_instruction = REPORT_SECTION_SYSTEM_PROMPT
+        
+        # 2. Task definition and user instructions
+        task_definition = f"""# Task
+You are generating content for a section in a technical report with the following title: "{element.title or 'Untitled Section'}"
+
+## User Instructions
+{element.instructions}"""
+
+        # 3. Context section - only include if we have context
+        context_section = ""
+        if has_context:
+            context_section = f"""
+# Reference Information
+Below is relevant reference information from our knowledge base that you should use to generate the content. 
+Each reference is numbered for easy citation.
+
+{context_from_vectorstore}"""
+            
+            # Add guidance based on context quality
+            if context_quality == "high":
+                context_section += "\n\nThe references above are highly relevant to the task. Be sure to draw from them extensively."
+            elif context_quality == "low":
+                context_section += "\n\nThe references above may be somewhat relevant but might not directly address all aspects of the task. Use them where appropriate and rely on your knowledge for gaps."
+        
+        # 4. Previous content section - for continuity
+        previous_content_section = ""
+        if previous_content:
+            previous_content_section = f"""
+# Previous Report Content
+This section follows previous content in the report. Ensure your output maintains consistency with this content:
+
+{previous_content}"""
+
+            # Add guidance for how to use the preceding content
+            if len(previous_content) > 1000:  # If there's substantial preceding content
+                previous_content_section += """
+
+When referencing the preceding content:
+1. Maintain consistent terminology, tone, and style
+2. Continue any relevant themes or narratives established earlier
+3. Avoid contradicting facts or statements made in previous sections
+4. Build upon concepts that have already been introduced
+5. If appropriate, refer back to specific points from earlier sections"""
+        
+        # 5. Output instructions
+        output_instructions = """
+# Output Instructions
+1. Generate comprehensive, well-structured content that directly addresses the user's instructions.
+2. Format your output in clean Markdown.
+3. If you use information from the provided references, mention which reference number you're drawing from.
+4. Ensure the content flows naturally from any previous report content.
+5. Focus on accuracy, clarity, and thoroughness."""
+
+        # Assemble the complete prompt
+        prompt = f"""{system_instruction}
+
+{task_definition}
+{context_section}
+{previous_content_section}
+{output_instructions}"""
             
         # Call MAGE service
         logger.info(f"Calling MAGE service for element ID: {element.id}")
@@ -686,12 +838,14 @@ Please generate markdown-formatted content for this section that follows the ins
                 "prompt": prompt,
                 "max_tokens": 1500,  # Reasonable limit for a report section
                 "temperature": 0.7,  # Balanced between creative and consistent
+                "preceding_context": previous_content if previous_content else None,  # Add preceding context as a separate field
+                "generation_config": {
+                    "max_new_tokens": 1500,
+                    "temperature": 0.7,
+                    "context_aware": True  # Signal to use context-aware generation
+                }
             }
             
-            # If vector store is specified, add it to the payload
-            if vector_store_id:
-                payload["vector_store_id"] = vector_store_id
-                
             logger.debug(f"Sending request to MAGE at URL: {url}")
             response = await client.post(url, json=payload)
             response.raise_for_status()  # Raise HTTP errors
@@ -706,6 +860,8 @@ Please generate markdown-formatted content for this section that follows the ins
                 return result["content"]
             elif "message" in result:
                 return result["message"]
+            elif "generated_text" in result:  # Added this check for compatibility
+                return result["generated_text"]
             else:
                 logger.error(f"Unexpected response format from MAGE service: {result}")
                 raise ValueError("Unexpected response format from MAGE service")
@@ -976,15 +1132,15 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
                 with open(report_content_path, "r", encoding="utf-8") as f:
                     markdown_content = f.read()
             else:
-                # No existing content, generate it
-                logger.info(f"No existing content found, generating report {report_id} for Word export")
-                
-                # Use a clean report generation function that only includes actual content
-                markdown_content = await generate_export_markdown(report)
-                
-                # Save the generated content for future use
-                with open(report_content_path, "w", encoding="utf-8") as f:
-                    f.write(markdown_content)
+                # No existing content - return an error instead of auto-generating
+                logger.warning(f"No generated content found for report {report_id}. Generation needed before export.")
+                return ErrorResponse(
+                    detail=ErrorDetail(
+                        code=ErrorCodes.GENERATION_FAILED,
+                        message="Report content has not been generated yet. Please use the 'Generate Report' button to generate content before exporting to Word."
+                    ),
+                    timestamp=now
+                )
         
         # Step 3: Convert the markdown to DOCX using pandoc
         try:
@@ -1127,6 +1283,8 @@ async def generate_export_markdown(report: Report) -> str:
 
     # Process each element in the report
     logger.info(f"Processing {len(report.content.elements)} elements for export")
+    has_missing_content = False
+    
     for element in report.content.elements:
         if element.title:
             markdown_parts.append(f"## {element.title}\n")
@@ -1141,11 +1299,16 @@ async def generate_export_markdown(report: Report) -> str:
                 # Use the AI-generated content directly (no instructions)
                 markdown_parts.append(f"{element.ai_generated_content}\n")
             else:
-                # If no generated content yet, leave an indicator
-                markdown_parts.append("*[Content not yet generated]*\n")
+                # If no generated content exists, log a warning - this content should be generated first
+                has_missing_content = True
+                logger.warning(f"Missing AI-generated content for section '{element.title or 'Untitled'}' - generation required")
+                # Skip this section in the output
 
         markdown_parts.append("\n")  # Add spacing
     
+    if has_missing_content:
+        logger.warning(f"Report {report.id} has sections with missing AI-generated content")
+        
     return "".join(markdown_parts)  # Join all parts together
 
 # Add other report builder related endpoints here 

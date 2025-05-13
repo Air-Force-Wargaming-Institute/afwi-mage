@@ -67,18 +67,58 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want the `Generation Service` (or its delegate like `embedding_service`) to retrieve relevant context from the specified `vectorStoreId` based on the user instructions.**
-    *   [ ] Task: Update the API contract to include `vector_store_id`.
-    *   [ ] Task: Implement the context retrieval logic within the Generation Service (or coordinate with `embedding_service`), using `vectorStoreId` and `user_instructions` to perform similarity search.
+    *   [x] Task: Update the API contract to include `vector_store_id`.
+    *   [x] Task: Implement the context retrieval logic within the Generation Service (or coordinate with `embedding_service`), using `vectorStoreId` and `user_instructions` to perform similarity search.
 *   **As a Backend Developer, I want the `Generation Service` to incorporate the retrieved vector store context into the final prompt sent to the LLM.**
-    *   [ ] Task: Implement prompt assembly logic within the Generation Service to combine system prompt, user instructions, retrieved context, and (later) preceding context.
+    *   [x] Task: Implement prompt assembly logic within the Generation Service to combine system prompt, user instructions, retrieved context, and (later) preceding context.
 *   **As a Backend Developer, I want `report_builder_service` to gather preceding report content (up to a defined limit) and pass it to the `Generation Service`.**
-    *   [ ] Task: Develop a strategy for managing context length (e.g., last N sections, token count limit, summarization).
-    *   [ ] Task: Implement the logic in `report_builder_service` to collect the appropriate preceding content.
-    *   [ ] Task: Update the API contract to include `preceding_context`.
+    *   [x] Task: Develop a strategy for managing context length (e.g., last N sections, token count limit, summarization).
+    *   [x] Task: Implement the logic in `report_builder_service` to collect the appropriate preceding content.
+    *   [x] Task: Update the API contract to include `preceding_context`.
 *   **As a Backend Developer, I want the `Generation Service` to include the preceding report context in the final LLM prompt.**
-    *   [ ] Task: Update the prompt assembly logic in the Generation Service to include the `preceding_context`.
+    *   [x] Task: Update the prompt assembly logic in the Generation Service to include the `preceding_context`. (Implemented enhanced preceding context handling with structured guidance for the LLM based on context length and explicit context-aware flag in the generation config.)
 
-### Phase 4: Robustness and Configuration
+### Phase 4: UI Generation Controls
+
+**Goal:** Provide intuitive UI components for users to trigger generation of entire reports or individual sections, with appropriate feedback and progress indicators.
+
+**User Stories & Tasks:**
+
+*   **As a User, I want a prominent "Generate Report" button in the report builder to trigger AI generation for all generative sections.**
+    *   [ ] Task: Add a "Generate Report" button to the ReportDesignerPage toolbar, adjacent to the "Export" button.
+    *   [ ] Task: Implement frontend API call to the existing `/api/report_builder/reports/{report_id}/generate` endpoint.
+    *   [ ] Task: Add loading indicators and success/error notifications for the generation process.
+    *   [ ] Task: Update the report preview to reflect newly generated content automatically.
+
+*   **As a User, I want to see the generation process happening incrementally, with visual feedback as each section is completed.**
+    *   [ ] Task: Implement a progress indicator showing which section is currently being generated.
+    *   [ ] Task: Add visual indicators (e.g., spinners) for sections awaiting generation.
+    *   [ ] Task: Update the UI in real-time as each section's content is received.
+    *   [ ] Task: Implement WebSocket or polling mechanism to receive incremental updates during generation.
+
+*   **As a User, I want to generate or regenerate individual sections without regenerating the entire report.**
+    *   [ ] Task: Add a "Generate" button for each generative section that hasn't been generated yet.
+    *   [ ] Task: Add a "Regenerate" button for each already-generated section.
+    *   [ ] Task: Implement frontend API call to the section-specific regeneration endpoint.
+    *   [ ] Task: Ensure section generation/regeneration properly displays loading state and results.
+
+*   **As a User, I want section regeneration to take into account the entire report context, maintaining consistency with other sections.**
+    *   [ ] Task: When calling section regeneration, send the full report context to maintain consistency.
+    *   [ ] Task: Update the backend regenerate_section endpoint to process both preceding and subsequent sections for context.
+    *   [ ] Task: Add visual indication that regenerated content is designed to be consistent with existing content.
+
+*   **As a User, I want to see the status of AI-generated sections clearly in the UI.**
+    *   [ ] Task: Implement visual indicators for different states: not generated, generation in progress, successfully generated, and generation failed.
+    *   [ ] Task: Add tooltips explaining the current state of each section.
+    *   [ ] Task: For failed generations, provide error information and retry options.
+
+*   **As a User, I want the option to regenerate the entire report from scratch if I've made significant changes.**
+    *   [ ] Task: Add a "Regenerate All" option (potentially in a dropdown menu).
+    *   [ ] Task: Implement confirmation dialog explaining that all AI-generated content will be replaced.
+    *   [ ] Task: Add a force_regenerate flag to the generate report API call.
+    *   [ ] Task: Ensure the UI updates completely after regeneration.
+
+### Phase 5: Robustness and Configuration
 
 **Goal:** Ensure the integration is reliable, handles errors gracefully, is properly configured, and supports enhanced user interactions like section regeneration.
 
