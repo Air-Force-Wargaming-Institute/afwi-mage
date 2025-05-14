@@ -18,9 +18,10 @@ The airgapped deployment solution enables the AFWI backend services (agent_servi
 The core challenge of airgapped deployment is managing dependencies without internet access. The approach uses a two-phase strategy:
 
 #### Phase 1: Preparation (Connected Environment)
-- Pre-download all Python package dependencies (both binary wheels and source packages)
-- Ensure compatibility with the target Linux environment by using Docker during the download
-- Package all application code, configuration, and dependency files for transfer
+- Pre-download all Python package dependencies (both binary wheels and source packages) into a central `backend_wheels` directory using the PowerShell scripts described in Section 3. This includes service-specific `download_wheels.ps1` scripts generating a `downloaded_wheels_list.txt`.
+- **Local Wheel Collection**: For each service, the `copy_wheels_from_list.ps1` script is run. This script reads the service's `downloaded_wheels_list.txt` and copies the required wheels from the central `backend_wheels` directory into the service's local `wheels/` directory. This ensures each service package contains only its necessary dependencies.
+- Ensure compatibility of all downloaded dependencies with the target Linux environment by using Docker during the download process.
+- Package all application code, configuration files, the service-local `wheels/` directory, and other necessary resources (like NLTK data for `extraction_service`) into a transfer archive (e.g., `${ServiceName}_airgapped.zip`).
 
 #### Phase 2: Deployment (Airgapped Environment)
 - Build Docker images using only local resources (no internet access)
@@ -81,20 +82,24 @@ This approach provides several benefits:
 - Significantly reduced final image size
 - Improved startup performance and resource efficiency
 
-### 3. Cross-Platform Scripts
+### 3. Dependency Preparation Scripts (Phase 1)
 
-Three different download scripts support various environments:
+The preparation of dependencies in a connected environment primarily relies on a PowerShell-centric scripting ecosystem. This includes:
 
-1. **download_wheels.py** - Linux/macOS Python script
-2. **download_wheels_windows.py** - Windows-friendly Python script
-3. **download_wheels.ps1** - PowerShell script for Windows
+1.  **`download_all_wheels.ps1` (Centralized Script)**: A top-level PowerShell script responsible for orchestrating the download of all required Python dependencies for all services. This script typically iterates through services and invokes their specific download scripts.
+2.  **Service-Specific `download_wheels.ps1` Scripts**: Each airgappable service contains its own `download_wheels.ps1` script. These PowerShell scripts are tailored to:
+    *   Identify the specific Python packages required by the service (from its `requirements.txt`).
+    *   Utilize Docker to download Linux-compatible binary wheels (`.whl`) and source packages (`.tar.gz`, `.zip`) into a common, centralized `backend_wheels` directory. This ensures that dependencies are compatible with the target Linux-based Docker environment.
+    *   Generate a `downloaded_wheels_list.txt` file, which lists the successfully downloaded wheel files for that service. This list is later used by the `copy_wheels_from_list.ps1` script.
 
-All scripts:
-- Use Docker to ensure Linux compatibility of dependencies
-- Handle both binary wheels and source packages
-- Apply platform-specific path handling
-- Include detailed logging and error handling
-- Offer archive creation for easy transfer
+Key features of these scripts:
+- **Docker for Compatibility**: All downloads are performed within a Docker container (e.g., `python:3.12-slim` based on `manylinux` standards) to ensure the wheels are compatible with the Linux environment where the services will eventually run.
+- **Comprehensive Dependency Gathering**: They aim to fetch both binary wheels (preferred for faster installation) and source distributions (as a fallback if a wheel isn't available or for packages that need compilation).
+- **Platform-Specific Handling**: While the core download logic runs in Linux Docker containers, the PowerShell scripts manage execution and path handling on the host (Windows, macOS, Linux).
+- **Logging and Error Handling**: Scripts include mechanisms for logging the download process and handling potential errors.
+- **Archive Preparation**: The overall process culminates in creating archives that bundle the application code and the downloaded dependencies for easy transfer to the airgapped environment.
+
+*(Note: While the primary approach is PowerShell-centric, helper scripts in Python or other languages might still be used for specific auxiliary tasks if beneficial.)*
 
 ### 4. Deployment Scripts
 
@@ -121,6 +126,13 @@ Since wheel files are binary and potentially large, they should not be tracked i
    - auth_service
    - chat_service
    - core_service
+   - direct_chat_service
+   - embedding_service
+   - extraction_service
+   - generation_service
+   - review_service
+   - upload_service
+   - workbench_service
 
 To add airgapped support to a new service:
 1. Create the wheels directory with a `.gitkeep` file

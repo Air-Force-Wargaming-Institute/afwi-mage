@@ -47,7 +47,7 @@ if (-not (Test-Path $sourceWheelsDirAbsolute -PathType Container)) {
 
 # Ensure the destination wheels directory exists
 if (-not (Test-Path $destWheelsDirAbsolute -PathType Container)) {
-    Write-Host "Creating destination wheels directory for $currentServiceName: $destWheelsDirAbsolute" -ForegroundColor Yellow
+    Write-Host "Creating destination wheels directory for ${currentServiceName}: $destWheelsDirAbsolute" -ForegroundColor Yellow
     try {
         New-Item -ItemType Directory -Path $destWheelsDirAbsolute -ErrorAction Stop | Out-Null
     } catch {
@@ -61,7 +61,7 @@ if (-not (Test-Path $destWheelsDirAbsolute -PathType Container)) {
 Write-Host "Reading wheel list from: $listFilePath" -ForegroundColor Cyan
 Write-Host "Source wheels directory: $sourceWheelsDirAbsolute" -ForegroundColor Cyan
 Write-Host "Destination wheels directory: $destWheelsDirAbsolute" -ForegroundColor Cyan
-Write-Host "Starting wheel copy process for service: $currentServiceName..." -ForegroundColor Yellow
+Write-Host "Starting wheel copy process for service: ${currentServiceName}..." -ForegroundColor Yellow
 
 $copiedCount = 0
 $notFoundCount = 0
@@ -86,14 +86,14 @@ foreach ($wheelFileName in $wheelFilesToCopy) {
     $destFilePath = ""
     try {
         if ($wheelFileName -match '[\\/:"*?<>|]') {
-            Write-Warning "Skipping invalid filename found in list for $currentServiceName: '$wheelFileName'"
+            Write-Warning "Skipping invalid filename found in list for ${currentServiceName}: '$wheelFileName'"
             $skippedCount++
             continue
         }
         $sourceFilePath = Join-Path -Path $sourceWheelsDirAbsolute -ChildPath $wheelFileName -ErrorAction Stop
         $destFilePath = Join-Path -Path $destWheelsDirAbsolute -ChildPath $wheelFileName -ErrorAction Stop
     } catch {
-        Write-Error "Failed to construct path for '$wheelFileName' in $currentServiceName: $($_.Exception.Message)"
+        Write-Error "Failed to construct path for '$wheelFileName' in ${currentServiceName}: $($_.Exception.Message)"
         $errorCount++
         continue
     }
@@ -104,18 +104,18 @@ foreach ($wheelFileName in $wheelFilesToCopy) {
             Copy-Item -Path $sourceFilePath -Destination $destFilePath -Force -ErrorAction Stop
             $copiedCount++
         } catch {
-            Write-Error "Failed to copy '$wheelFileName' for $currentServiceName: $($_.Exception.Message)"
+            Write-Error "Failed to copy '$wheelFileName' for ${currentServiceName}: $($_.Exception.Message)"
             $errorCount++
         }
     } else {
-        Write-Warning "Wheel file '$wheelFileName' not found in source directory '$sourceWheelsDirAbsolute' (listed by $currentServiceName)."
+        Write-Warning "Wheel file '$wheelFileName' not found in source directory '$sourceWheelsDirAbsolute' (listed by ${currentServiceName})."
         $notFoundCount++
     }
 }
 
 # --- Summary ---
 Write-Host "--------------------------------------------------" -ForegroundColor Cyan
-Write-Host "Wheel copy process finished for service: $currentServiceName." -ForegroundColor Green
+Write-Host "Wheel copy process finished for service: ${currentServiceName}." -ForegroundColor Green
 Write-Host "  Successfully copied: $copiedCount files." -ForegroundColor Green
 if ($notFoundCount -gt 0) {
     Write-Host "  Not found in source: $notFoundCount files." -ForegroundColor Yellow

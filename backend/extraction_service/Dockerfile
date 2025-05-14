@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirem
 # Create NLTK data directory and copy pre-downloaded data
 RUN mkdir -p /build/nltk_data
 # Copy pre-downloaded NLTK data from wheels directory
-COPY wheels/nltk_data/ /build/nltk_data/
+COPY nltk_data/ /build/nltk_data/
 
 # Second stage: Create the final image
 FROM afwi-mage-base:3.12-slim

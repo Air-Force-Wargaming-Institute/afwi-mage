@@ -82,7 +82,7 @@ $dockerArgs = @(
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 & docker @dockerArgs
 
@@ -99,7 +99,7 @@ $allDownloadedFiles = Get-ChildItem -Path $wheelsDirAbsolute
 if ($allDownloadedFiles.Count -eq 0) {
     Write-Warning "[$ServiceName] No files (wheels or sdist) found in $wheelsDirAbsolute. Check Docker output for errors."
 } else {
-    Write-Host "[$ServiceName] Found $($allDownloadedFiles.Count) files in $wheelsDirAbsolute:"
+    Write-Host "[$ServiceName] Found $($allDownloadedFiles.Count) files in ${wheelsDirAbsolute}:"
     $allDownloadedFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
 }
 
@@ -112,7 +112,7 @@ if ($wheels.Count -eq 0) {
     # foreach ($wheel in $wheels) { Write-Host "  - $($wheel.Name)" -ForegroundColor DarkGray } # Verbose
 }
 
-Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Saving list of required wheels to: ${listFilePath}" -ForegroundColor Cyan
 try {
     # Regenerate list based on requirements.txt, not just directory contents
     $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 

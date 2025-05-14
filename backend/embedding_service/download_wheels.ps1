@@ -81,28 +81,14 @@ $dockerArgs = @(
     "run", "--rm",
     "-v", "$normalizedWheelsPath`:/wheels",
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
-    "-v", "$normalizedWheelsPath`:/wheels",
-    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --no-binary=onnx --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 & docker @dockerArgs
 
-# Regardless of result, try downloading source packages for any packages that couldn't be found as wheels
-Write-Host "[$ServiceName] Downloading source packages for dependencies that don't have wheels..." -ForegroundColor Yellow
-$sourceDockerArgs = @(
-    "run", "--rm", 
-    "-v", "$normalizedWheelsPath`:/wheels",
-    "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
-    "python:3.12-slim",
-    "bash", "-c",
-    'cd /wheels && pip download --no-deps --no-binary=:all: -r /reqs/requirements.txt || echo "Source package download completed with some issues."'
-)
-& docker @sourceDockerArgs
-
 # Don't worry about exit codes - we're just collecting whatever we can get
-Write-Host "[$ServiceName] Docker commands finished." -ForegroundColor Green
+Write-Host "[$ServiceName] Docker command finished." -ForegroundColor Green
 
 # --- List Downloaded Wheels & Save List ---
 Write-Host "[$ServiceName] Listing downloaded packages from $wheelsDirAbsolute..." -ForegroundColor Cyan
@@ -122,7 +108,7 @@ if ($wheels.Count -eq 0 -and $sourcePackages.Count -eq 0) {
     Write-Host "[$ServiceName] Found $($wheels.Count) Linux-compatible wheel files and $($sourcePackages.Count) source packages in $wheelsDirAbsolute." -ForegroundColor Green
 }
 
-Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Saving list of required wheels to: ${listFilePath}" -ForegroundColor Cyan
 try {
     # Regenerate list based on requirements.txt, not just directory contents
     $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
