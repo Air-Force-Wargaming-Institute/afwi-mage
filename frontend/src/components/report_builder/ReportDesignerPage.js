@@ -12,12 +12,19 @@ import {
   CircularProgress,
   Snackbar,
   Menu,
-  MenuItem
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@material-ui/core';
+import { Alert } from '@material-ui/lab';
 import SaveIcon from '@material-ui/icons/Save';
 import PublishIcon from '@material-ui/icons/Publish';
 import CloseIcon from '@material-ui/icons/Close';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
 import ReportConfigPanel from './ReportConfigPanel';
 import ReportPreviewPanel from './ReportPreviewPanel';
 import axios from 'axios';
@@ -131,12 +138,15 @@ function ReportDesignerPage() {
   const [currentDefinition, setCurrentDefinition] = useState(getDefaultReport());
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [isNewReport, setIsNewReport] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorDetails, setErrorDetails] = useState({ code: '', message: '' });
 
   useEffect(() => {
     if (token) {
@@ -836,6 +846,137 @@ function ReportDesignerPage() {
     }).filter(Boolean).join('\n\n');
   };
 
+  // Add this new method to handle report generation
+  const handleGenerateReport = async () => {
+    // Check if report has been saved (has an ID)
+    if (!currentDefinition.id) {
+      setSnackbar({
+        open: true,
+        message: 'Please save the report before generating content',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    // Check if the report has at least one generative section
+    const hasGenerativeSections = currentDefinition.elements.some(
+      element => element.type === 'generative'
+    );
+
+    if (!hasGenerativeSections) {
+      setSnackbar({
+        open: true,
+        message: 'This report has no generative sections to generate content for',
+        severity: 'info'
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      // Display initial generation notification
+      setSnackbar({
+        open: true,
+        message: 'Generating report content...',
+        severity: 'info'
+      });
+
+      // Call the backend API to generate all sections
+      const response = await axios.post(
+        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/generate`),
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Check if we got an error response from the API
+      if (response.data && response.data.error === true) {
+        const errorCode = response.data.detail?.code;
+        const errorMessage = response.data.detail?.message || 'Unknown error occurred during generation';
+        
+        // Handle specific error codes with more helpful messages
+        if (errorCode === 'MAGE_SERVICE_ERROR') {
+          throw new Error('The AI generation service is not available. This is typically a temporary issue. Please try again in a few minutes.');
+        } else if (errorCode === 'VECTOR_STORE_ERROR') {
+          throw new Error('There was an issue accessing the knowledge base for context. Please check the vector store connection.');
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Fetch the updated report to get the generated content
+      const updatedReport = await axios.get(
+        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}`),
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Update the report definition with generated content
+      setCurrentDefinition(prev => {
+        const updated = {
+          ...prev,
+          ...updatedReport.data,
+          elements: updatedReport.data.content.elements || []
+        };
+        
+        // Log the updated definition to help with debugging
+        console.log('Updated report with generated content:', updated);
+        
+        return updated;
+      });
+
+      setSnackbar({
+        open: true,
+        message: 'Report content generated successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error generating report:', err);
+      
+      // Parse the error from the response if available
+      let errorMessage = err.message;
+      let errorCode = '';
+      
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          errorMessage = err.response.data.detail;
+        } else if (err.response.data.detail.message) {
+          errorMessage = err.response.data.detail.message;
+          errorCode = err.response.data.detail.code || '';
+          
+          // Add more context for specific error codes
+          if (err.response.data.detail.code === 'MAGE_SERVICE_ERROR') {
+            errorMessage = 'The AI generation service is not available. This is typically a temporary issue. Please try again in a few minutes.';
+            
+            // Show the error details dialog with troubleshooting info
+            setErrorDetails({
+              code: 'MAGE_SERVICE_ERROR',
+              message: errorMessage
+            });
+            setErrorDialogOpen(true);
+          }
+        }
+      }
+      
+      setError(errorMessage);
+      setSnackbar({
+        open: true,
+        message: `Error generating content: ${errorMessage}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCloseErrorDialog = () => {
+    setErrorDialogOpen(false);
+  };
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
@@ -865,6 +1006,21 @@ function ReportDesignerPage() {
             >
               {isSaving ? 'Saving...' : currentDefinition.isTemplate ? 'Save Template' : 'Save Report'}
             </Button>
+
+            {/* Add Generate Report button - only show for reports (not templates) */}
+            {!currentDefinition.isTemplate && (
+              <Button
+                startIcon={isGenerating ? <CircularProgress size={20} color="inherit" /> : <AutorenewIcon />}
+                onClick={handleGenerateReport}
+                disabled={isGenerating || !currentDefinition.id}
+                color="secondary"
+                variant="contained"
+                style={{ marginRight: 16 }}
+              >
+                {isGenerating ? 'Generating...' : 'Generate Report'}
+              </Button>
+            )}
+
             {!currentDefinition.isTemplate && (
               <Button
                 startIcon={<PublishIcon />}
@@ -908,6 +1064,7 @@ function ReportDesignerPage() {
           <ReportPreviewPanel
             definition={currentDefinition}
             onContentChange={handleDefinitionChange}
+            isGenerating={isGenerating}
           />
         </Box>
       </Box>
@@ -915,8 +1072,52 @@ function ReportDesignerPage() {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleSnackbarClose}
-        message={snackbar.message}
-      />
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity || 'info'}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Error details dialog */}
+      <Dialog
+        open={errorDialogOpen}
+        onClose={handleCloseErrorDialog}
+        aria-labelledby="error-dialog-title"
+        aria-describedby="error-dialog-description"
+      >
+        <DialogTitle id="error-dialog-title">AI Generation Service Unavailable</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="error-dialog-description">
+            <Typography paragraph>
+              The AI generation service (MAGE) is currently unavailable. This could be due to:
+            </Typography>
+            <ul>
+              <li>The service is still starting up</li>
+              <li>The service is temporarily down for maintenance</li>
+              <li>There might be a configuration issue with the service connection</li>
+            </ul>
+            <Typography paragraph>
+              <strong>Troubleshooting steps:</strong>
+            </Typography>
+            <Typography component="div" paragraph>
+              <ol>
+                <li>Wait a few minutes and try again</li>
+                <li>Check that all services are running properly</li>
+                <li>Verify the MAGE service configuration in your environment</li>
+                <li>Contact your administrator if this issue persists</li>
+              </ol>
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              Error code: {errorDetails.code}
+            </Typography>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseErrorDialog} color="primary" autoFocus>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

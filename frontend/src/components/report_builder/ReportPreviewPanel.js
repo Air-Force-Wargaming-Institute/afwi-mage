@@ -134,6 +134,20 @@ const useStyles = makeStyles((theme) => ({
   pendingGeneration: {
     fontStyle: 'italic',
     color: theme.palette.text.disabled,
+  },
+  generatingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(2),
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: theme.shape.borderRadius,
+  },
+  generatingText: {
+    marginTop: theme.spacing(1),
+    color: theme.palette.text.secondary,
+    fontStyle: 'italic',
   }
 }));
 
@@ -181,7 +195,7 @@ const formatExplicitContent = (contentInput, format = 'paragraph') => {
   }
 };
 
-function ReportPreviewPanel({ definition, onContentChange }) {
+function ReportPreviewPanel({ definition, onContentChange, isGenerating }) {
   const classes = useStyles();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -421,7 +435,6 @@ function ReportPreviewPanel({ definition, onContentChange }) {
         );
       } else if (element.type === 'generative') {
         // Render generative content with instructions and output
-        // IMPORTANT: Never use element.content for generative elements, only use element.ai_generated_content
         return (
           <Box key={element.id || index} mb={3}>
             <Box className={classes.instructionsSection}>
@@ -436,7 +449,14 @@ function ReportPreviewPanel({ definition, onContentChange }) {
                 Output from MAGE:
               </Typography>
               
-              {element.ai_generated_content ? (
+              {isGenerating ? (
+                <Box className={classes.generatingContent}>
+                  <CircularProgress size={30} />
+                  <Typography className={classes.generatingText}>
+                    Generating content...
+                  </Typography>
+                </Box>
+              ) : element.ai_generated_content ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
                   components={{

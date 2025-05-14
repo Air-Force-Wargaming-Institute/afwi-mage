@@ -198,8 +198,12 @@ init_templates()
 # Ensure this matches your docker-compose service name and port for embedding_service
 EMBEDDING_SERVICE_BASE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding_service:8006")
 
-# Placeholder for the MAGE Generation Service URL
-GENERATION_SERVICE_BASE_URL = os.getenv("GENERATION_SERVICE_URL", "http://generation_service:8003")
+# Configuration for vLLM
+VLLM_CHAT_COMPLETIONS_URL = os.getenv("VLLM_CHAT_COMPLETIONS_URL", "http://vllm:8000/v1/chat/completions")
+VLLM_MODEL_NAME = os.getenv("VLLM_MODEL_NAME", "/models/DeepHermes-3-Llama-3-8B-Preview-abliterated") # Default from direct_chat_service
+VLLM_MAX_TOKENS = int(os.getenv("VLLM_MAX_TOKENS", "2048")) # Max tokens for the generated response
+VLLM_TEMPERATURE = float(os.getenv("VLLM_TEMPERATURE", "0.7"))
+VLLM_REQUEST_TIMEOUT = int(os.getenv("VLLM_REQUEST_TIMEOUT", "300")) # Seconds
 
 @app.get("/api/report_builder/vector_stores", response_model=List[ReportBuilderVectorStoreInfo])
 async def get_vector_stores_for_report_builder():
@@ -415,48 +419,49 @@ async def delete_report(report_id: str):
     return
 
 @app.post("/api/report_builder/reports/{report_id}/generate", response_model=Union[GeneratedReportMarkdown, ErrorResponse])
-async def generate_report(report_id: str):
-    """
-    Generate a report using MAGE LLM service for the 'generative' elements.
-    
-    Args:
-        report_id (str): The ID of the report to generate
-        
-    Returns:
-        GeneratedReportMarkdown: The generated report markdown content
-        
-    Raises:
-        HTTPException: If report not found or generation fails
-    """
+async def generate_report(report_id: str, force_regenerate: bool = False):
+    logger.info(f"Received request to generate report: {report_id}, Force regenerate: {force_regenerate}")
+    report = load_report_from_file(REPORTS_DIR / f"{report_id}.json")
+    if not report:
+        logger.error(f"Report not found: {report_id}")
+        return ErrorResponse(
+            detail=ErrorDetail(code=ErrorCodes.REPORT_NOT_FOUND, message="Report not found"),
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+
+    # Commenting out or removing the health check for now
+    # service_healthy, health_message = await get_mage_service_health(VLLM_CHAT_COMPLETIONS_URL) # This needs a proper vLLM health endpoint if used
+    # if not service_healthy:
+    #     logger.error(f"Generation service is not healthy: {health_message}")
+    #     # Return a 503 Service Unavailable error or similar
+    #     return ErrorResponse(
+    #         detail=ErrorDetail(code=ErrorCodes.MAGE_SERVICE_ERROR, message=f"LLM service unavailable: {health_message}"),
+    #         timestamp=datetime.utcnow().isoformat() + "Z"
+    #     )
+    # logger.info(f"Generation service health check passed: {health_message}")
+
+    if not report.content or not report.content.elements:
+        logger.warning(f"Report {report_id} has no elements to generate.")
+        return ErrorResponse(
+            detail=ErrorDetail(code=ErrorCodes.GENERATION_FAILED, message="Report content has not been generated yet. Please use the 'Generate Report' button to generate content before exporting to Word."),
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+
     now = datetime.utcnow().isoformat() + "Z"  # For error timestamps
     
     try:
-        # Load the report definition
-        report_path = REPORTS_DIR / f"{report_id}.json"
-        report_to_generate = load_report_from_file(report_path)
-        
-        if not report_to_generate:
-            logger.warning(f"Report with ID {report_id} not found")
-            return ErrorResponse(
-                detail=ErrorDetail(
-                    code=ErrorCodes.REPORT_NOT_FOUND,
-                    message=f"Report with ID {report_id} not found"
-                ),
-                timestamp=now
-            )
-
         # Check if the report has a vector store ID but the vector store doesn't exist
-        if report_to_generate.vectorStoreId:
+        if report.vectorStoreId:
             try:
                 # Verify that the vector store exists by making a call to the embedding service
                 async with httpx.AsyncClient() as client:
-                    response = await client.get(f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{report_to_generate.vectorStoreId}")
+                    response = await client.get(f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{report.vectorStoreId}")
                     if response.status_code == 404:
-                        logger.warning(f"Report {report_id} references non-existent vector store ID: {report_to_generate.vectorStoreId}")
+                        logger.warning(f"Report {report_id} references non-existent vector store ID: {report.vectorStoreId}")
                         return ErrorResponse(
                             detail=ErrorDetail(
                                 code=ErrorCodes.VECTOR_STORE_ERROR,
-                                message=f"Vector store with ID {report_to_generate.vectorStoreId} not found"
+                                message=f"Vector store with ID {report.vectorStoreId} not found"
                             ),
                             timestamp=now
                         )
@@ -482,34 +487,19 @@ async def generate_report(report_id: str):
                         timestamp=now
                     )
 
-        # Check MAGE service availability
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{GENERATION_SERVICE_BASE_URL}/api/generation/health")
-                response.raise_for_status()
-        except (httpx.RequestError, httpx.HTTPStatusError) as e:
-            logger.error(f"MAGE service is not available: {str(e)}")
-            return ErrorResponse(
-                detail=ErrorDetail(
-                    code=ErrorCodes.MAGE_SERVICE_ERROR,
-                    message=f"MAGE service is not available. Please try again later."
-                ),
-                timestamp=now
-            )
-
         logger.info(f"Generating report for ID: {report_id}")
         markdown_parts = []  # Initialize a list to hold parts of the markdown
-        markdown_parts.append(f"# {report_to_generate.name}\n")
+        markdown_parts.append(f"# {report.name}\n")
 
-        if report_to_generate.description:
-            markdown_parts.append(f"{report_to_generate.description}\n\n")  # Add extra newline for spacing after description
+        if report.description:
+            markdown_parts.append(f"{report.description}\n\n")  # Add extra newline for spacing after description
 
         # Track any errors encountered during generation
         generation_errors = []
         
         # --- NEW: Keep track of preceding content for context ---
         preceding_contents = []  # List to keep track of previous content
-        TOKEN_LIMIT = 4000  # Maximum token limit for preceding context (adjust based on your model)
+        TOKEN_LIMIT = 1000  # Maximum token limit for preceding context (adjust based on your model)
         
         # Track the length of each section's content in estimated tokens
         # Rough estimate: 1 token ≈ 4 characters in English 
@@ -566,8 +556,8 @@ async def generate_report(report_id: str):
             return combined
         
         # Process each element in the report
-        logger.info(f"Processing {len(report_to_generate.content.elements)} elements")
-        for i, element in enumerate(report_to_generate.content.elements):
+        logger.info(f"Processing {len(report.content.elements)} elements")
+        for i, element in enumerate(report.content.elements):
             element_markdown = ""
             
             # Add element title to the markdown if it exists
@@ -601,7 +591,7 @@ async def generate_report(report_id: str):
                     # Use our enhanced generate_element_content function
                     generated_content = await generate_element_content(
                         element=element,
-                        vector_store_id=report_to_generate.vectorStoreId,
+                        vector_store_id=report.vectorStoreId,
                         previous_content=previous_content
                     )
                     
@@ -643,7 +633,7 @@ async def generate_report(report_id: str):
         full_markdown = "".join(markdown_parts)  # Join without double newlines if parts already end with one
         
         # Save the updated report with the generated content back to the file
-        save_report_to_file(report_to_generate)
+        save_report_to_file(report)
 
         # If we had generation errors, log them but still return the partial report
         if generation_errors:
@@ -689,206 +679,90 @@ async def generate_report(report_id: str):
         )
 
 async def generate_element_content(element: ReportElement, vector_store_id: Optional[str], previous_content: str = "") -> str:
-    """
-    Generate content for a report element using MAGE LLM service.
-    
-    Args:
-        element: The report element to generate content for
-        vector_store_id: Optional ID of vector store to use for context
-        previous_content: Previously generated content for context
-        
-    Returns:
-        str: The generated content
-        
-    Raises:
-        Exception: If generation fails
-    """
-    if not element.instructions:
-        logger.warning(f"No instructions provided for generative element ID: {element.id}")
-        return "*[No instructions provided for AI generation]*"
-    
-    try:
-        # Initialize context variable
-        context_from_vectorstore = ""
-        has_context = False
-        context_quality = "none"  # Can be "none", "low", or "high"
-        
-        # Retrieve context from vector store if available
-        if vector_store_id:
-            logger.info(f"Retrieving context from vector store ID: {vector_store_id} for element ID: {element.id}")
-            try:
-                # Call embedding service to retrieve relevant chunks
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    query_payload = {
-                        "query": element.instructions,
-                        "top_k": 5,  # Retrieve top 5 most relevant chunks
-                        "score_threshold": 0.7  # Only include chunks with relevance score above 0.7
-                    }
-                    
-                    url = f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{vector_store_id}/query"
-                    logger.info(f"Calling Embedding Service at: {url}")
-                    
-                    response = await client.post(url, json=query_payload)
-                    
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        results = response_data.get("results", [])
-                        
-                        if results:
-                            logger.info(f"Retrieved {len(results)} context chunks from vector store")
-                            
-                            # Check quality of results based on scores
-                            high_quality_results = [r for r in results if r.get("score", 0) > 0.8]
-                            if high_quality_results:
-                                context_quality = "high"
-                            else:
-                                context_quality = "low"
-                                
-                            # Format the chunks into a numbered list for easier reference by the LLM
-                            context_chunks = []
-                            for i, result in enumerate(results, 1):
-                                text = result.get("text", "").strip()
-                                # Add source info if available
-                                source = result.get("metadata", {}).get("source", "")
-                                if source:
-                                    context_chunks.append(f"[{i}] (Source: {source})\n{text}")
-                                else:
-                                    context_chunks.append(f"[{i}]\n{text}")
-                                    
-                            context_from_vectorstore = "\n\n".join(context_chunks)
-                            has_context = True
-                        else:
-                            logger.warning(f"No relevant context found in vector store {vector_store_id}")
-                    else:
-                        logger.error(f"Embedding service call failed. Status: {response.status_code}, Response: {response.text}")
-            except Exception as e:
-                logger.error(f"Error retrieving context from vector store: {str(e)}", exc_info=True)
-                # We continue even if context retrieval fails - just with empty context
-        
-        # Build a structured prompt with clear sections
-        # 1. System instruction (role definition)
-        system_instruction = REPORT_SECTION_SYSTEM_PROMPT
-        
-        # 2. Task definition and user instructions
-        task_definition = f"""# Task
-You are generating content for a section in a technical report with the following title: "{element.title or 'Untitled Section'}"
+    logger.info(f"Generating content for element: {element.title} (ID: {element.id})")
+    user_instructions = element.instructions or ""
+    full_user_prompt = user_instructions
 
-## User Instructions
-{element.instructions}"""
+    # Initialize context_text
+    context_text = ""
 
-        # 3. Context section - only include if we have context
-        context_section = ""
-        if has_context:
-            context_section = f"""
-# Reference Information
-Below is relevant reference information from our knowledge base that you should use to generate the content. 
-Each reference is numbered for easy citation.
-
-{context_from_vectorstore}"""
-            
-            # Add guidance based on context quality
-            if context_quality == "high":
-                context_section += "\n\nThe references above are highly relevant to the task. Be sure to draw from them extensively."
-            elif context_quality == "low":
-                context_section += "\n\nThe references above may be somewhat relevant but might not directly address all aspects of the task. Use them where appropriate and rely on your knowledge for gaps."
-        
-        # 4. Previous content section - for continuity
-        previous_content_section = ""
-        if previous_content:
-            previous_content_section = f"""
-# Previous Report Content
-This section follows previous content in the report. Ensure your output maintains consistency with this content:
-
-{previous_content}"""
-
-            # Add guidance for how to use the preceding content
-            if len(previous_content) > 1000:  # If there's substantial preceding content
-                previous_content_section += """
-
-When referencing the preceding content:
-1. Maintain consistent terminology, tone, and style
-2. Continue any relevant themes or narratives established earlier
-3. Avoid contradicting facts or statements made in previous sections
-4. Build upon concepts that have already been introduced
-5. If appropriate, refer back to specific points from earlier sections"""
-        
-        # 5. Output instructions
-        output_instructions = """
-# Output Instructions
-1. Generate comprehensive, well-structured content that directly addresses the user's instructions.
-2. Format your output in clean Markdown.
-3. If you use information from the provided references, mention which reference number you're drawing from.
-4. Ensure the content flows naturally from any previous report content.
-5. Focus on accuracy, clarity, and thoroughness."""
-
-        # Assemble the complete prompt
-        prompt = f"""{system_instruction}
-
-{task_definition}
-{context_section}
-{previous_content_section}
-{output_instructions}"""
-            
-        # Call MAGE service
-        logger.info(f"Calling MAGE service for element ID: {element.id}")
-        async with httpx.AsyncClient(timeout=120.0) as client:  # 2-minute timeout
-            url = f"{GENERATION_SERVICE_BASE_URL}/api/generation/text"
-            
-            payload = {
-                "prompt": prompt,
-                "max_tokens": 1500,  # Reasonable limit for a report section
-                "temperature": 0.7,  # Balanced between creative and consistent
-                "preceding_context": previous_content if previous_content else None,  # Add preceding context as a separate field
-                "generation_config": {
-                    "max_new_tokens": 1500,
-                    "temperature": 0.7,
-                    "context_aware": True  # Signal to use context-aware generation
-                }
-            }
-            
-            logger.debug(f"Sending request to MAGE at URL: {url}")
-            response = await client.post(url, json=payload)
-            response.raise_for_status()  # Raise HTTP errors
-            
-            result = response.json()
-            logger.debug(f"Received response from MAGE for element ID: {element.id}")
-            
-            # Extract the generated content
-            if "text" in result:
-                return result["text"]
-            elif "content" in result:
-                return result["content"]
-            elif "message" in result:
-                return result["message"]
-            elif "generated_text" in result:  # Added this check for compatibility
-                return result["generated_text"]
-            else:
-                logger.error(f"Unexpected response format from MAGE service: {result}")
-                raise ValueError("Unexpected response format from MAGE service")
-                
-    except httpx.RequestError as exc:
-        # Network-related errors
-        error_msg = f"Error connecting to MAGE service: {str(exc)}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
-        
-    except httpx.HTTPStatusError as exc:
-        # HTTP response errors (4XX, 5XX)
-        status_code = exc.response.status_code
+    # Step 1: Retrieve context from vector store if vectorStoreId is provided
+    if vector_store_id:
         try:
-            error_detail = exc.response.json()
-            error_msg = f"MAGE service returned HTTP {status_code}: {error_detail.get('detail', str(exc))}"
-        except:
-            error_msg = f"MAGE service returned HTTP {status_code}: {str(exc)}"
-        
-        logger.error(error_msg)
-        raise Exception(error_msg)
-        
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Use a more specific query if possible, for now using element instructions
+                # Ensure the embedding service endpoint is correct and expects 'query' and 'vectorstore_id'
+                response = await client.post(
+                    f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/query", 
+                    json={"query": user_instructions, "vectorstore_id": vector_store_id, "top_k": 3}
+                )
+                response.raise_for_status()
+                retrieved_docs = response.json().get("results", [])
+                if retrieved_docs:
+                    context_text = "\n\nRelevant Information from Knowledge Store:\n"
+                    for doc_info in retrieved_docs:
+                        # Assuming doc_info is a dict and has a 'text' field or similar
+                        context_text += f"- {doc_info.get('text', '')}\n"
+                    logger.info(f"Retrieved context from vector store for element {element.id}")
+        except httpx.RequestError as e:
+            logger.error(f"Could not connect to embedding service for vector store context: {e}")
+            # Optionally, append a notice about the error to the prompt or handle as a generation failure
+            full_user_prompt += "\n\n[Note: Error retrieving contextual information from knowledge store due to connection issue.]"
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Embedding service error for vector store context: {e.response.status_code} - {e.response.text}")
+            full_user_prompt += f"\n\n[Note: Error retrieving contextual information from knowledge store: {e.response.status_code}]"
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving vector store context: {e}")
+            full_user_prompt += "\n\n[Note: Unexpected error retrieving contextual information from knowledge store.]"
+    
+    if context_text:
+        full_user_prompt += context_text
+
+    if previous_content:
+        full_user_prompt = f"Consider the following previously generated report content:\n{previous_content}\n\nBased on that, and the following instructions, generate the current section:\n{full_user_prompt}"
+
+    messages = [
+        {"role": "system", "content": REPORT_SECTION_SYSTEM_PROMPT},
+        {"role": "user", "content": full_user_prompt}
+    ]
+
+    vllm_payload = {
+        "model": VLLM_MODEL_NAME,
+        "messages": messages,
+        "max_tokens": VLLM_MAX_TOKENS,
+        "temperature": VLLM_TEMPERATURE,
+        # Add other OpenAI compatible parameters if needed e.g. top_p, stop sequences
+    }
+
+    logger.info(f"Calling vLLM for element ID: {element.id}. Prompt: {full_user_prompt[:200]}...") # Log part of the prompt
+
+    try:
+        async with httpx.AsyncClient(timeout=VLLM_REQUEST_TIMEOUT) as client:
+            response = await client.post(VLLM_CHAT_COMPLETIONS_URL, json=vllm_payload)
+            response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+            
+            response_data = response.json()
+            generated_text = response_data.get('choices', [{}])[0].get('message', {}).get('content', '')
+            
+            if not generated_text:
+                logger.error(f"vLLM response for {element.id} was empty or not in expected format: {response_data}")
+                raise Exception("Received empty response from vLLM")
+            
+            logger.info(f"Successfully received response from vLLM for element ID: {element.id}")
+            return generated_text
+
+    except httpx.RequestError as e:
+        logger.error(f"Could not connect to vLLM service at {VLLM_CHAT_COMPLETIONS_URL}: {e}")
+        raise Exception(f"Connection to vLLM service failed: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"vLLM service returned an error: {e.response.status_code} - {e.response.text}")
+        raise Exception(f"vLLM service error: {e.response.status_code} - {e.response.text}")
     except Exception as e:
-        # Any other unexpected errors
-        error_msg = f"Unexpected error during content generation: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        raise Exception(error_msg)
+        logger.error(f"Unexpected error during vLLM call for element {element.id}: {str(e)}")
+        # Check if it's a KeyError from accessing response_data, indicating unexpected format
+        if isinstance(e, (KeyError, IndexError)):
+             raise Exception(f"Error parsing vLLM response: {str(e)}. Response format might be unexpected.")
+        raise Exception(f"Unexpected error during content generation: {str(e)}")
 
 # Template endpoints
 @app.post("/api/report_builder/templates", response_model=Template)

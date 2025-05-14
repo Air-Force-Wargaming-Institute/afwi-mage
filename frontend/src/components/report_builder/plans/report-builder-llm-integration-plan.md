@@ -85,10 +85,10 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 **User Stories & Tasks:**
 
 *   **As a User, I want a prominent "Generate Report" button in the report builder to trigger AI generation for all generative sections.**
-    *   [ ] Task: Add a "Generate Report" button to the ReportDesignerPage toolbar, adjacent to the "Export" button.
-    *   [ ] Task: Implement frontend API call to the existing `/api/report_builder/reports/{report_id}/generate` endpoint.
-    *   [ ] Task: Add loading indicators and success/error notifications for the generation process.
-    *   [ ] Task: Update the report preview to reflect newly generated content automatically.
+    *   [x] Task: Add a "Generate Report" button to the ReportDesignerPage toolbar, adjacent to the "Export" button.
+    *   [x] Task: Implement frontend API call to the existing `/api/report_builder/reports/{report_id}/generate` endpoint.
+    *   [x] Task: Add loading indicators and success/error notifications for the generation process.
+    *   [x] Task: Update the report preview to reflect newly generated content automatically.
 
 *   **As a User, I want to see the generation process happening incrementally, with visual feedback as each section is completed.**
     *   [ ] Task: Implement a progress indicator showing which section is currently being generated.
