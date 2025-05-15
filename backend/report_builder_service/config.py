@@ -30,6 +30,7 @@ VLLM_MODEL_NAME = os.getenv("VLLM_MODEL_NAME", "/models/DeepHermes-3-Llama-3-8B-
 VLLM_MAX_TOKENS = int(os.getenv("VLLM_MAX_TOKENS", "2048")) # Max tokens for the generated response
 VLLM_TEMPERATURE = float(os.getenv("VLLM_TEMPERATURE", "0.7"))
 VLLM_REQUEST_TIMEOUT = int(os.getenv("VLLM_REQUEST_TIMEOUT", "300")) # Seconds
+VLLM_API_KEY = os.getenv("VLLM_API_KEY", None) # API Key for the LLM service, if required
 
 # Token limits for context
 TOKEN_LIMIT = 1000  # Standard token limit for preceding context

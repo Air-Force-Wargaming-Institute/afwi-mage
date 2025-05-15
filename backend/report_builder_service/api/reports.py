@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 import json
 
-from models.schemas import Report, ReportCreate, GeneratedReportMarkdown, ErrorResponse, ErrorCodes
+from models.schemas import Report, ReportCreate, GeneratedReportMarkdown, ErrorResponse, ErrorCodes, ReportElement
 from services.file_service import load_report_from_file, save_report_to_file, load_all_reports
 from utils.errors import create_error_response
 from config import REPORTS_DIR, logger

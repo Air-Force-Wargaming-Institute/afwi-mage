@@ -1,11 +1,14 @@
 import httpx
 import logging
 from typing import Optional, Dict, Any, List
+import json
+from datetime import datetime
 
 from config import (
     logger, EMBEDDING_SERVICE_BASE_URL, VLLM_CHAT_COMPLETIONS_URL, 
     VLLM_MODEL_NAME, VLLM_MAX_TOKENS, VLLM_TEMPERATURE, VLLM_REQUEST_TIMEOUT,
-    REPORT_SECTION_SYSTEM_PROMPT, TOKEN_LIMIT, REGENERATION_TOKEN_LIMIT
+    REPORT_SECTION_SYSTEM_PROMPT, TOKEN_LIMIT, REGENERATION_TOKEN_LIMIT,
+    VLLM_API_KEY
 )
 from models.schemas import ReportElement, Report
 from services.file_service import save_report_to_file
@@ -22,6 +25,12 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
         
     Returns:
         str: The generated content
+        
+    Raises:
+        ConnectionError: When connection to dependent services fails
+        ValueError: When input data is invalid or improper
+        TimeoutError: When a service request times out
+        RuntimeError: For general processing errors
     """
     logger.info(f"Generating content for element: {element.title} (ID: {element.id})")
     user_instructions = element.instructions or ""
@@ -36,6 +45,7 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Use a more specific query if possible, for now using element instructions
                 # Ensure the embedding service endpoint is correct and expects 'query' and 'vectorstore_id'
+                logger.debug(f"Querying embedding service for context with query: {user_instructions[:50]}...")
                 response = await client.post(
                     f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/query", 
                     json={"query": user_instructions, "vectorstore_id": vector_store_id, "top_k": 3}
@@ -47,17 +57,34 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
                     for doc_info in retrieved_docs:
                         # Assuming doc_info is a dict and has a 'text' field or similar
                         context_text += f"- {doc_info.get('text', '')}\n"
-                    logger.info(f"Retrieved context from vector store for element {element.id}")
-        except httpx.RequestError as e:
-            logger.error(f"Could not connect to embedding service for vector store context: {e}")
-            # Optionally, append a notice about the error to the prompt or handle as a generation failure
-            full_user_prompt += "\n\n[Note: Error retrieving contextual information from knowledge store due to connection issue.]"
+                    logger.info(f"Retrieved {len(retrieved_docs)} context items from vector store for element {element.id}")
+                else:
+                    logger.warning(f"No context retrieved from vector store {vector_store_id} for element {element.id}")
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout connecting to embedding service for vector store context: {e}")
+            # We'll continue with generation but note the issue
+            full_user_prompt += "\n\n[Note: Could not retrieve contextual information from knowledge store due to timeout.]"
+            # Don't throw an exception here as we can continue without vector store context
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error to embedding service for vector store context: {e}")
+            full_user_prompt += "\n\n[Note: Could not retrieve contextual information from knowledge store due to connection error.]"
+            # Don't throw an exception here as we can continue without vector store context
         except httpx.HTTPStatusError as e:
-            logger.error(f"Embedding service error for vector store context: {e.response.status_code} - {e.response.text}")
-            full_user_prompt += f"\n\n[Note: Error retrieving contextual information from knowledge store: {e.response.status_code}]"
+            error_detail = f"status_code={e.response.status_code}"
+            try:
+                error_json = e.response.json()
+                if "detail" in error_json:
+                    error_detail = f"{error_detail}, detail={error_json['detail']}"
+            except:
+                pass
+            
+            logger.error(f"Embedding service error for vector store context: {error_detail}")
+            full_user_prompt += f"\n\n[Note: Could not retrieve contextual information from knowledge store due to service error: {error_detail}]"
+            # Don't throw an exception here as we can continue without vector store context
         except Exception as e:
-            logger.error(f"Unexpected error retrieving vector store context: {e}")
-            full_user_prompt += "\n\n[Note: Unexpected error retrieving contextual information from knowledge store.]"
+            logger.error(f"Unexpected error retrieving vector store context: {str(e)}", exc_info=True)
+            full_user_prompt += "\n\n[Note: Could not retrieve contextual information from knowledge store due to an unexpected error.]"
+            # Don't throw an exception here as we can continue without vector store context
     
     if context_text:
         full_user_prompt += context_text
@@ -78,35 +105,105 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
         # Add other OpenAI compatible parameters if needed e.g. top_p, stop sequences
     }
 
-    logger.info(f"Calling vLLM for element ID: {element.id}. Prompt: {full_user_prompt[:200]}...") # Log part of the prompt
-
+    logger.info(f"Calling vLLM for element ID: {element.id}. Prompt length: {len(full_user_prompt)} chars")
+    
+    # Step 2: Call the LLM service with comprehensive error handling
     try:
+        # Create a client with configurable timeout
         async with httpx.AsyncClient(timeout=VLLM_REQUEST_TIMEOUT) as client:
-            response = await client.post(VLLM_CHAT_COMPLETIONS_URL, json=vllm_payload)
-            response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+            start_time = datetime.now()
+            logger.debug(f"Starting LLM API call at {start_time}")
             
+            headers = {"Content-Type": "application/json"}
+            if VLLM_API_KEY:
+                headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
+                logger.debug("Using VLLM_API_KEY for authorization.")
+            
+            # Make the API call with proper exception handling
+            response = await client.post(VLLM_CHAT_COMPLETIONS_URL, json=vllm_payload, headers=headers)
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            logger.debug(f"LLM API call completed in {duration:.2f} seconds")
+            
+            # Check for HTTP errors
+            response.raise_for_status()
+            
+            # Parse the response
             response_data = response.json()
-            generated_text = response_data.get('choices', [{}])[0].get('message', {}).get('content', '')
             
-            if not generated_text:
-                logger.error(f"vLLM response for {element.id} was empty or not in expected format: {response_data}")
-                raise Exception("Received empty response from vLLM")
+            # Validate response structure
+            if 'choices' not in response_data or not response_data.get('choices'):
+                raise ValueError("LLM response missing 'choices' field or it's empty")
+                
+            first_choice = response_data.get('choices', [{}])[0]
+            if 'message' not in first_choice:
+                raise ValueError("LLM response choice missing 'message' field")
+                
+            generated_text = first_choice.get('message', {}).get('content', '')
             
-            logger.info(f"Successfully received response from vLLM for element ID: {element.id}")
+            # Validate we got actual content
+            if not generated_text or not generated_text.strip():
+                raise ValueError("Received empty content from LLM")
+            
+            logger.info(f"Successfully received response from vLLM for element ID: {element.id}, content length: {len(generated_text)} chars")
             return generated_text
 
-    except httpx.RequestError as e:
-        logger.error(f"Could not connect to vLLM service at {VLLM_CHAT_COMPLETIONS_URL}: {e}")
-        raise Exception(f"Connection to vLLM service failed: {str(e)}")
+    except httpx.TimeoutException as e:
+        logger.error(f"Timeout during LLM call for element {element.id}: {str(e)}")
+        raise TimeoutError(f"LLM service request timed out after {VLLM_REQUEST_TIMEOUT} seconds: {str(e)}")
+    
+    except httpx.ConnectError as e:
+        logger.error(f"Connection error to LLM service at {VLLM_CHAT_COMPLETIONS_URL}: {str(e)}")
+        raise ConnectionError(f"Could not connect to LLM service: {str(e)}")
+    
     except httpx.HTTPStatusError as e:
-        logger.error(f"vLLM service returned an error: {e.response.status_code} - {e.response.text}")
-        raise Exception(f"vLLM service error: {e.response.status_code} - {e.response.text}")
+        status_code = e.response.status_code
+        logger.error(f"LLM service returned HTTP {status_code} error for element {element.id}")
+        
+        # Try to extract more detailed error information from the response
+        error_detail = f"HTTP {status_code}"
+        try:
+            error_json = e.response.json()
+            if "error" in error_json:
+                error_detail = f"{error_detail}: {error_json['error']}"
+        except:
+            # If we can't parse JSON, use the text content
+            try:
+                error_detail = f"{error_detail}: {e.response.text[:200]}"
+            except:
+                pass
+        
+        # Map common status codes to more specific error messages
+        if status_code == 400:
+            raise ValueError(f"Bad request to LLM service: {error_detail}")
+        elif status_code == 401 or status_code == 403:
+            raise PermissionError(f"Authentication/authorization error with LLM service: {error_detail}")
+        elif status_code == 404:
+            raise ValueError(f"LLM service endpoint not found: {error_detail}")
+        elif status_code >= 500:
+            raise RuntimeError(f"LLM service internal error: {error_detail}")
+        else:
+            raise RuntimeError(f"Unexpected error from LLM service: {error_detail}")
+    
+    except ValueError as e:
+        # Pass through ValueError exceptions we've raised
+        logger.error(f"Value error during LLM generation for element {element.id}: {str(e)}")
+        raise
+    
+    except KeyError as e:
+        # Handle unexpected response format errors
+        logger.error(f"Unexpected response format from LLM for element {element.id}: {str(e)}")
+        raise ValueError(f"Unexpected LLM response format: {str(e)}")
+    
+    except json.JSONDecodeError as e:
+        # Handle JSON parsing errors
+        logger.error(f"Invalid JSON response from LLM for element {element.id}: {str(e)}")
+        raise ValueError(f"LLM service returned invalid JSON: {str(e)}")
+    
     except Exception as e:
-        logger.error(f"Unexpected error during vLLM call for element {element.id}: {str(e)}")
-        # Check if it's a KeyError from accessing response_data, indicating unexpected format
-        if isinstance(e, (KeyError, IndexError)):
-             raise Exception(f"Error parsing vLLM response: {str(e)}. Response format might be unexpected.")
-        raise Exception(f"Unexpected error during content generation: {str(e)}")
+        # Catch-all for any other unexpected errors
+        logger.error(f"Unexpected error during LLM call for element {element.id}: {str(e)}", exc_info=True)
+        raise RuntimeError(f"Unexpected error during content generation: {str(e)}")
 
 def estimate_tokens(text: str) -> int:
     """

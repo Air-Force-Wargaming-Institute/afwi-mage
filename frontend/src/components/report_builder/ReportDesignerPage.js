@@ -1090,11 +1090,15 @@ function ReportDesignerPage() {
       });
 
       // Call the backend API to regenerate the specific section
+      // Send the entire currentDefinition as the request body
       const response = await axios.post(
         getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/sections/${elementId}/regenerate?client_id=${clientId.current}`),
-        { instructions: element.instructions }, // Send the element's instructions instead of empty object
+        currentDefinition, // Send the full currentDefinition object
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json' // Ensure correct content type
+          }
         }
       );
 

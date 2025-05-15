@@ -109,15 +109,15 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
     *   [x] Task: Add visual indication that regenerated content is designed to be consistent with existing content.
 
 *   **As a User, I want to see the status of AI-generated sections clearly in the UI.**
-    *   [ ] Task: Implement visual indicators for different states: not generated, generation in progress, successfully generated, and generation failed.
-    *   [ ] Task: Add tooltips explaining the current state of each section.
-    *   [ ] Task: For failed generations, provide error information and retry options.
+    *   [ ] Task (DEFERRED): Implement visual indicators for different states: not generated, generation in progress, successfully generated, and generation failed.
+    *   [ ] Task (DEFERRED): Add tooltips explaining the current state of each section.
+    *   [ ] Task (DEFERRED): For failed generations, provide error information and retry options.
 
 *   **As a User, I want the option to regenerate the entire report from scratch if I've made significant changes.**
-    *   [ ] Task: Add a "Regenerate All" option (potentially in a dropdown menu).
-    *   [ ] Task: Implement confirmation dialog explaining that all AI-generated content will be replaced.
-    *   [ ] Task: Add a force_regenerate flag to the generate report API call.
-    *   [ ] Task: Ensure the UI updates completely after regeneration.
+    *   [ ] Task (DEFERRED): Add a "Regenerate All" option (potentially in a dropdown menu).
+    *   [ ] Task (DEFERRED): Implement confirmation dialog explaining that all AI-generated content will be replaced.
+    *   [ ] Task (DEFERRED): Add a force_regenerate flag to the generate report API call.
+    *   [ ] Task (DEFERRED): Ensure the UI updates completely after regeneration.
 
 ### Phase 5: Robustness and Configuration
 
@@ -126,28 +126,28 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 **User Stories & Tasks:**
 
 *   **As a Backend Developer, I want comprehensive error handling implemented in `report_builder_service` for the entire generation workflow.**
-    *   [ ] Task: Implement try-catch blocks around the API call to the Generation Service.
-    *   [ ] Task: Handle potential errors during context gathering.
-    *   [ ] Task: Handle timeouts and non-2xx responses from the Generation Service.
+    *   [x] Task: Implement try-catch blocks around the API call to the Generation Service.
+    *   [x] Task: Handle potential errors during context gathering.
+    *   [x] Task: Handle timeouts and non-2xx responses from the Generation Service.
 *   **As a Backend Developer, I want informative error messages propagated back to the frontend when generation fails.**
-    *   [ ] Task: Define standard error responses for generation failures.
-    *   [ ] Task: Ensure `report_builder_service` returns appropriate HTTP status codes and error details in the response body.
+    *   [x] Task: Define standard error responses for generation failures.
+    *   [x] Task: Ensure `report_builder_service` returns appropriate HTTP status codes and error details in the response body.
 *   **As a User, I want to trigger regeneration for a specific AI-generated section so I can get a different version based on the current report context (including any edits I've made).**
-    *   [ ] Task: Define a new API endpoint (e.g., `POST /api/report_builder/reports/{report_id}/sections/{section_index_or_id}/regenerate`).
-    *   [ ] Task: Implement frontend UI element (e.g., "Regenerate" button) for generated sections.
-    *   [ ] Task: Implement frontend logic to send the *current* report state (or relevant parts) and trigger the regeneration API call.
-    *   [ ] Task: Implement backend logic for the `regenerate_section` endpoint:
-        *   Accept current report context (potentially the full edited Markdown).
-        *   Identify the target section and its original `instructions`.
-        *   Gather preceding context based on the *provided current state*.
-        *   Call the Generation Service with instructions, current context, and `vectorStoreId`.
-        *   Return the newly generated content for *only* the requested section.
-    *   [ ] Task: Implement frontend logic to update the specific section's content upon successful regeneration.
+    *   [x] Task: Define a new API endpoint (e.g., `POST /api/report_builder/reports/{report_id}/sections/{section_index_or_id}/regenerate`). (Addressed by modifying existing `POST /api/report_builder/reports/{report_id}/sections/{element_id}/regenerate` to accept full report context)
+    *   [x] Task: Implement frontend UI element (e.g., "Regenerate" button) for generated sections. (Existing UI in ReportConfigPanel suitable)
+    *   [x] Task: Implement frontend logic to send the *current* report state (or relevant parts) and trigger the regeneration API call. (Updated handleRegenerateSection in ReportDesignerPage.js)
+    *   [x] Task: Implement backend logic for the `regenerate_section` endpoint:
+        *   [x] Accept current report context (potentially the full edited Markdown).
+        *   [x] Identify the target section and its original `instructions`.
+        *   [x] Gather preceding context based on the *provided current state*.
+        *   [x] Call the Generation Service with instructions, current context, and `vectorStoreId`.
+        *   [x] Return the newly generated content for *only* the requested section.
+    *   [x] Task: Implement frontend logic to update the specific section's content upon successful regeneration. (Handled by existing WebSocket updates and response processing in ReportDesignerPage.js)
 *   **As a Backend Developer, I want the necessary configuration (e.g., `Generation Service` URL) added to `report_builder_service` and managed appropriately.**
-    *   [ ] Task: Add configuration settings (e.g., in `config.py` or environment variables) for the Generation Service endpoint URL.
+    *   [x] Task: Add configuration settings (e.g., in `config.py` or environment variables) for the Generation Service endpoint URL. (Verified `VLLM_CHAT_COMPLETIONS_URL` in `config.py` already fulfills this requirement)
 *   **As a Backend Developer, I want the full API contract, including authentication/authorization, finalized and documented.**
-    *   [ ] Task: Define and document the final, stable API contract (see Section 5) incorporating all fields (`system_prompt`, `user_instructions`, `preceding_context`, `vector_store_id`, `generation_config`).
-    *   [ ] Task: Clarify and implement authentication/authorization mechanisms for the API endpoint.
+    *   [x] Task: Define and document the final, stable API contract (see Section 5) incorporating all fields (`system_prompt`, `user_instructions`, `preceding_context`, `vector_store_id`, `generation_config`). (Updated Section 5 of the plan to reflect the actual call to the LLM endpoint)
+    *   [x] Task: Clarify and implement authentication/authorization mechanisms for the API endpoint. (Added optional VLLM_API_KEY to config and its usage in generation_service.py)
 
 ### Phase 6: Enhanced User Experience and Error Handling
 
@@ -177,40 +177,69 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
     *   [ ] Task: Implement animated transitions between generation states.
     *   [ ] Task: Add success/failure icons that are visible at a glance for each section.
 
-## 5. API Considerations (`report_builder_service` -> `Generation Service`)
+## 5. API Considerations (`report_builder_service` -> LLM Service)
 
-_(This section remains as a reference for the final contract developed through the phases)_
+This section describes the API call made by the `report_builder_service` (specifically the `services.generation_service.generate_element_content` function) to the configured LLM service endpoint (e.g., a VLLM instance or an OpenAI-compatible API).
 
-A potential **final** API contract for the Generation Service endpoint used by the Report Builder:
-
-*   **Endpoint:** TBD (e.g., `/api/generation/generate_report_section`)
+*   **Endpoint URL:** Configured via `VLLM_CHAT_COMPLETIONS_URL` in `config.py` (typically loaded from environment variables).
 *   **Method:** `POST`
-*   **Request Body:**
-    '''json
+*   **Request Body (Example - OpenAI Chat Completions Format):**
+    ```json
     {
-      "system_prompt": "...",
-      "user_instructions": "...", // From ReportElement.instructions
-      "preceding_context": "...", // Markdown from previous sections
-      "vector_store_id": "...",   // ID for context retrieval
-      "generation_config": {      // Optional LLM parameters
-        "max_new_tokens": 1024,
-        "temperature": 0.7
-        // ... other params
+      "model": "string", // e.g., VLLM_MODEL_NAME from config.py
+      "messages": [
+        {
+          "role": "system",
+          "content": "string" // REPORT_SECTION_SYSTEM_PROMPT from config.py
+        },
+        {
+          "role": "user",
+          "content": "string" 
+          // This user content is dynamically constructed by generate_element_content.
+          // It includes:
+          // 1. User-provided instructions (from ReportElement.instructions).
+          // 2. Contextual information retrieved from the vector store (if vectorStoreId is provided and data is found).
+          // 3. Content of preceding report sections (markdown).
+          // 4. For section regeneration, it may also include report overview metadata (title, description).
+        }
+      ],
+      "max_tokens": "integer",   // e.g., VLLM_MAX_TOKENS from config.py
+      "temperature": "number", // e.g., VLLM_TEMPERATURE from config.py
+      // Other OpenAI-compatible parameters like top_p, stop sequences can be added if needed.
+    }
+    ```
+*   **Key Data Elements Prepared by `report_builder_service` for the `user` message content:**
+    *   `system_prompt`: Standardized, defined as `REPORT_SECTION_SYSTEM_PROMPT`.
+    *   `user_instructions`: From `ReportElement.instructions`.
+    *   `preceding_context`: Markdown from previous sections, managed for token limits.
+    *   `vector_store_id`: Used by `report_builder_service` to query the `EMBEDDING_SERVICE_BASE_URL` to fetch relevant context, which is then embedded into the user prompt. The ID itself is not sent to the LLM service.
+    *   `report_metadata`: For section regeneration, report name and description are prepended to the context.
+*   **Response Body (Success - Example from OpenAI Chat Completions):**
+    ```json
+    {
+      "id": "chatcmpl-...",
+      "object": "chat.completion",
+      "created": 1677652288,
+      "model": "...", 
+      "choices": [{
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "string" // Generated Markdown content for the section
+        },
+        "finish_reason": "stop"
+      }],
+      "usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
       }
-      // Potentially report metadata like title, overall goal?
     }
-    '''
-*   **Response Body (Success):**
-    '''json
-    {
-      "generated_text": "..." // Generated Markdown content for the section
-    }
-    '''
-*   **Response Body (Error):** Standard MAGE error format.
+    ```
+    The `report_builder_service` extracts `choices[0].message.content`.
+*   **Response Body (Error):** The `report_builder_service` expects HTTP errors from the LLM service (e.g., 4xx, 5xx). It handles these and translates them into its own error responses (see `ErrorCodes` in `models/schemas.py` and error handling in `api/generation.py`).
 
 ## 6. Open Questions
-
-_(Moved from previous Section 7)_
 
 *   Should the Generation Service perform the vector store query, or should `report_builder_service` do it and pass the results? (Current plan: Generation Service does it).
 *   What is the optimal strategy for including preceding report context within token limits? (Needs decision in Phase 2).

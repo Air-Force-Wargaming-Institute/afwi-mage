@@ -70,6 +70,9 @@ class ErrorResponse(BaseModel):
     error: bool = True
     detail: ErrorDetail
     timestamp: str
+    title: Optional[str] = None
+    suggestion: Optional[str] = None
+    additional_data: Optional[Dict[str, Any]] = None
 
 # Export Options
 class WordExportOptions(BaseModel):
@@ -83,4 +86,10 @@ class ErrorCodes:
     MAGE_SERVICE_ERROR = "MAGE_SERVICE_ERROR"
     GENERATION_FAILED = "GENERATION_FAILED"
     INVALID_REPORT_STRUCTURE = "INVALID_REPORT_STRUCTURE"
-    UNKNOWN_ERROR = "UNKNOWN_ERROR" 
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
+    # New error codes for specific generation errors
+    GENERATION_TIMEOUT = "GENERATION_TIMEOUT"
+    GENERATION_CONNECTION_ERROR = "GENERATION_CONNECTION_ERROR"
+    GENERATION_VALIDATION_ERROR = "GENERATION_VALIDATION_ERROR"
+    GENERATION_AUTH_ERROR = "GENERATION_AUTH_ERROR"
+    GENERATION_RUNTIME_ERROR = "GENERATION_RUNTIME_ERROR" 
