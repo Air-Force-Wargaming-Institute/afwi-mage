@@ -241,6 +241,7 @@ const RecordingControlPanel = () => {
   const [duration, setDuration] = useState(0);
   const [isWaveformReady, setIsWaveformReady] = useState(false);
   const isSeekingRef = useRef(false);
+  const [currentObjectUrl, setCurrentObjectUrl] = useState(null); // Added to track object URL
 
   const isPlaybackMode = !!loadedSessionId;
   
@@ -277,7 +278,6 @@ const RecordingControlPanel = () => {
         console.log('WaveSurfer ready');
         setDuration(wavesurfer.getDuration());
         setPlaybackTime(0);
-        setIsPlaying(false);
         setIsWaveformReady(true);
       });
       wavesurfer.on('audioprocess', (time) => {
@@ -295,12 +295,28 @@ const RecordingControlPanel = () => {
          setPlaybackTime(newTime);
          console.log('Seeked to:', newTime);
        });
+      // Add WaveSurfer error listener
+      wavesurfer.on('error', (err) => {
+        console.error('WaveSurfer error:', err);
+        setApiError(`WaveSurfer error: ${err.toString()}`); // Show WaveSurfer errors in the UI
+        setSnackbarMessage(`Audio processing error: ${err.toString()}`);
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        setIsWaveformReady(false); // Ensure buttons are disabled on error
+        if (wavesurferRef.current) {
+            wavesurferRef.current.empty(); // Clear the waveform area
+        }
+      });
 
       // Cleanup
       return () => {
         wavesurfer.unAll();
         wavesurfer.destroy();
         wavesurferRef.current = null;
+        if (currentObjectUrl) { // Revoke on unmount if an object URL exists
+          URL.revokeObjectURL(currentObjectUrl);
+          setCurrentObjectUrl(null);
+        }
       };
     }
   }, [theme]);
@@ -308,14 +324,69 @@ const RecordingControlPanel = () => {
   // Effect to load audio or reset state
   useEffect(() => {
     if (wavesurferRef.current) {
+      // Revoke previous object URL if it exists
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+        setCurrentObjectUrl(null);
+      }
+
       if (isPlaybackMode && audioUrl) {
-        console.log("Loading audio for playback:", audioUrl);
+        console.log("Attempting to load audio for playback via fetch:", audioUrl);
         setIsWaveformReady(false);
         setDuration(0);
         setPlaybackTime(0);
         setIsPlaying(false);
-        wavesurferRef.current.load(audioUrl);
+
+        const fetchAndLoadAudio = async () => {
+          try {
+            if (!token) {
+              setApiError("Authentication token not available to fetch audio.");
+              setSnackbarMessage("Error: Auth token missing for audio.");
+              setSnackbarSeverity('error');
+              setSnackbarOpen(true);
+              return;
+            }
+            console.log("Fetching audio with token:", audioUrl);
+            const response = await fetch(audioUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              cache: 'no-store'
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to fetch audio: ${response.status} ${errorText}`);
+            }
+
+            // Log the Content-Type of the successful audio response
+            console.log('[RecordingControlPanel] Audio fetch response Content-Type:', response.headers.get('Content-Type'));
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            setCurrentObjectUrl(objectUrl); // Store the new object URL
+
+            if (wavesurferRef.current) {
+              wavesurferRef.current.load(objectUrl);
+            }
+          } catch (error) {
+            console.error("Error fetching or loading audio:", error);
+            setApiError(error.message);
+            setSnackbarMessage(`Error loading audio: ${error.message}`);
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+            // Clear waveform on error
+             if (wavesurferRef.current) {
+                wavesurferRef.current.empty();
+             }
+            setIsWaveformReady(false);
+          }
+        };
+
+        fetchAndLoadAudio();
+
       } else if (!isPlaybackMode) {
+        // This part is for when not in playback mode (e.g., live recording view)
         wavesurferRef.current.empty();
         setIsWaveformReady(false);
         setDuration(0);
@@ -323,7 +394,9 @@ const RecordingControlPanel = () => {
         setIsPlaying(false);
       }
     }
-  }, [isPlaybackMode, audioUrl]);
+    // Cleanup function for this effect is not strictly necessary for currentObjectUrl
+    // because it's revoked at the start of the effect or on component unmount.
+  }, [isPlaybackMode, audioUrl, token, dispatch]); // Added token and dispatch
 
   // --- Timer Logic ---
   useEffect(() => {

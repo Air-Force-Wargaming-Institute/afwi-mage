@@ -55,9 +55,19 @@ export const getApiUrl = (service, endpoint) => {
 export const getGatewayUrl = (endpoint) => {
   // Ensure endpoint starts with / if it doesn't already
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // Use the base URL without service-specific port
-  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost';
-  return `${apiBaseUrl}${formattedEndpoint}`;
+  
+  // Use the gateway URL - default to localhost:80 if not specified
+  // Note: In production, this should be your gateway's domain/port
+  const gatewayUrl = process.env.REACT_APP_GATEWAY_URL || 'http://localhost:80';
+  
+  // Remove any trailing slash from the gateway URL
+  const baseUrl = gatewayUrl.endsWith('/') ? gatewayUrl.slice(0, -1) : gatewayUrl;
+  
+  // Construct the full URL
+  const url = `${baseUrl}${formattedEndpoint}`;
+  
+  console.log('Gateway URL:', url); // Debug log
+  return url;
 };
 
 // Add direct API endpoints export

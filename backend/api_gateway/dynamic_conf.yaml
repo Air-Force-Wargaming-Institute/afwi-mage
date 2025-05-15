@@ -12,7 +12,6 @@ http:
           - "X-User-ID"
           - "X-Username"
           - "X-User-Permission"
-          - "Authorization"
           - "X-Refreshed-Token"
         authRequestHeaders:
           - "Authorization"
