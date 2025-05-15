@@ -47,7 +47,7 @@ if (-not (Test-Path $sourceWheelsDirAbsolute -PathType Container)) {
 
 # Ensure the destination wheels directory exists
 if (-not (Test-Path $destWheelsDirAbsolute -PathType Container)) {
-    Write-Host "Creating destination wheels directory for $currentServiceName: $destWheelsDirAbsolute" -ForegroundColor Yellow
+    Write-Host "Creating destination wheels directory for ${currentServiceName}: $destWheelsDirAbsolute" -ForegroundColor Yellow
     try {
         New-Item -ItemType Directory -Path $destWheelsDirAbsolute -ErrorAction Stop | Out-Null
     } catch {
@@ -85,15 +85,15 @@ foreach ($wheelFileName in $wheelFilesToCopy) {
     $sourceFilePath = ""
     $destFilePath = ""
     try {
-        if ($wheelFileName -match '[\\/:"*?<>|]') {
-            Write-Warning "Skipping invalid filename found in list for $currentServiceName: '$wheelFileName'"
+        if ($wheelFileName -match '[\\\\/:"*?<>|]') {
+            Write-Warning "Skipping invalid filename found in list for ${currentServiceName}: '$wheelFileName'"
             $skippedCount++
             continue
         }
         $sourceFilePath = Join-Path -Path $sourceWheelsDirAbsolute -ChildPath $wheelFileName -ErrorAction Stop
         $destFilePath = Join-Path -Path $destWheelsDirAbsolute -ChildPath $wheelFileName -ErrorAction Stop
     } catch {
-        Write-Error "Failed to construct path for '$wheelFileName' in $currentServiceName: $($_.Exception.Message)"
+        Write-Error "Failed to construct path for '$wheelFileName' in ${currentServiceName}: $($_.Exception.Message)"
         $errorCount++
         continue
     }
@@ -104,7 +104,7 @@ foreach ($wheelFileName in $wheelFilesToCopy) {
             Copy-Item -Path $sourceFilePath -Destination $destFilePath -Force -ErrorAction Stop
             $copiedCount++
         } catch {
-            Write-Error "Failed to copy '$wheelFileName' for $currentServiceName: $($_.Exception.Message)"
+            Write-Error "Failed to copy '$wheelFileName' for ${currentServiceName}: $($_.Exception.Message)"
             $errorCount++
         }
     } else {

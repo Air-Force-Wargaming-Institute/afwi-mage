@@ -11,7 +11,7 @@ param(
         "busybox:latest", # For init-data
         "traefik:v3.3.4", # For api_gateway
         "redis/redis-stack:7.4.0-v3-x86_64", # For redis
-        "nvcr.io/nvidia/pytorch:23.10-py3", # For vLLM base
+        "vllm/vllm-openai:v0.8.5", # Actual base for vLLM service (see backend/vLLM/Dockerfile)
         "ollama/ollama:0.4.1"  # For Ollama base/target (ensure backend/ollama/Dockerfile aligns or adjust this)
     ),
     [string[]]$FrontendBaseImages = @(
@@ -95,15 +95,15 @@ try {
         $composeContent = Get-Content $airgapComposePath -Raw
         
         # Change include paths
-        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*vLLM/docker-compose.vllm.yml', ('include:`n  - ./compose_parts/docker-compose.vllm.yml' -replace '`n', \"`r`n\")
-        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*ollama/docker-compose.ollama.yml', ('include:`n  - ./compose_parts/docker-compose.ollama.yml' -replace '`n', \"`r`n\")
+        $composeContent = $composeContent -replace 'include:\\s*\\n\\s*-\\s*vLLM/docker-compose.vllm.yml', "include:`r`n  - ./compose_parts/docker-compose.vllm.yml"
+        $composeContent = $composeContent -replace 'include:\\s*\\n\\s*-\\s*ollama/docker-compose.ollama.yml', "include:`r`n  - ./compose_parts/docker-compose.ollama.yml"
         
         # List of services built by airgapped_deploy scripts (standard backend services)
         $builtServices = @("core", "chat", "agent", "extraction", "generation", "review", "upload", "embedding", "workbench", "auth", "direct_chat_service")
         foreach ($service in $builtServices) {
             # Regex to find 'build: ./service_name' or 'build: path: ./service_name' etc. and replace
-            $buildRegex = "(\n\s*$service:\s*(?:[^#\n]*\n)*?\s*)build:\s*.*?(\n\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
-            $replaceWith = \"\`$1image: ${service}-airgapped:latest\`$2\" # Use PowerShell string expansion carefully
+            $buildRegex = "(\\n\\s*${service}:\\s*(?:[^#\\n]*\\n)*?\\s*)build:\\s*.*?(\\n\\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
+            $replaceWith = "`$1image: ${service}-airgapped:latest`$2" # Use PowerShell string expansion carefully
             $composeContent = [regex]::Replace($composeContent, $buildRegex, $replaceWith, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         }
         # For vLLM and Ollama (which will also be built by airgapped_deploy)
@@ -124,7 +124,7 @@ try {
         $airgapVLLMComposePath = Join-Path $composePartsDir "docker-compose.vllm.yml"
         $vllmComposeContent = Get-Content $airgapVLLMComposePath -Raw
         $vllmBuildRegex = "(\n\s*vllm:\s*(?:[^#\n]*\n)*?\s*)build:\s*.*?(\n\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
-        $vllmReplaceWith = \"\`$1image: vllm-airgapped:latest\`$2\"
+        $vllmReplaceWith = "`$1image: vllm-airgapped:latest`$2"
         $vllmComposeContent = [regex]::Replace($vllmComposeContent, $vllmBuildRegex, $vllmReplaceWith, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         Set-Content -Path $airgapVLLMComposePath -Value $vllmComposeContent -Encoding UTF8
         Write-Host "Modified VLLM compose part for airgapped environment."
@@ -134,7 +134,7 @@ try {
         $airgapOllamaComposePath = Join-Path $composePartsDir "docker-compose.ollama.yml"
         $ollamaComposeContent = Get-Content $airgapOllamaComposePath -Raw
         $ollamaBuildRegex = "(\n\s*ollama:\s*(?:[^#\n]*\n)*?\s*)build:\s*.*?(\n\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
-        $ollamaReplaceWith = \"\`$1image: ollama-airgapped:latest\`$2\"
+        $ollamaReplaceWith = "`$1image: ollama-airgapped:latest`$2"
         $ollamaComposeContent = [regex]::Replace($ollamaComposeContent, $ollamaBuildRegex, $ollamaReplaceWith, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         Set-Content -Path $airgapOllamaComposePath -Value $ollamaComposeContent -Encoding UTF8
         Write-Host "Modified Ollama compose part for airgapped environment."
@@ -235,7 +235,7 @@ if (Test-Path $airgapDeployShSource) {
 }
 
 # Create a README for the package
-$packageReadmeContent = @\"
+$packageReadmeContent = @"
 Airgap Deployment Package Contents:
 ===================================
 
@@ -256,7 +256,7 @@ Basic Deployment Steps on Airgapped Machine:
 1. Transfer this entire package to the airgapped machine.
 2. Ensure Docker is running on the airgapped machine.
 3. Navigate to the `deployment_scripts` folder within this package.
-4. Run the appropriate deployment script (e.g., `.\\airgapped_deploy.ps1 -DeployAllServices` or `./airgapped_deploy.sh -a`).
+4. Run the appropriate deployment script (e.g., `.\\\\airgapped_deploy.ps1 -DeployAllServices` or `./airgapped_deploy.sh -a`).
    This script will:
      a. Load all base Docker images from `../docker_images/`.
      b. Extract and build images for services in `../backend_services/` (e.g., core-airgapped:latest).
@@ -266,7 +266,7 @@ Basic Deployment Steps on Airgapped Machine:
    Example: `cd ../backend_support/` then `docker compose up -d`
 
 Note: The deployment scripts build and tag images with an '-airgapped:latest' suffix. The provided docker-compose.yml in backend_support is modified to use these image names.
-\"@
+"@
 $packageReadmePath = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "README_AirgapPackage.txt"
 $packageReadmeContent | Out-File -FilePath $packageReadmePath -Encoding utf8
 Write-Host "Created package README at $packageReadmePath"

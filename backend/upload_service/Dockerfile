@@ -1,4 +1,4 @@
-FROM afwi-mage-base:latest
+FROM afwi-mage-base:3.12-slim
 
 # No need to install dependencies as they're in the base image
 
