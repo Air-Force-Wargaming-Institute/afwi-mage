@@ -2,7 +2,7 @@ fastapi==0.115.12
 uvicorn==0.34.2
 python-dotenv==1.1.0
 pydantic==2.11.4
-langchain-core==0.3.0
+langchain-core==0.3.29
 langchain-community==0.3.2
 python-multipart==0.0.20
 typing-extensions==4.13.2
@@ -12,7 +12,7 @@ aiofiles==24.1.0
 pytest-shutil==1.8.1
 #faiss-cpu>=1.7.0
 faiss-gpu-cu12==1.9.0.post1
-vllm==0.5.1
+vllm==0.8.5.post1
 aiohttp==3.9.5
 requests==2.31.0
 langchain-ollama==0.3.0

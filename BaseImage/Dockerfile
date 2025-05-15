@@ -17,6 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     pkg-config \
     curl \
+    git \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up LibreOffice environment

@@ -83,7 +83,7 @@ $dockerArgs = @(
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    'python -m pip install --upgrade pip && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 & docker @dockerArgs
 

@@ -1,7 +1,7 @@
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
 langchain==0.3.0
-langchain-core==0.3.0
+langchain-core==0.3.29
 langchain-community==0.3.0
 langchain-openai==0.3.0
 langchain-ollama==0.3.0
@@ -16,3 +16,4 @@ pytest-shutil==1.8.1
 filelock==3.17.0
 portalocker==3.1.0
 requests==2.31.0
+xformers==0.0.30
