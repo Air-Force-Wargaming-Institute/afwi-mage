@@ -156,9 +156,9 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 **User Stories & Tasks:**
 
 *   **As a User, I want to see AI-generated content appear in the report preview in real-time as each section is completed.**
-    *   [ ] Task: Ensure the report preview updates to display AI-generated content for each section incrementally as it is completed when using the main "Generate Report" button, effectively utilizing the real-time update mechanisms (detailed in User Story 2 of Phase 4).
-    *   [ ] Task: Implement smooth scrolling to newly generated sections as they complete.
-    *   [ ] Task: Add visual indicators to highlight newly added content in the preview.
+    *   [x] Task: Ensure the report preview updates to display AI-generated content for each section incrementally as it is completed when using the main "Generate Report" button, effectively utilizing the real-time update mechanisms (detailed in User Story 2 of Phase 4). (Consider referencing `Wargame Builder` frontend components like `ExecutionChecklist.js` for dynamic UI update patterns and `Wargame Service` backend for WebSocket/event handling examples).
+    *   [x] Task: Implement smooth scrolling to newly generated sections as they complete. (Dynamic UI updates in `Wargame Builder` might offer inspiration for handling view changes gracefully).
+    *   [x] Task: Add visual indicators to highlight newly added content in the preview. (Refer to `Wargame Builder` for examples of visual cues in dynamic UIs).
 
 *   **As a User, I want clear feedback and recovery options when AI generation fails.**
     *   [ ] Task: For failed generations, provide detailed error information and retry options.
@@ -167,15 +167,15 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
     *   [ ] Task: Include troubleshooting hints based on common error types (e.g., "Try simplifying your instructions").
 
 *   **As a User, I want to see AI-generated text appear in real-time as it's being created, similar to a typing effect.**
-    *   [ ] Task: Implement a streaming mechanism for receiving partial generation results.
-    *   [ ] Task: Update the UI to display text characters sequentially as they're received.
-    *   [ ] Task: Add visual cues (like a cursor or highlight) to indicate active text generation.
-    *   [ ] Task: Ensure the incremental text updates work for both whole-report and individual section generation.
+    *   [ ] Task: Implement a streaming mechanism for receiving partial generation results. (The `Wargame Service` backend's WebSocket communication and event handling patterns are highly relevant here; `Wargame Builder` frontend for real-time data display).
+    *   [ ] Task: Update the UI to display text characters sequentially as they're received. (Leverage dynamic UI update patterns from `Wargame Builder`).
+    *   [ ] Task: Add visual cues (like a cursor or highlight) to indicate active text generation. (Consider visual cues used in `Wargame Builder` for active processes).
+    *   [ ] Task: Ensure the incremental text updates work for both whole-report and individual section generation. (Real-time state synchronization examples from `Wargame Service` and `Wargame Builder` can be useful).
 
 *   **As a User, I want a more interactive and visual indication of the generation process status.**
-    *   [ ] Task: Add a progress visualization that shows both completed and pending sections.
-    *   [ ] Task: Implement animated transitions between generation states.
-    *   [ ] Task: Add success/failure icons that are visible at a glance for each section.
+    *   [ ] Task: Add a progress visualization that shows both completed and pending sections. (Components like `Wargame Builder`'s `ExecutionChecklist.js` can serve as a model for such visualizations).
+    *   [ ] Task: Implement animated transitions between generation states. (Refer to `Wargame Builder`'s dynamic UI updates for animation patterns).
+    *   [ ] Task: Add success/failure icons that are visible at a glance for each section. (Similar to status indicators in `Wargame Builder`'s `ExecutionChecklist.js`).
 
 ## 5. API Considerations (`report_builder_service` -> LLM Service)
 

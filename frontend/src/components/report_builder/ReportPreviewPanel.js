@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -185,7 +185,11 @@ const useStyles = makeStyles((theme) => ({
   },
   regenerateButton: {
     marginLeft: theme.spacing(1),
-  }
+  },
+  newlyGeneratedHighlight: { // CSS class for highlighting
+    transition: 'background-color 0.5s ease-out',
+    backgroundColor: theme.palette.action.selected, // Or a custom color like yellow/light green briefly
+  },
 }));
 
 // Updated function to format generative content
@@ -232,7 +236,7 @@ const formatExplicitContent = (contentInput, format = 'paragraph') => {
   }
 };
 
-function ReportPreviewPanel({ definition, onContentChange, isGenerating, generatingElements = {} }) {
+function ReportPreviewPanel({ definition, onContentChange, isGenerating, generatingElements = {}, scrollToElementId, setScrollToElementId, highlightElementId, setHighlightElementId }) {
   const classes = useStyles();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -240,11 +244,16 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [originalDefinition, setOriginalDefinition] = useState(null);
   const [elementsMetadata, setElementsMetadata] = useState([]);
+  const elementRefs = useRef({}); // To store refs for each element
 
   useEffect(() => {
     if (definition && definition.elements) {
       // We'll collect all formatted elements but handle Markdown differently for display vs. editing
       const formattedElements = definition.elements.map(element => {
+        // Initialize ref for new elements
+        if (!elementRefs.current[element.id]) {
+          elementRefs.current[element.id] = React.createRef();
+        }
         if (element.type === 'explicit') {
           // For headings, if content is empty, consider using element.title.
           // However, ReportConfigPanel is now designed to place heading text in element.content.
@@ -295,6 +304,30 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
       setEditText('');
     }
   }, [definition]);
+
+  // Effect for scrolling to the element
+  useEffect(() => {
+    if (scrollToElementId && elementRefs.current[scrollToElementId] && elementRefs.current[scrollToElementId].current) {
+      elementRefs.current[scrollToElementId].current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest' // Can be 'start', 'center', 'end', or 'nearest'
+      });
+      // Reset the scroll trigger after scrolling to prevent re-scrolling on other updates
+      setScrollToElementId(null); 
+    }
+    // Ensure dependencies are correctly listed. 
+    // definition.elements is included to re-evaluate if elements change (e.g. new element added before current one finishes)
+  }, [scrollToElementId, setScrollToElementId]); // Only depend on scrollToElementId and its setter
+
+  // Effect for highlighting the element and then fading
+  useEffect(() => {
+    if (highlightElementId) {
+      const timer = setTimeout(() => {
+        setHighlightElementId(null);
+      }, 2000); // Highlight for 2 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [highlightElementId, setHighlightElementId]);
 
   const handleEditClick = () => {
     // Store the original definition for cancellation
@@ -432,6 +465,12 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
     }
 
     return definition.elements.map((element, index) => {
+      // Ensure ref is created if it wasn't during the initial useEffect
+      if (!elementRefs.current[element.id]) {
+        elementRefs.current[element.id] = React.createRef();
+      }
+      const isHighlighted = element.id === highlightElementId;
+
       if (element.type === 'explicit') {
         // Render explicit content as before
         let contentToFormat = element.content || '';
@@ -443,7 +482,12 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
         const formattedContent = formatExplicitContent(contentToFormat, element.format);
         
         return (
-          <Box key={element.id || index} mb={2}>
+          <Box 
+            key={element.id || index} 
+            mb={2} 
+            ref={elementRefs.current[element.id]}
+            className={isHighlighted ? classes.newlyGeneratedHighlight : ''} // Apply highlight class
+          >
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkBreaks]}
               components={{
@@ -477,7 +521,12 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
         
         // Render generative content with instructions and output
         return (
-          <Box key={element.id || index} mb={3}>
+          <Box 
+            key={element.id || index} 
+            mb={3} 
+            ref={elementRefs.current[element.id]}
+            className={isHighlighted ? classes.newlyGeneratedHighlight : ''} // Apply highlight class
+          >
             <Box className={classes.instructionsSection}>
               <Typography className={classes.generativeSectionHeader}>
                 Instructions for MAGE:

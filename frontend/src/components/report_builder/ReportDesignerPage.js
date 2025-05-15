@@ -150,6 +150,8 @@ function ReportDesignerPage() {
   const [errorDetails, setErrorDetails] = useState({ code: '', message: '' });
   const [generatingElements, setGeneratingElements] = useState({});
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [scrollToElementId, setScrollToElementId] = useState(null);
+  const [highlightElementId, setHighlightElementId] = useState(null);
   const clientId = useRef(`user-${Math.random().toString(36).substring(2, 9)}`);
 
   useEffect(() => {
@@ -306,7 +308,11 @@ function ReportDesignerPage() {
               elements: transformedElements,
               vectorStoreId: data.vectorStoreId || '',
               status: data.status || 'draft',
-              isTemplate: isTemplate
+              isTemplate: isTemplate,
+              createdAt: data.createdAt,
+              updatedAt: data.updatedAt,
+              type: data.type || (isTemplate ? undefined : 'Custom'),
+              ...(isTemplate && { category: data.category || 'Custom' })
             });
             
             // Reset unsaved changes flag after initial load
@@ -888,6 +894,8 @@ function ReportDesignerPage() {
             
             return updatedDefinition;
           });
+          setScrollToElementId(element_id);
+          setHighlightElementId(element_id);
         }
       }
     });
@@ -1089,11 +1097,34 @@ function ReportDesignerPage() {
         severity: 'info'
       });
 
+      // Prepare the payload according to the backend's Report schema
+      const payload = {
+        id: currentDefinition.id,
+        name: currentDefinition.title, // Map title to name
+        description: currentDefinition.description,
+        vectorStoreId: currentDefinition.vectorStoreId,
+        type: currentDefinition.type || 'Custom', // Ensure type is present
+        templateId: currentDefinition.templateId,
+        status: currentDefinition.status || 'draft', // Ensure status is present
+        content: { // Nest elements under content
+          elements: currentDefinition.elements
+        },
+        // createdAt and updatedAt should ideally be present in currentDefinition if it's a saved report
+        // If they might be missing, the backend would need to handle it or we need to ensure they are always there.
+        // For now, assume they are passed if they exist on currentDefinition.
+        createdAt: currentDefinition.createdAt, 
+        updatedAt: currentDefinition.updatedAt 
+      };
+
+      // Remove undefined fields to avoid sending them if not set
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+      if (payload.content.elements === undefined) delete payload.content.elements; // Should not happen if currentDefinition.elements exists
+
       // Call the backend API to regenerate the specific section
       // Send the entire currentDefinition as the request body
       const response = await axios.post(
         getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/sections/${elementId}/regenerate?client_id=${clientId.current}`),
-        currentDefinition, // Send the full currentDefinition object
+        payload, // Send the transformed payload
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -1263,6 +1294,10 @@ function ReportDesignerPage() {
             onContentChange={handleDefinitionChange}
             isGenerating={isGenerating}
             generatingElements={generatingElements}
+            scrollToElementId={scrollToElementId}
+            setScrollToElementId={setScrollToElementId}
+            highlightElementId={highlightElementId}
+            setHighlightElementId={setHighlightElementId}
           />
         </Box>
       </Box>
