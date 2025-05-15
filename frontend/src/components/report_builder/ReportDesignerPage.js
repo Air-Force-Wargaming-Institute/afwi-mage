@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
   Container, 
@@ -30,6 +30,7 @@ import ReportPreviewPanel from './ReportPreviewPanel';
 import axios from 'axios';
 import { getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
+import websocketService from '../../services/websocketService';
 
 // Helper functions
 const getDefaultReport = () => ({
@@ -147,6 +148,9 @@ function ReportDesignerPage() {
   const [isNewReport, setIsNewReport] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDetails, setErrorDetails] = useState({ code: '', message: '' });
+  const [generatingElements, setGeneratingElements] = useState({});
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const clientId = useRef(`user-${Math.random().toString(36).substring(2, 9)}`);
 
   useEffect(() => {
     if (token) {
@@ -846,7 +850,64 @@ function ReportDesignerPage() {
     }).filter(Boolean).join('\n\n');
   };
 
-  // Add this new method to handle report generation
+  // Set up WebSocket connection for real-time updates
+  useEffect(() => {
+    // Subscribe to websocket updates for report generation
+    const unsubscribe = websocketService.subscribe('generation_status', (data) => {
+      // Handle generation status updates
+      if (data.report_id === reportId) {
+        const { element_id, status, content, error } = data;
+        
+        console.log(`WebSocket update for element ${element_id}: ${status}`, data);
+        
+        // Update the generating elements status
+        setGeneratingElements(prev => ({
+          ...prev,
+          [element_id]: { status, content, error }
+        }));
+        
+        // If a section completed successfully, update the report definition
+        if (status === 'completed' && content) {
+          setCurrentDefinition(prev => {
+            const updatedElements = prev.elements.map(element => {
+              if (element.id === element_id) {
+                console.log(`Updating element ${element_id} with new content`);
+                return {
+                  ...element,
+                  ai_generated_content: content
+                };
+              }
+              return element;
+            });
+            
+            // Create a new object to ensure React detects the change
+            const updatedDefinition = {
+              ...prev,
+              elements: updatedElements
+            };
+            
+            return updatedDefinition;
+          });
+        }
+      }
+    });
+    
+    // Subscribe to progress updates
+    const progressUnsubscribe = websocketService.subscribe('generation_progress', (data) => {
+      if (data.report_id === reportId) {
+        setGenerationProgress({
+          current: data.current_element,
+          total: data.total_elements
+        });
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+      progressUnsubscribe();
+    };
+  }, [reportId]);
+
   const handleGenerateReport = async () => {
     // Check if report has been saved (has an ID)
     if (!currentDefinition.id) {
@@ -872,8 +933,20 @@ function ReportDesignerPage() {
       return;
     }
 
+    // Reset generation state
     setIsGenerating(true);
     setError(null);
+    setGeneratingElements({});
+    setGenerationProgress({ current: 0, total: 0 });
+    
+    // Initialize generatingElements with 'pending' status for all generative sections
+    const initialGeneratingState = {};
+    currentDefinition.elements.forEach(element => {
+      if (element.type === 'generative') {
+        initialGeneratingState[element.id] = { status: 'pending' };
+      }
+    });
+    setGeneratingElements(initialGeneratingState);
 
     try {
       // Display initial generation notification
@@ -883,9 +956,9 @@ function ReportDesignerPage() {
         severity: 'info'
       });
 
-      // Call the backend API to generate all sections
+      // Call the backend API to generate all sections, passing the client ID for websocket updates
       const response = await axios.post(
-        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/generate`),
+        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/generate?client_id=${clientId.current}`),
         {},
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -907,7 +980,8 @@ function ReportDesignerPage() {
         }
       }
 
-      // Fetch the updated report to get the generated content
+      // With WebSockets, the UI is updated in real-time, but we should still fetch the final state
+      // to ensure consistency with any changes made by the backend (timestamps, etc.)
       const updatedReport = await axios.get(
         getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}`),
         {
@@ -915,16 +989,33 @@ function ReportDesignerPage() {
         }
       );
 
-      // Update the report definition with generated content
+      // Extract elements correctly from the response structure
+      const updatedElements = updatedReport.data.content?.elements || [];
+      
+      // ⚠️ Don't overwrite the elements array that has been incrementally updated by WebSocket
+      // Instead, only update metadata fields like timestamps
       setCurrentDefinition(prev => {
         const updated = {
           ...prev,
           ...updatedReport.data,
-          elements: updatedReport.data.content.elements || []
+          // Use API-specific fields like vectorStoreId
+          vectorStoreId: updatedReport.data.vectorStoreId,
+          // But keep our flattened elements structure
+          elements: prev.elements.map(element => {
+            // Find the corresponding element in the updatedReport
+            const updatedElement = updatedElements.find(e => e.id === element.id);
+            if (updatedElement) {
+              // Preserve the ai_generated_content that was added incrementally
+              return {
+                ...updatedElement,
+                ai_generated_content: element.ai_generated_content || updatedElement.ai_generated_content
+              };
+            }
+            return element;
+          })
         };
         
-        // Log the updated definition to help with debugging
-        console.log('Updated report with generated content:', updated);
+        console.log('Updated report metadata after generation completed:', updated);
         
         return updated;
       });
@@ -973,6 +1064,105 @@ function ReportDesignerPage() {
     }
   };
 
+  // Add a new function to handle regenerating a single section
+  const handleRegenerateSection = async (elementId) => {
+    try {
+      // Find the element to regenerate
+      const element = currentDefinition.elements.find(el => el.id === elementId);
+      
+      if (!element) {
+        throw new Error('Section not found');
+      }
+      
+      // Get the section title for display
+      const sectionTitle = element.title || 'Untitled Section';
+      
+      // Update generation status
+      setGeneratingElements(prev => ({
+        ...prev,
+        [elementId]: { status: 'generating' }
+      }));
+      
+      setSnackbar({
+        open: true,
+        message: `Regenerating "${sectionTitle}" with full report context...`,
+        severity: 'info'
+      });
+
+      // Call the backend API to regenerate the specific section
+      const response = await axios.post(
+        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/sections/${elementId}/regenerate?client_id=${clientId.current}`),
+        { instructions: element.instructions }, // Send the element's instructions instead of empty object
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Check if the response is an error
+      if (response.data && response.data.error === true) {
+        throw new Error(response.data.detail?.message || 'Unknown error occurred');
+      }
+
+      // If successful and we got content back directly (not via WebSocket)
+      if (response.data && response.data.content) {
+        // Update the report definition with the new content for this section
+        setCurrentDefinition(prev => {
+          const updatedElements = prev.elements.map(element => {
+            if (element.id === elementId) {
+              return {
+                ...element,
+                ai_generated_content: response.data.content
+              };
+            }
+            return element;
+          });
+          
+          return {
+            ...prev,
+            elements: updatedElements
+          };
+        });
+
+        // Update the generation status
+        setGeneratingElements(prev => ({
+          ...prev,
+          [elementId]: { status: 'completed' }
+        }));
+
+        setSnackbar({
+          open: true,
+          message: `"${sectionTitle}" regenerated successfully with full report context`,
+          severity: 'success'
+        });
+      }
+    } catch (err) {
+      console.error('Error regenerating section:', err);
+      
+      // Parse error message
+      let errorMessage = err.message;
+      
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          errorMessage = err.response.data.detail;
+        } else if (err.response.data.detail.message) {
+          errorMessage = err.response.data.detail.message;
+        }
+      }
+      
+      // Update generation status with error
+      setGeneratingElements(prev => ({
+        ...prev,
+        [elementId]: { status: 'error', error: errorMessage }
+      }));
+      
+      setSnackbar({
+        open: true,
+        message: `Error regenerating section: ${errorMessage}`,
+        severity: 'error'
+      });
+    }
+  };
+
   const handleCloseErrorDialog = () => {
     setErrorDialogOpen(false);
   };
@@ -1017,7 +1207,7 @@ function ReportDesignerPage() {
                 variant="contained"
                 style={{ marginRight: 16 }}
               >
-                {isGenerating ? 'Generating...' : 'Generate Report'}
+                {isGenerating ? `Generating... ${generationProgress.current}/${generationProgress.total}` : 'Generate Report'}
               </Button>
             )}
 
@@ -1058,6 +1248,9 @@ function ReportDesignerPage() {
             definition={currentDefinition}
             onChange={handleDefinitionChange}
             currentReportId={reportId}
+            onRegenerateSection={handleRegenerateSection}
+            isGenerating={isGenerating}
+            generatingElements={generatingElements}
           />
         </Box>
         <Box className={classes.rightPanel}>
@@ -1065,6 +1258,7 @@ function ReportDesignerPage() {
             definition={currentDefinition}
             onContentChange={handleDefinitionChange}
             isGenerating={isGenerating}
+            generatingElements={generatingElements}
           />
         </Box>
       </Box>

@@ -89,23 +89,24 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
     *   [x] Task: Implement frontend API call to the existing `/api/report_builder/reports/{report_id}/generate` endpoint.
     *   [x] Task: Add loading indicators and success/error notifications for the generation process.
     *   [x] Task: Update the report preview to reflect newly generated content automatically.
+    *   [ ] Task: Ensure the report preview updates to display AI-generated content for each section incrementally as it is completed when using the main "Generate Report" button, effectively utilizing the real-time update mechanisms (detailed in User Story 2 of Phase 4).
 
 *   **As a User, I want to see the generation process happening incrementally, with visual feedback as each section is completed.**
-    *   [ ] Task: Implement a progress indicator showing which section is currently being generated.
-    *   [ ] Task: Add visual indicators (e.g., spinners) for sections awaiting generation.
-    *   [ ] Task: Update the UI in real-time as each section's content is received.
-    *   [ ] Task: Implement WebSocket or polling mechanism to receive incremental updates during generation.
+    *   [x] Task: Implement a progress indicator showing which section is currently being generated.
+    *   [x] Task: Add visual indicators (e.g., spinners) for sections awaiting generation.
+    *   [x] Task: Update the UI in real-time as each section's content is received.
+    *   [x] Task: Implement WebSocket or polling mechanism to receive incremental updates during generation.
 
 *   **As a User, I want to generate or regenerate individual sections without regenerating the entire report.**
-    *   [ ] Task: Add a "Generate" button for each generative section that hasn't been generated yet.
-    *   [ ] Task: Add a "Regenerate" button for each already-generated section.
-    *   [ ] Task: Implement frontend API call to the section-specific regeneration endpoint.
-    *   [ ] Task: Ensure section generation/regeneration properly displays loading state and results.
+    *   [x] Task: Add a "Generate" button for each generative section that hasn't been generated yet. (Note: Implemented in the ReportConfigPanel instead of ReportPreviewPanel)
+    *   [x] Task: Add a "Regenerate" button for each already-generated section. (Note: Implemented in the ReportConfigPanel instead of ReportPreviewPanel)
+    *   [x] Task: Implement frontend API call to the section-specific regeneration endpoint.
+    *   [x] Task: Ensure section generation/regeneration properly displays loading state and results.
 
 *   **As a User, I want section regeneration to take into account the entire report context, maintaining consistency with other sections.**
-    *   [ ] Task: When calling section regeneration, send the full report context to maintain consistency.
-    *   [ ] Task: Update the backend regenerate_section endpoint to process both preceding and subsequent sections for context.
-    *   [ ] Task: Add visual indication that regenerated content is designed to be consistent with existing content.
+    *   [x] Task: When calling section regeneration, send the full report context to maintain consistency.
+    *   [x] Task: Update the backend regenerate_section endpoint to process both preceding and subsequent sections for context.
+    *   [x] Task: Add visual indication that regenerated content is designed to be consistent with existing content.
 
 *   **As a User, I want to see the status of AI-generated sections clearly in the UI.**
     *   [ ] Task: Implement visual indicators for different states: not generated, generation in progress, successfully generated, and generation failed.
@@ -147,6 +148,34 @@ The LLM tasking process in the Report Builder aims to mirror the interaction mod
 *   **As a Backend Developer, I want the full API contract, including authentication/authorization, finalized and documented.**
     *   [ ] Task: Define and document the final, stable API contract (see Section 5) incorporating all fields (`system_prompt`, `user_instructions`, `preceding_context`, `vector_store_id`, `generation_config`).
     *   [ ] Task: Clarify and implement authentication/authorization mechanisms for the API endpoint.
+
+### Phase 6: Enhanced User Experience and Error Handling
+
+**Goal:** Improve the user experience with more detailed error feedback and enhance the visual display of real-time AI-generated content.
+
+**User Stories & Tasks:**
+
+*   **As a User, I want to see AI-generated content appear in the report preview in real-time as each section is completed.**
+    *   [ ] Task: Ensure the report preview updates to display AI-generated content for each section incrementally as it is completed when using the main "Generate Report" button, effectively utilizing the real-time update mechanisms (detailed in User Story 2 of Phase 4).
+    *   [ ] Task: Implement smooth scrolling to newly generated sections as they complete.
+    *   [ ] Task: Add visual indicators to highlight newly added content in the preview.
+
+*   **As a User, I want clear feedback and recovery options when AI generation fails.**
+    *   [ ] Task: For failed generations, provide detailed error information and retry options.
+    *   [ ] Task: Implement a dedicated error panel that shows specific error messages.
+    *   [ ] Task: Add a "Retry" button that appears directly next to failed generations.
+    *   [ ] Task: Include troubleshooting hints based on common error types (e.g., "Try simplifying your instructions").
+
+*   **As a User, I want to see AI-generated text appear in real-time as it's being created, similar to a typing effect.**
+    *   [ ] Task: Implement a streaming mechanism for receiving partial generation results.
+    *   [ ] Task: Update the UI to display text characters sequentially as they're received.
+    *   [ ] Task: Add visual cues (like a cursor or highlight) to indicate active text generation.
+    *   [ ] Task: Ensure the incremental text updates work for both whole-report and individual section generation.
+
+*   **As a User, I want a more interactive and visual indication of the generation process status.**
+    *   [ ] Task: Add a progress visualization that shows both completed and pending sections.
+    *   [ ] Task: Implement animated transitions between generation states.
+    *   [ ] Task: Add success/failure icons that are visible at a glance for each section.
 
 ## 5. API Considerations (`report_builder_service` -> `Generation Service`)
 
@@ -206,5 +235,11 @@ Development of the features outlined in this plan will primarily involve compone
     *   The service responsible for receiving prompts, retrieving vector context, interacting with the base LLM, and returning generated text.
 *   **Embedding Service:** `backend/embedding_service/` (Potentially)
     *   May be involved indirectly if the Generation Service delegates vector store querying.
+*   **Wargame Builder Frontend:** `frontend/src/components/wargame_builder/`
+    *   Reference for UI patterns related to real-time updates and interactive visualization.
+    *   Components like `ExecutionChecklist.js`, `RelationshipMatrix.js`, and `WargameMap.js` demonstrate effective approaches to dynamic UI updates.
+*   **Wargame Service Backend:** `backend/wargame_service/`
+    *   Reference for backend patterns related to WebSocket communication and event handling.
+    *   Can provide examples of handling real-time state synchronization between client and server.
 
 This phased plan provides a structured approach for integrating LLM assistance into the Report Builder, ensuring consistency with existing MAGE patterns like Direct Chat and allowing for incremental development and testing. 

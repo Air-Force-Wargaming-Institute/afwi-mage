@@ -5,6 +5,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Try to initialize a default model at module load time
+try:
+    # Check if ollama is accessible and at least one model is available
+    logger.info("Checking Ollama service availability at startup...")
+    models = ollama.list()
+    if models and 'models' in models and len(models['models']) > 0:
+        logger.info(f"Ollama service is available with {len(models['models'])} models: {[m['name'] for m in models['models']]}")
+        # Set the default model to the first available one
+        DEFAULT_MODEL = models['models'][0]['name']
+        logger.info(f"Using {DEFAULT_MODEL} as the default model")
+    else:
+        # If no models are available, we'll use a default
+        DEFAULT_MODEL = "llama2"
+        logger.warning(f"No models found in Ollama. Will use '{DEFAULT_MODEL}' as default and attempt to pull it if needed.")
+except Exception as e:
+    logger.error(f"Error connecting to Ollama at startup: {str(e)}")
+    # Set a fallback default model
+    DEFAULT_MODEL = "llama2"
+    logger.warning(f"Will use '{DEFAULT_MODEL}' as default when Ollama becomes available")
+
 def initialize_model(model_name):
     try:
         # Check if the model already exists in Ollama

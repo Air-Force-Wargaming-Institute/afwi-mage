@@ -20,6 +20,11 @@ import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import TextareaAutosize from '@material-ui/core/TextareaAutosize';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
 import RefreshIcon from '@material-ui/icons/Refresh';
+import CachedIcon from '@material-ui/icons/Cached';
+import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
+import CheckCircleOutlineIcon from '@material-ui/icons/CheckCircleOutline';
+import ScheduleIcon from '@material-ui/icons/Schedule';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
 import websocketService from '../../services/websocketService';
 
 const useStyles = makeStyles((theme) => ({
@@ -70,9 +75,9 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
   },
   progressContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: theme.spacing(1),
+    width: '100%',
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
   },
   progress: {
     flexGrow: 1,
@@ -148,6 +153,38 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(1),
     color: theme.palette.text.secondary,
     fontStyle: 'italic',
+  },
+  sectionStatus: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: theme.spacing(1),
+  },
+  statusIcon: {
+    marginRight: theme.spacing(1),
+  },
+  errorText: {
+    color: theme.palette.error.main,
+    fontStyle: 'italic',
+  },
+  waitingStatus: {
+    color: theme.palette.text.secondary,
+  },
+  processingStatus: {
+    color: theme.palette.primary.main,
+  },
+  completedStatus: {
+    color: theme.palette.success.main,
+  },
+  errorStatus: {
+    color: theme.palette.error.main,
+  },
+  sectionActions: {
+    position: 'absolute',
+    top: theme.spacing(1),
+    right: theme.spacing(1),
+  },
+  regenerateButton: {
+    marginLeft: theme.spacing(1),
   }
 }));
 
@@ -195,7 +232,7 @@ const formatExplicitContent = (contentInput, format = 'paragraph') => {
   }
 };
 
-function ReportPreviewPanel({ definition, onContentChange, isGenerating }) {
+function ReportPreviewPanel({ definition, onContentChange, isGenerating, generatingElements = {} }) {
   const classes = useStyles();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -434,6 +471,10 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating }) {
           </Box>
         );
       } else if (element.type === 'generative') {
+        // Check if this element is currently being generated
+        const elementStatus = generatingElements[element.id] || {};
+        const status = elementStatus.status || 'not_started';
+        
         // Render generative content with instructions and output
         return (
           <Box key={element.id || index} mb={3}>
@@ -444,16 +485,70 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating }) {
               <Typography variant="body2">{element.instructions || 'No instructions provided'}</Typography>
             </Box>
             
-            <Box className={classes.outputSection}>
-              <Typography className={classes.generativeSectionHeader}>
-                Output from MAGE:
-              </Typography>
+            <Box className={classes.outputSection} position="relative">
+              <Box className={classes.sectionStatus}>
+                <Typography className={classes.generativeSectionHeader}>
+                  Output from MAGE:
+                </Typography>
+                
+                {isGenerating && status === 'pending' && (
+                  <Box ml={2} display="flex" alignItems="center" className={classes.waitingStatus}>
+                    <ScheduleIcon className={classes.statusIcon} fontSize="small" />
+                    <Typography variant="caption">Waiting...</Typography>
+                  </Box>
+                )}
+                
+                {isGenerating && status === 'processing' && (
+                  <Box ml={2} display="flex" alignItems="center" className={classes.processingStatus}>
+                    <CachedIcon className={classes.statusIcon} fontSize="small" />
+                    <Typography variant="caption">Processing...</Typography>
+                  </Box>
+                )}
+                
+                {isGenerating && status === 'generating' && (
+                  <Box ml={2} display="flex" alignItems="center" className={classes.processingStatus}>
+                    <CircularProgress size={16} className={classes.statusIcon} />
+                    <Typography variant="caption">Generating...</Typography>
+                  </Box>
+                )}
+                
+                {status === 'completed' && (
+                  <Box ml={2} display="flex" alignItems="center" className={classes.completedStatus}>
+                    <CheckCircleOutlineIcon className={classes.statusIcon} fontSize="small" />
+                    <Typography variant="caption">Completed</Typography>
+                  </Box>
+                )}
+                
+                {status === 'error' && (
+                  <Box ml={2} display="flex" alignItems="center" className={classes.errorStatus}>
+                    <ErrorOutlineIcon className={classes.statusIcon} fontSize="small" />
+                    <Typography variant="caption">Error</Typography>
+                  </Box>
+                )}
+              </Box>
               
-              {isGenerating ? (
+              {isGenerating && (status === 'pending' || status === 'processing' || status === 'generating') ? (
                 <Box className={classes.generatingContent}>
-                  <CircularProgress size={30} />
+                  {status === 'pending' ? (
+                    <ScheduleIcon color="disabled" />
+                  ) : status === 'processing' ? (
+                    <CachedIcon color="primary" />
+                  ) : (
+                    <CircularProgress size={30} />
+                  )}
                   <Typography className={classes.generatingText}>
-                    Generating content...
+                    {status === 'pending' 
+                      ? 'Waiting in queue...' 
+                      : status === 'processing' 
+                        ? 'Preparing to generate content...' 
+                        : 'Generating content...'}
+                  </Typography>
+                </Box>
+              ) : status === 'error' ? (
+                <Box p={2} className={classes.errorText}>
+                  <Typography variant="body2" className={classes.errorText}>
+                    <ErrorOutlineIcon fontSize="small" style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                    Error generating content: {elementStatus.error || 'Unknown error'}
                   </Typography>
                 </Box>
               ) : element.ai_generated_content ? (
