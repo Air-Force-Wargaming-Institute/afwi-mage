@@ -85,7 +85,11 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: `1px solid ${theme.palette.divider}`
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    position: 'sticky',
+    top: 0,
+    backgroundColor: theme.palette.background.default,
+    zIndex: 1100,
   },
   content: {
     display: 'flex',
@@ -93,6 +97,7 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     padding: theme.spacing(1.5),
     gap: theme.spacing(2),
+    paddingBottom: theme.spacing(8),
   },
   mainContentPanel: {
     display: 'flex',
@@ -299,6 +304,19 @@ const useStyles = makeStyles((theme) => ({
   initialLoadedData: {
     // Add initial data from context state
   },
+  stickyFooter: {
+    position: 'sticky',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: theme.spacing(1.5),
+    backgroundColor: theme.palette.background.paper,
+    borderTop: `1px solid ${theme.palette.divider}`,
+    zIndex: 1050,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  }
 }));
 
 // Helper function to format time in HH:MM:SS
@@ -326,9 +344,20 @@ const constructClassificationString = (baseClassification, caveatType, customCav
 };
 
 // Helper function to get banner style based on classification
-const getBannerStyle = (baseClassification, theme) => { // Now takes baseClassification
+const getBannerStyle = (baseClassification, theme, loadedSessionId) => { // Added loadedSessionId argument
   if (!baseClassification || baseClassification === 'SELECT A SECURITY CLASSIFICATION') {
-    return { display: 'none' }; // Hide banner if no classification
+    // If loadedSessionId exists but no classification, show a less intrusive default or a placeholder message
+    if (loadedSessionId) { // Use the passed loadedSessionId argument
+        return {
+            backgroundColor: theme.palette.grey[300],
+            color: theme.palette.getContrastText(theme.palette.grey[300]),
+            minHeight: '24px', 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        };
+    }
+    return { display: 'none' }; // Hide banner if no classification and not a loaded session
   }
   const upperClass = baseClassification.toUpperCase();
   let backgroundColor = theme.palette.grey[700]; // Default
@@ -343,7 +372,7 @@ const getBannerStyle = (baseClassification, theme) => { // Now takes baseClassif
 
   return {
     backgroundColor,
-    color: theme.palette.getContrastText(backgroundColor), 
+    color: theme.palette.getContrastText(backgroundColor),
   };
 };
 
@@ -371,12 +400,15 @@ const RecordTranscribe = () => {
     markers,
     audioUrl, // Already in context
     playbackTime, // Already in context for dispatch, local for control
+    sendWebSocketMessage, // Added for RealtimeTaggingPanel access
   } = state;
 
   const [confirmCloseDialog, setConfirmCloseDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [closeWarningType, setCloseWarningType] = useState('');
+  const [confirmNavigationDialog, setConfirmNavigationDialog] = useState(false);
+  const [navigationAction, setNavigationAction] = useState(null);
 
   // --- START: WaveSurfer State Lifted from RecordingControlPanel --- 
   const waveformRef = useRef(null); // This ref will be passed to RecordingControlPanel for the container
@@ -401,11 +433,13 @@ const RecordTranscribe = () => {
         classification: selectedClassification === 'SELECT A SECURITY CLASSIFICATION' ? '' : selectedClassification,
         caveatType: caveatType,
         customCaveat: customCaveat,
+        markers: markers, // Ensure markers are part of the comparison
       };
       
       const initialComparableData = {
         ...initialLoadedData,
         classification: initialLoadedData.classification === 'SELECT A SECURITY CLASSIFICATION' ? '' : initialLoadedData.classification,
+        markers: initialLoadedData.markers || [], // Ensure initial markers are comparable
       };
 
       const areEqual = deepCompare(currentDataToCompare, initialComparableData);
@@ -418,7 +452,7 @@ const RecordTranscribe = () => {
     }
   }, [
       loadedSessionId, initialLoadedData, audioFilename, transcriptionText, participants, 
-      eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch
+      eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch, markers
   ]);
 
   // --- START: WaveSurfer Initialization and Event Handling (Moved here) ---
@@ -523,10 +557,11 @@ const RecordTranscribe = () => {
   // --- START: Playback Handlers (Moved here) ---
   const handlePlayPause = useCallback(() => {
     if (wavesurferRef.current && isWaveformReady) {
+      dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: !isAudioPlaying }); 
       wavesurferRef.current.playPause();
       setIsAudioPlaying(wavesurferRef.current.isPlaying());
     }
-  }, [isWaveformReady]);
+  }, [isWaveformReady, dispatch, isAudioPlaying]);
 
   const handleStopPlayback = useCallback(() => {
     if (wavesurferRef.current && isWaveformReady) {
@@ -534,6 +569,7 @@ const RecordTranscribe = () => {
       setIsAudioPlaying(false);
       setCurrentPlaybackTimeForSlider(0);
       dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+      dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: false }); 
     }
   }, [isWaveformReady, dispatch]);
 
@@ -552,7 +588,6 @@ const RecordTranscribe = () => {
       setTimeout(() => { isSeekingRef.current = false; }, 100);
     }
   }, [isWaveformReady, audioDuration]);
-  // --- END: Playback Handlers ---
 
   const hasUnsavedFormData = () => {
     // Check only if not loading a session and in inactive state
@@ -571,11 +606,34 @@ const RecordTranscribe = () => {
     return isFilenameEntered || isMetadataEntered || isParticipantEntered || isClassificationSelected;
   };
   
+  // Effect to handle window close with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
+      const hasNewSessionData = hasUnsavedFormData(); // Use the existing helper
+
+      if (isRecordingActive || (loadedSessionId && isDirty) || (!loadedSessionId && hasNewSessionData)) {
+        event.preventDefault(); // Standard for most browsers
+        event.returnValue = ''; // Required for some browsers (displays a generic message)
+        return ''; // For older browsers
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty, loadedSessionId, recordingState, hasUnsavedFormData]); // Add dependencies
+  
   const handleCloseWindow = () => {
     const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
     const hasData = hasUnsavedFormData();
     if (isRecordingActive) {
       setCloseWarningType('recording'); 
+      setConfirmCloseDialog(true);
+    } else if (isDirty && loadedSessionId) { // Check isDirty for loaded sessions
+      setCloseWarningType('unsavedChanges');
       setConfirmCloseDialog(true);
     } else if (!loadedSessionId && hasData) {
       setCloseWarningType('formData'); 
@@ -620,16 +678,29 @@ const RecordTranscribe = () => {
           setSnackbarOpen(true);
           return;
       }
+      if (!isDirty) {
+          setSnackbarMessage("No changes to save.");
+          setSnackbarOpen(true);
+          return;
+      }
+
+      const fullClassificationToSave = constructClassificationString(selectedClassification, caveatType, customCaveat);
 
       const finalPayload = {
         session_name: audioFilename,
         event_metadata: { 
             ...eventMetadata, 
-            classification: constructClassificationString(selectedClassification, caveatType, customCaveat) || null, 
+            classification: fullClassificationToSave || null, 
         },
         participants: participants,
         full_transcript_text: transcriptionText,
-        markers: markers,
+        markers: markers.map(marker => { // Ensure markers are in the format expected by backend
+            const { id, ...restOfMarker } = marker; // Assuming frontend uses 'id'
+            return {
+                ...restOfMarker,
+                marker_id: id // Or whatever the backend expects for existing/new markers during PUT
+            };
+        }),
       };
 
       try {
@@ -667,14 +738,46 @@ const RecordTranscribe = () => {
 
   const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
 
+  const handleNavigationAttempt = (actionToPerform) => {
+    if (isDirty && loadedSessionId) {
+      setNavigationAction(() => actionToPerform); // Store the action
+      setConfirmNavigationDialog(true);
+    } else {
+      actionToPerform(); // Perform action directly if no unsaved changes
+    }
+  };
+
+  const proceedWithNavigation = () => {
+    if (navigationAction) {
+      navigationAction();
+    }
+    setConfirmNavigationDialog(false);
+    setNavigationAction(null);
+  };
+
+  const saveAndProceedWithNavigation = async () => {
+    await handleSaveChanges(); // Assumes handleSaveChanges will set isDirty to false on success
+    // Check if save was successful (isDirty became false) before proceeding
+    if (!isDirty) { // Access updated isDirty from state (use the destructured isDirty)
+        proceedWithNavigation();
+    } else {
+        // If save failed, do not proceed with navigation, keep dialog open or show error
+        setSnackbarMessage("Save failed. Please resolve errors before navigating.");
+        setSnackbarOpen(true);
+        // Optionally, do not close the navigation dialog here
+    }
+  };
+
   return (
     <Box className={classes.root}>
       {/* Classification Banner */}
       <Box
         className={classes.classificationBanner}
-        sx={{ ...getBannerStyle(selectedClassification, theme), display: fullClassificationDisplay ? 'block' : 'none'}}
+        sx={{ ...getBannerStyle(selectedClassification, theme, loadedSessionId), // Pass loadedSessionId here
+              display: (fullClassificationDisplay || (loadedSessionId && selectedClassification === 'SELECT A SECURITY CLASSIFICATION')) ? 'flex' : 'none' 
+            }}
       >
-        {fullClassificationDisplay}
+        {fullClassificationDisplay || (loadedSessionId && selectedClassification === 'SELECT A SECURITY CLASSIFICATION' ? 'NO CLASSIFICATION SET' : '')}
       </Box>
 
       {/* Header */}
@@ -693,7 +796,7 @@ const RecordTranscribe = () => {
       <Box className={classes.content}>
         {/* Left Panel: Session Browser */}
         <Grid item xs={12} md={2} style={{ height: '100%', overflowY: 'auto' }}>
-          <SessionBrowserPanel />
+          <SessionBrowserPanel onNavigationAttempt={handleNavigationAttempt} />
         </Grid>
 
         {/* Right Panel: Main Area */}
@@ -724,21 +827,6 @@ const RecordTranscribe = () => {
                   {/* Participants Form */}
                   <ParticipantManager isReadOnly={isFormDisabled} />
                   <Divider />
-
-                  {/* Save Changes button (Remains, logic needs review) */}
-                  {loadedSessionId && (
-                     <Button 
-                         variant="contained" 
-                         color="secondary" 
-                         size="small" 
-                         startIcon={<SaveIcon />} 
-                         onClick={handleSaveChanges} 
-                         disabled={isFormDisabled || !isDirty}
-                         style={{ marginTop: '8px' }}
-                     >
-                          Save Changes
-                      </Button>
-                  )}
 
                 </GradientBorderPaper>
               </Grid>
@@ -778,10 +866,29 @@ const RecordTranscribe = () => {
       {/* Status Bar */}
       <Box className={classes.statusBar}>
         <Typography variant="body2" color="textSecondary">
-          {sessionId ? `Session ID: ${sessionId}` : 'No active session'}
+          {error ? <span style={{color: theme.palette.error.main}}>{error}</span> : (sessionId ? `Session ID: ${sessionId}` : 'No active session')}
         </Typography>
-        <Box></Box>
+        <Box>
+            {/* Display isDirty status for debugging if needed */}
+            {/* {loadedSessionId && <Chip label={isDirty ? "Unsaved Changes" : "Saved"} size="small" color={isDirty ? "secondary" : "primary"} />} */}
+        </Box>
       </Box>
+
+      {/* Sticky Footer for Save Button */}
+      {loadedSessionId && (
+        <Paper className={classes.stickyFooter} elevation={3}>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="medium"
+            startIcon={<SaveIcon />}
+            onClick={handleSaveChanges}
+            disabled={isFormDisabled || !isDirty}
+          >
+            Save Changes
+          </Button>
+        </Paper>
+      )}
 
       {/* Dialogs */}
       <Dialog open={confirmCloseDialog} onClose={() => setConfirmCloseDialog(false)}>
@@ -789,19 +896,56 @@ const RecordTranscribe = () => {
         <DialogContent>
           <DialogContentText>
             {closeWarningType === 'recording' && 'You have an active recording session. Closing now will discard your recording. Do you want to continue?'}
-            {closeWarningType === 'formData' && 'You have unsaved changes in the new session form. Closing now will discard this information. Do you want to continue?'}
+            {closeWarningType === 'formData' && 'You have unsaved changes in the new session form. Closing now will discard this information. Do you want tocontinue?'}
+            {closeWarningType === 'unsavedChanges' && 'You have unsaved changes. Closing now will discard these changes. Do you want to continue?'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmCloseDialog(false)} color="primary">Cancel</Button>
-          <Button onClick={() => { if (closeWarningType === 'recording') { cancelRecording(); } window.close(); }} color="error">
-             {closeWarningType === 'recording' ? 'Discard Recording & Close' : 'Discard Changes & Close'}
+          <Button 
+            onClick={() => { 
+              if (closeWarningType === 'recording') { 
+                // Potentially call a method on RecordingControlPanel to stop and discard
+                // For now, this assumes `cancelRecording` or a direct dispatch handles it.
+                // dispatch({ type: ACTIONS.RESET_STATE }); // Or a more specific cancel action
+              } 
+              window.close(); 
+            }} 
+            color="error"
+          >
+             {closeWarningType === 'recording' ? 'Discard & Close' : 'Discard Changes & Close'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmNavigationDialog} onClose={() => setConfirmNavigationDialog(false)}>
+        <DialogTitle>Unsaved Changes</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You have unsaved changes. Do you want to save them before navigating away?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setConfirmNavigationDialog(false); setNavigationAction(null); }} color="inherit">
+            Cancel Navigation
+          </Button>
+          <Button onClick={proceedWithNavigation} color="error">
+            Discard Changes
+          </Button>
+          <Button onClick={saveAndProceedWithNavigation} color="primary" variant="contained">
+            Save and Continue
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar */}
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} message={snackbarMessage} />
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={6000} 
+        onClose={() => setSnackbarOpen(false)} 
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} 
+        message={snackbarMessage} 
+      />
     </Box>
   );
 };

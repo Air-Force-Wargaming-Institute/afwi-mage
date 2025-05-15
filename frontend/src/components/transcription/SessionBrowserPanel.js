@@ -74,7 +74,7 @@ const useStyles = makeStyles((theme) => ({
   }
 }));
 
-const SessionBrowserPanel = () => {
+const SessionBrowserPanel = ({ onNavigationAttempt }) => {
   const classes = useStyles();
   const { state, dispatch } = useTranscription();
   const { previousSessions, loadedSessionId } = state;
@@ -127,40 +127,58 @@ const SessionBrowserPanel = () => {
         setError("Authentication token not found.");
         return; 
     }
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: sessionId });
 
-      const sessionDetailsUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}`);
-      
-      const response = await fetch(sessionDetailsUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+    const action = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+          
+          dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: sessionId });
+
+          const sessionDetailsUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}`);
+          
+          const response = await fetch(sessionDetailsUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+          });
+
+          if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to fetch session details: ${response.status} ${errorText || response.statusText}`);
           }
-      });
+          const sessionData = await response.json();
+          
+          dispatch({ type: ACTIONS.LOAD_SESSION_DATA, payload: sessionData });
+          
+        } catch (error) {
+          console.error("Error loading session details:", error);
+          setError('Failed to load session details: ' + error.message);
+          dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: null });
+          dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to load session details.' });
+        } finally {
+           setIsLoading(false);
+        }
+    };
 
-      if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch session details: ${response.status} ${errorText || response.statusText}`);
-      }
-      const sessionData = await response.json();
-      
-      dispatch({ type: ACTIONS.LOAD_SESSION_DATA, payload: sessionData });
-      
-    } catch (error) {
-      console.error("Error loading session details:", error);
-      setError('Failed to load session details: ' + error.message);
-      dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: null });
-      dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to load session details.' });
-    } finally {
-       setIsLoading(false);
+    if (loadedSessionId === sessionId) return; // Do nothing if the same session is clicked
+
+    if (onNavigationAttempt) {
+        onNavigationAttempt(action);
+    } else {
+        action();
     }
   };
 
   const handleStartNewSession = () => {
-    dispatch({ type: ACTIONS.START_NEW_SESSION });
+    const action = () => {
+        dispatch({ type: ACTIONS.START_NEW_SESSION });
+    };
+    if (onNavigationAttempt) {
+        onNavigationAttempt(action);
+    } else {
+        action();
+    }
   };
 
   const openDeleteConfirm = (session, event) => {

@@ -30,6 +30,7 @@ export const ACTIONS = {
   DELETE_SESSION_SUCCESS: 'DELETE_SESSION_SUCCESS',
   SET_WEBSOCKET_SENDER: 'SET_WEBSOCKET_SENDER',
   SET_PLAYBACK_TIME: 'SET_PLAYBACK_TIME',
+  SET_IS_PLAYING: 'SET_IS_PLAYING', // Added for wavesurfer playback state
 };
 
 // Define recorder states
@@ -85,6 +86,7 @@ const initialState = {
   isDirty: false, // Flag to indicate if changes have been made since load/save
   sendWebSocketMessage: null,
   playbackTime: 0, // For tracking playback progress
+  isPlaying: false, // Added for wavesurfer playback state
 };
 
 // Reducer function to handle state updates
@@ -344,6 +346,9 @@ const transcriptionReducer = (state, action) => {
 
     case ACTIONS.SET_PLAYBACK_TIME:
       return { ...state, playbackTime: action.payload };
+
+    case ACTIONS.SET_IS_PLAYING: // Added for wavesurfer playback state
+      return { ...state, isPlaying: action.payload };
 
     default:
       return state;
