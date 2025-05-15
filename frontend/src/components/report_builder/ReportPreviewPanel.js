@@ -25,7 +25,6 @@ import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
 import CheckCircleOutlineIcon from '@material-ui/icons/CheckCircleOutline';
 import ScheduleIcon from '@material-ui/icons/Schedule';
 import AutorenewIcon from '@material-ui/icons/Autorenew';
-import websocketService from '../../services/websocketService';
 
 const useStyles = makeStyles((theme) => ({
   root: {

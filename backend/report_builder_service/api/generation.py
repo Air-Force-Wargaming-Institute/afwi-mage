@@ -14,7 +14,6 @@ from services.generation_service import (
     generate_element_content, get_preceding_content, get_context_within_limit, 
     generate_export_markdown, estimate_tokens
 )
-from services.websocket_service import ws_manager
 from utils.errors import create_error_response, get_status_code_for_error
 from config import (
     REPORTS_DIR, EMBEDDING_SERVICE_BASE_URL, TOKEN_LIMIT, REGENERATION_TOKEN_LIMIT, logger
@@ -22,9 +21,9 @@ from config import (
 
 router = APIRouter(prefix="/api/report_builder", tags=["report_generation"])
 
-@router.post("/reports/{report_id}/generate", response_model=Union[GeneratedReportMarkdown, ErrorResponse])
-async def generate_report(report_id: str, force_regenerate: bool = False, client_id: Optional[str] = Query(None)):
-    logger.info(f"Received request to generate report: {report_id}, Force regenerate: {force_regenerate}, Client ID: {client_id}")
+@router.post("/reports/{report_id}/generate", response_model=Union[Report, ErrorResponse])
+async def generate_report(report_id: str, force_regenerate: bool = False):
+    logger.info(f"Received request to generate report: {report_id}, Force regenerate: {force_regenerate}")
     report = load_report_from_file(REPORTS_DIR / f"{report_id}.json")
     if not report:
         logger.error(f"Report not found: {report_id}")
@@ -109,24 +108,8 @@ async def generate_report(report_id: str, force_regenerate: bool = False, client
         # Process each element in the report
         logger.info(f"Processing {len(report.content.elements)} elements")
         for i, element in enumerate(report.content.elements):
-            # Send progress update via WebSocket if client_id is provided
-            if client_id:
-                try:
-                    await ws_manager.send_json({
-                        "type": "generation_progress",
-                        "data": {
-                            "report_id": report_id,
-                            "total_elements": len(report.content.elements),
-                            "current_element": i + 1,
-                            "element_id": element.id,
-                            "element_title": element.title or "Untitled Element",
-                            "status": "processing"
-                        }
-                    }, client_id)
-                except Exception as e:
-                    logger.error(f"Failed to send WebSocket progress update: {e}")
-            
             element_markdown = ""
+            element.generation_status = "pending" # Add a temporary status
             
             # Add element title to the markdown if it exists
             if element.title:
@@ -154,23 +137,9 @@ async def generate_report(report_id: str, force_regenerate: bool = False, client
                     
                 # Generate content for this element
                 logger.info(f"Generating content for element ID: {element.id}, Title: {element.title or 'Untitled'}")
+                element.generation_status = "generating" # Update status
                 
                 try:
-                    # Send update that generation is starting for this element
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "generating",
-                                    "message": f"Generating content for {element.title or 'Untitled Element'}..."
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket status update: {e}")
-                    
                     # Use our generation service function
                     generated_content = await generate_element_content(
                         element=element,
@@ -182,6 +151,7 @@ async def generate_report(report_id: str, force_regenerate: bool = False, client
                         # Store the generated content
                         element.ai_generated_content = generated_content
                         element_markdown += f"{generated_content}\n"
+                        element.generation_status = "completed" # Update status
                         
                         # Add this content to our preceding context
                         section_content = f"## {element.title or 'Untitled Section'}\n{generated_content}"
@@ -191,218 +161,101 @@ async def generate_report(report_id: str, force_regenerate: bool = False, client
                         # Save the report after each successfully generated section to persist changes
                         save_report_to_file(report)
                         logger.debug(f"Saved report to file after generating content for element {element.id}")
-                        
-                        # Send update that generation completed successfully for this element
-                        if client_id:
-                            try:
-                                await ws_manager.send_json({
-                                    "type": "generation_status",
-                                    "data": {
-                                        "report_id": report_id,
-                                        "element_id": element.id,
-                                        "status": "completed",
-                                        "content": generated_content
-                                    }
-                                }, client_id)
-                            except Exception as e:
-                                logger.error(f"Failed to send WebSocket completion update: {e}")
                     else:
                         error_message = "Generation returned empty content"
                         logger.warning(f"Empty content generated for element {element.id}")
                         element_markdown += f"*[Error: {error_message}]*\n"
+                        element.generation_status = "error" # Update status
+                        element.generation_error = error_message # Store error message
                         generation_errors.append({
                             "element_id": element.id,
                             "element_title": element.title or "Untitled Element",
                             "error_code": ErrorCodes.GENERATION_FAILED,
                             "error_message": error_message
                         })
-                        
-                        # Send error update
-                        if client_id:
-                            try:
-                                await ws_manager.send_json({
-                                    "type": "generation_status",
-                                    "data": {
-                                        "report_id": report_id,
-                                        "element_id": element.id,
-                                        "status": "error",
-                                        "error": error_message
-                                    }
-                                }, client_id)
-                            except Exception as e:
-                                logger.error(f"Failed to send WebSocket error update: {e}")
-                        
                 except TimeoutError as e:
                     # Handle timeout errors specifically
                     error_code = ErrorCodes.GENERATION_TIMEOUT
                     error_message = f"Generation timed out: {str(e)}"
                     logger.error(f"Timeout error for element {element.id}: {str(e)}")
                     element_markdown += f"*[Error: Generation timed out]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": error_code,
                         "error_message": error_message
                     })
-                    
-                    # Send specific timeout error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message,
-                                    "error_code": error_code
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
-                
                 except ConnectionError as e:
                     # Handle connection errors specifically
                     error_code = ErrorCodes.GENERATION_CONNECTION_ERROR
                     error_message = f"Connection error: {str(e)}"
                     logger.error(f"Connection error for element {element.id}: {str(e)}")
                     element_markdown += f"*[Error: Connection failed to generation service]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": error_code,
                         "error_message": error_message
                     })
-                    
-                    # Send specific connection error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message,
-                                    "error_code": error_code
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
-                
                 except ValueError as e:
                     # Handle value/validation errors
                     error_code = ErrorCodes.GENERATION_VALIDATION_ERROR
                     error_message = f"Invalid data or response: {str(e)}"
                     logger.error(f"Validation error for element {element.id}: {str(e)}")
                     element_markdown += f"*[Error: {error_message}]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": error_code,
                         "error_message": error_message
                     })
-                    
-                    # Send validation error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message,
-                                    "error_code": error_code
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
-                
                 except PermissionError as e:
                     # Handle authentication/authorization errors
                     error_code = ErrorCodes.GENERATION_AUTH_ERROR
                     error_message = f"Authentication error: {str(e)}"
                     logger.error(f"Auth error for element {element.id}: {str(e)}")
                     element_markdown += f"*[Error: Authentication failed with generation service]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": error_code,
                         "error_message": error_message
                     })
-                    
-                    # Send auth error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message,
-                                    "error_code": error_code
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
-                
                 except RuntimeError as e:
                     # Handle general runtime errors
                     error_code = ErrorCodes.GENERATION_RUNTIME_ERROR
                     error_message = f"Runtime error: {str(e)}"
                     logger.error(f"Runtime error for element {element.id}: {str(e)}")
                     element_markdown += f"*[Error: {error_message}]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": error_code,
                         "error_message": error_message
                     })
-                    
-                    # Send runtime error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message,
-                                    "error_code": error_code
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
-                
                 except Exception as e:
                     # Catch all other exceptions
                     error_message = f"Error generating content: {str(e)}"
                     logger.error(error_message, exc_info=True)
                     element_markdown += f"*[Error: {error_message}]*\n"
+                    element.generation_status = "error" # Update status
+                    element.generation_error = error_message # Store error message
                     generation_errors.append({
                         "element_id": element.id,
                         "element_title": element.title or "Untitled Element",
                         "error_code": ErrorCodes.GENERATION_FAILED,
                         "error_message": error_message
                     })
-                    
-                    # Send error update
-                    if client_id:
-                        try:
-                            await ws_manager.send_json({
-                                "type": "generation_status",
-                                "data": {
-                                    "report_id": report_id,
-                                    "element_id": element.id,
-                                    "status": "error",
-                                    "error": error_message
-                                }
-                            }, client_id)
-                        except Exception as e:
-                            logger.error(f"Failed to send WebSocket error update: {e}")
 
             # Add spacing and append this element's markdown to the full report
             element_markdown += "\n"
@@ -420,17 +273,12 @@ async def generate_report(report_id: str, force_regenerate: bool = False, client
             logger.warning(f"Report generation completed with {len(generation_errors)} errors in elements: {error_summary}")
             
             # Return a successful response but include error information
-            response = GeneratedReportMarkdown(
-                report_id=report_id, 
-                markdown_content=full_markdown,
-                generation_errors=generation_errors,
-                has_errors=True
-            )
-            
-            return response
+            report.generation_errors = generation_errors
+            report.has_errors = True
+            return report
         else:
             logger.info(f"Successfully generated report for ID: {report_id}")
-            return GeneratedReportMarkdown(report_id=report_id, markdown_content=full_markdown)
+            return report
     
     except Exception as e:
         logger.error(f"Unexpected error generating report {report_id}: {str(e)}", exc_info=True)
@@ -638,26 +486,145 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
             f"An unexpected error occurred during Word export: {str(e)}"
         )
 
-@router.post("/reports/{report_id}/sections/{element_id}/regenerate", response_model=Union[Dict[str, Any], ErrorResponse])
-async def regenerate_section(report_id: str, element_id: str, report_in: Report, client_id: Optional[str] = Query(None)):
-    """
-    Regenerate a specific section of a report based on the provided current state of the report.
+@router.post("/reports/{report_id}/generate_next_element", response_model=Union[Report, ErrorResponse])
+async def generate_next_element_in_report(report_id: str):
+    logger.info(f"Received request to generate next element for report: {report_id}")
+    report = load_report_from_file(REPORTS_DIR / f"{report_id}.json")
+
+    if not report:
+        logger.error(f"Report not found: {report_id}")
+        error_response = create_error_response(ErrorCodes.REPORT_NOT_FOUND, "Report not found")
+        return JSONResponse(status_code=get_status_code_for_error(ErrorCodes.REPORT_NOT_FOUND), content=error_response)
+
+    if not report.content or not report.content.elements:
+        logger.warning(f"Report {report_id} has no elements.")
+        # Return report as is, frontend can decide if this means "complete"
+        return report
+
+    next_element_to_generate = None
+    element_index = -1
+    preceding_contents_for_next = []
+
+    # Find the first generative element that needs content
+    # Accumulate preceding content as we go
+    current_accumulated_content = []
+    if report.name: # Add report title as initial context
+        current_accumulated_content.append(f"# {report.name}\\n")
+    if report.description: # Add report description
+        current_accumulated_content.append(f"{report.description}\\n\\n")
+
+    for idx, el in enumerate(report.content.elements):
+        if el.type == 'explicit' and el.content and el.content.strip():
+            section_title = f"## {el.title}\\n" if el.title else ""
+            current_accumulated_content.append(f"{section_title}{el.content}\\n")
+        elif el.type == 'generative' and el.ai_generated_content and el.ai_generated_content.strip() and el.generation_status == 'completed':
+            section_title = f"## {el.title}\\n" if el.title else ""
+            current_accumulated_content.append(f"{section_title}{el.ai_generated_content}\\n")
+        
+        if el.type == 'generative' and el.generation_status != 'completed':
+            if not next_element_to_generate: # Found the first one
+                next_element_to_generate = el
+                element_index = idx
+                preceding_contents_for_next = list(current_accumulated_content) # Copy current context
+
+    if not next_element_to_generate:
+        logger.info(f"No more generative elements to process for report {report_id}.")
+        # All generative elements are processed or none exist that need processing.
+        # We can add a flag or specific status to the report if needed, e.g. report.generation_completed = True
+        return report
+
+    element = next_element_to_generate
+    logger.info(f"Found next element to generate: ID {element.id}, Title: {element.title or 'Untitled'}")
+    element.generation_status = "generating"
     
-    This endpoint regenerates just one section of a report.
-    It uses the entire provided report object as context, which may include unsaved edits from the client,
-    maintaining context from both preceding and following sections to ensure consistency
-    and coherence throughout the entire report.
+    # Save report with "generating" status before starting actual generation
+    save_report_to_file(report) 
+
+    try:
+        # Verify vector store if specified
+        if report.vectorStoreId:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(f"{EMBEDDING_SERVICE_BASE_URL}/api/embedding/vectorstores/{report.vectorStoreId}")
+                    if response.status_code == 404:
+                        raise ValueError(f"Vector store {report.vectorStoreId} not found.")
+                    response.raise_for_status()
+            except Exception as vs_exc:
+                logger.error(f"Vector store validation failed for report {report_id}, element {element.id}: {vs_exc}")
+                element.generation_status = "error"
+                element.generation_error = f"Vector store error: {str(vs_exc)}"
+                save_report_to_file(report)
+                return report # Return report with this element marked as error
+
+        previous_context_str = get_preceding_content(preceding_contents_for_next)
+        logger.info(f"Using {estimate_tokens(previous_context_str)} tokens of preceding content for element {element.id}")
+
+        generated_content = await generate_element_content(
+            element=element,
+            vector_store_id=report.vectorStoreId,
+            previous_content=previous_context_str
+        )
+
+        if generated_content:
+            element.ai_generated_content = generated_content
+            element.generation_status = "completed"
+            element.generation_error = None
+            element.updatedAt = datetime.utcnow()
+        else:
+            element.generation_status = "error"
+            element.generation_error = "Generation returned empty content"
+            element.updatedAt = datetime.utcnow()
+        
+        report.updatedAt = datetime.utcnow().isoformat() + "Z"
+        save_report_to_file(report)
+        logger.info(f"Processed element {element.id}, status: {element.generation_status}")
+        return report
+
+    except TimeoutError as e:
+        logger.error(f"Timeout error for element {element.id}: {str(e)}")
+        element.generation_status = "error"
+        element.generation_error = f"Generation timed out: {str(e)}"
+    except ConnectionError as e:
+        logger.error(f"Connection error for element {element.id}: {str(e)}")
+        element.generation_status = "error"
+        element.generation_error = f"Connection error: {str(e)}"
+    except ValueError as e: # Includes validation errors from generate_element_content or vector store
+        logger.error(f"Validation error for element {element.id}: {str(e)}")
+        element.generation_status = "error"
+        element.generation_error = f"Validation error: {str(e)}"
+    except PermissionError as e:
+        logger.error(f"Auth error for element {element.id}: {str(e)}")
+        element.generation_status = "error"
+        element.generation_error = f"Authentication error: {str(e)}"
+    except RuntimeError as e:
+        logger.error(f"Runtime error for element {element.id}: {str(e)}")
+        element.generation_status = "error"
+        element.generation_error = f"Runtime error: {str(e)}"
+    except Exception as e:
+        logger.error(f"Unexpected error generating element {element.id}: {str(e)}", exc_info=True)
+        element.generation_status = "error"
+        element.generation_error = f"Unexpected error: {str(e)}"
+    
+    element.updatedAt = datetime.utcnow()
+    report.updatedAt = datetime.utcnow().isoformat() + "Z"
+    save_report_to_file(report) # Save report with error status for the element
+    return report
+
+@router.post("/reports/{report_id}/sections/{element_id}/regenerate", response_model=Union[Report, ErrorResponse])
+async def regenerate_section(report_id: str, element_id: str, report_in: Report):
+    """
+    Regenerates a specific section of a report using the provided full report context.
+    The client sends the entire current state of the report (`report_in`).
     
     Args:
         report_id: The ID of the report containing the section (must match report_in.id).
         element_id: The ID of the specific element/section to regenerate.
         report_in: The full Report object, including any client-side edits, to be used as context.
-        client_id: Optional client ID for WebSocket updates.
         
     Returns:
-        A dictionary with the element_id, new content, and status, or an ErrorResponse.
+        The modified report_in object.
     """
-    logger.info(f"Received request to regenerate section {element_id} in report {report_id} using provided report data.")
+    logger.info(f"Regenerating section {element_id} for report {report_id}. Client provided full report state.")
 
     # Validate that the report_id in the path matches the one in the body
     if report_id != report_in.id:
@@ -767,21 +734,8 @@ async def regenerate_section(report_id: str, element_id: str, report_in: Report,
                 content=error_response
             )
     
-    # Send WebSocket update that generation is starting
-    if client_id:
-        try:
-            await ws_manager.send_json({
-                "type": "generation_status",
-                "data": {
-                    "report_id": report_id,
-                    "element_id": element_id,
-                    "status": "generating",
-                    "message": f"Regenerating section: {target_element.title or 'Untitled'} with full report context from client"
-                }
-            }, client_id)
-        except Exception as e:
-            logger.error(f"Failed to send WebSocket status update: {e}")
-    
+    logger.info(f"Target element for regeneration: {target_element.title or 'Untitled Section'} (ID: {target_element.id})")
+
     try:
         # Build context from all preceding sections and following sections using report_in
         preceding_contents = []
@@ -841,16 +795,6 @@ async def regenerate_section(report_id: str, element_id: str, report_in: Report,
         
         if not generated_content:
             logger.error(f"Generated content is empty for element {target_element.id} during client-data based regeneration")
-            if client_id:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": "Generated content was empty"
-                    }
-                }, client_id)
             error_code = ErrorCodes.GENERATION_FAILED
             error_response = create_error_response(
                 error_code,
@@ -864,31 +808,19 @@ async def regenerate_section(report_id: str, element_id: str, report_in: Report,
         
         # Update the element with new content IN THE report_in OBJECT
         target_element.ai_generated_content = generated_content
-        
-        # Update timestamp of the report_in object
-        report_in.updatedAt = datetime.utcnow().isoformat() + "Z"
-        
-        # Save the updated report_in (which contains the client's edits + new generated content)
-        save_report_to_file(report_in) # Make sure this function handles Report object correctly
-        
-        if client_id:
-            await ws_manager.send_json({
-                "type": "generation_status",
-                "data": {
-                    "report_id": report_id,
-                    "element_id": element_id,
-                    "status": "completed",
-                    "content": generated_content # Send new content back
-                }
-            }, client_id)
-            
-        logger.info(f"Successfully regenerated content for element {target_element.id} based on client data and saved report {report_in.id}")
-        
-        return {
-            "element_id": element_id,
-            "content": generated_content,
-            "status": "success"
-        }
+        target_element.generation_status = "completed" # Update status
+        target_element.generation_error = None # Clear any previous error
+
+        # Update the timestamp of the regenerated element and the report
+        now = datetime.utcnow()
+        target_element.updatedAt = now 
+        report_in.updatedAt = now
+
+        # Save the modified report_in (which now contains the regenerated section)
+        save_report_to_file(report_in)
+        logger.info(f"Successfully regenerated content for element {target_element.id} and saved updated report {report_in.id}")
+
+        return report_in
     
     except TimeoutError as e:
         # Handle timeout errors specifically
@@ -896,135 +828,83 @@ async def regenerate_section(report_id: str, element_id: str, report_in: Report,
         error_message = f"Generation timed out: {str(e)}"
         logger.error(f"Timeout error for element {element_id}: {str(e)}")
         
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": error_message,
-                        "error_code": error_code
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
-        return create_error_response(error_code, error_message)
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = error_message
+            save_report_to_file(report_in) # Save report with error status
+
+        return create_error_response(error_code, error_message, {"element_id": element_id, "report_id": report_id})
         
     except ConnectionError as e:
         # Handle connection errors specifically
         error_code = ErrorCodes.GENERATION_CONNECTION_ERROR
         error_message = f"Connection error: {str(e)}"
         logger.error(f"Connection error for element {element_id}: {str(e)}")
-        
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": error_message,
-                        "error_code": error_code
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
-        return create_error_response(error_code, error_message)
+
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = error_message
+            save_report_to_file(report_in) # Save report with error status
+
+        return create_error_response(error_code, error_message, {"element_id": element_id, "report_id": report_id})
     
     except ValueError as e:
         # Handle validation errors
         error_code = ErrorCodes.GENERATION_VALIDATION_ERROR
         error_message = f"Invalid data or response: {str(e)}"
         logger.error(f"Validation error for element {element_id}: {str(e)}")
-        
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": error_message,
-                        "error_code": error_code
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
-        return create_error_response(error_code, error_message)
+
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = error_message
+            save_report_to_file(report_in) # Save report with error status
+
+        return create_error_response(error_code, error_message, {"element_id": element_id, "report_id": report_id})
     
     except PermissionError as e:
         # Handle authentication errors
         error_code = ErrorCodes.GENERATION_AUTH_ERROR
         error_message = f"Authentication error: {str(e)}"
         logger.error(f"Auth error for element {element_id}: {str(e)}")
-        
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": error_message,
-                        "error_code": error_code
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
-        return create_error_response(error_code, error_message)
+
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = error_message
+            save_report_to_file(report_in) # Save report with error status
+
+        return create_error_response(error_code, error_message, {"element_id": element_id, "report_id": report_id})
     
     except RuntimeError as e:
         # Handle runtime errors
         error_code = ErrorCodes.GENERATION_RUNTIME_ERROR
         error_message = f"Runtime error: {str(e)}"
         logger.error(f"Runtime error for element {element_id}: {str(e)}")
-        
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": error_message,
-                        "error_code": error_code
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
-        return create_error_response(error_code, error_message)
+
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = error_message
+            save_report_to_file(report_in) # Save report with error status
+
+        return create_error_response(error_code, error_message, {"element_id": element_id, "report_id": report_id})
         
     except Exception as e:
         # General catch-all handler
-        logger.error(f"Error regenerating content for element {element_id}: {str(e)}", exc_info=True)
+        error_message_detail = f"Error regenerating content for element {element_id}: {str(e)}"
+        logger.error(error_message_detail, exc_info=True)
         
-        # Send error via WebSocket
-        if client_id:
-            try:
-                await ws_manager.send_json({
-                    "type": "generation_status",
-                    "data": {
-                        "report_id": report_id,
-                        "element_id": element_id,
-                        "status": "error",
-                        "error": str(e)
-                    }
-                }, client_id)
-            except Exception as ws_err:
-                logger.error(f"Failed to send error via WebSocket: {ws_err}")
-                
+        # Update element status
+        if target_element:
+            target_element.generation_status = "error"
+            target_element.generation_error = str(e) # Store generic error
+            save_report_to_file(report_in) # Save report with error status
+
         return create_error_response(
             ErrorCodes.GENERATION_FAILED,
-            f"Error regenerating section: {str(e)}"
+            f"Error regenerating section: {str(e)}",
+            {"element_id": element_id, "report_id": report_id}
         ) 

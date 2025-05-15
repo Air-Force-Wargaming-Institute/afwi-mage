@@ -21,7 +21,7 @@ def load_report_from_file(file_path: Path) -> Optional[Report]:
 def save_report_to_file(report: Report):
     file_path = REPORTS_DIR / f"{report.id}.json"
     with open(file_path, "w") as f:
-        json.dump(report.dict(), f, indent=4)
+        f.write(report.model_dump_json(indent=4))
 
 # Function to load all reports from the reports directory
 def load_all_reports() -> List[Report]:

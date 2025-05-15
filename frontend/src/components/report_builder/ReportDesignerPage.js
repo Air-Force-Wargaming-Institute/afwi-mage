@@ -30,7 +30,6 @@ import ReportPreviewPanel from './ReportPreviewPanel';
 import axios from 'axios';
 import { getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
-import websocketService from '../../services/websocketService';
 
 // Helper functions
 const getDefaultReport = () => ({
@@ -152,7 +151,6 @@ function ReportDesignerPage() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [scrollToElementId, setScrollToElementId] = useState(null);
   const [highlightElementId, setHighlightElementId] = useState(null);
-  const clientId = useRef(`user-${Math.random().toString(36).substring(2, 9)}`);
 
   useEffect(() => {
     if (token) {
@@ -856,68 +854,7 @@ function ReportDesignerPage() {
     }).filter(Boolean).join('\n\n');
   };
 
-  // Set up WebSocket connection for real-time updates
-  useEffect(() => {
-    // Subscribe to websocket updates for report generation
-    const unsubscribe = websocketService.subscribe('generation_status', (data) => {
-      // Handle generation status updates
-      if (data.report_id === reportId) {
-        const { element_id, status, content, error } = data;
-        
-        console.log(`WebSocket update for element ${element_id}: ${status}`, data);
-        
-        // Update the generating elements status
-        setGeneratingElements(prev => ({
-          ...prev,
-          [element_id]: { status, content, error }
-        }));
-        
-        // If a section completed successfully, update the report definition
-        if (status === 'completed' && content) {
-          setCurrentDefinition(prev => {
-            const updatedElements = prev.elements.map(element => {
-              if (element.id === element_id) {
-                console.log(`Updating element ${element_id} with new content`);
-                return {
-                  ...element,
-                  ai_generated_content: content
-                };
-              }
-              return element;
-            });
-            
-            // Create a new object to ensure React detects the change
-            const updatedDefinition = {
-              ...prev,
-              elements: updatedElements
-            };
-            
-            return updatedDefinition;
-          });
-          setScrollToElementId(element_id);
-          setHighlightElementId(element_id);
-        }
-      }
-    });
-    
-    // Subscribe to progress updates
-    const progressUnsubscribe = websocketService.subscribe('generation_progress', (data) => {
-      if (data.report_id === reportId) {
-        setGenerationProgress({
-          current: data.current_element,
-          total: data.total_elements
-        });
-      }
-    });
-    
-    return () => {
-      unsubscribe();
-      progressUnsubscribe();
-    };
-  }, [reportId]);
-
   const handleGenerateReport = async () => {
-    // Check if report has been saved (has an ID)
     if (!currentDefinition.id) {
       setSnackbar({
         open: true,
@@ -927,12 +864,8 @@ function ReportDesignerPage() {
       return;
     }
 
-    // Check if the report has at least one generative section
-    const hasGenerativeSections = currentDefinition.elements.some(
-      element => element.type === 'generative'
-    );
-
-    if (!hasGenerativeSections) {
+    const generativeElements = currentDefinition.elements.filter(el => el.type === 'generative');
+    if (generativeElements.length === 0) {
       setSnackbar({
         open: true,
         message: 'This report has no generative sections to generate content for',
@@ -941,138 +874,139 @@ function ReportDesignerPage() {
       return;
     }
 
-    // Reset generation state
     setIsGenerating(true);
     setError(null);
-    setGeneratingElements({});
-    setGenerationProgress({ current: 0, total: 0 });
     
-    // Initialize generatingElements with 'pending' status for all generative sections
+    // Initialize generatingElements state for all generative sections
     const initialGeneratingState = {};
-    currentDefinition.elements.forEach(element => {
-      if (element.type === 'generative') {
-        initialGeneratingState[element.id] = { status: 'pending' };
-      }
+    generativeElements.forEach(el => {
+      initialGeneratingState[el.id] = { 
+        status: 'pending', // Mark as pending initially
+        content: el.ai_generated_content, // Preserve existing content if any
+        error: el.generation_error 
+      };
     });
     setGeneratingElements(initialGeneratingState);
+    setGenerationProgress({ current: 0, total: generativeElements.length });
 
-    try {
-      // Display initial generation notification
-      setSnackbar({
-        open: true,
-        message: 'Generating report content...',
-        severity: 'info'
-      });
+    // Sequentially generate content for each generative element
+    // We will use a mutable copy of currentDefinition to update it step-by-step
+    let currentReportState = JSON.parse(JSON.stringify(currentDefinition));
+    let completedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
+    
+    // Update progress based on already completed elements
+    setGenerationProgress({ current: completedCount, total: generativeElements.length });
 
-      // Call the backend API to generate all sections, passing the client ID for websocket updates
-      const response = await axios.post(
-        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/generate?client_id=${clientId.current}`),
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      // Check if we got an error response from the API
-      if (response.data && response.data.error === true) {
-        const errorCode = response.data.detail?.code;
-        const errorMessage = response.data.detail?.message || 'Unknown error occurred during generation';
-        
-        // Handle specific error codes with more helpful messages
-        if (errorCode === 'MAGE_SERVICE_ERROR') {
-          throw new Error('The AI generation service is not available. This is typically a temporary issue. Please try again in a few minutes.');
-        } else if (errorCode === 'VECTOR_STORE_ERROR') {
-          throw new Error('There was an issue accessing the knowledge base for context. Please check the vector store connection.');
-        } else {
-          throw new Error(errorMessage);
-        }
-      }
-
-      // With WebSockets, the UI is updated in real-time, but we should still fetch the final state
-      // to ensure consistency with any changes made by the backend (timestamps, etc.)
-      const updatedReport = await axios.get(
-        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}`),
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      // Extract elements correctly from the response structure
-      const updatedElements = updatedReport.data.content?.elements || [];
-      
-      // ⚠️ Don't overwrite the elements array that has been incrementally updated by WebSocket
-      // Instead, only update metadata fields like timestamps
-      setCurrentDefinition(prev => {
-        const updated = {
+    for (const elementToProcess of generativeElements) {
+      // Check if this element already has content and is 'completed' (idempotency, or skip if allowing retry on error)
+      const existingElementData = currentReportState.elements.find(e => e.id === elementToProcess.id);
+      if (existingElementData && existingElementData.ai_generated_content && existingElementData.generation_status === 'completed') {
+        // Already processed and completed in a previous step/run, reflect this in generatingElements and progress
+        setGeneratingElements(prev => ({
           ...prev,
-          ...updatedReport.data,
-          // Use API-specific fields like vectorStoreId
-          vectorStoreId: updatedReport.data.vectorStoreId,
-          // But keep our flattened elements structure
-          elements: prev.elements.map(element => {
-            // Find the corresponding element in the updatedReport
-            const updatedElement = updatedElements.find(e => e.id === element.id);
-            if (updatedElement) {
-              // Preserve the ai_generated_content that was added incrementally
-              return {
-                ...updatedElement,
-                ai_generated_content: element.ai_generated_content || updatedElement.ai_generated_content
-              };
-            }
-            return element;
-          })
-        };
-        
-        console.log('Updated report metadata after generation completed:', updated);
-        
-        return updated;
-      });
-
-      setSnackbar({
-        open: true,
-        message: 'Report content generated successfully',
-        severity: 'success'
-      });
-    } catch (err) {
-      console.error('Error generating report:', err);
-      
-      // Parse the error from the response if available
-      let errorMessage = err.message;
-      let errorCode = '';
-      
-      if (err.response?.data?.detail) {
-        if (typeof err.response.data.detail === 'string') {
-          errorMessage = err.response.data.detail;
-        } else if (err.response.data.detail.message) {
-          errorMessage = err.response.data.detail.message;
-          errorCode = err.response.data.detail.code || '';
-          
-          // Add more context for specific error codes
-          if (err.response.data.detail.code === 'MAGE_SERVICE_ERROR') {
-            errorMessage = 'The AI generation service is not available. This is typically a temporary issue. Please try again in a few minutes.';
-            
-            // Show the error details dialog with troubleshooting info
-            setErrorDetails({
-              code: 'MAGE_SERVICE_ERROR',
-              message: errorMessage
-            });
-            setErrorDialogOpen(true);
+          [elementToProcess.id]: {
+            status: 'completed',
+            content: existingElementData.ai_generated_content,
+            error: null
           }
-        }
+        }));
+        // completedCount was already set, so progress is fine
+        continue; // Move to the next element
       }
-      
-      setError(errorMessage);
-      setSnackbar({
-        open: true,
-        message: `Error generating content: ${errorMessage}`,
-        severity: 'error'
-      });
-    } finally {
-      setIsGenerating(false);
+
+      // Mark current element as 'generating' in the UI
+      setGeneratingElements(prev => ({
+        ...prev,
+        [elementToProcess.id]: { status: 'generating', content: elementToProcess.ai_generated_content }
+      }));
+
+      try {
+        setSnackbar({ open: true, message: `Generating section: ${elementToProcess.title || 'Untitled Section'}...`, severity: 'info' });
+        
+        const response = await axios.post(
+          getGatewayUrl(`/api/report_builder/reports/${currentReportState.id}/generate_next_element`),
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const apiResponseData = response.data; // Store the raw API response
+
+        if (apiResponseData && apiResponseData.content && apiResponseData.content.elements) {
+          // Create a new "flat" definition for the React state
+          const newFlatDefinition = {
+            ...apiResponseData, // Spread top-level properties like id, name, status, etc.
+            elements: apiResponseData.content.elements, // Hoist elements
+          };
+          delete newFlatDefinition.content; // Remove the nested 'content' property
+
+          setCurrentDefinition(newFlatDefinition); // Update the main state with the flat structure
+          currentReportState = newFlatDefinition; // Update local variable for consistency
+
+          // Find the regenerated element in the original API response's structure for UI updates
+          const regeneratedElement = apiResponseData.content.elements.find(el => el.id === elementToProcess.id);
+          
+          if (regeneratedElement) {
+            setGeneratingElements(prev => ({
+              ...prev,
+              [regeneratedElement.id]: {
+                status: regeneratedElement.generation_status || (regeneratedElement.ai_generated_content ? 'completed' : 'error'), 
+                content: regeneratedElement.ai_generated_content,
+                error: regeneratedElement.generation_error
+              }
+            }));
+
+            if (regeneratedElement.generation_status === 'completed' || (regeneratedElement.ai_generated_content && !regeneratedElement.generation_error)) {
+              completedCount++;
+              setSnackbar({ open: true, message: `Section "${regeneratedElement.title || 'Untitled'}" generated.`, severity: 'success' });
+              setScrollToElementId(regeneratedElement.id); // Scroll to the newly generated element
+              setHighlightElementId(regeneratedElement.id); // Highlight it
+            } else {
+              setSnackbar({ 
+                open: true, 
+                message: `Error generating section "${regeneratedElement.title || 'Untitled'}": ${regeneratedElement.generation_error || 'Unknown error'}`, 
+                severity: 'error' 
+              });
+            }
+          } else {
+             // This case should ideally not happen if backend returns the element it processed
+             setGeneratingElements(prev => ({
+                ...prev,
+                [elementToProcess.id]: { status: 'error', error: 'Processed element not found in response' }
+            }));
+          }
+          setGenerationProgress({ current: completedCount, total: generativeElements.length });
+        } else if (apiResponseData && apiResponseData.error) { // Backend returned a structured error
+          throw new Error(apiResponseData.detail?.message || 'Unknown error from server during next element generation.');
+        } else {
+          throw new Error('Unexpected response from server for next element generation.');
+        }
+      } catch (err) {
+        console.error(`Error generating element ${elementToProcess.id}:`, err);
+        const errorMessage = err.response?.data?.detail?.message || err.message || 'Failed to generate section.';
+        setError(prevError => `${prevError || ''} Element ${elementToProcess.title || elementToProcess.id}: ${errorMessage}\\n`);
+        setGeneratingElements(prev => ({
+          ...prev,
+          [elementToProcess.id]: { status: 'error', error: errorMessage }
+        }));
+        setSnackbar({ open: true, message: `Failed to generate section "${elementToProcess.title || 'Untitled'}": ${errorMessage}`, severity: 'error' });
+        // Optionally, decide if you want to stop the loop on first error or continue
+        // For now, it continues to the next element if any error occurs on one.
+      }
+    } // End of for...of loop
+
+    setIsGenerating(false);
+    if (!error) { // If loop completed without setting a general error state
+        const finalCompletedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
+        if (finalCompletedCount === generativeElements.length) {
+            setSnackbar({ open: true, message: 'All report sections generated successfully!', severity: 'success' });
+        } else {
+             setSnackbar({ open: true, message: 'Report generation finished, but some sections may have errors.', severity: 'warning' });
+        }
+    } else {
+        setSnackbar({ open: true, message: `Report generation completed with errors. Check individual sections.`, severity: 'error' });
     }
   };
 
-  // Add a new function to handle regenerating a single section
   const handleRegenerateSection = async (elementId) => {
     try {
       // Find the element to regenerate
@@ -1123,7 +1057,7 @@ function ReportDesignerPage() {
       // Call the backend API to regenerate the specific section
       // Send the entire currentDefinition as the request body
       const response = await axios.post(
-        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/sections/${elementId}/regenerate?client_id=${clientId.current}`),
+        getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/sections/${elementId}/regenerate`), // Removed client_id
         payload, // Send the transformed payload
         {
           headers: { 
@@ -1134,41 +1068,56 @@ function ReportDesignerPage() {
       );
 
       // Check if the response is an error
-      if (response.data && response.data.error === true) {
-        throw new Error(response.data.detail?.message || 'Unknown error occurred');
+      if (response.data && response.data.error === true) { // Standard error response
+        throw new Error(response.data.detail?.message || 'Unknown error occurred during regeneration');
       }
 
-      // If successful and we got content back directly (not via WebSocket)
-      if (response.data && response.data.content) {
-        // Update the report definition with the new content for this section
-        setCurrentDefinition(prev => {
-          const updatedElements = prev.elements.map(element => {
-            if (element.id === elementId) {
-              return {
-                ...element,
-                ai_generated_content: response.data.content
-              };
+      // If successful, the response.data is the updated Report object
+      const apiResponseData = response.data; // Use a clear variable name
+
+      if (apiResponseData && apiResponseData.content && apiResponseData.content.elements) {
+        // Create a new "flat" definition for the React state
+        const newFlatDefinition = {
+          ...apiResponseData, // Spread top-level properties like id, name, status, etc.
+          elements: apiResponseData.content.elements, // Hoist elements
+        };
+        delete newFlatDefinition.content; // Remove the nested 'content' property
+
+        setCurrentDefinition(newFlatDefinition); // Update the main state with the flat structure
+
+        // Find the regenerated element in the original API response's structure (which is nested)
+        const regeneratedElement = apiResponseData.content.elements.find(el => el.id === elementId);
+
+        if (regeneratedElement) {
+            setGeneratingElements(prev => ({
+                ...prev,
+                [regeneratedElement.id]: { 
+                    status: regeneratedElement.generation_status || (regeneratedElement.ai_generated_content ? 'completed' : 'error'), 
+                    content: regeneratedElement.ai_generated_content,
+                    error: regeneratedElement.generation_error
+                }
+            }));
+            
+            if (regeneratedElement.generation_status === 'completed' || (regeneratedElement.ai_generated_content && !regeneratedElement.generation_error)) {
+                 setSnackbar({
+                    open: true,
+                    message: `"${sectionTitle}" regenerated successfully with full report context`,
+                    severity: 'success'
+                });
+                setScrollToElementId(elementId);
+                setHighlightElementId(elementId);
+            } else {
+                 setSnackbar({
+                    open: true,
+                    message: `Error regenerating "${sectionTitle}": ${regeneratedElement.generation_error || 'Unknown error'}`,
+                    severity: 'error'
+                });
             }
-            return element;
-          });
-          
-          return {
-            ...prev,
-            elements: updatedElements
-          };
-        });
-
-        // Update the generation status
-        setGeneratingElements(prev => ({
-          ...prev,
-          [elementId]: { status: 'completed' }
-        }));
-
-        setSnackbar({
-          open: true,
-          message: `"${sectionTitle}" regenerated successfully with full report context`,
-          severity: 'success'
-        });
+        } else {
+            throw new Error("Regenerated element not found in the server response.");
+        }
+      } else {
+         throw new Error("Received an unexpected response from the server during section regeneration.");
       }
     } catch (err) {
       console.error('Error regenerating section:', err);

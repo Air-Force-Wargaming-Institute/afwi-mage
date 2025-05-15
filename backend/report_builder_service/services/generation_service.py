@@ -12,7 +12,6 @@ from config import (
 )
 from models.schemas import ReportElement, Report
 from services.file_service import save_report_to_file
-from services.websocket_service import ws_manager
 
 async def generate_element_content(element: ReportElement, vector_store_id: Optional[str], previous_content: str = "") -> str:
     """

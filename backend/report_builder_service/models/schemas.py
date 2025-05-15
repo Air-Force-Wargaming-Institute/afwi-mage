@@ -12,6 +12,9 @@ class ReportElement(BaseModel):
     content: Optional[str] = None
     instructions: Optional[str] = None
     ai_generated_content: Optional[str] = None
+    generation_status: Optional[Literal['pending', 'generating', 'completed', 'error']] = None
+    generation_error: Optional[str] = None
+    updatedAt: Optional[datetime] = None # Added for regenerate_section logic
 
 class ReportContent(BaseModel):
     elements: List[ReportElement] = Field(default_factory=list)
@@ -34,6 +37,8 @@ class Report(ReportBase):
     updatedAt: str # ISO format string
     status: str = "draft"
     content: ReportContent
+    generation_errors: Optional[List[Dict[str, Any]]] = None # Stores errors for specific elements
+    has_errors: Optional[bool] = False # Overall status if any element failed
 
 # Template Models
 class TemplateBase(BaseModel):
@@ -58,8 +63,9 @@ class ReportBuilderVectorStoreInfo(BaseModel):
 class GeneratedReportMarkdown(BaseModel):
     report_id: str
     markdown_content: str
-    has_errors: bool = False
-    generation_errors: Optional[List[Dict[str, Any]]] = None
+    # These fields are now part of the Report model, so GeneratedReportMarkdown might be deprecated or simplified
+    # has_errors: bool = False
+    # generation_errors: Optional[List[Dict[str, Any]]] = None
 
 # Error Models
 class ErrorDetail(BaseModel):
