@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -12,7 +12,7 @@ import {
   CircularProgress
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import { Flag as FlagIcon, Person as PersonIcon, Add as AddIcon } from '@material-ui/icons';
+import { Flag as FlagIcon, Person as PersonIcon, Add as AddIcon, Delete as DeleteIcon } from '@material-ui/icons';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
 import { getApiUrl, getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -92,9 +92,24 @@ const useStyles = makeStyles((theme) => ({
     fontSize: '0.75rem',
     marginTop: theme.spacing(1),
   },
+  markerChip: {
+    position: 'relative',
+    margin: theme.spacing(0.5),
+    paddingRight: theme.spacing(4),
+    '& .MuiChip-deleteIcon': {
+      position: 'absolute',
+      right: theme.spacing(0.5),
+      top: '50%',
+      transform: 'translateY(-50%)',
+      color: theme.palette.error.light,
+      '&:hover': {
+        color: theme.palette.error.dark,
+      }
+    }
+  },
 }));
 
-const RealtimeTaggingPanel = ({ isReadOnly }) => {
+const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) => {
   const classes = useStyles();
   const theme = useTheme();
   const { state, dispatch } = useTranscription();
@@ -102,37 +117,88 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
   const {
     sessionId,
     recordingState,
-    recordingTime, // Needed for marker timestamp
+    recordingTime,
     participants,
     markers: activeMarkers,
     availableMarkerTypes,
     loadedSessionId,
-    // Need classification info for markers
     classification: selectedClassification,
     caveatType,
     customCaveat,
     sendWebSocketMessage,
+    playbackTime,
+    isPlaying,
   } = state;
 
   const [customMarkerLabel, setCustomMarkerLabel] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
-  // Added states for API integration
   const [isAddingMarker, setIsAddingMarker] = useState(false);
   const [markerError, setMarkerError] = useState(null);
   const [isAddingCustomMarker, setIsAddingCustomMarker] = useState(false);
   const [pendingMarkerId, setPendingMarkerId] = useState(null);
   
-  // Added states for speaker tagging
   const [taggingSpeaker, setTaggingSpeaker] = useState(false);
   const [speakerError, setSpeakerError] = useState(null);
   const [pendingSpeakerId, setPendingSpeakerId] = useState(null);
 
-  // Add a timeline marker
+  const canAddMarkers = 
+    (recordingState === RECORDING_STATES.RECORDING) ||
+    (loadedSessionId && isAudioPlaying);
+
+  const currentMarkerTime = (loadedSessionId && isAudioPlaying) ? playbackTime : 
+                            (recordingState === RECORDING_STATES.RECORDING ? recordingTime : playbackTime);
+
+  // New function to update markers on the backend for a loaded session
+  const updateMarkersOnBackend = async (markersToSave) => {
+    if (!loadedSessionId || !token) return;
+
+    setIsAddingMarker(true); // Reuse existing loading state or create a new one
+    setMarkerError(null);
+
+    const backendMarkers = markersToSave.map(marker => {
+      const { id, ...restOfMarker } = marker;
+      return {
+        ...restOfMarker,
+        marker_id: id, // Use frontend 'id' as 'marker_id'
+        // Ensure 'added_at' is present, especially for new client-side markers
+        added_at: marker.added_at || new Date().toISOString(), 
+        // Ensure 'user_id' is present
+        user_id: marker.user_id || (user?.username || 'unknown-user'),
+      };
+    });
+
+    try {
+      const response = await fetch(getGatewayUrl(`/api/transcription/sessions/${loadedSessionId}`), {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ markers: backendMarkers }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error (${response.status}): ${errorData || response.statusText}`);
+      }
+      
+      dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); // This will update initialLoadedData and set isDirty to false
+      setSnackbarMessage('Marker changes saved to server.');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Error updating markers on backend:', error);
+      setMarkerError(`Failed to save marker changes: ${error.message}`);
+      // Optionally, dispatch an action to indicate sync error or revert UI changes
+    } finally {
+      setIsAddingMarker(false);
+    }
+  };
+
   const addMarker = async (markerType) => {
-    if (loadedSessionId || recordingState !== RECORDING_STATES.RECORDING) {
-      setSnackbarMessage('Can only add markers during active recording.');
+    if (!canAddMarkers) {
+      setSnackbarMessage('Can only add markers during active recording or playback.');
       setSnackbarOpen(true);
       return;
     }
@@ -142,85 +208,63 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
       setMarkerError(null);
       setPendingMarkerId(markerType.id);
       
-      if (!token) {
-        setMarkerError("Authentication token not found.");
-        setIsAddingMarker(false);
-        setPendingMarkerId(null);
-        return;
-      }
-      
       const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
-      
-      // Create local marker ID for optimistic UI update
-      const localMarkerId = `marker-${Date.now()}`;
-      
-      // Add marker to local state (optimistic update)
-      const newMarker = {
-        id: localMarkerId,
+      const timestampForMarker = currentMarkerTime;
+
+      const newMarkerPayload = {
+        id: `marker-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
         marker_type: markerType.type,
-        timestamp: recordingTime,
-        description: `${markerType.label} at ${formatTime(recordingTime)}`,
+        timestamp: timestampForMarker,
+        description: `${markerType.label} at ${formatTime(timestampForMarker)}`,
         classification: fullClassification,
-        user_id: user?.username || 'unknown-user'
+        user_id: user?.username || 'unknown-user',
+        added_at: new Date().toISOString(), // Add added_at for new markers
       };
       
-      dispatch({ type: ACTIONS.ADD_MARKER, payload: {
-        type: markerType.type,
-        label: markerType.label,
-        timestamp: recordingTime,
-        classification: fullClassification
-      }});
+      const optimisticNewMarkers = [...activeMarkers, newMarkerPayload];
+      dispatch({ type: ACTIONS.ADD_MARKER, payload: newMarkerPayload });
 
-      // API Call to save marker
-      if (sessionId) {
-        // Prepare API payload based on API spec
-        const markerPayload = {
+      if (!loadedSessionId && sessionId && token) {
+        const apiMarkerPayload = {
           marker_type: markerType.type,
-          timestamp: recordingTime,
-          description: `${markerType.label} marker added at ${formatTime(recordingTime)}`,
+          timestamp: timestampForMarker,
+          description: `${markerType.label} marker added at ${formatTime(timestampForMarker)}`,
           classification: fullClassification,
-          user_id: user?.username || 'unknown-user'
         };
         
-        // Endpoint URL
         const markerEndpoint = getGatewayUrl(`/api/transcription/sessions/${sessionId}/markers`);
-        
         const response = await fetch(markerEndpoint, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(markerPayload)
+          body: JSON.stringify(apiMarkerPayload)
         });
         
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`);
+          dispatch({ type: ACTIONS.REMOVE_MARKER, payload: newMarkerPayload.id });
+          throw new Error(`API Error (${response.status}): ${response.statusText}`);
         }
-        
         const responseData = await response.json();
-        console.log('Marker added successfully via API:', responseData);
-        
-        // Update UI on success
-        setSnackbarMessage(`Added ${markerType.label} marker at ${formatTime(recordingTime)}`);
-        setSnackbarOpen(true);
-      } else {
-        throw new Error("Session ID is missing, cannot save marker.");
+        console.log('Marker added successfully via API (live session):', responseData);
+        // For live sessions, we don't call updateMarkersOnBackend as it's a new marker to a live session not PUTting all markers.
+      } else if (loadedSessionId && token) {
+        // Marker added to an already loaded session, update all markers on backend
+        await updateMarkersOnBackend(optimisticNewMarkers);
       }
+
+      setSnackbarMessage(`Added ${markerType.label} marker at ${formatTime(timestampForMarker)}`);
+      setSnackbarOpen(true);
     } catch (error) {
       console.error('Error adding marker:', error);
       setMarkerError(`Failed to add marker: ${error.message}`);
-      dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to save marker to server.' });
-      setSnackbarMessage('Failed to save marker to server.');
-      setSnackbarOpen(true);
     } finally {
       setIsAddingMarker(false);
       setPendingMarkerId(null);
     }
   };
 
-  // Add a custom marker type
   const handleAddCustomMarkerType = async () => {
     const trimmedLabel = customMarkerLabel.trim();
     if (!trimmedLabel) {
@@ -236,10 +280,6 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
       dispatch({ type: ACTIONS.ADD_CUSTOM_MARKER_TYPE, payload: trimmedLabel });
       setCustomMarkerLabel('');
       
-      // In a production app, we might want to persist custom marker types
-      // This would require an additional API endpoint not currently defined
-      
-      // Simulate success
       setTimeout(() => {
         setSnackbarMessage(`Added new marker type: ${trimmedLabel}`);
         setSnackbarOpen(true);
@@ -254,7 +294,6 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
     }
   };
 
-  // Handler for clicking a speaker tag
   const handleSpeakerTagClick = async (participant) => {
     if (loadedSessionId || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) {
       setSnackbarMessage('Can only tag speakers during active or paused recording.');
@@ -267,28 +306,23 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
       setSpeakerError(null);
       setPendingSpeakerId(participant.id);
       
-      const currentTime = recordingTime;
+      const currentTime = currentMarkerTime;
       console.log(`Attempting speaker tag: ${participant.name} (ID: ${participant.id}) at time ${formatTime(currentTime)}`);
       
-      // Use the WebSocket sender function from context
       if (sendWebSocketMessage) {
         const speakerTagPayload = {
-          type: "speaker_tag", // Explicitly define type for backend WS router
+          type: "speaker_tag",
           speaker_id: participant.id,
           timestamp: currentTime
         };
         
         console.log('[WebSocket] Sending speaker_tag message:', speakerTagPayload);
-        const success = sendWebSocketMessage(speakerTagPayload); // Send the message
+        const success = sendWebSocketMessage(speakerTagPayload);
 
         if (success) {
-          // UI update on successful send attempt
           setSnackbarMessage(`Tagged speaker: ${participant.name} at ${formatTime(currentTime)}`);
           setSnackbarOpen(true);
-          // Optimistic update? Maybe add a temporary marker?
-          // dispatch({ type: ACTIONS.ADD_MARKER, payload: { type: 'speaker_tag_event', label: `Tagged ${participant.name}`, timestamp: currentTime }});
         } else {
-          // Handle send failure (e.g., WS not connected)
           throw new Error("WebSocket not connected or send failed.");
         }
       } else {
@@ -306,49 +340,25 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
     }
   };
   
-  // Remove marker (with API integration)
-  const handleRemoveMarker = async (markerId) => {
-    if (loadedSessionId) return; // Can't remove markers in loaded session
-    
-    try {
-      // Optimistic update - remove from local state first
-      dispatch({ type: ACTIONS.REMOVE_MARKER, payload: markerId });
-      
-      // API call to remove marker would go here
-      // This is not explicitly defined in the current API spec
-      // But would be needed for a complete implementation
-      
-      if (sessionId) {
-        // Possible endpoint structure
-        // const removeMarkerEndpoint = getApiUrl('TRANSCRIPTION', `/api/transcription/sessions/${sessionId}/markers/${markerId}`);
-        
-        // This would be the actual API call to delete a marker
-        /*
-        const response = await fetch(removeMarkerEndpoint, {
-          method: 'DELETE'
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to remove marker: ${response.status}`);
-        }
-        */
-        
-        // Simulate success
-        console.log(`[API] Would remove marker ${markerId} from session ${sessionId}`);
-      }
-    } catch (error) {
-      console.error('Error removing marker:', error);
-      setSnackbarMessage('Failed to remove marker from server.');
-      setSnackbarOpen(true);
-      
-      // We could revert the optimistic update here if needed
-      // by refetching markers from API
+  const handleRemoveMarker = async (markerIdToRemove) => {
+    if (globalIsReadOnly && !loadedSessionId) {
+        setSnackbarMessage('Cannot remove markers in this state.');
+        setSnackbarOpen(true);
+        return;
+    }
+    const updatedMarkersAfterRemoval = activeMarkers.filter(m => m.id !== markerIdToRemove);
+    dispatch({ type: ACTIONS.REMOVE_MARKER, payload: markerIdToRemove });
+
+    if (loadedSessionId && token) {
+      await updateMarkersOnBackend(updatedMarkersAfterRemoval);
     }
   };
 
+  const markerButtonsDisabled = isAddingMarker || !canAddMarkers;
+  const finalIsReadOnlyForCustomMarker = globalIsReadOnly || isAddingCustomMarker;
+
   return (
     <Box>
-        {/* Timeline Markers Section */}
         <Box className={classes.formSection}>
             <Typography variant="h6" className={classes.formTitle}>Timeline Markers</Typography>
             <Box className={classes.timelineMarkers} sx={{ mt: 0.5 }}>
@@ -359,7 +369,7 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
                     color={markerType.color === 'default' ? 'inherit' : markerType.color}
                     startIcon={<FlagIcon />}
                     onClick={() => addMarker(markerType)}
-                    disabled={isReadOnly || recordingState !== RECORDING_STATES.RECORDING || isAddingMarker || pendingMarkerId === markerType.id}
+                    disabled={markerButtonsDisabled || pendingMarkerId === markerType.id || globalIsReadOnly}
                     className={`${classes.markerButton} ${pendingMarkerId === markerType.id ? classes.markerLoading : ''}`}
                     size="small"
                 >
@@ -381,7 +391,6 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
               </Typography>
             )}
             
-            {/* Add Custom Marker UI */}
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5, alignItems: 'center' }}>
             <TextField
                 label="New Marker Label"
@@ -390,36 +399,39 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
                 value={customMarkerLabel}
                 onChange={(e) => setCustomMarkerLabel(e.target.value)}
                 sx={{ flexGrow: 1 }}
-                disabled={isReadOnly || isAddingCustomMarker}
+                disabled={finalIsReadOnlyForCustomMarker || globalIsReadOnly}
             />
             <Button 
                 variant="contained" 
                 size="small" 
                 onClick={handleAddCustomMarkerType} 
-                disabled={isReadOnly || isAddingCustomMarker || !customMarkerLabel.trim()} 
+                disabled={finalIsReadOnlyForCustomMarker || globalIsReadOnly || !customMarkerLabel.trim()}
                 startIcon={isAddingCustomMarker ? <CircularProgress size={20} /> : <AddIcon />}
             >
                 Add Type
             </Button>
             </Box>
-            {/* Display Active Markers */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-            {Array.isArray(activeMarkers) && activeMarkers.map((marker) => (
-                <Chip
-                    key={marker.id}
-                    label={`${availableMarkerTypes.find(mt => mt.type === marker.marker_type)?.label || marker.marker_type} at ${formatTime(marker.timestamp)}`}
-                    color="primary" // Consider using marker specific color?
-                    size="small"
-                    onDelete={loadedSessionId ? undefined : () => handleRemoveMarker(marker.id)} // Allow delete only if not loaded
-                    disabled={loadedSessionId} // Disable delete chip if loaded
-                />
-            ))}
+            {Array.isArray(activeMarkers) && activeMarkers.map((marker) => {
+                const markerTypeDetails = availableMarkerTypes.find(mt => mt.type === marker.marker_type);
+                return (
+                    <Chip
+                        key={marker.id}
+                        label={`${markerTypeDetails?.label || marker.marker_type} at ${formatTime(marker.timestamp)}`}
+                        color="primary" 
+                        size="small"
+                        onDelete={(loadedSessionId && !globalIsReadOnly) ? () => handleRemoveMarker(marker.id) : undefined}
+                        deleteIcon={(loadedSessionId && !globalIsReadOnly) ? <DeleteIcon /> : undefined}
+                        className={classes.markerChip}
+                        disabled={(!loadedSessionId && globalIsReadOnly) || (loadedSessionId && globalIsReadOnly)}
+                    />
+                );
+            })}
             </Box>
         </Box>
 
         <Divider />
 
-        {/* Speaker Tags Section - Conditionally render based on loadedSessionId */}
         {!loadedSessionId && (
             <Box sx={{ pt: 1.5 }} className={classes.speakerTagsSection}>
             <Typography variant="h6" className={classes.formTitle}>Tag Current Speaker</Typography>
@@ -432,7 +444,7 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
                     onClick={() => handleSpeakerTagClick(participant)}
                     size="medium"
                     disabled={
-                      isReadOnly || 
+                      globalIsReadOnly ||
                       (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED) || 
                       taggingSpeaker || 
                       pendingSpeakerId === participant.id
@@ -473,12 +485,11 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
             </Box>
         )}
 
-        {/* Local Snackbar for component-specific messages */}
         <Snackbar
             open={snackbarOpen}
             autoHideDuration={4000}
             onClose={() => setSnackbarOpen(false)}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} // Place differently from main snackbar
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             message={snackbarMessage}
         />
     </Box>

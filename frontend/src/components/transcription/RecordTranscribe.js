@@ -1,7 +1,7 @@
 // RecordTranscribe.js
 // This component is used to record and transcribe audio in a new MAGE browserwindow.
 
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -354,80 +354,206 @@ const RecordTranscribe = () => {
   const { state, dispatch } = useTranscription();
   const { token } = useContext(AuthContext);
   
-  // Remove local refs and state related to recording controls/waveform
-  // const intervalRef = useRef(null);
-  // const waveformRef = useRef(null); 
-  // const wavesurferRef = useRef(null);
-  // const [audioStream, setAudioStream] = useState(null);
-  // const [mediaRecorder, setMediaRecorder] = useState(null);
-  // const [audioChunks, setAudioChunks] = useState([]);
-  // const [isInitializing, setIsInitializing] = useState(false);
-  
-  // Keep state not moved
-  // const transcriptionPanelRef = useRef(null); // For scrolling transcription
+  const {
+    sessionId,
+    recordingState,
+    transcriptionText,
+    audioFilename,
+    error,
+    participants,
+    classification: selectedClassification,
+    caveatType,
+    customCaveat,
+    eventMetadata,
+    loadedSessionId,
+    isDirty,
+    initialLoadedData,
+    markers,
+    audioUrl, // Already in context
+    playbackTime, // Already in context for dispatch, local for control
+  } = state;
+
   const [confirmCloseDialog, setConfirmCloseDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  // const [customMarkerLabel, setCustomMarkerLabel] = useState(''); // Moved
   const [closeWarningType, setCloseWarningType] = useState('');
 
-  // Extract state from context
-  const {
-    sessionId,
-    recordingState, // Still needed for read-only checks maybe?
-    // recordingTime, // Managed by RecordingControlPanel
-    transcriptionText,
-    audioFilename, // Session Name
-    error, // Still needed for snackbar
-    participants, // Needed for participant manager
-    classification: selectedClassification, // Needed for forms
-    caveatType, // Needed for forms
-    customCaveat, // Needed for forms
-    eventMetadata, // Needed for forms
-    // markers: activeMarkers, // Handled by child
-    // availableMarkerTypes, // Handled by child
-    loadedSessionId, // Still needed for mode checks
-    // Assume context tracks initial loaded data for comparison
-    // initialSessionData // We'll check for existence/changes later
-    // Assume context tracks if changes were made
-    isDirty, // Add isDirty from context state
-    initialLoadedData // Add initial data from context state
-  } = state;
+  // --- START: WaveSurfer State Lifted from RecordingControlPanel --- 
+  const waveformRef = useRef(null); // This ref will be passed to RecordingControlPanel for the container
+  const wavesurferRef = useRef(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false); // Renamed from isPlaying for clarity
+  const [currentPlaybackTimeForSlider, setCurrentPlaybackTimeForSlider] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isWaveformReady, setIsWaveformReady] = useState(false);
+  const isSeekingRef = useRef(false); // To prevent audioprocess updates during seek
+  const [currentObjectUrl, setCurrentObjectUrl] = useState(null); // For managing blob URLs
+  const [apiError, setApiError] = useState(null); // For WaveSurfer/audio loading errors
+  // --- END: WaveSurfer State --- 
 
-  // --- START EDIT ---
-  // Effect to check for changes and update isDirty state
+  // Effect for isDirty check (remains the same)
   useEffect(() => {
     if (loadedSessionId && initialLoadedData) {
-      // Fields to compare
       const currentDataToCompare = {
         audioFilename: audioFilename,
         transcriptionText: transcriptionText,
         participants: participants,
         eventMetadata: eventMetadata,
-        classification: selectedClassification,
+        classification: selectedClassification === 'SELECT A SECURITY CLASSIFICATION' ? '' : selectedClassification,
         caveatType: caveatType,
         customCaveat: customCaveat,
       };
       
-      // Compare current state with the initial loaded state
-      const areEqual = deepCompare(currentDataToCompare, initialLoadedData);
+      const initialComparableData = {
+        ...initialLoadedData,
+        classification: initialLoadedData.classification === 'SELECT A SECURITY CLASSIFICATION' ? '' : initialLoadedData.classification,
+      };
+
+      const areEqual = deepCompare(currentDataToCompare, initialComparableData);
       
-      // Dispatch action only if dirty state needs to change
       if (!areEqual && !isDirty) {
           dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: true });
       } else if (areEqual && isDirty) {
           dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: false });
       }
     }
-    // Dependencies: Include all state variables being compared + loadedSessionId + initialLoadedData
   }, [
       loadedSessionId, initialLoadedData, audioFilename, transcriptionText, participants, 
       eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch
   ]);
-  // --- END EDIT ---
 
-  // --- Helper function to check for unsaved form data ---
-  // This logic might need adjustment based on which component handles saving changes for loaded sessions
+  // --- START: WaveSurfer Initialization and Event Handling (Moved here) ---
+  useEffect(() => {
+    if (waveformRef.current && !wavesurferRef.current) { // Initialize only once
+      const wavesurfer = WaveSurfer.create({
+        container: waveformRef.current, // waveformRef is the div in RecordingControlPanel
+        waveColor: theme.palette.primary.light,
+        progressColor: theme.palette.secondary.main,
+        cursorColor: theme.palette.warning.main,
+        barWidth: 2, barRadius: 3, cursorWidth: 1, height: 80, barGap: 2,
+        responsive: true, normalize: true, partialRender: true, backend: 'WebAudio'
+      });
+      wavesurferRef.current = wavesurfer;
+
+      wavesurfer.on('ready', () => {
+        console.log('WaveSurfer ready (in RecordTranscribe)');
+        setAudioDuration(wavesurfer.getDuration());
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsWaveformReady(true);
+        setIsAudioPlaying(false); // Ensure playing is false on ready
+      });
+      wavesurfer.on('audioprocess', (time) => {
+        if (!isSeekingRef.current) {
+          setCurrentPlaybackTimeForSlider(time);
+          dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: time });
+        }
+      });
+      wavesurfer.on('finish', () => {
+        setIsAudioPlaying(false);
+        setCurrentPlaybackTimeForSlider(wavesurferRef.current.getDuration()); // Go to end
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: wavesurferRef.current.getDuration() });
+      });
+      wavesurfer.on('seek', (progress) => {
+        const newTime = progress * wavesurferRef.current.getDuration();
+        setCurrentPlaybackTimeForSlider(newTime);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: newTime });
+      });
+      wavesurfer.on('error', (err) => {
+        console.error('WaveSurfer error (in RecordTranscribe):', err);
+        setApiError(`WaveSurfer error: ${err.toString()}`);
+        setIsWaveformReady(false);
+      });
+    }
+    // Cleanup on component unmount
+    return () => {
+      if (wavesurferRef.current) {
+        wavesurferRef.current.unAll();
+        wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+      }
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+        setCurrentObjectUrl(null);
+      }
+    };
+  }, [theme, dispatch]); // Removed currentObjectUrl from deps, managed internally
+
+  // Effect to load audio when audioUrl changes (Moved and adapted)
+  useEffect(() => {
+    if (wavesurferRef.current) {
+      if (currentObjectUrl) { // Revoke previous if any
+        URL.revokeObjectURL(currentObjectUrl);
+        setCurrentObjectUrl(null);
+      }
+      if (loadedSessionId && audioUrl) {
+        setIsWaveformReady(false); // Reset ready state
+        setAudioDuration(0);
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsAudioPlaying(false);
+
+        const fetchAndLoadAudio = async () => {
+          try {
+            if (!token) throw new Error("Auth token missing");
+            const response = await fetch(audioUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            setCurrentObjectUrl(objectUrl); 
+            wavesurferRef.current.load(objectUrl);
+          } catch (error) {
+            console.error("Error fetching or loading audio:", error);
+            setApiError(error.message);
+            setIsWaveformReady(false);
+          }
+        };
+        fetchAndLoadAudio();
+      } else if (!loadedSessionId) { // If new session or reset
+        wavesurferRef.current.empty();
+        setIsWaveformReady(false);
+        setAudioDuration(0);
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsAudioPlaying(false);
+      }
+    }
+  }, [loadedSessionId, audioUrl, token, dispatch]);
+  // --- END: WaveSurfer Logic Moved ---
+
+  // --- START: Playback Handlers (Moved here) ---
+  const handlePlayPause = useCallback(() => {
+    if (wavesurferRef.current && isWaveformReady) {
+      wavesurferRef.current.playPause();
+      setIsAudioPlaying(wavesurferRef.current.isPlaying());
+    }
+  }, [isWaveformReady]);
+
+  const handleStopPlayback = useCallback(() => {
+    if (wavesurferRef.current && isWaveformReady) {
+      wavesurferRef.current.stop();
+      setIsAudioPlaying(false);
+      setCurrentPlaybackTimeForSlider(0);
+      dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+    }
+  }, [isWaveformReady, dispatch]);
+
+  const handleSliderChange = useCallback((event, newValue) => {
+    if (isWaveformReady && audioDuration > 0) {
+      setCurrentPlaybackTimeForSlider(newValue);
+    }
+  }, [isWaveformReady, audioDuration]);
+
+  const handleSliderChangeCommitted = useCallback((event, newValue) => {
+    if (wavesurferRef.current && isWaveformReady && audioDuration > 0) {
+      isSeekingRef.current = true;
+      const seekPosition = newValue / audioDuration;
+      wavesurferRef.current.seekTo(seekPosition);
+      // Event listener for 'seek' will dispatch SET_PLAYBACK_TIME
+      setTimeout(() => { isSeekingRef.current = false; }, 100);
+    }
+  }, [isWaveformReady, audioDuration]);
+  // --- END: Playback Handlers ---
+
   const hasUnsavedFormData = () => {
     // Check only if not loading a session and in inactive state
     if (loadedSessionId || recordingState !== RECORDING_STATES.INACTIVE) return false;
@@ -445,31 +571,6 @@ const RecordTranscribe = () => {
     return isFilenameEntered || isMetadataEntered || isParticipantEntered || isClassificationSelected;
   };
   
-  // Generate a random color for participants (Keep - needed for add participant)
-  // const getRandomColor = () => {
-  //   const colors = ['#4285f4', '#ea4335', '#34a853', '#fbbc05', '#9c27b0', '#00bcd4', '#ff5722', '#3f51b5'];
-  //   return colors[Math.floor(Math.random() * colors.length)];
-  // };
-
-  // Handle beforeunload event (Keep)
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
-      const hasData = hasUnsavedFormData();
-      const shouldWarn = isRecordingActive || (!loadedSessionId && hasData);
-      if (shouldWarn) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [recordingState, loadedSessionId, audioFilename, eventMetadata, participants, selectedClassification]);
-
-  // Handle close window button (Keep)
   const handleCloseWindow = () => {
     const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
     const hasData = hasUnsavedFormData();
@@ -484,17 +585,6 @@ const RecordTranscribe = () => {
     }
   };
 
-  // Display error message in snackbar (Keep)
-  useEffect(() => {
-    if (error) { // Check error from state
-      setSnackbarMessage(error);
-      setSnackbarOpen(true);
-      // Optionally clear the error after showing
-      // dispatch({ type: ACTIONS.SET_ERROR, payload: null });
-    }
-  }, [error]);
-
-  // Cancel recording function (Keep - handles dialog interaction)
   const cancelRecording = async () => {
     if (loadedSessionId) {
         dispatch({ type: ACTIONS.START_NEW_SESSION });
@@ -524,43 +614,6 @@ const RecordTranscribe = () => {
     }
   };
   
-  // Add a new participant placeholder (Keep - belongs to participant manager section)
-  // const addNewParticipantPlaceholder = () => { ... };
-
-  // Handle changes in the inline participant fields (Keep - belongs to participant manager section)
-  // const handleParticipantChange = (id, field, value) => { ... };
-
-  // Remove participant function (Keep - belongs to participant manager section)
-  // const removeParticipant = (id) => { ... };
-
-  // Auto-scroll transcription panel (Keep)
-  // useEffect(() => {
-  //   if (transcriptionPanelRef.current) {
-  //     transcriptionPanelRef.current.scrollTop = transcriptionPanelRef.current.scrollHeight;
-  //   }
-  // }, [transcriptionText]); // Scroll when text changes
-
-  // Disable forms ONLY if actively recording or paused, allow editing loaded sessions
-  const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
-  
-  // --- START EDIT ---
-  // Determine if the RealtimeTaggingPanel should be read-only
-  // It should be interactive (not read-only) ONLY when actively recording a NEW session.
-  // It should be read-only if:
-  //  - Viewing a loaded session (loadedSessionId is true)
-  //  - Recording is paused
-  //  - Recording is inactive/stopped
-  const isTaggingPanelReadOnly =
-    !!loadedSessionId || // If a session is loaded, it's read-only for tagging
-    recordingState === RECORDING_STATES.PAUSED ||
-    recordingState === RECORDING_STATES.INACTIVE ||
-    recordingState === RECORDING_STATES.STOPPED;
-  // --- END EDIT ---
-
-  // Construct the full classification string for display (Keep)
-  const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
-
-  // --- Save Changes Logic (for loaded sessions) ---
   const handleSaveChanges = async () => {
       if (!loadedSessionId || !token) {
           setSnackbarMessage("Cannot save: No session loaded or not authenticated.");
@@ -568,20 +621,16 @@ const RecordTranscribe = () => {
           return;
       }
 
-      // Prepare payload with current state data
-      const updatePayload = {
-          session_name: audioFilename,
-          event_metadata: eventMetadata,
-          participants: participants,
-          full_transcript_text: transcriptionText // Assuming transcript text is editable
+      const finalPayload = {
+        session_name: audioFilename,
+        event_metadata: { 
+            ...eventMetadata, 
+            classification: constructClassificationString(selectedClassification, caveatType, customCaveat) || null, 
+        },
+        participants: participants,
+        full_transcript_text: transcriptionText,
+        markers: markers,
       };
-
-      // Remove null/undefined values? The backend might handle this.
-      // Example: Clean payload if needed
-      // const cleanedPayload = Object.entries(updatePayload).reduce((acc, [key, value]) => {
-      //     if (value !== null && value !== undefined) acc[key] = value;
-      //     return acc;
-      // }, {});
 
       try {
           const saveUrl = getGatewayUrl(`/api/transcription/sessions/${loadedSessionId}`);
@@ -591,7 +640,7 @@ const RecordTranscribe = () => {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify(updatePayload) // Send the full current state
+              body: JSON.stringify(finalPayload)
           });
 
           if (!response.ok) {
@@ -602,12 +651,7 @@ const RecordTranscribe = () => {
           const result = await response.json();
           setSnackbarMessage("Changes saved successfully.");
           setSnackbarOpen(true);
-          // Optionally: Dispatch an action to reset the 'isDirty' state or update 'initialSessionData' in context
-          // dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
-          // --- START EDIT ---
-          // Dispatch action to mark session as saved (resets isDirty and updates initialLoadedData)
           dispatch({ type: ACTIONS.MARK_SESSION_SAVED });
-          // --- END EDIT ---
           console.log("Save successful:", result);
 
       } catch (error) {
@@ -617,6 +661,11 @@ const RecordTranscribe = () => {
           dispatch({ type: ACTIONS.SET_ERROR, payload: `Failed to save changes: ${error.message}` });
       }
   };
+
+  const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
+  const isTaggingPanelReadOnly = loadedSessionId ? !isAudioPlaying : (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED);
+
+  const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
 
   return (
     <Box className={classes.root}>
@@ -653,8 +702,19 @@ const RecordTranscribe = () => {
               {/* Inner Left Column (Controls/Info/Forms) */}
               <Grid item xs={12} md={5} style={{ height: '100%' }}>
                 <GradientBorderPaper className={classes.controlPanel}>
-                  {/* Recording Controls */}
-                  <RecordingControlPanel />
+                  {/* Pass WaveSurfer related props to RecordingControlPanel */}
+                  <RecordingControlPanel 
+                    waveformRef={waveformRef} // Pass the ref for the div container
+                    isAudioPlaying={isAudioPlaying}
+                    currentPlaybackTime={currentPlaybackTimeForSlider} // Use local for slider
+                    duration={audioDuration}
+                    isWaveformReady={isWaveformReady}
+                    onPlayPause={handlePlayPause}
+                    onStopPlayback={handleStopPlayback}
+                    onSliderChange={handleSliderChange}
+                    onSliderChangeCommitted={handleSliderChangeCommitted}
+                    apiError={apiError} // Pass WaveSurfer specific errors
+                  />
                   <Divider />
 
                   {/* Session Metadata Form */}
@@ -673,7 +733,6 @@ const RecordTranscribe = () => {
                          size="small" 
                          startIcon={<SaveIcon />} 
                          onClick={handleSaveChanges} 
-                         // disabled={!isDirty || isFormDisabled} // Enable button based on changes
                          disabled={isFormDisabled || !isDirty}
                          style={{ marginTop: '8px' }}
                      >
@@ -694,7 +753,11 @@ const RecordTranscribe = () => {
 
                   {/* Realtime Tagging Panel */}
                   <Box sx={{ px: 1.5, pb: 1 }}>
-                    <RealtimeTaggingPanel isReadOnly={isTaggingPanelReadOnly} />
+                    <RealtimeTaggingPanel 
+                        isReadOnly={isTaggingPanelReadOnly} 
+                        isAudioPlaying={isAudioPlaying} // Pass playing state
+                        // playbackTime is already in context, RealtimeTaggingPanel will use it
+                    />
                   </Box>
 
                   <Divider sx={{ mx: 2 }}/>

@@ -24,7 +24,9 @@ from schemas import (
      StopSessionRequest, StopSessionResponse, 
      ParticipantSchema, EventMetadataSchema, # Import needed schemas for responses/updates
      AddMarkerRequest, AddMarkerResponse, # Import marker schemas
-     GetTranscriptionResponse # Import new response model
+     GetTranscriptionResponse, # Import new response model
+     UpdateSessionRequest, # Ensure this is the one from schemas.py
+     UpdateSessionResponse as SchemaUpdateSessionResponse # Alias the one from schemas.py if needed
 )
 # Import the centralized model loader and getter using relative path
 from model_loader import get_models, are_models_loaded
@@ -421,25 +423,17 @@ async def get_session_details(
     # Pydantic will validate the dictionary against SessionDetailsResponse
     return session_dict
     
-# Define request body model for updating session details
-class UpdateSessionRequest(BaseModel):
-     session_name: Optional[str] = None
-     event_metadata: Optional[EventMetadataSchema] = None
-     participants: Optional[List[ParticipantSchema]] = None
-     full_transcript_text: Optional[str] = None
-     # Add other editable fields if needed
-
-class UpdateSessionResponse(BaseModel):
+class UpdateSessionResponse(BaseModel): # This local definition is fine if it's what the route should return
      session_id: UUID
      status: str = "updated"
      updated_at: datetime
 
 @router.put("/api/transcription/sessions/{session_id}", 
-            response_model=UpdateSessionResponse, 
+            response_model=UpdateSessionResponse, # Uses the local UpdateSessionResponse
             summary="Update details of a session")
 async def update_session_details(
     session_id: UUID, 
-    update_data: UpdateSessionRequest,
+    update_data: UpdateSessionRequest, # Crucially, this should now refer to the imported schemas.UpdateSessionRequest
     db: AsyncSession = Depends(get_db_session)
 ):
     """Updates the editable details of a specific recording session."""
@@ -531,6 +525,47 @@ async def get_transcription(
         transcription_segments=session.transcription_segments,
         last_update=session.last_update
     )
+
+# --- START EDIT ---
+@router.delete("/api/transcription/sessions/{session_id}",
+               status_code=status.HTTP_204_NO_CONTENT,
+               summary="Delete a specific session")
+async def delete_session_endpoint(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session)
+    # current_user_id: str = Depends(get_current_user_id) # Optional: Add ownership check
+):
+    """
+    Deletes a specific transcription session by its ID.
+    This will remove the session record from the database.
+    """
+    logger.info(f"Received request to delete session: {session_id}")
+
+    # Optional: Add check to ensure user owns the session before deleting
+    # session_to_check = await session_manager.get_session(db, str(session_id))
+    # if not session_to_check:
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    # if session_to_check.user_id != current_user_id:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User not authorized to delete this session.")
+
+    success = await session_manager.delete_session(db, str(session_id))
+
+    if not success:
+        # session_manager.delete_session logs whether it was a 404 or a 500-type error
+        # We can assume if it failed after finding it, it's a server error.
+        # If it couldn't find it, get_session within delete_session would have logged.
+        # For simplicity, we can re-check existence if needed or rely on delete_session's outcome.
+        # Re-checking existence to give a more accurate error:
+        existing_session = await session_manager.get_session(db, str(session_id))
+        if not existing_session:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found, cannot delete.")
+        else:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete session from database.")
+
+    # If successful, FastAPI will automatically return a 204 No Content response.
+    # No need to return anything explicitly.
+    return
+# --- END EDIT ---
 
 # --- Existing File Upload Endpoint (Renamed for Clarity) ---
 

@@ -3,7 +3,8 @@ import {
   Box,
   Typography,
   CircularProgress,
-  Button
+  Button,
+  TextField
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import { Refresh as RefreshIcon } from '@material-ui/icons';
@@ -20,6 +21,8 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(1.5),
     borderRadius: theme.shape.borderRadius,
     position: 'relative',
+    display: 'flex', 
+    flexDirection: 'column', 
   },
   transcriptionText: {
     whiteSpace: 'pre-wrap',
@@ -68,6 +71,21 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1,
   },
+  editableTranscript: {
+    flexGrow: 1, 
+    '& .MuiOutlinedInput-root': {
+        height: '100%', 
+         display: 'flex',
+         flexDirection: 'column',
+    },
+    '& .MuiOutlinedInput-input': {
+        height: '100% !important', 
+        overflowY: 'auto',
+        padding: theme.spacing(1.5),
+        fontFamily: '"Nunito Sans", "Helvetica", "Arial", sans-serif',
+        lineHeight: 1.8,
+    },
+  },
 }));
 
 const TranscriptionDisplay = () => {
@@ -77,13 +95,17 @@ const TranscriptionDisplay = () => {
   const { 
     transcriptionText,
     loadedSessionId,
+    recordingState,
   } = state;
   
   const transcriptionPanelRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Fetch transcription for loaded sessions
+  const isEditable = loadedSessionId && 
+                     recordingState !== RECORDING_STATES.RECORDING && 
+                     recordingState !== RECORDING_STATES.PAUSED;
+  
   const fetchTranscription = useCallback(async () => {
     if (!loadedSessionId || !token) {
       if (!token) setError("Cannot fetch transcript: Authentication token not found.");
@@ -128,21 +150,22 @@ const TranscriptionDisplay = () => {
     }
   }, [loadedSessionId, dispatch, token]);
   
-  // Fetch transcription when loaded session changes
   useEffect(() => {
     if (loadedSessionId) {
       fetchTranscription();
+    } else {
+      setIsLoading(false);
+      setError(null);
     }
   }, [loadedSessionId, fetchTranscription]);
   
-  // Auto-scroll transcription panel
   useEffect(() => {
-    if (transcriptionPanelRef.current) {
+    const isTextFieldFocused = document.activeElement?.tagName === 'TEXTAREA';
+    if (transcriptionPanelRef.current && (!isEditable || !isTextFieldFocused) ) {
       transcriptionPanelRef.current.scrollTop = transcriptionPanelRef.current.scrollHeight;
     }
-  }, [transcriptionText]);
+  }, [transcriptionText, isEditable]);
   
-  // Debug useEffect to log transcription text changes
   useEffect(() => {
     console.log('[TranscriptionDisplay] transcriptionText updated:', 
       transcriptionText ? 
@@ -151,16 +174,22 @@ const TranscriptionDisplay = () => {
     );
   }, [transcriptionText]);
   
-  // Helper function for retry
   const handleRetryConnection = () => {
     if (loadedSessionId && error) {
       fetchTranscription();
     }
   };
 
+  const handleTranscriptChange = (event) => {
+    dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: event.target.value });
+  };
+
   return (
-    <AnimatedGradientPaper className={classes.transcriptionPanel} ref={transcriptionPanelRef}>
-      {/* Loading overlay */}
+    <AnimatedGradientPaper 
+        className={classes.transcriptionPanel} 
+        ref={transcriptionPanelRef} 
+        style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}
+    >
       {isLoading && (
         <Box className={classes.loadingOverlay}>
           <CircularProgress />
@@ -170,7 +199,6 @@ const TranscriptionDisplay = () => {
         </Box>
       )}
       
-      {/* Error message */}
       {error && (
         <Box textAlign="center" mb={2}>
           <Typography variant="body2" className={classes.errorMessage}>
@@ -191,17 +219,30 @@ const TranscriptionDisplay = () => {
         </Box>
       )}
       
-      {/* Transcription content */}
-      {transcriptionText ? (
-        <Typography variant="body1" className={classes.transcriptionText}>
-          {transcriptionText}
-        </Typography>
-      ) : (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2" color="textSecondary">
-            {loadedSessionId ? 'No transcript found for this session.' : 'Transcription will appear here...'}
+      {!isLoading && !error && (
+        isEditable ? (
+          <TextField
+            multiline
+            fullWidth
+            variant="outlined"
+            value={transcriptionText || ''} 
+            onChange={handleTranscriptChange}
+            placeholder="Edit transcription..."
+            className={classes.editableTranscript}
+            rows={10} 
+            sx={{ flexGrow: 1, '& .MuiInputBase-root': { height: '100%' } }}
+          />
+        ) : transcriptionText ? (
+          <Typography variant="body1" className={classes.transcriptionText}>
+            {transcriptionText}
           </Typography>
-        </Box>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Typography variant="body2" color="textSecondary">
+              {loadedSessionId ? 'No transcript available for this session or an error occurred.' : 'Transcription will appear here...'}
+            </Typography>
+          </Box>
+        )
       )}
     </AnimatedGradientPaper>
   );

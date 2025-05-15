@@ -93,10 +93,10 @@ http:
         attempts: 3
         initialInterval: "500ms"
     
-    # Circuit breaker middleware
-    circuit-breaker:
-      circuitBreaker:
-        expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
+    # # Circuit breaker middleware
+    # circuit-breaker:
+    #   circuitBreaker:
+    #     expression: "NetworkErrorRatio() > 0.5 || ResponseCodeRatio(500, 600, 0, 600) > 0.5"
     
     # Compress middleware
     compress:

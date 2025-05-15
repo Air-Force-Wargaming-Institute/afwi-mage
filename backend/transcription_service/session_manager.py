@@ -1,19 +1,26 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 # Remove io if no longer needed centrally
 # import io 
 
 # Use SQLAlchemy for DB operations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import delete # Add this import
 from sqlalchemy.dialects.postgresql import insert as pg_insert # For upsert if needed
 from sqlalchemy.orm.attributes import flag_modified
 
 from schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema, OutputFormatPreferencesSchema
 # Import the DB model and session getter
 from database import TranscriptionSession, get_db_session 
+
+# --- START EDIT ---
+import pathlib
+import shutil
+from config import ARTIFACT_STORAGE_BASE_PATH # Import base path
+# --- END EDIT ---
 
 logger = logging.getLogger(__name__)
 
@@ -266,23 +273,20 @@ class SessionManager:
              return []
              
     async def update_session_details(self, db: AsyncSession, session_id: str, update_data: dict) -> bool:
-         """Updates editable fields of a session (e.g., name, metadata, participants, transcript text)."""
+         """Updates editable fields of a session (e.g., name, metadata, participants, transcript text, markers)."""
          session = await self.get_session(db, session_id)
          if not session:
              logger.warning(f"Attempted to update details for non-existent session: {session_id}")
              return False
-         
-         # Only allow updates if session is completed?
-         # if session.status != "completed":
-         #     logger.warning(f"Attempted to update details for non-completed session: {session_id}")
-         #     return False
              
          try:
              updated = False
-             allowed_fields = ["session_name", "event_metadata", "participants", "full_transcript_text"]
+             allowed_fields = ["session_name", "event_metadata", "participants", "full_transcript_text", "markers"]
              for field, value in update_data.items():
                  if field in allowed_fields and value is not None:
                      setattr(session, field, value)
+                     if field == "event_metadata" or field == "participants" or field == "markers": # These are JSON fields
+                         flag_modified(session, field)
                      updated = True
                      
              if updated:
@@ -293,12 +297,53 @@ class SessionManager:
                  return True
              else:
                  logger.info(f"No valid fields provided to update for session {session_id}." )
-                 return False # Or True if no update needed?
+                 return False 
                  
          except Exception as e:
              await db.rollback()
              logger.error(f"Failed to update details for session {session_id} in DB: {e}", exc_info=True)
              return False
+
+    async def delete_session(self, db: AsyncSession, session_id: str) -> bool:
+        """Deletes a session from the database by ID and its associated artifact folder."""
+        session_uuid = uuid.UUID(session_id)
+        # --- START EDIT ---
+        # It's better to fetch the session first to get its path, then delete files, then DB record
+        session_to_delete = await self.get_session(db, session_id)
+
+        if not session_to_delete:
+            logger.warning(f"Attempted to delete non-existent session: {session_id}")
+            return False
+        
+        # Construct the session artifact path
+        # This assumes session_id is the folder name directly under ARTIFACT_STORAGE_BASE_PATH
+        session_artifact_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / session_id
+        # --- END EDIT ---
+
+        try:
+            # --- START EDIT ---
+            # Delete the session artifact folder from the filesystem
+            if session_artifact_path.exists():
+                if session_artifact_path.is_dir():
+                    shutil.rmtree(session_artifact_path)
+                    logger.info(f"Successfully deleted artifact directory: {session_artifact_path}")
+                else:
+                    # If it's a file and not a directory (should not happen based on structure)
+                    session_artifact_path.unlink()
+                    logger.info(f"Successfully deleted artifact file: {session_artifact_path}") # Log if it was a file
+            else:
+                logger.info(f"Artifact directory not found, skipping file deletion: {session_artifact_path}")
+            # --- END EDIT ---
+
+            stmt = delete(TranscriptionSession).where(TranscriptionSession.session_id == session_uuid)
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"Successfully deleted session {session_id} from DB.")
+            return True
+        except Exception as e:
+            await db.rollback() # Rollback DB changes if any error (including file system error) occurs
+            logger.error(f"Failed to delete session {session_id} (DB or files): {e}", exc_info=True)
+            return False
 
 # Instantiate the manager - Singleton pattern might be better, but this works for now.
 session_manager = SessionManager()
