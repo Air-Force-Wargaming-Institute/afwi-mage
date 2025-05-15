@@ -97,7 +97,7 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     padding: theme.spacing(1.5),
     gap: theme.spacing(2),
-    paddingBottom: theme.spacing(8),
+    paddingBottom: theme.spacing(8), // Ensure this doesn't get cut off by 100% height children
   },
   mainContentPanel: {
     display: 'flex',
@@ -107,12 +107,12 @@ const useStyles = makeStyles((theme) => ({
     height: '100%',
   },
   controlPanel: {
-    padding: theme.spacing(1.5),
+    // padding: theme.spacing(1.5), // REMOVED - GradientBorderPaper has its own padding
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1.5),
-    overflowY: 'auto',
-    height: '100%',
+    // gap: theme.spacing(1.5), // REMOVED - Will be applied to inner scrollable Box
+    // overflowY: 'auto', // REMOVED - GradientBorderPaper should not scroll
+    height: '100%', // Ensures GradientBorderPaper fills its Grid cell
   },
   audioVisualizer: {
     height: '100px',
@@ -805,29 +805,41 @@ const RecordTranscribe = () => {
               {/* Inner Left Column (Controls/Info/Forms) */}
               <Grid item xs={12} md={5} style={{ height: '100%' }}>
                 <GradientBorderPaper className={classes.controlPanel}>
-                  {/* Pass WaveSurfer related props to RecordingControlPanel */}
-                  <RecordingControlPanel 
-                    waveformRef={waveformRef} // Pass the ref for the div container
-                    isAudioPlaying={isAudioPlaying}
-                    currentPlaybackTime={currentPlaybackTimeForSlider} // Use local for slider
-                    duration={audioDuration}
-                    isWaveformReady={isWaveformReady}
-                    onPlayPause={handlePlayPause}
-                    onStopPlayback={handleStopPlayback}
-                    onSliderChange={handleSliderChange}
-                    onSliderChangeCommitted={handleSliderChangeCommitted}
-                    apiError={apiError} // Pass WaveSurfer specific errors
-                  />
-                  <Divider />
+                  {/* Inner Box to handle scrolling and layout of children */}
+                  <Box
+                    style={{
+                      height: '100%', // Fill GradientBorderPaper
+                      overflowY: 'auto', // Enable vertical scrolling for content
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: theme.spacing(1.5), // Layout for direct children
+                      // The theme.spacing(3) padding comes from GradientBorderPaper itself
+                    }}
+                  >
+                    {/* Pass WaveSurfer related props to RecordingControlPanel */}
+                    <RecordingControlPanel
+                      waveformRef={waveformRef} // Pass the ref for the div container
+                      isAudioPlaying={isAudioPlaying}
+                      currentPlaybackTime={currentPlaybackTimeForSlider} // Use local for slider
+                      duration={audioDuration}
+                      isWaveformReady={isWaveformReady}
+                      onPlayPause={handlePlayPause}
+                      onStopPlayback={handleStopPlayback}
+                      onSliderChange={handleSliderChange}
+                      onSliderChangeCommitted={handleSliderChangeCommitted}
+                      apiError={apiError} // Pass WaveSurfer specific errors
+                    />
+                    <Divider />
 
-                  {/* Session Metadata Form */}
-                  <SessionMetadataForm isReadOnly={isFormDisabled} />
-                  <Divider />
+                    {/* Session Metadata Form */}
+                    <SessionMetadataForm isReadOnly={isFormDisabled} />
+                    <Divider />
 
-                  {/* Participants Form */}
-                  <ParticipantManager isReadOnly={isFormDisabled} />
-                  <Divider />
-
+                    {/* Participants Form */}
+                    <ParticipantManager isReadOnly={isFormDisabled} />
+                    <Divider />
+                    {/* Ensure no extra empty elements here if not needed */}
+                  </Box>
                 </GradientBorderPaper>
               </Grid>
 
