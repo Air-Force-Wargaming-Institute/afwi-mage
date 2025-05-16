@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,8 @@ import {
 import { makeStyles } from '@material-ui/core/styles';
 import { Flag as FlagIcon, Person as PersonIcon, Add as AddIcon } from '@material-ui/icons';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
-import { getApiUrl } from '../../config';
+import { getApiUrl, getGatewayUrl } from '../../config';
+import { AuthContext } from '../../contexts/AuthContext';
 
 // Helper function to format time in HH:MM:SS
 const formatTime = (seconds) => {
@@ -97,6 +98,7 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
   const classes = useStyles();
   const theme = useTheme();
   const { state, dispatch } = useTranscription();
+  const { token, user } = useContext(AuthContext);
   const {
     sessionId,
     recordingState,
@@ -109,6 +111,7 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
     classification: selectedClassification,
     caveatType,
     customCaveat,
+    sendWebSocketMessage,
   } = state;
 
   const [customMarkerLabel, setCustomMarkerLabel] = useState('');
@@ -139,6 +142,13 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
       setMarkerError(null);
       setPendingMarkerId(markerType.id);
       
+      if (!token) {
+        setMarkerError("Authentication token not found.");
+        setIsAddingMarker(false);
+        setPendingMarkerId(null);
+        return;
+      }
+      
       const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
       
       // Create local marker ID for optimistic UI update
@@ -151,6 +161,7 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
         timestamp: recordingTime,
         description: `${markerType.label} at ${formatTime(recordingTime)}`,
         classification: fullClassification,
+        user_id: user?.username || 'unknown-user'
       };
       
       dispatch({ type: ACTIONS.ADD_MARKER, payload: {
@@ -168,52 +179,44 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
           timestamp: recordingTime,
           description: `${markerType.label} marker added at ${formatTime(recordingTime)}`,
           classification: fullClassification,
-          user_id: 'current-user' // In production, replace with actual user ID
+          user_id: user?.username || 'unknown-user'
         };
         
         // Endpoint URL
-        const markerEndpoint = getApiUrl('TRANSCRIPTION', `/api/transcription/sessions/${sessionId}/markers`);
+        const markerEndpoint = getGatewayUrl(`/api/transcription/sessions/${sessionId}/markers`);
         
-        // This would be the actual API call when backend is ready
-        /*
         const response = await fetch(markerEndpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify(markerPayload)
         });
         
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`API Error (${response.status}): ${errorText}`);
+          throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`);
         }
         
         const responseData = await response.json();
-        console.log('Marker added successfully:', responseData);
-        */
+        console.log('Marker added successfully via API:', responseData);
         
-        // Simulate API call for development
-        console.log('[API] Adding marker to endpoint:', markerEndpoint);
-        console.log('[API] Marker payload:', markerPayload);
-        
-        // Simulate API response delay
-        setTimeout(() => {
-          console.log('[API] Marker added successfully');
-          setSnackbarMessage(`Added ${markerType.label} marker at ${formatTime(recordingTime)}`);
-          setSnackbarOpen(true);
-          setIsAddingMarker(false);
-          setPendingMarkerId(null);
-        }, 1000);
+        // Update UI on success
+        setSnackbarMessage(`Added ${markerType.label} marker at ${formatTime(recordingTime)}`);
+        setSnackbarOpen(true);
+      } else {
+        throw new Error("Session ID is missing, cannot save marker.");
       }
     } catch (error) {
       console.error('Error adding marker:', error);
       setMarkerError(`Failed to add marker: ${error.message}`);
-      setIsAddingMarker(false);
-      setPendingMarkerId(null);
-      // We don't revert the optimistic update since the local marker is still valid for UI
-      // Just show error to user
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to save marker to server.' });
       setSnackbarMessage('Failed to save marker to server.');
       setSnackbarOpen(true);
+    } finally {
+      setIsAddingMarker(false);
+      setPendingMarkerId(null);
     }
   };
 
@@ -265,44 +268,41 @@ const RealtimeTaggingPanel = ({ isReadOnly }) => {
       setPendingSpeakerId(participant.id);
       
       const currentTime = recordingTime;
-      console.log(`Speaker tag clicked: ${participant.name} (ID: ${participant.id}) at time ${formatTime(currentTime)}`);
+      console.log(`Attempting speaker tag: ${participant.name} (ID: ${participant.id}) at time ${formatTime(currentTime)}`);
       
-      // API integration for speaker tagging would go here
-      // This is not explicitly defined in the current API spec, but would be needed
-      // Possible implementation could use the WebSocket or a specific endpoint
-      
-      if (sessionId) {
-        // Possible endpoint structure based on API needs
-        // const speakerTagEndpoint = getApiUrl('TRANSCRIPTION', `/api/transcription/sessions/${sessionId}/tag-speaker`);
-        
-        // Possible payload structure
+      // Use the WebSocket sender function from context
+      if (sendWebSocketMessage) {
         const speakerTagPayload = {
+          type: "speaker_tag", // Explicitly define type for backend WS router
           speaker_id: participant.id,
-          timestamp: currentTime,
-          session_id: sessionId
+          timestamp: currentTime
         };
         
-        // For now, just log what would be sent
-        console.log('[API] Would tag speaker with payload:', speakerTagPayload);
-        
-        // Simulate API success
-        setTimeout(() => {
+        console.log('[WebSocket] Sending speaker_tag message:', speakerTagPayload);
+        const success = sendWebSocketMessage(speakerTagPayload); // Send the message
+
+        if (success) {
+          // UI update on successful send attempt
           setSnackbarMessage(`Tagged speaker: ${participant.name} at ${formatTime(currentTime)}`);
           setSnackbarOpen(true);
-          setTaggingSpeaker(false);
-          setPendingSpeakerId(null);
-          
-          // In a production app, this would update the transcription segments
-          // with the speaker ID for the current segment
-        }, 500);
+          // Optimistic update? Maybe add a temporary marker?
+          // dispatch({ type: ACTIONS.ADD_MARKER, payload: { type: 'speaker_tag_event', label: `Tagged ${participant.name}`, timestamp: currentTime }});
+        } else {
+          // Handle send failure (e.g., WS not connected)
+          throw new Error("WebSocket not connected or send failed.");
+        }
+      } else {
+        console.error("sendWebSocketMessage function not available in context.");
+        throw new Error("Cannot send speaker tag: WebSocket sender not ready.");
       }
     } catch (error) {
       console.error('Error tagging speaker:', error);
       setSpeakerError(`Failed to tag speaker: ${error.message}`);
-      setTaggingSpeaker(false);
-      setPendingSpeakerId(null);
       setSnackbarMessage('Failed to tag speaker.');
       setSnackbarOpen(true);
+    } finally {
+      setTaggingSpeaker(false);
+      setPendingSpeakerId(null);
     }
   };
   

@@ -24,14 +24,13 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_GPU_MEMORY_UTILIZATION=0.1
       - OLLAMA_GPU_LAYERS_AUTO=1
-      - OLLAMA_NUM_GPU=1
+      - OLLAMA_NUM_GPU=2
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
-              #count: 2
+              count: 2
               capabilities: [gpu]
     networks:
       - app-network

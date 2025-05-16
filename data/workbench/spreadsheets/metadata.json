@@ -1,10 +1,51 @@
 {
-  "aaf105bb-89e8-4027-8291-a72378468daf": {
-    "filename": "products-10000.csv",
-    "size_bytes": 1605977,
+  "dd30295d-898f-4654-b705-b722103ecaf8": {
+    "filename": "Sample Likert.xlsx",
+    "size_bytes": 16233,
     "sheet_count": 1,
     "sheets": [
       "Sheet1"
+    ],
+    "columns": [
+      "Player",
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4",
+      "Q5",
+      "Q6",
+      "Q7"
+    ],
+    "row_count": 18,
+    "sheets_metadata": {
+      "Sheet1": {
+        "columns": [
+          "Player",
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4",
+          "Q5",
+          "Q6",
+          "Q7"
+        ],
+        "row_count": 18
+      }
+    },
+    "id": "dd30295d-898f-4654-b705-b722103ecaf8",
+    "description": null,
+    "original_filename": "Sample Likert.xlsx",
+    "modified_filename": "Sample Likert.xlsx",
+    "upload_date": "2025-05-05T15:07:00.259672",
+    "modified_date": "2025-05-05T15:07:00.259672",
+    "storage_path": "/app/data/workbench/spreadsheets/dd30295d-898f-4654-b705-b722103ecaf8.xlsx"
+  },
+  "875ce5a6-cade-42d1-9710-2fd1a44cf4b4": {
+    "filename": "products-10000.xlsx",
+    "size_bytes": 1179559,
+    "sheet_count": 1,
+    "sheets": [
+      "products-10000"
     ],
     "columns": [
       "Index",
@@ -23,7 +64,7 @@
     ],
     "row_count": 10000,
     "sheets_metadata": {
-      "Sheet1": {
+      "products-10000": {
         "columns": [
           "Index",
           "Name",
@@ -42,12 +83,106 @@
         "row_count": 10000
       }
     },
-    "id": "aaf105bb-89e8-4027-8291-a72378468daf",
+    "id": "875ce5a6-cade-42d1-9710-2fd1a44cf4b4",
     "description": null,
-    "original_filename": "products-10000.csv",
-    "modified_filename": "products-10000.csv",
-    "upload_date": "2025-04-28T19:10:05.586914",
-    "modified_date": "2025-04-28T19:10:05.586914",
-    "storage_path": "/app/data/workbench/spreadsheets/aaf105bb-89e8-4027-8291-a72378468daf.csv"
+    "original_filename": "products-10000.xlsx",
+    "modified_filename": "products-10000.xlsx",
+    "upload_date": "2025-05-05T16:33:38.079177",
+    "modified_date": "2025-05-05T16:33:38.079177",
+    "storage_path": "/app/data/workbench/spreadsheets/875ce5a6-cade-42d1-9710-2fd1a44cf4b4.xlsx"
+  },
+  "77a57f12-afe8-4082-b50a-fea994b7cd83": {
+    "id": "77a57f12-afe8-4082-b50a-fea994b7cd83",
+    "filename": "products-10000.xlsx",
+    "original_filename": "products-10000.xlsx",
+    "modified_filename": "Copy of products-10000.xlsx",
+    "upload_date": "2025-05-05T16:42:14.181933",
+    "modified_date": "2025-05-05T16:42:14.181933",
+    "storage_path": "/app/data/workbench/spreadsheets/77a57f12-afe8-4082-b50a-fea994b7cd83.xlsx",
+    "original_id": "875ce5a6-cade-42d1-9710-2fd1a44cf4b4",
+    "description": "Duplicate of products-10000.xlsx created for column transformation",
+    "sheet_count": 1,
+    "sheets": [
+      "products-10000"
+    ],
+    "sheets_metadata": {
+      "products-10000": {
+        "columns": [
+          "Index",
+          "Name",
+          "Description",
+          "Brand",
+          "Category",
+          "Price",
+          "Currency",
+          "Stock",
+          "EAN",
+          "Color",
+          "Size",
+          "Availability",
+          "Internal ID"
+        ],
+        "row_count": 10000
+      }
+    },
+    "columns": [
+      "Index",
+      "Name",
+      "Description",
+      "Brand",
+      "Category",
+      "Price",
+      "Currency",
+      "Stock",
+      "EAN",
+      "Color",
+      "Size",
+      "Availability",
+      "Internal ID"
+    ],
+    "size_bytes": 1179559
+  },
+  "8cc22e7f-ba88-4e37-a1a8-dfba5c598715": {
+    "filename": "TSSG Game Data Compiled.xlsx",
+    "size_bytes": 139641,
+    "sheet_count": 1,
+    "sheets": [
+      "Game Observations"
+    ],
+    "columns": [
+      "Observer",
+      "Block",
+      "Section",
+      "Observation",
+      "Speaker",
+      "Timestamp",
+      "Primary Tag",
+      "Secondary Tag",
+      "Free Tag"
+    ],
+    "row_count": 1812,
+    "sheets_metadata": {
+      "Game Observations": {
+        "columns": [
+          "Observer",
+          "Block",
+          "Section",
+          "Observation",
+          "Speaker",
+          "Timestamp",
+          "Primary Tag",
+          "Secondary Tag",
+          "Free Tag"
+        ],
+        "row_count": 1812
+      }
+    },
+    "id": "8cc22e7f-ba88-4e37-a1a8-dfba5c598715",
+    "description": null,
+    "original_filename": "TSSG Game Data Compiled.xlsx",
+    "modified_filename": "TSSG Game Data Compiled.xlsx",
+    "upload_date": "2025-05-06T21:43:29.260455",
+    "modified_date": "2025-05-06T21:43:29.260455",
+    "storage_path": "/app/data/workbench/spreadsheets/8cc22e7f-ba88-4e37-a1a8-dfba5c598715.xlsx"
   }
 }

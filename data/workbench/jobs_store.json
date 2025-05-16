@@ -1,0 +1,15 @@
+{
+  "5840d02b-c755-4f61-8c88-1fafd8e4b89e": {
+    "id": "5840d02b-c755-4f61-8c88-1fafd8e4b89e",
+    "type": "column_transformation",
+    "status": "running",
+    "progress": 66.71799999999999,
+    "message": "Processing rows: 66.7% complete",
+    "created_at": "2025-05-05T16:42:14.157785",
+    "started_at": "2025-05-05T16:42:14.169341",
+    "parameters": {
+      "spreadsheet_id": "875ce5a6-cade-42d1-9710-2fd1a44cf4b4",
+      "sheet_name": "products-10000"
+    }
+  }
+}

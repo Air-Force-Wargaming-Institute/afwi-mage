@@ -1,7 +1,7 @@
 FROM vllm/vllm-openai:v0.8.5
 
 # Default value for GPU count
-ARG GPU_COUNT=1
+ARG GPU_COUNT=2
 ENV TP_SIZE=$GPU_COUNT
 
 # Create an entrypoint script

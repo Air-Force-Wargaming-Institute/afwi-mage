@@ -45,6 +45,7 @@ Thumbs.db
 /models/*
 !/data/builder/AGENTS/example.json
 !/data/builder/TEAMS/example.json
+!/data/wargames/*.json
 /AirgapDeploymentPackage/*
 !/AirgapDeploymentPackage/README_AirgapPackage.txt
 
