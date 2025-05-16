@@ -83,14 +83,14 @@ $dockerArgs = @(
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'python -m pip install --upgrade pip && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    'python -m pip install --upgrade pip --root-user-action=ignore && python -m pip download --dest /wheels --prefer-binary --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
 )
 
 # Write-Host "[$ServiceName] Executing Docker command: docker $($dockerArgs -join ' ' )" -ForegroundColor DarkGray
-& docker @dockerArgs
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "[$ServiceName] Error downloading wheels using Docker. Exit code: $LASTEXITCODE"
+    Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages OR this might be due to the '|| echo' in the bash command. Check output carefully."
     # Don't exit immediately, still try to list/copy existing wheels if any
 } else {
     Write-Host "[$ServiceName] Docker wheel download command finished." -ForegroundColor Green
@@ -109,31 +109,126 @@ if ($wheels.Count -eq 0) {
 
 Write-Host "[$ServiceName] Saving list of required wheels to: $listFilePath" -ForegroundColor Cyan
 try {
-    # Regenerate list based on requirements.txt, not just directory contents
-    $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
-        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim() # Get base name, split by more delimiters
-        if ($packageName) { $packageName } # Ensure we don't add empty strings
-    }
-    
-    $foundWheels = @()
-    foreach ($reqItem in $requiredPackages) {
-        # Normalize current requirement name from list to underscores for matching against wheel names
-        $escapedReqHyphen = [regex]::Escape($reqItem) # Original form (e.g., python-dotenv)
-        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_')) # Underscore form (e.g., python_dotenv)
+    $requiredWheels = @() # Initialize as an empty array
+    $processedPackages = @{}  # Use a hashtable for faster lookups and to ensure uniqueness
 
-        $matchingWheel = $wheels | Where-Object { 
-            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
-            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
-        } | Select-Object -First 1 # Select first match if multiple (e.g. due to different wheel tags but same version)
-
-        if ($matchingWheel) {
-            $foundWheels += $matchingWheel.Name
-        } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute"
+    # --- Primary Method: Parse explicit wheel filenames from pip output ---
+    foreach ($line in $dockerCommandOutput) {
+        if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+        } elseif ($line -match 'Saved /wheels/([^/]+\.whl)') { 
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+        } elseif ($line -match 'Downloading ([^/]+\.whl)') {
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
         }
     }
 
-    $foundWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
+    # --- Fallback 1: Parse "Successfully downloaded package1 package2 ..." line ---
+    # This is useful if pip lists packages it handled without explicit wheel filenames for each.
+    if ($processedPackages.Count -eq 0) { # Only if primary method yielded nothing
+        Write-Warning "[$ServiceName] No wheels directly identified. Parsing 'Successfully downloaded...' line from pip output."
+        $successfullyDownloadedPattern = 'Successfully downloaded\s+(.*)' 
+        $dockerOutputString = $dockerCommandOutput -join [System.Environment]::NewLine
+        if ($dockerOutputString -match $successfullyDownloadedPattern) {
+            $packageListString = $matches[1]
+            $packageNames = $packageListString -split '\s+' | Where-Object { $_ } # Split by space and remove empty strings
+            
+            foreach ($packageNameInList in $packageNames) {
+                $pkgNameClean = $packageNameInList.Trim()
+                $pkgNameUnderscore = $pkgNameClean.Replace('-', '_')
+                
+                # Find the BEST single matching wheel in the cache for this package name
+                $bestMatchWheel = $wheels | Where-Object {
+                    ($_.Name -like "$pkgNameClean-*.whl" -or $_.Name -like "$pkgNameUnderscore-*.whl") 
+                } | Sort-Object -Property Name -Descending | Select-Object -First 1 # Attempt to get latest version/best match
+
+                if ($bestMatchWheel) {
+                    if (-not $processedPackages.ContainsKey($bestMatchWheel.Name)) {
+                        $processedPackages[$bestMatchWheel.Name] = $true
+                    }
+                } else {
+                    Write-Warning "[$ServiceName] Could not find a cached wheel for package '$pkgNameClean' mentioned in 'Successfully downloaded' list."
+                }
+            }
+        }
+    }
+    
+    # --- Fallback 2: Parse "Collecting package_name" lines ---
+    # This helps catch transitive dependencies or other packages pip considered.
+    # We run this IN ADDITION to previous steps, as it might find dependencies missed by explicit names.
+    # However, ensure it doesn't re-add if already processed or pick multiple versions for same core package.
+    Write-Host "[$ServiceName] Parsing 'Collecting...' lines from pip output to identify further potential dependencies." -ForegroundColor DarkGray
+    foreach ($line in $dockerCommandOutput) {
+        if ($line -match '^Collecting ([a-zA-Z0-9._-]+)') {
+            $packageNameFromCollecting = $matches[1].Trim()
+            $packageNameUnderscore = $packageNameFromCollecting.Replace('-', '_')
+            
+            # Check if a wheel for this package (any version) is already processed
+            $alreadyProcessed = $false
+            foreach($existingWheelName in $processedPackages.Keys){
+                if($existingWheelName -like "$packageNameFromCollecting-*" -or $existingWheelName -like "$packageNameUnderscore-*"){
+                    $alreadyProcessed = $true
+                    break
+                }
+            }
+
+            if (-not $alreadyProcessed) {
+                $bestMatchWheel = $wheels | Where-Object {
+                    ($_.Name -like "$packageNameFromCollecting-*.whl" -or $_.Name -like "$packageNameUnderscore-*.whl")
+                } | Sort-Object -Property Name -Descending | Select-Object -First 1
+
+                if ($bestMatchWheel) {
+                    if (-not $processedPackages.ContainsKey($bestMatchWheel.Name)) {
+                        $processedPackages[$bestMatchWheel.Name] = $true
+                        Write-Host "[$ServiceName] Added '$($bestMatchWheel.Name)' from 'Collecting' line." -ForegroundColor DarkGray
+                    }
+                } else {
+                     Write-Warning "[$ServiceName] 'Collecting' line for '$packageNameFromCollecting', but no matching wheel found in cache."
+                }
+            }
+        }
+    }
+
+    $requiredWheels = $processedPackages.Keys | Sort-Object
+    
+    # --- Fallback 3 (Original workbench logic): If still no wheels after all pip parsing, try requirements.txt matching ---
+    if ($requiredWheels.Count -eq 0) {
+        Write-Warning "[$ServiceName] No wheels identified from any pip output parsing. Falling back to matching requirements.txt directly against cache."
+        $directRequiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '(^#|^\s*$)' } | ForEach-Object { 
+            $pkgName = ($_ -split '[<>=!~\\\[\\\]\\s]')[0].Trim()
+            if ($pkgName) { $pkgName }
+        }
+        foreach ($reqItem in $directRequiredPackages) {
+            $escapedReqHyphen = [regex]::Escape($reqItem) 
+            $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_'))
+
+            $matchingWheelInstance = $wheels | Where-Object { 
+                $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
+                $_.Name -match "^${escapedReqUnderscore}(-|_)" 
+            } | Sort-Object -Property Name -Descending | Select-Object -First 1 # Get best/latest if multiple simple matches
+
+            if ($matchingWheelInstance) {
+                if (-not $processedPackages.ContainsKey($matchingWheelInstance.Name)) { # Check processedPackages again
+                    $processedPackages[$matchingWheelInstance.Name] = $true 
+                }
+            } else {
+                Write-Warning "[$ServiceName] Requirements.txt fallback: No downloaded wheel found for '$reqItem' in $wheelsDirAbsolute"
+            }
+        }
+        $requiredWheels = $processedPackages.Keys | Sort-Object # Re-evaluate $requiredWheels from $processedPackages
+    }
+
+    # Final check and output
+    if ($requiredWheels.Count -eq 0) {
+        Write-Error "[$ServiceName] CRITICAL: No wheels were identified even after all fallbacks. The wheels list will be empty. Check Docker output and requirements.txt."
+    } else {
+        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) required wheel files after all parsing stages." -ForegroundColor Green
+    }
+    
+    $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
 
 } catch {

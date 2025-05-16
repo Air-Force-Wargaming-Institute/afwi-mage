@@ -1,42 +1,42 @@
 # FastAPI and web server
-fastapi==0.115.12
-uvicorn==0.34.2
-pydantic==2.11.4
+fastapi>=0.115.11
+uvicorn>=0.34.0
+pydantic>=2.0,<3.0
 
 # Data processing and manipulation
 numpy==1.26.0
 
 # Document processing
-pypdf==5.3.1
+pypdf>=5.3.1
 # markdown==3.4.3
 # python-pptx==0.6.21
-unstructured==0.11.8
-unstructured-inference==0.7.30
+unstructured==0.10.16
+unstructured-inference
 # pdfminer.six==20221105
 
 # Document processing and metadata extraction
-PyPDF2==3.0.0
-python-docx==1.1.2
+PyPDF2>=3.0.0
+python-docx>=1.1.2
 
 # LangChain and vector databases
-langchain==0.3.0
-langchain-core==0.3.29
-langchain-community==0.3.0
-langchain-text-splitters==0.3.0
-langchain-openai==0.1.4
+langchain>=0.3
+langchain-core>=0.3
+langchain-community>=0.3
+langchain-text-splitters>=0.3
+langchain-openai>=0.1.4
 
 # Embedding models - CPU versions
 # openai>=1.3.0
 
 # Utilities
-python-multipart==0.0.20
-requests==2.31.0
+python-multipart>=0.0.20
+requests>=2.31.0
 
 # Environment and configuration
-python-dotenv==1.1.0
+python-dotenv==1.0.1
 
-# Vector store - GPU version (CUDA 12)
-#faiss-cpu>=1.7.0
-faiss-gpu-cu12==1.9.0.post1
+# Vector store - CPU version
+faiss-cpu>=1.7.0
+
 # System monitoring
 psutil==5.9.5

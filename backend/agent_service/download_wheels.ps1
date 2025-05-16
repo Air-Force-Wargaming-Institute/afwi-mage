@@ -45,83 +45,154 @@ $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDir -ChildPath "..")).Pa
 $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 
 # Use Docker to download Linux-compatible wheels
-Write-Host "Running Docker to download Linux-compatible wheels..." -ForegroundColor Yellow
+Write-Host "[$ServiceName] Running Docker to download Linux-compatible wheels to $wheelsDirAbsolute..." -ForegroundColor Yellow
 
-# Normalize paths for Docker volume mounting on Windows
-# For wheels directory
-$normalizedWheelsPath = $wheelsDirAbsolute.Replace("\", "/")
-if ($IsWindows) {
-    # Convert C:\... to /c/... format for Docker Desktop
-    $driveLetter = $normalizedWheelsPath.Substring(0, 1).ToLower()
-    $normalizedWheelsPath = "/$driveLetter" + $normalizedWheelsPath.Substring(2)
+# Normalize paths for Docker volume mounting
+Function Normalize-DockerPath ($path) {
+    $normalized = $path.Replace('\', '/')
+    if ($IsWindows) {
+        $driveLetter = $normalized.Substring(0, 1).ToLower()
+        $normalized = "/$driveLetter" + $normalized.Substring(2)
+    }
+    return $normalized
 }
 
-# For requirements file
-$normalizedRequirementsPath = $requirementsFileAbsolute.Replace("\", "/")
-if ($IsWindows) {
-    # Convert C:\... to /c/... format for Docker Desktop
-    $driveLetter = $normalizedRequirementsPath.Substring(0, 1).ToLower()
-    $normalizedRequirementsPath = "/$driveLetter" + $normalizedRequirementsPath.Substring(2)
-}
+$normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
+$normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
 
-# Use double quotes for the whole command and single quotes for paths with colons in PowerShell
+# Define the bash command for Docker using here-string (@'...'@) format for consistent line handling
+$bashCommand = @'
+python -m pip install --upgrade pip --root-user-action=ignore && \
+python -m pip download --dest /wheels --prefer-binary --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt
+'@
+
 $dockerArgs = @(
     "run", "--rm",
     "-v", "$normalizedWheelsPath`:/wheels",
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip install --upgrade pip && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    $bashCommand
 )
-& docker @dockerArgs
+
+# Execute Docker command and capture all output
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "[$ServiceName] Error downloading wheels using Docker. Exit code: $LASTEXITCODE"
-    exit $LASTEXITCODE
+    Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
+} else {
+    Write-Host "[$ServiceName] Docker wheel download command finished successfully." -ForegroundColor Green
 }
 
-# List the downloaded wheels from the target directory
-$wheels = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl"
-
-Write-Host "Downloaded $($wheels.Count) Linux-compatible wheel files to $wheelsDirAbsolute" -ForegroundColor Green
-foreach ($wheel in $wheels) {
-    Write-Host "  - $($wheel.Name)" -ForegroundColor White
+# --- List Downloaded Wheels & Save List ---
+Write-Host "[$ServiceName] Listing ALL downloaded files (wheels and sdist) from $wheelsDirAbsolute (central cache)..." -ForegroundColor Cyan
+$allDownloadedFilesInCache = Get-ChildItem -Path $wheelsDirAbsolute
+if ($allDownloadedFilesInCache.Count -eq 0) {
+    Write-Warning "[$ServiceName] No files (wheels or sdist) found in central cache $wheelsDirAbsolute. This is unusual if Docker command succeeded."
+} else {
+    Write-Host "[$ServiceName] Found $($allDownloadedFilesInCache.Count) files in ${wheelsDirAbsolute}."
+    # Get count for each type
+    $wheelCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }).Count
+    $sdistCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.zip" }).Count
+    $otherCountInCache = $allDownloadedFilesInCache.Count - $wheelCountInCache - $sdistCountInCache
+    Write-Host "[$ServiceName] File types in cache: $wheelCountInCache wheels, $sdistCountInCache source distributions, $otherCountInCache other files."
 }
 
-# Save the list of downloaded wheels to a file in the script's directory (agent_service)
+$wheelsInCache = $allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }
+if ($wheelsInCache.Count -eq 0) {
+     Write-Warning "[$ServiceName] No wheel files found in central cache $wheelsDirAbsolute."
+} else {
+    Write-Host "[$ServiceName] Found $($wheelsInCache.Count) Linux-compatible wheel files in central cache $wheelsDirAbsolute." -ForegroundColor Green
+}
+
+# Save the list of downloaded wheels to a file in the script's directory
 $outputFileName = "downloaded_wheels_list.txt"
 $outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
+
+Write-Host "[$ServiceName] Generating list of required wheels for ${outputFilePath}" -ForegroundColor Cyan
 try {
-    # $wheels.Name | Out-File -FilePath $outputFilePath -Encoding utf8 # Old method: just dump all wheel names
-
-    # Regenerate list based on requirements.txt to include only necessary wheels
-    $requirementsFileForList = Join-Path -Path $scriptDir -ChildPath "requirements.txt"
-    $requiredPackages = Get-Content $requirementsFileForList | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
-        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim()
-        if ($packageName) { $packageName }
-    }
-
-    $foundWheels = @()
-    foreach ($reqItem in $requiredPackages) {
-        $escapedReqHyphen = [regex]::Escape($reqItem)
-        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_'))
-
-        $matchingWheel = $wheels | Where-Object { 
-            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
-            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
-        } | Select-Object -First 1
-
-        if ($matchingWheel) {
-            $foundWheels += $matchingWheel.Name
-        } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute (central backend_wheels)"
+    # We'll extract wheel information from the Docker output by looking for package references
+    $requiredWheels = @()
+    $processedPackages = @{}  # Use a hashtable for faster lookups
+    
+    # Extract all wheel filenames directly mentioned in the output
+    # Look for patterns like "File was already downloaded /wheels/package-name.whl"
+    foreach ($line in $dockerCommandOutput) {
+        # Match wheels directly mentioned in the output
+        if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
+            $wheelName = $matches[1]
+            $processedPackages[$wheelName] = $true
+        } elseif ($line -match 'Downloading ([^/]+\.whl)') { # Covers newly downloaded wheels
+            $wheelName = $matches[1]
+            $processedPackages[$wheelName] = $true
+        }
+        
+        # Also try to match packages that pip is collecting
+        # This will help find transitive dependencies mentioned in the output
+        if ($line -match '^Collecting ([a-zA-Z0-9._-]+)(?:==|\[|$|\s)') { # Match package names from Collecting lines
+            $packageName = $matches[1].Trim()
+            # Convert dashes to underscores as needed in wheel filenames
+            $packageNameUnderscore = $packageName.Replace('-', '_')
+            
+            # Find all wheels that match this package name in the central cache
+            $matchingWheelsFromCache = $wheelsInCache | Where-Object { 
+                $_.Name -like "$packageName-*.whl" -or 
+                $_.Name -like "$packageNameUnderscore-*.whl"
+            }
+            
+            foreach ($wheelInstance in $matchingWheelsFromCache) {
+                if (-not $processedPackages.ContainsKey($wheelInstance.Name)) {
+                    $processedPackages[$wheelInstance.Name] = $true
+                }
+            }
         }
     }
-    $foundWheels | Out-File -FilePath $outputFilePath -Encoding utf8
-    Write-Host "List of required wheels saved to: $outputFilePath" -ForegroundColor Green
+    
+    # Convert the hashtable keys to an array
+    $requiredWheels = $processedPackages.Keys | Sort-Object
+    
+    # If no wheels were found from parsing output, fall back to the requirements.txt direct matching as a last resort
+    if ($requiredWheels.Count -eq 0) {
+        Write-Warning "[$ServiceName] No wheels identified from pip output. Trying to match directly from requirements.txt against cache."
+        
+        $requirementsFileForList = Join-Path -Path $scriptDir -ChildPath "requirements.txt"
+        $directRequiredPackages = Get-Content $requirementsFileForList | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
+            $pkgName = ($_ -split '[<>=!~\[\]\s]')[0].Trim()
+            if ($pkgName) { $pkgName }
+        }
+        
+        foreach ($reqItem in $directRequiredPackages) {
+            $escapedReqHyphen = [regex]::Escape($reqItem)
+            $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_'))
+
+            $matchingWheelInstance = $wheelsInCache | Where-Object { 
+                $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
+                $_.Name -match "^${escapedReqUnderscore}(-|_)" 
+            } | Select-Object -First 1
+
+            if ($matchingWheelInstance) {
+                if (-not ($requiredWheels -contains $matchingWheelInstance.Name)) {
+                    $requiredWheels += $matchingWheelInstance.Name
+                }
+            } else {
+                Write-Warning "[$ServiceName] Fallback: No downloaded wheel found for direct requirement '$reqItem' in $wheelsDirAbsolute"
+            }
+        }
+        $requiredWheels = $requiredWheels | Sort-Object | Get-Unique
+    }
+    
+    if ($requiredWheels.Count -eq 0) {
+        Write-Warning "[$ServiceName] No wheels were identified for requirements even after fallback. Using ALL wheels from cache."
+        $requiredWheels = $wheelsInCache | ForEach-Object { $_.Name } | Sort-Object | Get-Unique
+    } else {
+        Write-Host "[$ServiceName] Using the identified $($requiredWheels.Count) wheels based on pip output and requirements." -ForegroundColor Green
+    }
+    
+    $requiredWheels | Out-File -FilePath $outputFilePath -Encoding utf8
+    Write-Host "[$ServiceName] List of required wheels saved to: $outputFilePath" -ForegroundColor Green
 
 } catch {
-    Write-Host "Error saving wheel list to file: $_" -ForegroundColor Red
+    Write-Error "[$ServiceName] Error generating or saving wheel list to file '$outputFilePath': $_"
 }
 
 # Automatically run the script to copy wheels from the list to the local wheels directory
@@ -174,7 +245,7 @@ if ($doZip) {
         # Ensure we are in the script\'s directory context for relative paths
         # Push-Location $scriptDirAbsolute # No longer needed with explicit path
         # Use explicit path and wildcard within that path
-        Compress-Archive -Path (Join-Path $scriptDir \'*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
+        Compress-Archive -Path (Join-Path $scriptDir '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
         
         # Ensure DeploymentZIPs directory exists

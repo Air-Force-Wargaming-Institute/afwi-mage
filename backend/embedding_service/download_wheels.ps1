@@ -22,7 +22,7 @@ $localWheelsDirRelative = "./wheels"
 $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
 $listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
-$deploymentZipsDirName = "DeploymentZIPs" # New
+$deploymentZipsDirName = "DeploymentZIPs"
 
 # Resolve absolute paths
 try {
@@ -32,7 +32,6 @@ try {
     $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
     $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
     $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
-    # Construct the path for DeploymentZIPs directory (one level up from scriptDir)
     $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
     $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 } catch {
@@ -41,13 +40,11 @@ try {
 }
 
 # --- Pre-checks ---
-# Check for requirements.txt
 if (-not (Test-Path $requirementsFileAbsolute -PathType Leaf)) {
     Write-Error "[$ServiceName] Error: requirements.txt not found at $requirementsFileAbsolute"
     exit 1
 }
 
-# Create central wheels directory if it doesn't exist
 if (-not (Test-Path $wheelsDirAbsolute -PathType Container)) {
     Write-Host "[$ServiceName] Creating central wheels directory: $wheelsDirAbsolute" -ForegroundColor Yellow
     try {
@@ -56,14 +53,11 @@ if (-not (Test-Path $wheelsDirAbsolute -PathType Container)) {
         Write-Error "[$ServiceName] Failed to create central wheels directory '$wheelsDirAbsolute': $_"
         exit 1
     }
-} else {
-    # Write-Host "[$ServiceName] Using existing central wheels directory: $wheelsDirAbsolute" -ForegroundColor DarkGray
 }
 
 # --- Download Wheels using Docker ---
 Write-Host "[$ServiceName] Running Docker to download Linux-compatible wheels to $wheelsDirAbsolute..." -ForegroundColor Yellow
 
-# Normalize paths for Docker volume mounting
 Function Normalize-DockerPath ($path) {
     $normalized = $path.Replace('\', '/')
     if ($IsWindows) {
@@ -76,74 +70,147 @@ Function Normalize-DockerPath ($path) {
 $normalizedWheelsPath = Normalize-DockerPath -path $wheelsDirAbsolute
 $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolute
 
-# First try to get wheels where possible
+$bashCommand = @'
+python -m pip install --upgrade pip --root-user-action=ignore && \
+python -m pip download --dest /wheels --prefer-binary --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt
+'@
+
 $dockerArgs = @(
     "run", "--rm",
     "-v", "$normalizedWheelsPath`:/wheels",
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'python -m pip install --upgrade pip && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    $bashCommand
 )
-& docker @dockerArgs
 
-# Don't worry about exit codes - we're just collecting whatever we can get
-Write-Host "[$ServiceName] Docker command finished." -ForegroundColor Green
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
+} else {
+    Write-Host "[$ServiceName] Docker wheel download command finished successfully." -ForegroundColor Green
+}
 
 # --- List Downloaded Wheels & Save List ---
-Write-Host "[$ServiceName] Listing downloaded packages from $wheelsDirAbsolute..." -ForegroundColor Cyan
-$wheels = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl"
-$sourcePackages = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.tar.gz"
-if (-not $sourcePackages) {
-    $sourcePackages = @()
-}
-$zipPackages = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.zip"
-if ($zipPackages) {
-    $sourcePackages += $zipPackages
-}
-
-if ($wheels.Count -eq 0 -and $sourcePackages.Count -eq 0) {
-     Write-Warning "[$ServiceName] No wheel or source package files found in $wheelsDirAbsolute. Check Docker output for errors."
+Write-Host "[$ServiceName] Listing ALL downloaded files (wheels and sdist) from $wheelsDirAbsolute (central cache)..." -ForegroundColor Cyan
+$allDownloadedFilesInCache = Get-ChildItem -Path $wheelsDirAbsolute
+if ($allDownloadedFilesInCache.Count -eq 0) {
+    Write-Warning "[$ServiceName] No files (wheels or sdist) found in central cache $wheelsDirAbsolute. This is unusual if Docker command succeeded."
 } else {
-    Write-Host "[$ServiceName] Found $($wheels.Count) Linux-compatible wheel files and $($sourcePackages.Count) source packages in $wheelsDirAbsolute." -ForegroundColor Green
+    Write-Host "[$ServiceName] Found $($allDownloadedFilesInCache.Count) files in ${wheelsDirAbsolute}."
+    $wheelCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }).Count
+    $sdistCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.zip" }).Count
+    $otherCountInCache = $allDownloadedFilesInCache.Count - $wheelCountInCache - $sdistCountInCache
+    Write-Host "[$ServiceName] File types in cache: $wheelCountInCache wheels, $sdistCountInCache source distributions, $otherCountInCache other files."
 }
 
-Write-Host "[$ServiceName] Saving list of required wheels to: ${listFilePath}" -ForegroundColor Cyan
+$wheelsInCache = $allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }
+
+if ($wheelsInCache.Count -eq 0) {
+     Write-Warning "[$ServiceName] No wheel files found in central cache $wheelsDirAbsolute."
+} else {
+    Write-Host "[$ServiceName] Found $($wheelsInCache.Count) Linux-compatible wheel files in central cache $wheelsDirAbsolute." -ForegroundColor Green
+}
+
+Write-Host "[$ServiceName] Generating list of required wheels for ${listFilePath}" -ForegroundColor Cyan
 try {
-    # Regenerate list based on requirements.txt, not just directory contents
-    $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
-        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim() # Get base name, split by more delimiters
-        if ($packageName) { $packageName } # Ensure we don't add empty strings
-    }
+    # We'll extract wheel information from the Docker output by looking for package references
+    $requiredWheels = @()
+    $processedPackages = @{}  # Use a hashtable for faster lookups
     
-    $foundWheels = @()
-    foreach ($reqItem in $requiredPackages) {
-        # Normalize current requirement name from list to underscores for matching against wheel names
-        $escapedReqHyphen = [regex]::Escape($reqItem) # Original form (e.g., python-dotenv)
-        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_')) # Underscore form (e.g., python_dotenv)
-
-        $matchingWheel = $wheels | Where-Object { 
-            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
-            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
-        } | Select-Object -First 1 # Select first match if multiple (e.g. due to different wheel tags but same version)
-
-        if ($matchingWheel) {
-            Write-Host "[$ServiceName] Found wheel for '$req': $($matchingWheel.Name)" -ForegroundColor Green
-            $foundWheels += $matchingWheel.Name
-        } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute"
+    # Extract all wheel filenames directly mentioned in the output
+    # Look for patterns like "File was already downloaded /wheels/package-name.whl"
+    # or "Saved /wheels/package-name.whl" or "Downloading package-name.whl"
+    # This uses $dockerCommandOutput which is captured earlier by Tee-Object
+    foreach ($line in $dockerCommandOutput) {
+        if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+        } elseif ($line -match 'Saved /wheels/([^/]+\.whl)') { # Common pattern for actual downloads
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+        } elseif ($line -match 'Downloading ([^/]+\.whl)') { # Another download pattern
+            $wheelName = $matches[1]
+            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
         }
     }
 
-    $foundWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
-    Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
+    # From lines like "Successfully downloaded fastapi pydantic ...", extract those package names
+    # and find the corresponding wheel files from $wheelsInCache.
+    # This regex captures the package names after "Successfully downloaded"
+    $successfullyDownloadedPattern = 'Successfully downloaded\\s+(.*)'
+    $dockerOutputString = $dockerCommandOutput -join [System.Environment]::NewLine
     
-    if ($foundSourcePackages.Count -gt 0) {
-        Write-Host "[$ServiceName] The following packages were found as source packages and will need build dependencies in Dockerfile:" -ForegroundColor Yellow
-        foreach ($pkg in $foundSourcePackages) {
-            Write-Host "  - $pkg" -ForegroundColor Yellow
+    if ($dockerOutputString -match $successfullyDownloadedPattern) {
+        $packageListString = $matches[1]
+        $packageNames = $packageListString -split '\\s+' | Where-Object { $_ } # Split by space and remove empty strings
+        
+        foreach ($packageName in $packageNames) {
+            $packageNameClean = $packageName.Trim()
+            # Handle hyphen/underscore variations for matching wheel filenames
+            $packageNameUnderscore = $packageNameClean.Replace('-', '_') 
+            
+            $matchingWheels = $wheelsInCache | Where-Object {
+                $_.Name -like "$packageNameClean-*.whl" -or
+                $_.Name -like "$packageNameUnderscore-*.whl"
+            }
+            
+            foreach ($wheel in $matchingWheels) {
+                if (-not $processedPackages.ContainsKey($wheel.Name)) {
+                    $processedPackages[$wheel.Name] = $true
+                }
+            }
         }
-        Write-Host "[$ServiceName] Ensure your Dockerfile includes necessary build tools (gcc, python-dev, etc.)" -ForegroundColor Yellow
+    }
+    
+    # Convert the hashtable keys to an array and sort
+    $requiredWheels = $processedPackages.Keys | Sort-Object
+    
+    # Fallback if pip output parsing yielded no wheels (e.g., all from cache, different log format)
+    if ($requiredWheels.Count -eq 0) {
+        Write-Warning "[$ServiceName] No wheels identified from primary pip output parsing. Attempting fallback: checking 'Collecting' lines."
+        # Fallback: Try to match based on "Collecting" lines if the primary method failed
+        foreach ($line in $dockerCommandOutput) {
+            if ($line -match '^Collecting ([a-zA-Z0-9._-]+)') {
+                $packageName = $matches[1].Trim()
+                $packageNameUnderscore = $packageName.Replace('-', '_')
+                
+                $matchingWheels = $wheelsInCache | Where-Object {
+                    $_.Name -like "$packageName-*.whl" -or
+                    $_.Name -like "$packageNameUnderscore-*.whl"
+                }
+                foreach ($wheel in $matchingWheels) {
+                    if (-not $processedPackages.ContainsKey($wheel.Name)) {
+                        $processedPackages[$wheel.Name] = $true
+                    }
+                }
+            }
+        }
+        $requiredWheels = $processedPackages.Keys | Sort-Object
+    }
+
+    if ($requiredWheels.Count -eq 0) {
+        Write-Error "[$ServiceName] No wheels were identified from pip output parsing. This is unexpected. Check Docker logs. The list file may be empty or reflect all cache items if this logic fails."
+        # Unlike the original embedding_service script that would 'exit 1',
+        # we now align with extraction_service's behavior of not exiting here,
+        # allowing an empty list or letting Out-File handle it.
+    } else {
+        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) required wheel files by parsing pip output." -ForegroundColor Green
+    }
+    
+    # Save the list to the file
+    $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
+    Write-Host "[$ServiceName] List of required wheels saved to $listFilePath." -ForegroundColor Green
+
+    # Retain source package listing if any were found by original script logic
+    $sourcePackages = $allDownloadedFilesInCache | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.zip" }
+    if ($sourcePackages.Count -gt 0) {
+        Write-Host "[$ServiceName] The following packages were found as source packages in the cache:" -ForegroundColor Yellow
+        foreach ($pkg in $sourcePackages) {
+            Write-Host "  - $($pkg.Name)" -ForegroundColor Yellow
+        }
+        Write-Host "[$ServiceName] Ensure your Dockerfile includes necessary build tools (gcc, python-dev, etc.) if these are needed and not covered by wheels." -ForegroundColor Yellow
     }
 
 } catch {
@@ -173,7 +240,6 @@ if (-not (Test-Path $listFilePath -PathType Leaf)) {
 }
 
 # --- NLTK Data Handling (Placeholder) ---
-# Check if NLTK is in requirements and handle data download if needed
 $nltkRequired = $false
 try {
     $nltkRequired = Get-Content $requirementsFileAbsolute | Select-String -Pattern '^nltk\b' -Quiet
@@ -181,7 +247,6 @@ try {
 
 if ($nltkRequired) {
     Write-Host "[$ServiceName] NLTK requirement detected." -ForegroundColor Yellow
-    # Ensure nltk_data directory exists
     if (-not (Test-Path $nltkDataDirAbsolute -PathType Container)) {
         Write-Host "[$ServiceName] Creating NLTK data directory: $nltkDataDirAbsolute" -ForegroundColor Yellow
         try {
@@ -190,11 +255,7 @@ if ($nltkRequired) {
             Write-Error "[$ServiceName] Failed to create NLTK data directory '$nltkDataDirAbsolute': $_"
         }
     }
-    
-    # Placeholder: Add logic here to download NLTK data (e.g., using another Docker command)
-    # Example: Trigger a docker command to download 'punkt', 'stopwords' etc. into a volume mounted at $nltkDataDirAbsolute
     Write-Warning "[$ServiceName] NLTK data download logic is not implemented yet. Please handle manually if needed for airgapped environment."
-    # Consider creating a separate script like download_nltk_data.ps1 and calling it here.
 }
 
 # --- Final Instructions --- 
@@ -203,13 +264,13 @@ Write-Host "[$ServiceName] Wheels and source packages are downloaded to central 
 Write-Host "[$ServiceName] Required wheels copied to local location: $localWheelsDirAbsolute" -ForegroundColor Cyan
 Write-Host "[$ServiceName] To use in airgapped environment:" -ForegroundColor Cyan
 Write-Host "   1. Copy the '$ServiceName' directory (containing the local '$localWheelsDirRelative' folder) to the target machine." -ForegroundColor White
-Write-Host "   2. Copy the entire '$wheelsDirAbsolute' directory which contains both wheels AND source packages" -ForegroundColor White
-Write-Host "   3. In your Dockerfile, add build dependencies and install from the wheels/source packages:" -ForegroundColor Yellow
-Write-Host "      - FROM python:3.12-slim" -ForegroundColor Yellow
-Write-Host "      - COPY requirements.txt /app/" -ForegroundColor Yellow
-Write-Host "      - COPY $wheelsDirRelative /wheels/" -ForegroundColor Yellow 
-Write-Host "      - RUN apt-get update && apt-get install -y build-essential gcc python3-dev cmake" -ForegroundColor Yellow
-Write-Host "      - RUN pip install --no-cache-dir --find-links=/wheels -r /app/requirements.txt" -ForegroundColor Yellow
+Write-Host "   2. If source packages are needed and listed above, ensure '$wheelsDirAbsolute' is also available or they are copied, and build tools are in Docker."
+Write-Host "   3. In your Dockerfile, add build dependencies and install from the wheels/source packages:" -ForegroundColor White
+Write-Host "      - FROM python:3.12-slim" -ForegroundColor White
+Write-Host "      - COPY requirements.txt /app/" -ForegroundColor White
+Write-Host "      - COPY $localWheelsDirRelative /wheels/" -ForegroundColor White 
+Write-Host "      - RUN apt-get update && apt-get install -y build-essential gcc python3-dev cmake # Example build tools" -ForegroundColor White
+Write-Host "      - RUN pip install --no-cache-dir --find-links=/wheels -r /app/requirements.txt" -ForegroundColor White
 Write-Host "   4. Source packages will be built at install time with the build dependencies you installed" -ForegroundColor White
 
 # Create a package.zip file for easy transfer
@@ -231,22 +292,17 @@ if ($doZip) {
     $zipFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $zipFileName
     Write-Host "[$ServiceName] Creating archive $zipFileName ..." -ForegroundColor Yellow
     try {
-        # Use explicit path and wildcard within that path
         Compress-Archive -Path (Join-Path $scriptDirAbsolute '*') -DestinationPath $zipFilePath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Created $zipFilePath" -ForegroundColor Green
-
-        # Ensure DeploymentZIPs directory exists
         if (-not (Test-Path $deploymentZipsDirAbsolute -PathType Container)) {
             Write-Host "[$ServiceName] Creating deployment zips directory: $deploymentZipsDirAbsolute" -ForegroundColor Yellow
             try {
                 New-Item -ItemType Directory -Path $deploymentZipsDirAbsolute -ErrorAction Stop | Out-Null
             } catch {
                 Write-Error "[$ServiceName] Failed to create deployment zips directory '$deploymentZipsDirAbsolute': $_"
-                throw # Re-throw to stop script if dir creation fails
+                throw
             }
         }
-
-        # Move the zip file
         $finalZipPath = Join-Path -Path $deploymentZipsDirAbsolute -ChildPath $zipFileName
         Move-Item -Path $zipFilePath -Destination $finalZipPath -Force -ErrorAction Stop
         Write-Host "[$ServiceName] Moved $zipFileName to $finalZipPath" -ForegroundColor Green

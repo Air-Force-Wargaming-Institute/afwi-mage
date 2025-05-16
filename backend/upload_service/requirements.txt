@@ -1,20 +1,20 @@
 # Web framework and related
-fastapi>=0.115.11 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
-uvicorn[standard]==0.34.0 #consider using 0.32.0
+fastapi==0.115.12 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]==0.34.2 #consider using 0.32.0
 python-multipart==0.0.20 #consider using 0.0.12
-pydantic>=2.0,<3.0
+pydantic==2.11.4
 
 # PDF and document processing
-PyPDF2>=3.0.0
+PyPDF2==3.0.1
 python-docx==1.1.2
 # System and file operations
-aiofiles>=24.1.0
+aiofiles==24.1.0
 
 # Data processing
-pandas>=2.0.0
-openpyxl>=3.1.2  # For Excel (.xlsx) support
-xlrd>=2.0.1      # For Excel (.xls) support
-pyarrow>=14.0.0  # For improved pandas performance
+pandas==2.2.3
+openpyxl==3.1.5  # For Excel (.xlsx) support
+xlrd==2.0.1      # For Excel (.xls) support
+pyarrow==20.0.0  # For improved pandas performance
 
 # Utilities
 python-dotenv==1.0.1

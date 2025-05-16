@@ -1,11 +1,11 @@
 # Web framework and related
-fastapi>=0.115.11 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
-uvicorn[standard]>=0.34.0 #consider using 0.32.0
-python-multipart>=0.0.20 #consider using 0.0.12
-pydantic>=2.0,<3.0
+fastapi==0.115.12 #consider using 0.111.1 or 0.115.4 using fastapi[standard]
+uvicorn[standard]==0.34.2 #consider using 0.32.0
+python-multipart==0.0.20 #consider using 0.0.12
+pydantic==2.11.4
 
 # AI and LLM
 ollama==0.3.3
 
 # Utilities
-python-dotenv>=1.0.1
+python-dotenv==1.1.0

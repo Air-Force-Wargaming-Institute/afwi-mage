@@ -1,2 +1,0 @@
-# This file ensures the wheels directory is tracked in git
-# The actual wheel files should be excluded via .gitignore 

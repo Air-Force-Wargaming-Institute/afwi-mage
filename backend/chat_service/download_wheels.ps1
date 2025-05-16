@@ -82,8 +82,8 @@ $normalizedRequirementsPath = Normalize-DockerPath -path $requirementsFileAbsolu
 # 2. Run pip download to download all required packages and their dependencies
 # 3. Return the exit code
 $bashCommand = @'
-python -m pip install --upgrade pip && 
-pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt
+python -m pip install --upgrade pip --root-user-action=ignore && \
+python -m pip download --dest /wheels --prefer-binary --python-version 3.12 --only-binary=:all: --no-binary=:none: -r /reqs/requirements.txt
 '@
 
 $dockerArgs = @(
@@ -210,20 +210,7 @@ try {
         Write-Warning "[$ServiceName] Using all available wheels as a fallback: $($requiredWheels.Count) files"
     } else {
         Write-Host "[$ServiceName] Identified $($requiredWheels.Count) wheel files from pip output." -ForegroundColor Green
-        
-        # Prompt the user to decide if they want transitive dependencies resolved
-        Write-Host ""
-        Write-Host "[$ServiceName] Would you like to include all wheels in the cache to ensure all dependencies are included? (Y/N)" -ForegroundColor Yellow
-        Write-Host "  Y = Include all $($wheelsInCache.Count) wheels to guarantee all dependencies (larger size)" -ForegroundColor DarkGray
-        Write-Host "  N = Only include the $($requiredWheels.Count) explicitly referenced wheels (smaller size, might miss some dependencies)" -ForegroundColor DarkGray
-        $response = Read-Host
-        
-        if ($response -eq "Y" -or $response -eq "y") {
-            Write-Host "[$ServiceName] Including all wheel files to ensure all transitive dependencies are captured." -ForegroundColor Yellow
-            $requiredWheels = $wheelsInCache | ForEach-Object { $_.Name }
-        } else {
-            Write-Host "[$ServiceName] Only including explicitly referenced wheels ($($requiredWheels.Count) files)." -ForegroundColor Yellow
-        }
+        Write-Host "[$ServiceName] Using the identified wheels to ensure minimal dependencies are included." -ForegroundColor Yellow
     }
     
     # Save the list to the file

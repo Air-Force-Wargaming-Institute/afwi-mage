@@ -6,6 +6,8 @@ LABEL maintainer="AFWI MAGE Team" \
 # Install common system dependencies needed across services
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    python3-dev \
     libpq-dev \
     postgresql-client \
     libmagic1 \
@@ -22,6 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
+
+# Update pip
+RUN pip install --upgrade pip==25.1.1
 
 # Set up LibreOffice environment
 RUN mkdir -p /root/.config/libreoffice/4/user && \

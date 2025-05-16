@@ -2,13 +2,6 @@ FROM afwi-mage-base:3.12-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies for source packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements and wheel files for installation
 COPY requirements.txt /build/
 COPY wheels/ /build/wheels/

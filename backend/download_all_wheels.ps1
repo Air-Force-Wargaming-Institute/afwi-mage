@@ -62,7 +62,11 @@ foreach ($ServiceDir in $ServiceDirs) {
                     Write-Host "Successfully finished running download_wheels.ps1 in $ServiceDir."
                 }
             } catch {
-                Write-Error "Error executing '$WheelScriptPath': $_"
+                Write-Error "Error executing '$WheelScriptPath'. Full error record: $_"
+                if ($_.Exception) {
+                    Write-Error "Exception Message: $($_.Exception.Message)"
+                    Write-Error "ScriptStackTrace: $($_.Exception.ScriptStackTrace)"
+                }
             }
             # Return to the original directory
             Pop-Location

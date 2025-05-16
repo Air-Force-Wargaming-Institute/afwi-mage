@@ -12,7 +12,7 @@ param(
         "traefik:v3.3.4", # For api_gateway
         "redis/redis-stack:7.4.0-v3-x86_64", # For redis
         "vllm/vllm-openai:v0.8.5", # Actual base for vLLM service (see backend/vLLM/Dockerfile)
-        "ollama/ollama:0.4.1"  # For Ollama base/target (ensure backend/ollama/Dockerfile aligns or adjust this)
+        "ollama/ollama:0.6.7"  # For Ollama base/target (ensure backend/ollama/Dockerfile aligns or adjust this)
     ),
     [string[]]$FrontendBaseImages = @(
         "node:18-alpine" # Example for Frontend, ensure frontend/Dockerfile aligns
