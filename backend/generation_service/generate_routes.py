@@ -9,10 +9,18 @@ import json
 import logging
 import traceback
 from services.llm_service import initialize_model, chat_with_model, generate_text
+import ollama
+import services.llm_service as llm_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/api/generate/health")
+async def health_check():
+    """Health check endpoint for compatibility with other services."""
+    logger.info("Health check endpoint called")
+    return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 @router.get("/api/generate/training-datasets/")
 async def get_training_datasets():
@@ -129,8 +137,48 @@ async def chat(model_name: str, messages: list = Body(...), stream: bool = Query
         raise HTTPException(status_code=500, detail=f"Error chatting with model: {str(e)}")
 
 @router.post("/api/generate/generate-text/{model_name}")
-async def generate(model_name: str, prompt: str = Body(...), stream: bool = Query(False)):
+async def generate(model_name: str, request: dict = Body(...), stream: bool = Query(False)):
     try:
+        logger.info(f"Received generate-text request for model: {model_name}")
+        
+        # Extract the prompt from the request body
+        if not request or not isinstance(request, dict):
+            logger.error(f"Invalid request body: {request}")
+            raise HTTPException(status_code=400, detail="Request must be a JSON object with a 'prompt' field")
+            
+        if "prompt" not in request:
+            logger.error(f"Missing 'prompt' field in request: {request}")
+            raise HTTPException(status_code=400, detail="Request must contain a 'prompt' field")
+            
+        prompt = request["prompt"]
+        logger.debug(f"Extracted prompt: {prompt[:100]}...")  # Log first 100 chars
+            
+        # Check if model exists or try to use default
+        try:
+            models_list = ollama.list()
+            available_models = [model["name"] for model in models_list.get("models", [])]
+            
+            if model_name not in available_models:
+                # If the requested model is not available, use default
+                logger.warning(f"Model '{model_name}' not found. Available models: {available_models}")
+                
+                if hasattr(llm_service, 'DEFAULT_MODEL') and llm_service.DEFAULT_MODEL in available_models:
+                    logger.info(f"Using default model '{llm_service.DEFAULT_MODEL}' instead")
+                    model_name = llm_service.DEFAULT_MODEL
+                elif available_models:
+                    logger.info(f"Using first available model '{available_models[0]}' instead")
+                    model_name = available_models[0]
+                else:
+                    # No models available, we need to pull one
+                    default_model = "llama2"
+                    logger.info(f"No models available, pulling {default_model}...")
+                    ollama.pull(default_model)
+                    model_name = default_model
+        except Exception as e:
+            logger.error(f"Error checking available models: {str(e)}")
+            # Continue with requested model_name and let generate_text handle any errors
+            
+        # Pass the actual prompt content to the LLM
         response = generate_text(model_name, prompt, stream)
         if stream:
             return StreamingResponse(response, media_type="text/event-stream")

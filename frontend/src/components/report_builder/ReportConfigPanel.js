@@ -14,7 +14,8 @@ import {
   ButtonGroup,
   Tooltip,
   Collapse,
-  useTheme
+  useTheme,
+  CircularProgress
 } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
@@ -24,6 +25,9 @@ import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
 import FormatListBulletedIcon from '@material-ui/icons/FormatListBulleted';
 import FormatListNumberedIcon from '@material-ui/icons/FormatListNumbered';
+import AutorenewIcon from '@material-ui/icons/Autorenew';
+import RefreshIcon from '@material-ui/icons/Refresh';
+import InfoIcon from '@material-ui/icons/Info';
 import { GradientText, SubtleGlowPaper } from '../../styles/StyledComponents';
 import { getGatewayUrl } from '../../config';
 import axios from 'axios';
@@ -81,6 +85,7 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(1.5),
     marginBottom: theme.spacing(1),
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   typeToggleButtonGroup: {
   },
@@ -184,6 +189,18 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: theme.palette.action.hover,
     },
   },
+  regenerateButton: {
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.primary.light,
+    color: '#fff',
+    '&:hover': {
+      backgroundColor: theme.palette.primary.main,
+    },
+  },
+  regenerateTooltip: {
+    maxWidth: 280,
+  },
 }));
 
 // Available format options
@@ -200,7 +217,7 @@ const formatOptions = [
   // Add more formats like blockquote, code block if needed
 ];
 
-function ReportConfigPanel({ definition, onChange, currentReportId }) {
+function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerateSection, isGenerating, generatingElements = {} }) {
   const classes = useStyles();
   const theme = useTheme();
   const { token } = useContext(AuthContext);
@@ -292,6 +309,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
     format: 'paragraph',
     content: '',
     instructions: '',
+    ai_generated_content: null
   });
 
   const handleAddElement = () => {
@@ -308,9 +326,41 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
   };
 
   const handleElementChange = (elementId, field, value) => {
-    const newElements = (definition?.elements || []).map(el => 
-      el.id === elementId ? { ...el, [field]: value } : el
-    );
+    const newElements = (definition?.elements || []).map(el => {
+      if (el.id === elementId) {
+        const updatedElement = { ...el, [field]: value };
+        
+        // Special handling when switching between element types
+        if (field === 'type') {
+          if (value === 'explicit') {
+            // Don't clear any fields when switching to explicit
+            // Just ensure the required fields exist
+            if (updatedElement.ai_generated_content === undefined) {
+              updatedElement.ai_generated_content = null;
+            }
+            if (updatedElement.instructions === undefined) {
+              updatedElement.instructions = '';
+            }
+          } else if (value === 'generative') {
+            // Don't clear any fields when switching to generative
+            // Just ensure the required fields exist
+            if (updatedElement.content === undefined) {
+              updatedElement.content = '';
+            }
+            if (updatedElement.instructions === undefined) {
+              updatedElement.instructions = '';
+            }
+            if (updatedElement.ai_generated_content === undefined) {
+              updatedElement.ai_generated_content = null;
+            }
+          }
+        }
+        
+        return updatedElement;
+      }
+      return el;
+    });
+    
     onChange({ ...definition, elements: newElements });
   };
 
@@ -599,13 +649,37 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
                       })}
                     </ButtonGroup>
                   )}
+
+                  {element.type === 'generative' && onRegenerateSection && (
+                    <Tooltip 
+                      title={
+                        <Typography variant="body2">
+                          {element.ai_generated_content ? 
+                            "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
+                            "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
+                        </Typography>
+                      }
+                      classes={{ tooltip: classes.regenerateTooltip }}
+                      placement="top"
+                    >
+                      <Button
+                        variant="contained"
+                        disabled={isGenerating}
+                        className={classes.regenerateButton}
+                        size="small"
+                        onClick={() => onRegenerateSection(element.id)}
+                        startIcon={generatingElements[element.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
+                      >
+                        {element.ai_generated_content ? 'Regenerate' : 'Generate'}
+                      </Button>
+                    </Tooltip>
+                  )}
                 </Box>
                 
                 {element.type === 'explicit' ? (
                   <TextField
-                    label="Content"
                     multiline
-                    rows={3}
+                    rows={2}
                     fullWidth
                     variant="outlined"
                     margin="dense"
@@ -618,28 +692,27 @@ function ReportConfigPanel({ definition, onChange, currentReportId }) {
                         handleElementChange(element.id || index, 'content', e.target.value);
                       }
                     }}
-                    helperText={
+                    label={
                       isBulletFormat(element) ? 
-                      'Enter list items. Use line breaks (Enter) for new items.' : 
+                      'Content: Use line breaks for new items.' : 
                       element.format === 'numberedList' ? 
-                      'Enter list items. Use line breaks (Enter) for new items. Indent with spaces for sub-lists (numbering is automatic).' : 
+                      'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
                       element.format === 'paragraph' ? 
-                      'Enter text. Line breaks (Enter) will be preserved.' : 
-                      'Enter text content here. Formatting is controlled by the buttons above.'
+                      'Content: Line breaks will be preserved.' : 
+                      'Content: Formatting is controlled by the buttons above.'
                     }
                   />
                 ) : (
                   <TextField
-                    label="AI Instructions"
+                    label="AI Prompt - Provide instructions for MAGE to generate this element."
                     multiline
-                    rows={3}
+                    rows={2}
                     fullWidth
                     variant="outlined"
                     margin="dense"
                     size="small"
                     value={element.instructions || ''}
                     onChange={(e) => handleElementChange(element.id || index, 'instructions', e.target.value)}
-                    helperText="Provide clear instructions for the AI to generate this element."
                   />
                 )}
               </Box>

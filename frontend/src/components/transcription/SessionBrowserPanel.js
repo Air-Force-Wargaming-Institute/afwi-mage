@@ -5,14 +5,22 @@ import {
   Button,
   List,
   ListItem,
+  ListItemIcon,
   ListItemText,
   Typography,
   Divider,
   Paper,
-  CircularProgress
+  CircularProgress,
+  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Tooltip,
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import { Add as AddIcon } from '@material-ui/icons';
+import { Add as AddIcon, Delete as DeleteIcon } from '@material-ui/icons';
 import { useTranscription, ACTIONS } from '../../contexts/TranscriptionContext';
 import { GradientBorderPaper } from '../../styles/StyledComponents';
 import { getApiUrl, getGatewayUrl } from '../../config';
@@ -39,10 +47,13 @@ const useStyles = makeStyles((theme) => ({
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
     },
-    // Add styling for selected item
-    // selected: {
-    //   backgroundColor: theme.palette.action.selected,
-    // }
+    '&.Mui-selected': {
+        backgroundColor: theme.palette.action.selected,
+        '&:hover': {
+            backgroundColor: theme.palette.action.selectedHover || theme.palette.action.hover, 
+        }
+    },
+    paddingRight: theme.spacing(7),
   },
   loaderContainer: {
     display: 'flex',
@@ -55,25 +66,32 @@ const useStyles = makeStyles((theme) => ({
     textAlign: 'center',
     padding: theme.spacing(2),
   },
+  listItemSecondaryAction: {
+    position: 'absolute',
+    right: theme.spacing(1), 
+    top: '50%',
+    transform: 'translateY(-50%)',
+  }
 }));
 
-const SessionBrowserPanel = () => {
+const SessionBrowserPanel = ({ onNavigationAttempt }) => {
   const classes = useStyles();
   const { state, dispatch } = useTranscription();
   const { previousSessions, loadedSessionId } = state;
   const { token } = useContext(AuthContext);
   
-  // Add loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch sessions on component mount
   useEffect(() => {
     const fetchSessions = async () => {
       if (!token) {
         setError("Authentication token not found.");
         setIsLoading(false);
-        return; // Don't fetch if no token
+        return; 
       }
       try {
         setIsLoading(true);
@@ -109,44 +127,109 @@ const SessionBrowserPanel = () => {
         setError("Authentication token not found.");
         return; 
     }
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // 1. Set the loadedSessionId optimistically
-      dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: sessionId });
 
-      // 2. Fetch full session data from API using sessionId
-      const sessionDetailsUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}`);
-      
-      const response = await fetch(sessionDetailsUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+    const action = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+          
+          dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: sessionId });
+
+          const sessionDetailsUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}`);
+          
+          const response = await fetch(sessionDetailsUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+          });
+
+          if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to fetch session details: ${response.status} ${errorText || response.statusText}`);
           }
-      });
+          const sessionData = await response.json();
+          
+          dispatch({ type: ACTIONS.LOAD_SESSION_DATA, payload: sessionData });
+          
+        } catch (error) {
+          console.error("Error loading session details:", error);
+          setError('Failed to load session details: ' + error.message);
+          dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: null });
+          dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to load session details.' });
+        } finally {
+           setIsLoading(false);
+        }
+    };
 
-      if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch session details: ${response.status} ${errorText || response.statusText}`);
-      }
-      const sessionData = await response.json();
-      
-      // 3. Dispatch LOAD_SESSION_DATA with actual fetched data
-      dispatch({ type: ACTIONS.LOAD_SESSION_DATA, payload: sessionData });
-      
-    } catch (error) {
-      console.error("Error loading session details:", error);
-      setError('Failed to load session details: ' + error.message);
-      // Reset loadedSessionId if failed
-      dispatch({ type: ACTIONS.SET_LOADED_SESSION_ID, payload: null });
-      dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to load session details.' });
-    } finally {
-       setIsLoading(false);
+    if (loadedSessionId === sessionId) return; // Do nothing if the same session is clicked
+
+    if (onNavigationAttempt) {
+        onNavigationAttempt(action);
+    } else {
+        action();
     }
   };
 
   const handleStartNewSession = () => {
-    dispatch({ type: ACTIONS.START_NEW_SESSION });
+    const action = () => {
+        dispatch({ type: ACTIONS.START_NEW_SESSION });
+    };
+    if (onNavigationAttempt) {
+        onNavigationAttempt(action);
+    } else {
+        action();
+    }
+  };
+
+  const openDeleteConfirm = (session, event) => {
+    event.stopPropagation(); 
+    setSessionToDelete(session);
+    setShowDeleteConfirm(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    setSessionToDelete(null);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionToDelete || !token) {
+      setError("Session to delete not specified or token missing.");
+      closeDeleteConfirm();
+      return;
+    }
+
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      const deleteUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToDelete.session_id}`);
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 204) {
+          // Successfully deleted
+        } else {
+          const errorText = await response.text();
+          throw new Error(`Failed to delete session: ${response.status} ${errorText || response.statusText}`);
+        }
+      }
+      
+      dispatch({ type: ACTIONS.DELETE_SESSION_SUCCESS, payload: sessionToDelete.session_id });
+      
+    } catch (deleteError) {
+      console.error("Error deleting session:", deleteError);
+      setError(`Failed to delete session: ${deleteError.message}`);
+      dispatch({ type: ACTIONS.SET_ERROR, payload: `Failed to delete session: ${deleteError.message}` });
+    } finally {
+      setIsDeleting(false);
+      closeDeleteConfirm();
+    }
   };
 
   return (
@@ -166,14 +249,12 @@ const SessionBrowserPanel = () => {
       <Divider />
       <Typography variant="subtitle1" gutterBottom style={{ marginTop: '16px' }}>Previous Recordings</Typography>
       
-      {/* Show loading indicator */}
-      {isLoading && (
+      {isLoading && !isDeleting && (
         <Box className={classes.loaderContainer}>
           <CircularProgress size={24} />
         </Box>
       )}
       
-      {/* Show error message */}
       {error && (
         <Typography className={classes.errorMessage} variant="body2">
           {error}
@@ -190,12 +271,27 @@ const SessionBrowserPanel = () => {
                 onClick={() => handleSelectSession(session.session_id)}
                 className={classes.listItem}
                 selected={loadedSessionId === session.session_id}
-                disabled={isLoading}
+                disabled={isLoading || isDeleting}
               >
                 <ListItemText
                   primary={session.session_name}
                   secondary={`${new Date(session.start_time).toLocaleDateString()} - ${session.event_metadata?.classification || 'N/A'}`}
                 />
+                <Box className={classes.listItemSecondaryAction}>
+                  <Tooltip title="Delete session" placement="top">
+                    <span> 
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        size="small"
+                        onClick={(e) => openDeleteConfirm(session, e)}
+                        disabled={isDeleting && sessionToDelete?.session_id === session.session_id}
+                      >
+                        {(isDeleting && sessionToDelete?.session_id === session.session_id) ? <CircularProgress size={20} /> : <DeleteIcon />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
               </ListItem>
             ))}
           </List>
@@ -207,6 +303,22 @@ const SessionBrowserPanel = () => {
           )
         )}
       </Box>
+      <Dialog open={showDeleteConfirm} onClose={closeDeleteConfirm}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to permanently delete the session "<strong>{sessionToDelete?.session_name}</strong>"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteConfirm} color="primary" disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteSession} color="secondary" disabled={isDeleting}>
+            {isDeleting ? <CircularProgress size={20} /> : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </GradientBorderPaper>
   );
 };

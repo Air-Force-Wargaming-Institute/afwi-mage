@@ -433,14 +433,15 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+      - ollama
+      - vllm
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - PORT=8019
       - PYTHONUNBUFFERED=1
       - EMBEDDING_SERVICE_URL=http://embedding:8006
-
-  # report_service:
-  #   build:
+      - VLLM_CHAT_COMPLETIONS_URL=http://vllm:8000/v1/chat/completions
+      - VLLM_MODEL_NAME=/models/DeepHermes-3-Llama-3-8B-Preview-abliterated
 
 volumes:
   postgres_data:

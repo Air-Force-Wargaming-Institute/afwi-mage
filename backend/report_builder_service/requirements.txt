@@ -1,4 +1,7 @@
-fastapi
-uvicorn[standard]
-pydantic
-httpx # For making async HTTP requests 
+fastapi==0.103.1
+uvicorn[standard]==0.23.2
+pydantic==2.4.2
+httpx==0.25.0 # For making async HTTP requests
+python-docx==1.1.2
+pypandoc==1.15
+python-multipart==0.0.6 # For handling file uploads 

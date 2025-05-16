@@ -77,16 +77,16 @@ This plan focuses on the backend development for the Report Builder feature, bui
     *   [X] Task: Decide on a storage mechanism for templates (e.g., predefined JSON files within the service, or a database table).
     *   [X] Task: Create `GET /api/report_builder/templates` endpoint to list available templates (name, description, ID).
     *   [X] Task: Create `GET /api/report_builder/templates/{template_id}` endpoint to retrieve a specific template's full structure.
-    *   [ ] Task: (Frontend will need to adapt `ReportBuilderMain.js` to fetch these instead of using `reportTemplates.js` directly).
+    *   [X] Task: (Frontend will need to adapt `ReportBuilderMain.js` to fetch these instead of using `reportTemplates.js` directly).
 *   **As a Backend Developer, I want to implement an API endpoint to convert the generated Markdown report into a Microsoft Word document.**
-    *   [ ] Task: Research and choose a suitable library for Markdown to Word conversion (e.g., Pandoc, python-docx).
-    *   [ ] Task: Create `GET /api/report_builder/reports/{report_id}/export/word` endpoint.
-    *   [ ] Task: This endpoint should:
-        *   [ ] Task: Load the report definition.
-        *   [ ] Task: If the report hasn't been generated yet, or if a "force regenerate" option is implied, trigger the generation process (from Phase 3).
-        *   [ ] Task: Take the final Markdown content.
-        *   [ ] Task: Convert it to a .docx file.
-        *   [ ] Task: Return the .docx file as a downloadable response (setting appropriate `Content-Disposition` and `Content-Type` headers).
+    *   [X] Task: Research and choose a suitable library for Markdown to Word conversion (e.g., Pandoc, python-docx).
+    *   [X] Task: Create `GET /api/report_builder/reports/{report_id}/export/word` endpoint.
+    *   [X] Task: This endpoint should:
+        *   [X] Task: Load the report definition.
+        *   [X] Task: If the report hasn't been generated yet, or if a "force regenerate" option is implied, trigger the generation process (from Phase 3).
+        *   [X] Task: Take the final Markdown content.
+        *   [X] Task: Convert it to a .docx file.
+        *   [X] Task: Return the .docx file as a downloadable response (setting appropriate `Content-Disposition` and `Content-Type` headers).
 
 ## Future Considerations (Post-MVP):
 

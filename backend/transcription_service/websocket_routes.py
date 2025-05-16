@@ -10,14 +10,15 @@ import whisperx
 from datetime import datetime
 import os # Import os
 import pathlib # Import pathlib
-from typing import Optional
+from typing import Optional, Tuple, List, Dict # Updated typing
+from sqlalchemy.orm.attributes import flag_modified # <-- ADD THIS IMPORT
 
 from websocket_manager import manager # Import the manager instance
 from model_loader import get_models, are_models_loaded # Import model loading utilities
 from config import (
     DEVICE, BATCH_SIZE, HF_TOKEN, 
-    WEBSOCKET_BUFFER_SECONDS, DIARIZATION_MIN_CHUNK_MS,
-    ARTIFACT_STORAGE_BASE_PATH
+    WEBSOCKET_BUFFER_SECONDS, # DIARIZATION_MIN_CHUNK_MS, # No longer used here
+    ARTIFACT_STORAGE_BASE_PATH, AUDIO_FORMAT, TARGET_SAMPLE_RATE
 )
 from session_manager import session_manager # Import Session Manager
 from database import get_db_session, TranscriptionSession 
@@ -26,395 +27,402 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# --- START EDIT ---
-# Placeholder function for token validation (replace with actual logic)
-async def validate_token(token: str) -> bool:
-    """Placeholder for actual token validation logic."""
-    if not token:
-        return False
-    # In a real scenario, decode JWT, call auth service, etc.
-    logger.debug(f"Validating token (length: {len(token)})...") # Basic check
-    # For now, just check if it's not empty
-    return len(token) > 10 # Example: Simple length check
-# --- END EDIT ---
+# In-memory store for session-specific transcription progress
+# { "session_id": {"last_processed_duration_seconds": 0.0, "all_segments": []} }
+session_transcription_progress: Dict[str, Dict] = {}
+
+
+# Placeholder function for token validation (replace with actual logic) - REMOVED as it was commented out
 
 # Constants
-TARGET_SAMPLE_RATE = 16000
-# BUFFER_DURATION_SECONDS = 5 # Process audio every N seconds - Use config
-# MIN_CHUNK_DURATION_MS = 100 # Minimum duration for a diarization segment - Use config
-AUDIO_FORMAT = "webm"
+# TARGET_SAMPLE_RATE = 16000 # Defined in config
+# AUDIO_FORMAT = "webm" # Defined in config
 
-# Function to save audio chunk
-async def save_audio_chunk(session_id: str, audio_bytes: bytes, db: AsyncSession) -> Optional[str]:
-    """Saves an audio chunk to a session-specific directory and updates the DB."""
+
+# Function to save the final accumulated audio
+async def save_final_accumulated_audio(session_id_str: str, audio_data: bytes, db_session: AsyncSession, base_path_str: str) -> Optional[str]:
+    """Saves the complete accumulated audio data to a final file and updates the DB."""
+    if not audio_data:
+        logger.info(f"[{session_id_str}] No data in final accumulator to save.")
+        return None
+    
+    session_storage_path = pathlib.Path(base_path_str) / session_id_str
+    session_storage_path.mkdir(parents=True, exist_ok=True)
+    
+    final_audio_filename = f"complete_session_audio_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.{AUDIO_FORMAT}"
+    final_audio_path = session_storage_path / final_audio_filename
+    
     try:
-        session = await session_manager.get_session(db, session_id)
-        if not session:
-            logger.error(f"[{session_id}] Cannot save chunk, session not found.")
-            return None
-
-        # Define chunk storage path
-        chunk_dir = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / session_id / "_chunks"
-        chunk_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create a unique filename (e.g., using timestamp)
-        timestamp_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
-        chunk_filename = f"chunk_{timestamp_str}.{AUDIO_FORMAT}"
-        chunk_path = chunk_dir / chunk_filename
-
-        # Write the chunk
-        with open(chunk_path, "wb") as f:
-            f.write(audio_bytes)
+        with open(final_audio_path, "wb") as f:
+            f.write(audio_data)
+        logger.info(f"[{session_id_str}] Saved final accumulated audio to: {final_audio_path}")
         
-        chunk_path_str = str(chunk_path.resolve()) # Store absolute path
-        logger.debug(f"[{session_id}] Saved audio chunk to: {chunk_path_str}")
-
-        # Update DB
-        if session.audio_chunk_paths is None:
-            session.audio_chunk_paths = []
-        session.audio_chunk_paths.append(chunk_path_str)
-        session.last_update = datetime.utcnow()
-        await db.commit()
-        logger.debug(f"[{session_id}] Updated audio_chunk_paths in DB.")
-        return chunk_path_str
-
+        session_obj = await session_manager.get_session(db_session, session_id_str)
+        if session_obj:
+            session_obj.audio_storage_path = str(final_audio_path.resolve())
+            session_obj.last_update = datetime.utcnow()
+            await db_session.commit()
+            logger.info(f"[{session_id_str}] Updated audio_storage_path in DB to {final_audio_path}")
+            return str(final_audio_path.resolve())
+        else:
+            logger.error(f"[{session_id_str}] Session not found in DB to update final audio path.")
+            return None
     except OSError as e:
-        logger.error(f"[{session_id}] OS Error saving audio chunk {chunk_path}: {e}", exc_info=True)
-        await db.rollback() # Rollback DB changes on file error
+        logger.error(f"[{session_id_str}] OS Error saving final audio {final_audio_path}: {e}", exc_info=True)
+        if db_session: await db_session.rollback()
         return None
     except Exception as e:
-        logger.error(f"[{session_id}] Unexpected error saving audio chunk: {e}", exc_info=True)
-        await db.rollback()
+        logger.error(f"[{session_id_str}] Unexpected error saving final audio: {e}", exc_info=True)
+        if db_session: await db_session.rollback()
         return None
 
-async def process_audio_buffer(audio_buffer: io.BytesIO, session_id: str, db: AsyncSession):
-    """Processes the audio buffer: transcribes, aligns, and diarizes."""
-    session = await session_manager.get_session(db, session_id) # Get session object
-    if not session:
-        logger.error(f"[{session_id}] Session not found during buffer processing.")
-        return
-        
-    if audio_buffer.getbuffer().nbytes == 0:
-        logger.debug(f"[{session_id}] Audio buffer empty, skipping processing.")
-        return
+# REMOVED save_audio_chunk function as it's no longer needed for final file assembly.
+# Individual chunk saving logic is removed.
+
+# Replaced process_audio_buffer with process_live_transcription_update_sliding_window
+async def process_live_transcription_update_sliding_window(
+    full_audio_bytes: bytes,
+    session_id: str,
+    db: AsyncSession,
+    current_transcribed_duration_seconds: float  # How much was processed before this call
+) -> Tuple[List[Dict], float]: # Returns new_segments, new_total_processed_duration_seconds
+    if not full_audio_bytes:
+        return [], current_transcribed_duration_seconds
 
     try:
-        audio_buffer.seek(0)
-        audio_segment = AudioSegment.from_file(audio_buffer, format=AUDIO_FORMAT)
-        duration_ms = len(audio_segment)
-        logger.info(f"[{session_id}] Processing {duration_ms / 1000.0:.2f}s of audio from buffer...")
+        full_segment_audio = AudioSegment.from_file(io.BytesIO(full_audio_bytes), format=AUDIO_FORMAT)
+        total_duration_seconds = len(full_segment_audio) / 1000.0
+
+        if total_duration_seconds <= current_transcribed_duration_seconds:
+            logger.debug(f"[{session_id}] No new audio beyond {current_transcribed_duration_seconds:.2f}s for sliding window.")
+            return [], current_transcribed_duration_seconds
+
+        start_ms = int(current_transcribed_duration_seconds * 1000)
+        end_ms = int(total_duration_seconds * 1000)
         
-        # --- Preprocessing --- 
-        audio_segment = audio_segment.set_frame_rate(TARGET_SAMPLE_RATE)
-        samples = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-        audio_np = samples
+        new_audio_slice = full_segment_audio[start_ms:end_ms]
+        duration_of_slice_seconds = len(new_audio_slice) / 1000.0
 
-        current_language = session.detected_language or "en"
-        whisper_model, _, align_model_tuple = get_models(language_code=current_language) # diarize_model is None
+        # Avoid processing tiny slivers of audio which might be due to timing issues or very small final chunks
+        if duration_of_slice_seconds <= 0.1: # Increased threshold slightly
+            logger.debug(f"[{session_id}] New audio slice too short ({duration_of_slice_seconds:.3f}s), skipping transcription for this pass.")
+            return [], total_duration_seconds # Return new total duration, but no new segments
 
-        if not whisper_model: # Removed check for diarize_model
-             logger.error(f"[{session_id}] Whisper model not loaded. Cannot process buffer.")
-             error_message = json.dumps({"type": "status_update", "status": "error", "message": "Core models unavailable."}) 
-             await manager.send_personal_message(error_message, session_id)
-             return
-
-        # 1. Transcription
-        logger.debug(f"[{session_id}] Starting transcription...")
-        transcription_result = whisper_model.transcribe(audio_np, batch_size=BATCH_SIZE)
-        detected_language = transcription_result.get("language", current_language)
-        # Update session language if changed
-        if detected_language != current_language:
-             await session_manager.set_detected_language(db, session_id, detected_language)
-             current_language = detected_language
+        logger.info(f"[{session_id}] Sliding window: Processing new slice from {current_transcribed_duration_seconds:.2f}s to {total_duration_seconds:.2f}s (slice duration: {duration_of_slice_seconds:.2f}s)")
         
-        logger.debug(f"[{session_id}] Transcription complete. Detected language: {detected_language}")
+        new_audio_slice_resampled = new_audio_slice.set_frame_rate(TARGET_SAMPLE_RATE)
+        samples_np = np.array(new_audio_slice_resampled.get_array_of_samples()).astype(np.float32) / 32768.0
 
-        segments = transcription_result["segments"]
-        if not segments:
-            logger.info(f"[{session_id}] No segments transcribed from buffer.")
-            return # Nothing more to do
-
-        if detected_language != current_language: # This condition might be redundant due to above update
-             logger.info(f"[{session_id}] Language changed. Getting correct alignment model for {detected_language}.")
-             _, _, align_model_tuple = get_models(language_code=detected_language) # diarize_model is None
-             
-        if align_model_tuple is None:
-            logger.error(f"[{session_id}] Alignment model for {detected_language} failed to load. Skipping alignment.") # Removed diarization from msg
-            raw_text = " ".join([seg.get('text', '').strip() for seg in segments])
-            message = json.dumps({
-                "type": "transcription_update", 
-                "text": raw_text, 
-                "segments": segments, 
-                "is_final": False, 
-                "status": "warning",
-                "message": "Alignment skipped." # Removed Diarization
-            })
-            await manager.send_personal_message(message, session_id)
-            # Still store raw segments if alignment fails but transcription worked
-            if segments:
-                try:
-                    if session.transcription_segments is None: session.transcription_segments = []
-                    session.transcription_segments.extend(segments) # Store raw segments
-                    session.last_update = datetime.utcnow()
-                    await db.commit()
-                    logger.info(f"[{session_id}] Stored {len(segments)} RAW segments in DB due to alignment failure.")
-                except Exception as e_db:
-                    await db.rollback()
-                    logger.error(f"[{session_id}] Failed to store RAW segments in DB: {e_db}", exc_info=True)
-            return
+        session_db_obj = await session_manager.get_session(db, session_id)
+        if not session_db_obj:
+            logger.error(f"[{session_id}] Session not found during sliding window processing.")
+            return [], total_duration_seconds
             
-        align_model, align_metadata = align_model_tuple
-        logger.debug(f"[{session_id}] Aligning transcription...")
-        aligned_result = whisperx.align(segments, align_model, align_metadata, audio_np, DEVICE, return_char_alignments=False)
-        logger.debug(f"[{session_id}] Alignment complete.")
+        current_language = session_db_obj.detected_language or "en"
+        whisper_model, _, align_model_tuple = get_models(language_code=current_language)
 
-        # Diarization SKIPPED
-        logger.debug(f"[{session_id}] Diarization (SKIPPED)...")
-        # if duration_ms < DIARIZATION_MIN_CHUNK_MS: 
-        #      logger.info(f"[{session_id}] Audio chunk too short ({duration_ms}ms) for diarization, assigning UNKNOWN speaker.")
-        #      processed_segments_list = aligned_result["segments"]
-        #      for seg in processed_segments_list:
-        #          seg['speaker'] = 'UNKNOWN'
-        # else:
-        #      logger.debug(f"[{session_id}] Performing diarization...")
-        #      # diarize_model is None
-        #      # if not diarize_model:
-        #      #     logger.error(f"[{session_id}] Diarization model not loaded. Skipping.")
-        #      #     processed_segments_list = aligned_result["segments"]
-        #      #     for seg in processed_segments_list:
-        #      #         seg['speaker'] = 'UNKNOWN'
-        #      # else:
-        #      #     diarize_segments = diarize_model(audio_np)
-        #      #     diarized_result = whisperx.assign_word_speakers(diarize_segments, aligned_result["segments"])
-        #      #     
-        #      #     if isinstance(diarized_result, dict) and "segments" in diarized_result:
-        #      #         processed_segments_list = diarized_result["segments"]
-        #      #     elif isinstance(diarized_result, list):
-        #      #         processed_segments_list = diarized_result
-        #      #     else:
-        #      #         logger.error(f"[{session_id}] Unexpected result format from assign_word_speakers. Skipping assignment.")
-        #      #         processed_segments_list = aligned_result["segments"] # Fallback
-        #      #         for seg in processed_segments_list:
-        #      #             seg['speaker'] = 'UNKNOWN'
-        #      logger.debug(f"[{session_id}] Diarization complete.")
-        logger.warning(f"[{session_id}] Diarization has been SKIPPED. Assigning UNKNOWN to speakers.")
-        processed_segments_list = aligned_result.get("segments", []) if isinstance(aligned_result, dict) else aligned_result if isinstance(aligned_result, list) else []
-        for seg in processed_segments_list:
-            seg['speaker'] = 'UNKNOWN'
+        if not whisper_model:
+             logger.error(f"[{session_id}] Whisper model not loaded for sliding window. Cannot process.")
+             # Consider sending a status update to the client if this happens
+             return [], total_duration_seconds 
 
-        output_segments = []
-        # combined_text = "" # We will generate combined text at the end in /stop
-        # Use the correctly identified list of processed segments
-        for segment in processed_segments_list: 
-             speaker = segment.get("speaker", "UNKNOWN") # Will be UNKNOWN
-             text = segment.get("text", "").strip()
-             start = segment.get("start")
-             end = segment.get("end")
-             # Calculate confidence if available (using word confidences if available)
-             word_confidences = [w.get('score', 0) for w in segment.get('words', []) if 'score' in w]
+        transcription_result = whisper_model.transcribe(samples_np, batch_size=BATCH_SIZE)
+        detected_language_for_slice = transcription_result.get("language", current_language)
+        
+        if detected_language_for_slice != current_language:
+             logger.info(f"[{session_id}] Language for slice ({detected_language_for_slice}) differs from session ({current_language}). Updating session.")
+             await session_manager.set_detected_language(db, session_id, detected_language_for_slice)
+             current_language = detected_language_for_slice # Update for alignment model
+             _, _, align_model_tuple = get_models(language_code=current_language)
+             
+        raw_segments_from_slice = transcription_result.get("segments", [])
+        if not raw_segments_from_slice:
+            logger.info(f"[{session_id}] No segments transcribed from the current audio slice.")
+            return [], total_duration_seconds
+
+        final_segments_for_slice = []
+        if align_model_tuple:
+            align_model, align_metadata = align_model_tuple
+            try:
+                aligned_result = whisperx.align(raw_segments_from_slice, align_model, align_metadata, samples_np, DEVICE, return_char_alignments=False)
+                final_segments_for_slice = aligned_result.get("segments", [])
+                logger.debug(f"[{session_id}] Alignment complete for slice. Got {len(final_segments_for_slice)} aligned segments.")
+            except Exception as align_e:
+                logger.error(f"[{session_id}] Error during alignment for slice: {align_e}", exc_info=True)
+                final_segments_for_slice = raw_segments_from_slice # Fallback to raw if alignment fails
+        else:
+            logger.warning(f"[{session_id}] Alignment model for {current_language} not available for slice. Using raw segments.")
+            final_segments_for_slice = raw_segments_from_slice
+            
+        output_segments_this_call = []
+        for seg_data in final_segments_for_slice:
+             relative_start = seg_data.get("start")
+             relative_end = seg_data.get("end")
+             abs_start = (relative_start + current_transcribed_duration_seconds) if relative_start is not None else None
+             abs_end = (relative_end + current_transcribed_duration_seconds) if relative_end is not None else None
+
+             word_confidences = [w.get('score', 0) for w in seg_data.get('words', []) if 'score' in w]
              segment_confidence = sum(word_confidences) / len(word_confidences) if word_confidences else None
 
-             output_segments.append({
-                 "speaker": speaker,
-                 "text": text,
-                 "start": start,
-                 "end": end,
-                 "confidence": segment_confidence # Use calculated confidence
+             output_segments_this_call.append({
+                 "speaker": "UNKNOWN", # Diarization is skipped
+                 "text": seg_data.get("text", "").strip(),
+                 "start": abs_start,
+                 "end": abs_end,
+                 "confidence": segment_confidence
              })
-             # Append text for potential full transcript view
-             # combined_text += f"{speaker}: {text}\n"
         
-        # ---> Store segments in DB session <---
-        if output_segments:
-             try:
-                  if session.transcription_segments is None:
-                      session.transcription_segments = []
-                  # Append new segments - SQLAlchemy tracks changes to mutable JSON
-                  session.transcription_segments.extend(output_segments)
-                  session.last_update = datetime.utcnow()
-                  await db.commit()
-                  logger.info(f"[{session_id}] Stored {len(output_segments)} processed segments in DB.")
-             except Exception as e:
-                  await db.rollback()
-                  logger.error(f"[{session_id}] Failed to store segments in DB: {e}", exc_info=True)
-
-             # Send update via WebSocket (Correctly indented)
-             message = json.dumps({
-                 "type": "transcription_update",
-                 "segments": output_segments, # Send structured segments
-                 "status": "in_progress",
-                 "is_final": False # Indicate these are intermediate results
-             })
-             logger.info(f"[{session_id}] Sending {len(output_segments)} processed segments via WebSocket.")
-             await manager.send_personal_message(message, session_id)
-        else: # Correctly indented relative to the `if output_segments:`
-             logger.info(f"[{session_id}] No text segments produced after processing.")
+        logger.info(f"[{session_id}] Produced {len(output_segments_this_call)} segments from this slice.")
+        return output_segments_this_call, total_duration_seconds
 
     except CouldntDecodeError:
-        logger.warning(f"[{session_id}] Could not decode buffered audio. Buffer cleared.")
-        error_message = json.dumps({"type": "status_update", "status": "error", "message": "Audio decode error."}) 
-        await manager.send_personal_message(error_message, session_id)
-    except Exception as e:
-        logger.error(f"[{session_id}] Error during buffer processing: {e}", exc_info=True)
-        error_message = json.dumps({"type": "status_update", "status": "error", "message": f"Transcription/Diarization failed: {str(e)[:100]}..."}) 
-        await manager.send_personal_message(error_message, session_id)
-    finally:
-        # Clear the buffer after processing attempts
-        audio_buffer.seek(0)
-        audio_buffer.truncate()
-        logger.debug(f"[{session_id}] Audio buffer cleared.")
+        logger.error(f"[{session_id}] Sliding window: Could not decode full audio buffer. Size: {len(full_audio_bytes)} bytes.", exc_info=True)
+        return [], current_transcribed_duration_seconds
+    except Exception as e_proc:
+        logger.error(f"[{session_id}] Sliding window: Error during processing: {e_proc}", exc_info=True)
+        return [], current_transcribed_duration_seconds
 
-@router.websocket("/stream/{session_id}")
+
+@router.websocket("/api/ws/transcription/stream/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """
-    WebSocket endpoint for streaming audio, buffering, transcription, and diarization.
-    Handles saving audio chunks progressively.
+    WebSocket endpoint for streaming audio, performing live transcription using a sliding window,
+    and saving the complete audio file at the end.
     """
-    # --- Validation and Setup ---
-    db: AsyncSession = None # Initialize db variable
-    # --- START EDIT ---
-    # Extract token from query parameters
-    token = websocket.query_params.get("token")
-    logger.debug(f"[{session_id}] WebSocket connection attempt. Token provided: {'Yes' if token else 'No'}")
+    db: AsyncSession = None
+    main_audio_accumulator = io.BytesIO() # Accumulates ALL incoming audio bytes for final save
+    last_transcription_process_time = asyncio.get_event_loop().time()
 
-    # Validate token
-    if not await validate_token(token):
-        logger.warning(f"[{session_id}] WebSocket connection rejected due to invalid/missing token.")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
-        return
-    # --- END EDIT ---
+    # Initialize transcription progress for this session
+    session_transcription_progress[session_id] = {
+        "last_processed_duration_seconds": 0.0, 
+        "all_segments": []
+    }
+    
+    logger.info(f"[{session_id}] WebSocket connection attempt. Token validation skipped.")
 
     try:
-        # Manually get a DB session for the WebSocket connection lifespan
-        # Cannot use Depends() directly in WebSocket route
-        async for session_db in get_db_session():
-            db = session_db
-            break # get_db_session yields only once
+        async for session_db_gen in get_db_session():
+            db = session_db_gen
+            break 
         if db is None:
-             raise RuntimeError("Failed to get DB session for WebSocket")
+             logger.error(f"[{session_id}] Failed to obtain DB session. Closing WS.")
+             await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="DB unavailable")
+             return
              
         if not await session_manager.is_session_active(db, session_id):
-            logger.warning(f"WebSocket connection attempt for invalid/inactive session: {session_id}")
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or inactive session")
+            logger.warning(f"WS attempt for invalid/inactive session: {session_id}")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid session")
             return
 
         if not are_models_loaded():
-            logger.error(f"[{session_id}] Models not loaded. Cannot start WebSocket connection.")
-            await websocket.close(code=status.WS_1013_TRY_AGAIN_LATER, reason="Models not available")
+            logger.error(f"[{session_id}] Models not loaded. Closing WS.")
+            await websocket.close(code=status.WS_1013_TRY_AGAIN_LATER, reason="Models unavailable")
             return
 
         await manager.connect(websocket, session_id)
         await session_manager.update_session_status(db, session_id, "recording")
-
-        audio_buffer = io.BytesIO()
-        last_process_time = asyncio.get_event_loop().time()
+        logger.info(f"[{session_id}] WebSocket connected and session status set to 'recording'.")
 
         # --- Main Loop --- 
         while True:
-            session = await session_manager.get_session(db, session_id)
-            if not session:
-                 logger.warning(f"[{session_id}] Session disappeared during WebSocket connection. Closing.")
-                 raise WebSocketDisconnect(code=status.WS_1011_INTERNAL_ERROR, reason="Session data lost")
+            current_loop_time = asyncio.get_event_loop().time()
+            session_from_db = await session_manager.get_session(db, session_id)
+            if not session_from_db:
+                 logger.warning(f"[{session_id}] Session disappeared from DB. Closing WS.")
+                 raise WebSocketDisconnect(code=status.WS_1011_INTERNAL_ERROR, reason="Session lost")
                  
-            session_status = session.status
+            session_status = session_from_db.status
             if session_status in ["stopped", "cancelled", "error", "interrupted"]:
-                 logger.info(f"[{session_id}] Session status changed to {session_status}. Closing WebSocket.")
-                 # Process final buffer before closing if needed
-                 if audio_buffer.tell() > 0:
-                     logger.info(f"[{session_id}] Processing final buffer before closing WebSocket.")
-                     await process_audio_buffer(audio_buffer, session_id, db) 
+                 logger.info(f"[{session_id}] Session status '{session_status}'. Processing final data and closing WebSocket.")
+                 
+                 # Final transcription processing for any remaining audio in the accumulator
+                 if main_audio_accumulator.tell() > 0:
+                     full_audio_final_snapshot = main_audio_accumulator.getvalue()
+                     progress_info = session_transcription_progress.get(session_id, {"last_processed_duration_seconds": 0.0, "all_segments": []})
+                     
+                     logger.info(f"[{session_id}] Performing final transcription pass for status '{session_status}'.")
+                     final_new_segments, _ = await process_live_transcription_update_sliding_window(
+                         full_audio_final_snapshot, session_id, db, 
+                         progress_info["last_processed_duration_seconds"]
+                     )
+                     if final_new_segments:
+                         progress_info["all_segments"].extend(final_new_segments)
+                         # No client update here as WS is closing
+
+                 # Save complete audio from main_audio_accumulator
+                 if main_audio_accumulator.tell() > 0:
+                     final_audio_data_to_save = main_audio_accumulator.getvalue()
+                     logger.info(f"[{session_id}] Saving final accumulated audio ({len(final_audio_data_to_save)} bytes) as session status is '{session_status}'.")
+                     await save_final_accumulated_audio(session_id, final_audio_data_to_save, db, ARTIFACT_STORAGE_BASE_PATH)
+                 else:
+                     logger.info(f"[{session_id}] Accumulator empty on close for status '{session_status}'. No final audio to save.")
+
+                 # Store all collected segments in the DB
+                 final_segments_to_store = session_transcription_progress.get(session_id, {}).get("all_segments", [])
+                 if final_segments_to_store:
+                     session_from_db.transcription_segments = final_segments_to_store
+                     # session_from_db.full_transcript_text = ... (generate from all_segments if needed by stop_session)
+                     session_from_db.last_update = datetime.utcnow()
+                     if session_status == "stopped" and not session_from_db.completion_time: # If explicitly stopped, mark completion time
+                         session_from_db.completion_time = datetime.utcnow()
+                     await db.commit()
+                     logger.info(f"[{session_id}] Stored {len(final_segments_to_store)} total segments in DB on WebSocket close due to status '{session_status}'.")
+                 
                  raise WebSocketDisconnect(code=status.WS_1001_GOING_AWAY, reason=f"Session ended ({session_status})")
 
             if session_status == "paused":
-                 await asyncio.sleep(1) # Wait while paused
-                 continue # Skip receiving/processing
+                 await asyncio.sleep(0.5) # Shorter sleep for paused state allows faster resume
+                 last_transcription_process_time = current_loop_time # Reset timer to avoid immediate processing on resume
+                 continue
                  
+            received_data = None
             try:
-                data = await asyncio.wait_for(websocket.receive(), timeout=1.0) 
+                received_data = await asyncio.wait_for(websocket.receive(), timeout=0.1) 
             except asyncio.TimeoutError:
-                # --- Buffer Processing on Timeout --- 
-                current_time = asyncio.get_event_loop().time()
-                if audio_buffer.tell() > 0 and (current_time - last_process_time) >= WEBSOCKET_BUFFER_SECONDS:
-                    # Process the current buffer for transcription
-                    await process_audio_buffer(audio_buffer, session_id, db)
-                    last_process_time = current_time
-                continue 
+                pass # This is expected, loop continues to periodic processing check
 
-            if data["type"] == "websocket.disconnect":
-                logger.info(f"[{session_id}] WebSocket disconnect message received.")
-                raise WebSocketDisconnect(code=data.get("code", 1000))
-            
-            # --- Handle Text Messages (Speaker Tags) ---
-            elif data.get("type") == "websocket.receive" and data.get("text") is not None:
-                 try:
-                     message_data = json.loads(data["text"])
-                     msg_type = message_data.get("type")
-                     
-                     if msg_type == "speaker_tag":
-                         speaker_id = message_data.get("speaker_id")
-                         timestamp = message_data.get("timestamp")
-                         if speaker_id and isinstance(timestamp, (int, float)):
-                             logger.info(f"[{session_id}] Received speaker tag: Speaker={speaker_id}, Time={timestamp:.2f}s")
-                             await session_manager.add_speaker_tag_event(db, session_id, speaker_id, timestamp)
+            if received_data:
+                if received_data["type"] == "websocket.disconnect":
+                    logger.info(f"[{session_id}] WebSocket disconnect message received.")
+                    raise WebSocketDisconnect(code=received_data.get("code", 1000))
+                
+                elif received_data.get("type") == "websocket.receive" and received_data.get("text"):
+                     try:
+                         message_data = json.loads(received_data["text"])
+                         msg_type = message_data.get("type")
+                         if msg_type == "speaker_tag":
+                             speaker_id = message_data.get("speaker_id")
+                             timestamp = message_data.get("timestamp") # This is recording time in seconds
+                             if speaker_id and isinstance(timestamp, (int, float)):
+                                 logger.info(f"[{session_id}] Received speaker tag: Spk={speaker_id}, T={timestamp:.2f}s")
+                                 await session_manager.add_speaker_tag_event(db, session_id, speaker_id, timestamp)
+                             else:
+                                 logger.warning(f"[{session_id}] Invalid speaker_tag msg: {message_data}")
                          else:
-                             logger.warning(f"[{session_id}] Invalid speaker_tag message received: {message_data}")
+                              logger.warning(f"[{session_id}] Unknown text msg type: {msg_type}")
+                     except Exception as e_text:
+                          logger.error(f"[{session_id}] Error processing text msg: {e_text}", exc_info=True)
+                
+                elif received_data.get("type") == "websocket.receive" and received_data.get("bytes"):
+                     audio_bytes_received = received_data.get('bytes')
+                     if audio_bytes_received:
+                         main_audio_accumulator.write(audio_bytes_received)
+                         # No more transcription_chunk_buffer
+                         logger.debug(f"[{session_id}] Received {len(audio_bytes_received)} audio bytes. Main accumulator size: {main_audio_accumulator.tell()} bytes")
+                         # Removed individual chunk saving (save_audio_chunk)
                      else:
-                          logger.warning(f"[{session_id}] Received unknown text message type: {msg_type}")
-                          
-                 except json.JSONDecodeError:
-                     logger.warning(f"[{session_id}] Received non-JSON text message: {data['text'][:100]}...")
-                 except Exception as e:
-                      logger.error(f"[{session_id}] Error processing text message: {e}", exc_info=True)
-            
-            # --- Handle Audio Bytes --- 
-            elif data.get("type") == "websocket.receive" and data.get("bytes") is not None:
-                 audio_bytes = data.get('bytes')
-                 if not audio_bytes:
-                     continue
-                 
-                 # 1. Append to in-memory buffer for transcription processing
-                 audio_buffer.write(audio_bytes)
-                 
-                 # 2. Save the raw chunk directly to file
-                 await save_audio_chunk(session_id, audio_bytes, db)
+                         logger.debug(f"[{session_id}] Received empty audio bytes packet.")
 
-                 # 3. Check if buffer needs processing for transcription
-                 current_time = asyncio.get_event_loop().time()
-                 if (current_time - last_process_time) >= WEBSOCKET_BUFFER_SECONDS:
-                     await process_audio_buffer(audio_buffer, session_id, db)
-                     last_process_time = current_time
-            # else: ignore other message types
 
-    except WebSocketDisconnect as e:
-        logger.info(f"[{session_id}] WebSocket disconnected (code: {e.code}, reason: {e.reason})")
+            # Periodic processing using sliding window
+            if (current_loop_time - last_transcription_process_time) >= WEBSOCKET_BUFFER_SECONDS:
+                if main_audio_accumulator.tell() > 0:
+                    full_audio_snapshot = main_audio_accumulator.getvalue()
+                    
+                    current_progress = session_transcription_progress.get(session_id, {"last_processed_duration_seconds": 0.0, "all_segments": []})
+                    last_processed_total_duration = current_progress["last_processed_duration_seconds"]
+
+                    logger.debug(f"[{session_id}] Attempting periodic transcription. Accumulator size: {len(full_audio_snapshot)}, last processed duration: {last_processed_total_duration:.2f}s.")
+                    
+                    newly_generated_segments, updated_total_processed_duration = await process_live_transcription_update_sliding_window(
+                        full_audio_snapshot,
+                        session_id,
+                        db,
+                        last_processed_total_duration
+                    )
+
+                    if newly_generated_segments:
+                        current_progress["all_segments"].extend(newly_generated_segments)
+                        logger.info(f"[{session_id}] Sending {len(current_progress['all_segments'])} total segments to client after periodic update.")
+                        message_payload = {
+                            "type": "transcription_update",
+                            "segments": current_progress["all_segments"], # Send all for frontend to render
+                            "status": "in_progress",
+                            "is_final": False 
+                        }
+                        await manager.send_personal_message(json.dumps(message_payload), session_id)
+                    
+                    current_progress["last_processed_duration_seconds"] = updated_total_processed_duration
+                    session_transcription_progress[session_id] = current_progress # Update tracker
+                else:
+                    logger.debug(f"[{session_id}] Periodic check: Main accumulator empty, skipping transcription.")
+                last_transcription_process_time = current_loop_time
+
+    except WebSocketDisconnect as e_ws_disconnect:
+        logger.info(f"[{session_id}] WebSocket disconnected (code: {e_ws_disconnect.code}, reason: '{e_ws_disconnect.reason}')")
+        # This block handles cleanup for ANY disconnect, including graceful ones from above.
         if db:
-             # Process final buffer if needed
-             if audio_buffer.tell() > 0:
-                 logger.info(f"[{session_id}] Processing final audio buffer on disconnect...")
-                 await process_audio_buffer(audio_buffer, session_id, db) 
-             # Update status if still recording/paused
-             session = await session_manager.get_session(db, session_id)
-             current_status = session.status if session else None
-             if current_status in ["recording", "paused"]:
-                 logger.info(f"[{session_id}] Setting session status to 'interrupted' due to disconnect.")
-                 await session_manager.update_session_status(db, session_id, "interrupted")
+            logger.info(f"[{session_id}] Finalizing data on WebSocketDisconnect...")
+            # Perform a final transcription pass if there's accumulated audio
+            if main_audio_accumulator.tell() > 0:
+                final_full_audio_snapshot = main_audio_accumulator.getvalue()
+                progress_info_on_disc = session_transcription_progress.get(session_id, {"last_processed_duration_seconds": 0.0, "all_segments": []})
+                
+                logger.info(f"[{session_id}] Performing final transcription pass on disconnect.")
+                final_new_segments_on_disc, _ = await process_live_transcription_update_sliding_window(
+                    final_full_audio_snapshot, session_id, db,
+                    progress_info_on_disc["last_processed_duration_seconds"]
+                )
+                if final_new_segments_on_disc:
+                    progress_info_on_disc["all_segments"].extend(final_new_segments_on_disc)
+                
+                # Save the complete audio stream from main_audio_accumulator
+                logger.info(f"[{session_id}] Saving final accumulated audio ({len(final_full_audio_snapshot)} bytes) on disconnect.")
+                await save_final_accumulated_audio(session_id, final_full_audio_snapshot, db, ARTIFACT_STORAGE_BASE_PATH)
+            else:
+                logger.info(f"[{session_id}] Accumulator empty on disconnect. No final audio to save.")
+
+            # Update session in DB with all collected segments and final status
+            final_session_state_on_disc = await session_manager.get_session(db, session_id)
+            if final_session_state_on_disc:
+                all_final_segments = session_transcription_progress.get(session_id, {}).get("all_segments", [])
+                if all_final_segments:
+                    final_session_state_on_disc.transcription_segments = all_final_segments
+                
+                current_status_on_disc = final_session_state_on_disc.status
+                # If the session was 'recording' or 'paused', and disconnect wasn't due to 'stopped' or 'cancelled' (already handled), mark as 'interrupted'.
+                if current_status_on_disc in ["recording", "paused"] and e_ws_disconnect.reason and not any(s in e_ws_disconnect.reason for s in ["Session ended (stopped)", "Session ended (cancelled)"]):
+                    logger.info(f"[{session_id}] Setting session status to 'interrupted' due to unexpected WebSocket disconnect.")
+                    final_session_state_on_disc.status = "interrupted"
+                
+                if not final_session_state_on_disc.completion_time and final_session_state_on_disc.status in ["stopped", "completed", "interrupted"]: # Ensure completion time if terminal
+                    final_session_state_on_disc.completion_time = datetime.utcnow()
+
+                final_session_state_on_disc.last_update = datetime.utcnow()
+                await db.commit()
+                logger.info(f"[{session_id}] Finalized session in DB on disconnect. Status: {final_session_state_on_disc.status}")
+            else:
+                logger.warning(f"[{session_id}] Session not found during disconnect cleanup, cannot update DB.")
         else:
              logger.warning(f"[{session_id}] DB session unavailable during disconnect cleanup.")
              
     except Exception as loop_error:
         logger.error(f"[{session_id}] Unexpected error in WebSocket loop: {loop_error}", exc_info=True)
         if db:
-             await session_manager.update_session_status(db, session_id, "error")
-        try:
+             session_check = await session_manager.get_session(db, session_id)
+             if session_check and session_check.status not in ["stopped", "completed", "cancelled", "interrupted"]:
+                await session_manager.update_session_status(db, session_id, "error")
+             else:
+                logger.error(f"[{session_id}] Session not found or already in terminal state, cannot set status to error.")
+        try: # Attempt to notify client of error
             error_payload = json.dumps({"type": "status_update", "status": "error", "message": "Internal server error."}) 
-            await websocket.send_text(error_payload)
-        except Exception: pass
+            if websocket.client_state == 1: # STATE_CONNECTED = 1
+                 await websocket.send_text(error_payload)
+        except Exception: pass # Ignore if cannot send
         
     finally:
-        if manager:
-             manager.disconnect(session_id)
-        audio_buffer.close()
-        # Ensure DB session is closed if obtained manually
-        if db:
+        if session_id in session_transcription_progress: # Clean up session progress tracking
+            del session_transcription_progress[session_id]
+            logger.debug(f"[{session_id}] Removed session progress from in-memory tracker.")
+
+        if manager and manager.active_connections.get(session_id) == websocket: # Check if this specific websocket is the one registered
+            manager.disconnect(session_id) # This logs internally
+            logger.info(f"[{session_id}] WebSocket connection explicitly removed from manager.")
+
+        if main_audio_accumulator: main_audio_accumulator.close()
+        
+        if db: 
              await db.close()
-        logger.info(f"[{session_id}] Cleaned up WebSocket resources.")
+             logger.debug(f"[{session_id}] Database session closed.")
+        logger.info(f"[{session_id}] Cleaned up WebSocket resources for session.")

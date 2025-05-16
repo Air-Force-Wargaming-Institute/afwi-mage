@@ -139,67 +139,57 @@ const ReportBuilderMain = () => {
                 setIsLoading(false);
             };
             fetchData();
+            
+            // Add event listener to refresh data when window regains focus
+            const handleFocus = () => {
+                console.log("Window focused, refreshing data");
+                fetchData();
+            };
+            
+            window.addEventListener('focus', handleFocus);
+            
+            // Add event listener for messages from the ReportDesignerPage
+            const handleMessage = (event) => {
+                // Verify the origin for security
+                if (event.origin !== window.location.origin) return;
+                
+                // Check if this is a message from the report designer
+                if (event.data && event.data.type === 'REPORT_BUILDER_SAVE') {
+                    console.log("Received save notification from designer:", event.data);
+                    fetchData(); // Refresh the data
+                }
+            };
+            
+            window.addEventListener('message', handleMessage);
+            
+            // Clean up event listeners
+            return () => {
+                window.removeEventListener('focus', handleFocus);
+                window.removeEventListener('message', handleMessage);
+            };
         }
     }, [token]);
 
     const handleCreateReport = async (options) => {
-        const newReportInstanceIdBase = `report-${Date.now()}`;
-        let newReportData = {};
-        let templateToStore = null;
-        let reportType = 'Custom';
-        let reportName = 'New Custom Report';
-        let reportDescription = 'A new report created from scratch.';
-
+        // For custom reports
+        if (options && options.type === 'custom') {
+            window.open(`/report-designer`, '_blank', 'width=1200,height=800');
+            return;
+        }
+        
+        // For template-based reports
         if (options && options.type === 'template' && options.data) {
-            templateToStore = options.data;
-            reportType = 'Template-based';
-            reportName = `New from: ${templateToStore.name}`;
-            reportDescription = templateToStore.description;
-            
-            // Transform template content to report content format if necessary
-            const templateContent = templateToStore.content || { elements: [] };
-            
-            newReportData = {
-                name: reportName,
-                description: reportDescription,
-                type: reportType,
-                templateId: templateToStore.id,
-                content: templateContent
-            };
-        } else {
-            newReportData = {
-                name: reportName,
-                description: reportDescription,
-                type: reportType,
-                content: { elements: [] }
-            };
-        }
-
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await axios.post(getGatewayUrl('/api/report_builder/reports'), newReportData, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const createdReport = response.data;
-            setReports(prev => [...prev, createdReport]);
-
-            if (templateToStore) {
-                try {
-                    sessionStorage.setItem(templateToStore.id, JSON.stringify(templateToStore));
-                } catch (e) {
-                    console.error("Error saving template to session storage", e);
-                }
-                window.open(`/report-designer/${createdReport.id}?templateKey=${templateToStore.id}`, '_blank', 'width=1200,height=800');
-            } else {
-                window.open(`/report-designer/${createdReport.id}`, '_blank', 'width=1200,height=800');
+            // Store the template in session storage to be used by the designer
+            try {
+                sessionStorage.setItem('selectedTemplate', JSON.stringify(options.data));
+            } catch (e) {
+                console.error("Error saving template to session storage", e);
             }
-
-        } catch (err) {
-            console.error("Error creating report:", err);
-            setError('Failed to create report. Please try again.');
+            
+            // Open the designer with a query param indicating it's a template-based new report
+            window.open(`/report-designer?fromTemplate=true`, '_blank', 'width=1200,height=800');
+            return;
         }
-        setIsLoading(false);
     };
 
     const handleViewEdit = (report) => {
@@ -225,41 +215,11 @@ const ReportBuilderMain = () => {
     };
 
     const handleCreateTemplate = async () => {
-        setIsLoading(true);
-        setError(null);
+        // Use a temporary ID for the new template
+        const tempId = `temp-${Date.now()}`;
         
-        try {
-            // Create a basic template shell
-            const templateData = {
-                name: "New Template",
-                description: "",
-                category: "Custom",
-                content: {
-                    elements: []
-                }
-            };
-            
-            // Send the template to the backend
-            const response = await axios.post(
-                getGatewayUrl('/api/report_builder/templates'), 
-                templateData,
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-            
-            const newTemplate = response.data;
-            setTemplates(prev => [...prev, newTemplate]);
-            
-            // Open the template editor in the ReportDesignerPage
-            window.open(`/report-designer/${newTemplate.id}?isTemplate=true`, '_blank', 'width=1200,height=800');
-            
-        } catch (err) {
-            console.error("Error creating template:", err);
-            setError('Failed to create template. Please try again.');
-        }
-        
-        setIsLoading(false);
+        // Open the template editor without creating a backend entry
+        window.open(`/report-designer?isTemplate=true`, '_blank', 'width=1200,height=800');
     };
 
     // Add a function to fetch templates

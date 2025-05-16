@@ -15,6 +15,8 @@ import {
   Snackbar
 } from '@material-ui/core';
 import DeleteIcon from '@material-ui/icons/Delete';
+import VerifiedUserIcon from '@material-ui/icons/VerifiedUser';
+import ExtensionIcon from '@material-ui/icons/Extension';
 import { GradientText } from '../../styles/StyledComponents'; // Import GradientText
 import { AuthContext } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -44,6 +46,7 @@ const useStyles = makeStyles((theme) => ({
     overflowY: 'auto',
     overflowX: 'hidden', // Prevent horizontal scrolling
     marginBottom: theme.spacing(2),
+    padding: theme.spacing(1, 0.5),
     '&::-webkit-scrollbar': {
       width: '8px',
     },
@@ -64,18 +67,65 @@ const useStyles = makeStyles((theme) => ({
   },
   templateItem: {
     cursor: 'pointer',
+    border: `1px solid ${theme.palette.divider}`,
     borderRadius: theme.shape.borderRadius,
-    marginBottom: theme.spacing(0.5),
-    transition: 'all 0.2s ease-in-out',
-    whiteSpace: 'nowrap', // Prevent text wrapping
-    overflow: 'hidden', // Hide overflow
-    textOverflow: 'ellipsis', // Show ellipsis for overflow text
+    marginBottom: theme.spacing(1.5),
+    padding: theme.spacing(1, 1.5),
+    transition: 'all 0.3s ease',
+    position: 'relative',
+    overflow: 'visible',
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
-      transform: 'translateX(4px)',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      borderColor: theme.palette.primary.light,
     },
-    '&:last-child': {
-      marginBottom: 0,
+    '&:active': {
+      transform: 'translateY(0)',
+      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      bottom: -2,
+      left: 0,
+      width: 0,
+      height: 2,
+      backgroundColor: theme.palette.primary.main,
+      transition: 'width 0.3s ease',
+    },
+    '&:hover::after': {
+      width: '100%',
+    },
+  },
+  systemTemplate: {
+    borderLeft: `4px solid ${theme.palette.secondary.main}`,
+  },
+  customTemplate: {
+    borderLeft: `4px solid ${theme.palette.primary.main}`,
+  },
+  templateIcon: {
+    marginRight: theme.spacing(1),
+    color: theme.palette.text.secondary,
+  },
+  templateActions: {
+    position: 'absolute',
+    right: theme.spacing(1),
+    top: '50%',
+    transform: 'translateY(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  useTemplateButton: {
+    minWidth: 'auto',
+    marginRight: theme.spacing(1),
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    '&:hover': {
+      backgroundColor: theme.palette.primary.dark,
     },
   },
   button: {
@@ -111,6 +161,28 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     padding: theme.spacing(2),
     flexGrow: 1,
+  },
+  categoryBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: '3px 8px',
+    fontWeight: 600,
+    marginRight: theme.spacing(1),
+  },
+  systemBadge: {
+    backgroundColor: theme.palette.secondary.light,
+    color: theme.palette.secondary.dark,
+    border: `1px solid ${theme.palette.secondary.main}`,
+  },
+  customBadge: {
+    backgroundColor: theme.palette.primary.light,
+    color: theme.palette.primary.dark,
+    border: `1px solid ${theme.palette.primary.main}`,
+  },
+  categoryIcon: {
+    fontSize: 14,
+    marginRight: theme.spacing(0.5),
   },
 }));
 
@@ -249,36 +321,71 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
               key={template.id}
               data-template-id={template.id}
               button 
-              className={classes.templateItem} 
+              className={`${classes.templateItem} ${template.category === 'Custom' ? classes.customTemplate : classes.systemTemplate}`} 
               onClick={() => handleSelectTemplate(template)}
             >
-              <ListItemText 
-                primary={template.name} 
-                secondary={
-                  <>
+              <Box display="flex" flexDirection="column" width="100%">
+                <Box display="flex" alignItems="center" mb={0.5}>
+                  <Box
+                    component="span"
+                    width={24}
+                    height={24}
+                    mr={1}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    borderRadius="50%"
+                    bgcolor={template.category === 'Custom' ? 'primary.light' : 'secondary.light'}
+                    color="background.paper"
+                    fontSize="0.8rem"
+                    fontWeight="bold"
+                  >
+                    {template.name.charAt(0).toUpperCase()}
+                  </Box>
+                  <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                    {template.name}
+                  </Typography>
+                </Box>
+                
+                {template.description && (
+                  <Typography variant="body2" color="textSecondary" style={{ marginLeft: 32 }}>
                     {template.description}
-                    <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
-                      <span style={{ fontWeight: 500 }}>Category:</span> {template.category}
-                    </Typography>
-                  </>
-                }
-                primaryTypographyProps={{ style: { fontWeight: 500 } }}
-              />
+                  </Typography>
+                )}
+                
+                <Box display="flex" alignItems="center" mt={0.5} style={{ marginLeft: 32 }}>
+                  <Box 
+                    component="span"
+                    className={`${classes.categoryBadge} ${
+                      template.category === 'Custom' ? classes.customBadge : classes.systemBadge
+                    }`}
+                  >
+                    {template.category === 'Custom' ? (
+                      <>
+                        <ExtensionIcon className={classes.categoryIcon} />
+                        Custom Template
+                      </>
+                    ) : (
+                      <>
+                        <VerifiedUserIcon className={classes.categoryIcon} />
+                        System Template
+                      </>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+              
               {template.category === 'Custom' && (
-                <ListItemSecondaryAction>
+                <Box className={classes.templateActions}>
                   <IconButton 
                     edge="end" 
                     aria-label="delete" 
                     onClick={(e) => handleDeleteTemplate(e, template.id)}
                     size="small"
-                    style={{ 
-                      padding: 10,
-                      marginRight: 8 
-                    }}
                   >
-                    <DeleteIcon style={{ fontSize: 20 }} />
+                    <DeleteIcon style={{ fontSize: 18 }} />
                   </IconButton>
-                </ListItemSecondaryAction>
+                </Box>
               )}
             </ListItem>
           ))}
