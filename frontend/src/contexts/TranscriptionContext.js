@@ -18,6 +18,7 @@ export const ACTIONS = {
   REMOVE_MARKER: 'REMOVE_MARKER',
   ADD_CUSTOM_MARKER_TYPE: 'ADD_CUSTOM_MARKER_TYPE',
   RESET_STATE: 'RESET_STATE',
+  APPEND_TRANSCRIPTION_SEGMENTS: 'APPEND_TRANSCRIPTION_SEGMENTS',
   // New actions for session browsing
   SET_PREVIOUS_SESSIONS: 'SET_PREVIOUS_SESSIONS',
   SET_LOADED_SESSION_ID: 'SET_LOADED_SESSION_ID',
@@ -25,7 +26,11 @@ export const ACTIONS = {
   START_NEW_SESSION: 'START_NEW_SESSION', // Action to clear loaded session and reset relevant fields
   // Actions for tracking changes
   SET_IS_DIRTY: 'SET_IS_DIRTY',
-  MARK_SESSION_SAVED: 'MARK_SESSION_SAVED' // Resets dirty flag and updates initial data
+  MARK_SESSION_SAVED: 'MARK_SESSION_SAVED', // Resets dirty flag and updates initial data
+  DELETE_SESSION_SUCCESS: 'DELETE_SESSION_SUCCESS',
+  SET_WEBSOCKET_SENDER: 'SET_WEBSOCKET_SENDER',
+  SET_PLAYBACK_TIME: 'SET_PLAYBACK_TIME',
+  SET_IS_PLAYING: 'SET_IS_PLAYING', // Added for wavesurfer playback state
 };
 
 // Define recorder states
@@ -78,7 +83,10 @@ const initialState = {
   audioUrl: null, // URL for playback when a session is loaded
   // State for tracking unsaved changes in loaded sessions
   initialLoadedData: null, // Stores the state when LOAD_SESSION_DATA was dispatched
-  isDirty: false // Flag to indicate if changes have been made since load/save
+  isDirty: false, // Flag to indicate if changes have been made since load/save
+  sendWebSocketMessage: null,
+  playbackTime: 0, // For tracking playback progress
+  isPlaying: false, // Added for wavesurfer playback state
 };
 
 // Reducer function to handle state updates
@@ -91,7 +99,15 @@ const transcriptionReducer = (state, action) => {
     case ACTIONS.SET_RECORDING_TIME:
       return { ...state, recordingTime: action.payload };
     case ACTIONS.SET_TRANSCRIPTION_TEXT:
-      return { ...state, transcriptionText: action.payload };
+      let isNowDirty = state.isDirty;
+      if (state.loadedSessionId && state.initialLoadedData) {
+        isNowDirty = action.payload !== (state.initialLoadedData.transcriptionText || '');
+      }
+      return {
+        ...state,
+        transcriptionText: action.payload,
+        isDirty: state.loadedSessionId ? isNowDirty : false,
+      };
     case ACTIONS.SET_AUDIO_FILENAME:
       return { ...state, audioFilename: action.payload };
     case ACTIONS.SET_ERROR:
@@ -102,7 +118,6 @@ const transcriptionReducer = (state, action) => {
       return {
         ...state,
         classification: action.payload,
-        // Reset caveats only if classification changes to the default placeholder
         caveatType: action.payload === 'SELECT A SECURITY CLASSIFICATION' ? null : state.caveatType,
         customCaveat: action.payload === 'SELECT A SECURITY CLASSIFICATION' ? '' : state.customCaveat
       };
@@ -119,14 +134,16 @@ const transcriptionReducer = (state, action) => {
     case ACTIONS.SET_MARKERS:
       return { ...state, markers: action.payload };
     case ACTIONS.ADD_MARKER:
-      const newMarker = {
-          id: `marker-${Date.now()}`,
-          marker_type: action.payload.type,
-          timestamp: action.payload.timestamp,
-          description: `${action.payload.label} at ${formatTime(action.payload.timestamp)}`,
-          classification: action.payload.classification,
+      const newMarkers = [...state.markers, action.payload];
+      let markerAddDirty = state.isDirty;
+      if (state.loadedSessionId) {
+        markerAddDirty = true;
+      }
+      return {
+        ...state,
+        markers: newMarkers,
+        isDirty: markerAddDirty
       };
-      return { ...state, markers: [...state.markers, newMarker] };
     case ACTIONS.REMOVE_MARKER:
       return {
         ...state,
@@ -148,33 +165,69 @@ const transcriptionReducer = (state, action) => {
         ...state,
         availableMarkerTypes: [...state.availableMarkerTypes, newCustomMarkerType]
       };
+    case ACTIONS.APPEND_TRANSCRIPTION_SEGMENTS: 
+      console.log('[TranscriptionContext] Processing segments update:', action.payload);
+      
+      if (!action.payload || !Array.isArray(action.payload) || action.payload.length === 0) {
+        console.warn('[TranscriptionContext] Received empty or invalid segments array');
+        return state;
+      }
+      
+      const sortedSegments = [...action.payload].sort((a, b) => (a.start || 0) - (b.start || 0));
+      
+      let fullText = '';
+      sortedSegments.forEach(segment => {
+        if (segment.text) {
+          const speakerLabel = segment.speaker && segment.speaker !== 'UNKNOWN' 
+            ? `${segment.speaker}: ` 
+            : '';
+          
+          fullText += `${speakerLabel}${segment.text.trim()}\n`;
+        }
+      });
+      
+      console.log('[TranscriptionContext] Generated transcript text:', fullText);
+      
+      return { ...state, transcriptionText: fullText };
     case ACTIONS.RESET_STATE:
-      // Preserve custom marker types but reset everything else
       const preservedMarkerTypes = state.availableMarkerTypes;
       return {
           ...initialState,
           availableMarkerTypes: preservedMarkerTypes
       };
 
-    // --- New Reducers for Session Browsing ---
     case ACTIONS.SET_PREVIOUS_SESSIONS:
       return { ...state, previousSessions: action.payload };
 
     case ACTIONS.SET_LOADED_SESSION_ID:
-        // When just setting the ID, don't change other state yet.
-        // The caller should dispatch LOAD_SESSION_DATA after fetching.
-      return { ...state, loadedSessionId: action.payload };
+        return { ...state, loadedSessionId: action.payload };
 
     case ACTIONS.LOAD_SESSION_DATA:
-      // Payload should be the full session object fetched from the API
-      // (matching structure in Get Session Details plan)
       const loadedData = action.payload;
+      const processedMarkers = (loadedData.markers || []).map(backendMarker => ({
+        ...backendMarker,
+        id: backendMarker.marker_id || `marker-fallback-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+      }));
+      const initialTranscript = loadedData.full_transcript_text || '';
+      const initialClassification = loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION';
+      let initialCaveatType = null;
+      let initialCustomCaveat = '';
+
+      if (initialClassification && initialClassification !== 'SELECT A SECURITY CLASSIFICATION') {
+          const parts = initialClassification.split('//');
+          if (parts.length > 1 && parts[1].trim() !== '') {
+              initialCaveatType = 'custom';
+              initialCustomCaveat = parts[1].trim();
+          } else {
+              initialCaveatType = 'none';
+          }
+      }
       return {
         ...state,
         loadedSessionId: loadedData.session_id,
-        sessionId: loadedData.session_id, // Set the active sessionId as well
-        audioFilename: loadedData.session_name || '', // Use session_name or fallback
-        transcriptionText: loadedData.transcription_text || '',
+        sessionId: loadedData.session_id,
+        audioFilename: loadedData.session_name || '',
+        transcriptionText: initialTranscript,
         participants: loadedData.participants || [],
         eventMetadata: loadedData.event_metadata ? {
             wargame_name: loadedData.event_metadata.wargame_name || '',
@@ -182,61 +235,56 @@ const transcriptionReducer = (state, action) => {
             phase: loadedData.event_metadata.phase || '',
             location: loadedData.event_metadata.location || '',
             organization: loadedData.event_metadata.organization || '',
-            // Keep existing classification structure separate
         } : initialState.eventMetadata,
-        classification: loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION',
-        caveatType: loadedData.event_metadata?.caveat_type || null,
-        customCaveat: loadedData.event_metadata?.custom_caveat || '',
-        markers: loadedData.markers || [],
-        audioUrl: loadedData.audio_url || null, // Store audio URL for playback
-        recordingState: RECORDING_STATES.STOPPED, // Assume loaded session is stopped
-        recordingTime: 0, // Reset timer
+        classification: initialClassification.split('//')[0],
+        caveatType: initialCaveatType,
+        customCaveat: initialCustomCaveat,
+        markers: processedMarkers,
+        audioUrl: loadedData.audio_url || null,
+        recordingState: RECORDING_STATES.STOPPED,
+        recordingTime: 0,
         error: null,
-        // Store initial loaded data for comparison and reset dirty flag
         isDirty: false,
-        initialLoadedData: {
+        initialLoadedData: { 
             audioFilename: loadedData.session_name || '',
-            transcriptionText: loadedData.transcription_text || '',
+            transcriptionText: initialTranscript, 
             participants: loadedData.participants || [],
-            eventMetadata: loadedData.event_metadata ? { /* same structure as above */
+            eventMetadata: loadedData.event_metadata ? { 
                 wargame_name: loadedData.event_metadata.wargame_name || '',
                 scenario: loadedData.event_metadata.scenario || '',
                 phase: loadedData.event_metadata.phase || '',
                 location: loadedData.event_metadata.location || '',
                 organization: loadedData.event_metadata.organization || '',
             } : initialState.eventMetadata,
-            classification: loadedData.event_metadata?.classification || 'SELECT A SECURITY CLASSIFICATION',
-            caveatType: loadedData.event_metadata?.caveat_type || null,
-            customCaveat: loadedData.event_metadata?.custom_caveat || '',
-            // Markers are generally not editable directly in this flow
-        }
+            classification: initialClassification.split('//')[0],
+            caveatType: initialCaveatType,
+            customCaveat: initialCustomCaveat,
+            markers: processedMarkers, // Store initial markers for comparison
+        },
+        playbackTime: 0 // Reset playback time on new session load
       };
 
     case ACTIONS.START_NEW_SESSION:
-      // Reset relevant fields to initial state, keeping custom markers and previous session list
       const preservedMarkerTypesNew = state.availableMarkerTypes;
       const preservedPreviousSessions = state.previousSessions;
       return {
         ...initialState,
         availableMarkerTypes: preservedMarkerTypesNew,
         previousSessions: preservedPreviousSessions,
-        // Ensure loadedSessionId is cleared
         loadedSessionId: null,
-        // Clear initial data and dirty flag
         initialLoadedData: null,
-        isDirty: false
+        isDirty: false,
+        playbackTime: 0 // Reset playback time
       };
 
-    // Reducers for dirty state
     case ACTIONS.SET_IS_DIRTY:
-        // Only set dirty if a session is actually loaded
         if (state.loadedSessionId) {
             return { ...state, isDirty: action.payload };
         }
-        return state; // No change if no session loaded
+        return state;
         
     case ACTIONS.MARK_SESSION_SAVED:
-        // Reset dirty flag and update initialLoadedData to current state
+        const currentClassificationForSave = state.classification === 'SELECT A SECURITY CLASSIFICATION' ? '' : state.classification;
         return {
             ...state,
             isDirty: false,
@@ -245,11 +293,62 @@ const transcriptionReducer = (state, action) => {
                 transcriptionText: state.transcriptionText,
                 participants: state.participants,
                 eventMetadata: state.eventMetadata,
-                classification: state.classification,
+                classification: currentClassificationForSave,
                 caveatType: state.caveatType,
                 customCaveat: state.customCaveat,
+                markers: [...state.markers],
             }
         };
+
+    case ACTIONS.DELETE_SESSION_SUCCESS:
+      const newPreviousSessions = state.previousSessions.filter(
+        session => session.session_id !== action.payload
+      );
+      if (state.loadedSessionId === action.payload) {
+        const preservedMarkerTypesDel = state.availableMarkerTypes;
+        return {
+          ...initialState,
+          availableMarkerTypes: preservedMarkerTypesDel,
+          previousSessions: newPreviousSessions,
+          loadedSessionId: null,
+          initialLoadedData: null,
+          isDirty: false,
+          sessionId: null,
+          recordingState: RECORDING_STATES.INACTIVE,
+          recordingTime: 0,
+          transcriptionText: '',
+          audioFilename: '',
+          error: null,
+          participants: [],
+          classification: 'SELECT A SECURITY CLASSIFICATION',
+          caveatType: null,
+          customCaveat: '',
+          eventMetadata: {
+            wargame_name: '',
+            scenario: '',
+            phase: '',
+            location: '',
+            organization: ''
+          },
+          markers: [],
+          audioUrl: null,
+          sendWebSocketMessage: null,
+          playbackTime: 0 // Reset playbackTime
+        };
+      }
+      return {
+        ...state,
+        previousSessions: newPreviousSessions,
+      };
+    
+    case ACTIONS.SET_WEBSOCKET_SENDER: 
+      return { ...state, sendWebSocketMessage: action.payload };
+
+    case ACTIONS.SET_PLAYBACK_TIME:
+      return { ...state, playbackTime: action.payload };
+
+    case ACTIONS.SET_IS_PLAYING: // Added for wavesurfer playback state
+      return { ...state, isPlaying: action.payload };
 
     default:
       return state;

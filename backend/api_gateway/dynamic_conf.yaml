@@ -12,7 +12,6 @@ http:
           - "X-User-ID"
           - "X-Username"
           - "X-User-Permission"
-          - "Authorization"
           - "X-Refreshed-Token"
         authRequestHeaders:
           - "Authorization"
@@ -152,8 +151,19 @@ http:
         - "security-headers"
         - "rate-limit-upload"
 
-    # Transcription Service Router
-    transcription-router: 
+    # New router for Transcription WebSocket Stream (higher priority, no auth-middleware)
+    transcription-ws-router:
+      rule: "PathPrefix(`/api/ws/transcription/stream`)"
+      service: "transcription-service"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "cors-headers"
+        - "security-headers"
+      priority: 10 # Higher priority than the general transcription-router
+
+    # Transcription Service Router (General)
+    transcription-router:
       rule: "PathPrefix(`/api/transcription`) || Path(`/api/transcription/health`)"
       service: "transcription-service"
       entryPoints:

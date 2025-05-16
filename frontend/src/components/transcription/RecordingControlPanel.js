@@ -20,7 +20,6 @@ import {
   PauseCircleFilled as PauseCircleFilledIcon,
   Error as ErrorIcon
 } from '@material-ui/icons';
-import WaveSurfer from 'wavesurfer.js';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
 import { getApiUrl, getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -197,7 +196,18 @@ const MAX_RETRY_ATTEMPTS = 3;
 // WebSocket constants
 const WS_RECONNECT_DELAY_BASE = 2000; // ms
 
-const RecordingControlPanel = () => {
+const RecordingControlPanel = ({ 
+  waveformRef,
+  isAudioPlaying: isParentAudioPlaying,
+  currentPlaybackTime: parentCurrentPlaybackTime,
+  duration: parentDuration,
+  isWaveformReady: parentIsWaveformReady,
+  onPlayPause,
+  onStopPlayback,
+  onSliderChange,
+  onSliderChangeCommitted,
+  apiError: parentApiError
+}) => {
   const classes = useStyles();
   const theme = useTheme();
   const { state, dispatch } = useTranscription();
@@ -213,114 +223,30 @@ const RecordingControlPanel = () => {
     eventMetadata,
     classification: selectedClassification,
     caveatType,
-    customCaveat
+    customCaveat,
   } = state;
 
-  // Local state and refs managed by this component
   const intervalRef = useRef(null);
-  const waveformRef = useRef(null);
-  const wavesurferRef = useRef(null);
   const [audioStream, setAudioStream] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
   const [isInitializing, setIsInitializing] = useState(false);
-  
-  // Enhanced error states
   const [recorderError, setRecorderError] = useState(null);
-  const [apiError, setApiError] = useState(null);
-  const [networkStatus, setNetworkStatus] = useState('online');
-  const [retryCount, setRetryCount] = useState(0);
-  const [isStreaming, setIsStreaming] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('info');
-
-  // Add Playback State
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackTime, setPlaybackTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isWaveformReady, setIsWaveformReady] = useState(false);
-  const isSeekingRef = useRef(false);
+  const [networkStatus, setNetworkStatus] = useState('online');
+  const [retryCount, setRetryCount] = useState(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const wsRef = useRef(null);
+  const isStreamingStateRef = useRef(isStreaming);
 
   const isPlaybackMode = !!loadedSessionId;
-  
-  // WebSocket references
-  const wsRef = useRef(null);
 
-  // --- WaveSurfer Initialization and Event Handling ---
   useEffect(() => {
-    if (waveformRef.current) {
-      const wavesurfer = WaveSurfer.create({
-        container: waveformRef.current,
-        waveColor: theme.palette.primary.light,
-        progressColor: theme.palette.secondary.main,
-        cursorColor: theme.palette.warning.main,
-        barWidth: 2,
-        barRadius: 3,
-        cursorWidth: 1,
-        height: 80,
-        barGap: 2,
-        responsive: true,
-        normalize: true,
-        partialRender: true,
-        backend: 'WebAudio'
-      });
-      wavesurferRef.current = wavesurfer;
+    isStreamingStateRef.current = isStreaming;
+  }, [isStreaming]);
 
-      // Playback Event Listeners
-      wavesurfer.on('ready', () => {
-        console.log('WaveSurfer ready');
-        setDuration(wavesurfer.getDuration());
-        setPlaybackTime(0);
-        setIsPlaying(false);
-        setIsWaveformReady(true);
-      });
-      wavesurfer.on('audioprocess', (time) => {
-        if (!isSeekingRef.current) {
-            setPlaybackTime(time);
-        }
-      });
-      wavesurfer.on('finish', () => {
-        console.log('WaveSurfer finished playing');
-        setIsPlaying(false);
-        setPlaybackTime(duration);
-      });
-       wavesurfer.on('seek', (progress) => {
-         const newTime = progress * duration;
-         setPlaybackTime(newTime);
-         console.log('Seeked to:', newTime);
-       });
-
-      // Cleanup
-      return () => {
-        wavesurfer.unAll();
-        wavesurfer.destroy();
-        wavesurferRef.current = null;
-      };
-    }
-  }, [theme]);
-
-  // Effect to load audio or reset state
-  useEffect(() => {
-    if (wavesurferRef.current) {
-      if (isPlaybackMode && audioUrl) {
-        console.log("Loading audio for playback:", audioUrl);
-        setIsWaveformReady(false);
-        setDuration(0);
-        setPlaybackTime(0);
-        setIsPlaying(false);
-        wavesurferRef.current.load(audioUrl);
-      } else if (!isPlaybackMode) {
-        wavesurferRef.current.empty();
-        setIsWaveformReady(false);
-        setDuration(0);
-        setPlaybackTime(0);
-        setIsPlaying(false);
-      }
-    }
-  }, [isPlaybackMode, audioUrl]);
-
-  // --- Timer Logic ---
   useEffect(() => {
     if (recordingState === RECORDING_STATES.RECORDING) {
       intervalRef.current = setInterval(() => {
@@ -339,67 +265,47 @@ const RecordingControlPanel = () => {
     };
   }, [recordingState, recordingTime, dispatch]);
   
-  // --- WebSocket Connection Management ---
   const connectWebSocket = useCallback((streamingUrl) => {
     if (!streamingUrl || loadedSessionId) return null;
     
-    // Check for token before attempting connection
-    if (!token) {
-        setApiError("WebSocket connection failed: Authentication token not found.");
-        setNetworkStatus('offline');
-        setSnackbarMessage("Cannot connect: Auth token missing.");
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-        return null;
-    }
-
-    // Append token as query parameter
-    const wsUrlWithToken = `${streamingUrl}?token=${token}`;
+    const wsUrl = streamingUrl;
 
     try {
-      // Close existing WebSocket if any
       if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
         console.log('[WebSocket] Closing existing connection before reconnecting.');
         wsRef.current.close(1000, "Client initiated reconnect"); 
       }
       
-      console.log(`[WebSocket] Attempting to connect to: ${wsUrlWithToken}`);
-      setNetworkStatus('connecting'); // Update status
+      console.log(`[WebSocket] Attempting to connect to: ${wsUrl}`);
+      setNetworkStatus('connecting');
       setSnackbarMessage('Connecting to transcription service...');
       setSnackbarSeverity('info');
       setSnackbarOpen(true);
 
-      const ws = new WebSocket(wsUrlWithToken); 
-      wsRef.current = ws; // Assign early to allow cleanup
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
       
       ws.onopen = () => {
         console.log('[WebSocket] Connection established');
         setIsStreaming(true);
-        setApiError(null);
-        setNetworkStatus('online');
         setRetryCount(0);
         setSnackbarMessage('WebSocket connection established');
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
-        // Provide the sender function to the context
         dispatch({ 
             type: ACTIONS.SET_WEBSOCKET_SENDER, 
-            payload: (message) => { // Define the sender function
+            payload: (message) => {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                     try {
                         wsRef.current.send(JSON.stringify(message));
-                        return true; // Indicate success
+                        return true;
                     } catch (error) {
                         console.error('[WebSocket] Error sending message via context function:', error);
-                        setApiError('Failed to send WebSocket message.');
-                        // Optionally show snackbar
-                        return false; // Indicate failure
+                        return false;
                     }
                 } else {
                     console.warn('[WebSocket] Attempted to send message via context when WS not open.');
-                    setApiError('WebSocket not connected. Cannot send message.');
-                    // Optionally show snackbar
-                    return false; // Indicate failure
+                    return false;
                 }
             }
         });
@@ -408,28 +314,27 @@ const RecordingControlPanel = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('[WebSocket] Received message:', data); // Log received message
+          console.log('[WebSocket] Received message:', data);
           
           if (data.type === 'transcription_update') {
-            // Dispatch action to update transcription in context
-            // Assuming TranscriptionContext handles appending/updating segments
-            if (data.segments && Array.isArray(data.segments)) {
-               dispatch({ type: ACTIONS.APPEND_TRANSCRIPTION_SEGMENTS, payload: data.segments });
-            } else {
-                console.warn('[WebSocket] Received transcription_update without valid segments array:', data);
-            }
+            console.log('[WebSocket] Received transcription segments:', 
+              data.segments.length, 
+              'segments. First segment:', 
+              data.segments[0], 
+              'Last segment:', 
+              data.segments[data.segments.length - 1]
+            );
+            
+            dispatch({ type: ACTIONS.APPEND_TRANSCRIPTION_SEGMENTS, payload: data.segments });
+            console.log('[WebSocket] Dispatched APPEND_TRANSCRIPTION_SEGMENTS action');
           } else if (data.type === 'status_update') {
              console.log(`Status Update: ${data.status} - ${data.message}`);
-             // Potentially update UI based on backend status
              if (data.status === 'error') {
-                 setApiError(data.message || 'WebSocket processing error.');
                  setSnackbarMessage(data.message || 'Error during processing.');
                  setSnackbarSeverity('error');
                  setSnackbarOpen(true);
              }
           } 
-          // Add handling for other message types if needed
-
         } catch (error) {
           console.error('[WebSocket] Error parsing message or processing data:', error);
           console.error('[WebSocket] Raw message data:', event.data);
@@ -439,43 +344,36 @@ const RecordingControlPanel = () => {
       ws.onclose = (event) => {
         console.log(`[WebSocket] Connection closed: Code=${event.code}, Reason='${event.reason}', Clean=${event.wasClean}`);
         setIsStreaming(false);
-        wsRef.current = null; // Clear ref on close
+        wsRef.current = null;
         
-        // Clear the sender function from context on close
         dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
 
-        // Don't automatically reconnect if stopped cleanly by user or server
         const userStopped = recordingState === RECORDING_STATES.STOPPED || recordingState === RECORDING_STATES.INACTIVE;
         if (event.code === 1000 || event.code === 1001 || userStopped) { 
             setNetworkStatus('offline');
-            setApiError(null); // Clear previous errors if closed cleanly
+            setRetryCount(0);
             setSnackbarMessage('WebSocket disconnected cleanly.');
             setSnackbarSeverity('info');
             setSnackbarOpen(true);
-            return; // Don't reconnect
+            return;
         }
 
-        // Try to reconnect if closed unexpectedly during recording/paused
         if (!userStopped && retryCount < MAX_RETRY_ATTEMPTS) {
-          const delay = WS_RECONNECT_DELAY_BASE * Math.pow(2, retryCount); // Exponential backoff
+          const delay = WS_RECONNECT_DELAY_BASE * Math.pow(2, retryCount);
           setRetryCount(prev => prev + 1);
           setNetworkStatus('reconnecting');
-          setApiError(`WebSocket closed unexpectedly. Retrying (${retryCount + 1}/${MAX_RETRY_ATTEMPTS})...`);
           setSnackbarMessage(`WebSocket disconnected. Retrying connection in ${delay/1000}s...`);
           setSnackbarSeverity('warning');
           setSnackbarOpen(true);
           
           setTimeout(() => {
-            // Only reconnect if still in a recording/paused state
             if (state.recordingState === RECORDING_STATES.RECORDING || state.recordingState === RECORDING_STATES.PAUSED) {
                console.log(`[WebSocket] Attempting reconnect #${retryCount + 1}...`);
-               connectWebSocket(streamingUrl); // Retry connection
+               connectWebSocket(streamingUrl);
             }
           }, delay); 
         } else if (!userStopped) {
-          // Max retries reached
           setNetworkStatus('offline');
-          setApiError('Failed to maintain connection to server. Recording locally.');
           setSnackbarMessage('Failed to reconnect. Recording locally.');
           setSnackbarSeverity('error');
           setSnackbarOpen(true);
@@ -484,31 +382,26 @@ const RecordingControlPanel = () => {
       
       ws.onerror = (error) => {
         console.error('[WebSocket] Error:', error);
-        // onclose will likely be called after onerror, handle state updates there
-        setApiError('WebSocket connection error occurred.'); 
         setSnackbarMessage('WebSocket connection error.');
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
-        // No need to close here, onclose should handle it
       };
       
-      return ws; // Return the WebSocket instance
+      return ws;
 
     } catch (error) {
       console.error('[WebSocket] Connection setup error:', error);
-      setApiError(`WebSocket setup failed: ${error.message}`);
       setNetworkStatus('offline');
       setSnackbarMessage(`WebSocket connection failed: ${error.message}`);
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
-      if (wsRef.current) { // Ensure ref is cleared on setup error
+      if (wsRef.current) {
            wsRef.current = null;
       }
       return null;
     }
-  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState, token]);
+  }, [loadedSessionId, recordingState, retryCount, dispatch, state.recordingState]);
   
-  // Function to stream audio chunks to server
   const streamAudioChunk = useCallback((audioChunk) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !isStreaming) {
          console.warn('[WebSocket] Attempted to send chunk while not connected/streaming.');
@@ -516,18 +409,72 @@ const RecordingControlPanel = () => {
      }
     
     try {
-      // Send the binary audio data (Blob)
       wsRef.current.send(audioChunk);
     } catch (error) {
       console.error('[WebSocket] Error sending audio chunk:', error);
-      setApiError(`Failed to stream audio: ${error.message}`);
       setSnackbarMessage('Error streaming audio. Check connection.');
       setSnackbarSeverity('warning');
       setSnackbarOpen(true);
     }
   }, [isStreaming]);
 
-  // --- Recording Logic ---
+  const uploadAndTranscribeAudio = useCallback(async (audioBlob, inputFilename) => {
+    if (!audioBlob || audioBlob.size === 0) {
+      console.warn('[TranscriptionUtil] No audio data to upload.');
+      setSnackbarMessage('No audio data for utility transcription.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    if (!token) {
+      console.error('[TranscriptionUtil] Auth token not available for upload.');
+      setSnackbarMessage('Auth token missing. Cannot upload file.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const formData = new FormData();
+    const filename = inputFilename && inputFilename.includes('.') ? inputFilename : 'recording.webm';
+    formData.append('file', audioBlob, filename);
+
+    console.log(`[TranscriptionUtil] Uploading ${filename} (${(audioBlob.size / 1024).toFixed(2)} KB) for utility transcription...`);
+    setSnackbarMessage(`Uploading ${filename} for transcription...`);
+    setSnackbarSeverity('info');
+    setSnackbarOpen(true);
+
+    try {
+      const response = await fetch(getGatewayUrl('/api/transcription/transcribe-file'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[TranscriptionUtil] API Error (${response.status}):`, errorText);
+        throw new Error(`Server error ${response.status}: ${errorText || 'Failed to transcribe file'}`);
+      }
+
+      const result = await response.json();
+      console.log('[TranscriptionUtil] Transcription result:', result);
+      const lang = result.language || 'N/A';
+      const numSegments = result.segments ? result.segments.length : 0;
+      setSnackbarMessage(`File transcribed (${lang}, ${numSegments} segments). Check console for details.`);
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (error) {
+      console.error('[TranscriptionUtil] Error uploading or transcribing file:', error);
+      setSnackbarMessage(`Error during utility transcription: ${error.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  }, [token, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
+
   const initializeRecording = useCallback(async () => {
     if (loadedSessionId) {
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Cannot record while viewing a past session.' });
@@ -537,9 +484,7 @@ const RecordingControlPanel = () => {
     try {
       setIsInitializing(true);
       setRecorderError(null);
-      setApiError(null);
       
-      // Check for required fields
       const hasFilename = audioFilename && audioFilename.trim() !== '';
       const hasWargameName = eventMetadata?.wargame_name && eventMetadata.wargame_name.trim() !== '';
       const hasNamedParticipant = participants.length > 0 && participants.some(p => p.name && p.name.trim() !== '');
@@ -554,34 +499,39 @@ const RecordingControlPanel = () => {
         if (!hasSelectedClassification) errorMsg += 'Security Classification, ';
         else if (!hasSelectedCaveatType) errorMsg += 'Custom Caveat, ';
         
-        setRecorderError(errorMsg.slice(0, -2)); // Remove trailing comma and space
+        setRecorderError(errorMsg.slice(0, -2));
         setIsInitializing(false);
         return null;
       }
       
-      // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setAudioStream(stream);
       
-      // Create MediaRecorder
       const recorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm',
-        bitsPerSecond: 128000 // 128 kbps
+        bitsPerSecond: 128000
       });
       setMediaRecorder(recorder);
 
-      // Handle data available events
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          // Add to local chunks storage
-          setAudioChunks(chunks => [...chunks, e.data]);
-          
-          // Stream to server if connected
-          streamAudioChunk(e.data);
+          setAudioChunks(localChunks => [...localChunks, e.data]);
+          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !isStreamingStateRef.current) {
+            console.warn(
+              '[WebSocket] Attempted to send chunk while not connected/streaming (checked with refs).',
+              'WS ReadyState:', wsRef.current ? wsRef.current.readyState : 'No WS instance',
+              'isStreaming Ref:', isStreamingStateRef.current
+            );
+            return;
+          }
+          try {
+            wsRef.current.send(e.data);
+          } catch (error) {
+            console.error('[WebSocket] Error sending audio chunk:', error);
+          }
         }
       };
       
-      // Ensure we have participants, or create a default one
       let currentParticipants = participants;
       if (currentParticipants.length === 0) {
         currentParticipants = [{
@@ -593,7 +543,6 @@ const RecordingControlPanel = () => {
         dispatch({ type: ACTIONS.SET_PARTICIPANTS, payload: currentParticipants });
       }
       
-      // Create API payload
       const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
       const apiPayload = {
         user_id: user?.username || 'unknown-user',
@@ -609,7 +558,6 @@ const RecordingControlPanel = () => {
         participants: currentParticipants
       };
       
-      // Start API session
       try {
         console.log('[API] Would start session with payload:', apiPayload);
         
@@ -630,7 +578,6 @@ const RecordingControlPanel = () => {
         const sessionData = await response.json();
         dispatch({ type: ACTIONS.SET_SESSION_ID, payload: sessionData.session_id });
         
-        // Pass the actual streaming URL to connectWebSocket
         connectWebSocket(sessionData.streaming_url); 
         
         setIsInitializing(false);
@@ -641,9 +588,6 @@ const RecordingControlPanel = () => {
         return recorder;
       } catch (error) {
         console.error('[API] Error starting session:', error);
-        setApiError(`Failed to start session: ${error.message}`);
-        
-        // We can still record locally even if API fails
         setSnackbarMessage('Failed to connect to server. Recording will continue locally.');
         setSnackbarSeverity('warning');
         setSnackbarOpen(true);
@@ -661,7 +605,6 @@ const RecordingControlPanel = () => {
       
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to initialize recording: ' + error.message });
       
-      // Clean up any resources
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
         setAudioStream(null);
@@ -675,7 +618,8 @@ const RecordingControlPanel = () => {
     loadedSessionId, dispatch, token, user,
     audioFilename, eventMetadata, 
     selectedClassification, caveatType, customCaveat, 
-    participants, connectWebSocket, streamAudioChunk
+    participants, connectWebSocket,
+    audioStream 
   ]);
 
   const startRecording = useCallback(async () => {
@@ -683,16 +627,11 @@ const RecordingControlPanel = () => {
     
     const recorder = await initializeRecording();
     if (recorder) {
-      // Start recording with regular chunks
       recorder.start(AUDIO_CHUNK_DURATION);
       
-      // Update state
       dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.RECORDING });
       dispatch({ type: ACTIONS.SET_RECORDING_TIME, payload: 0 });
       setAudioChunks([]);
-      
-      // Start visualizing microphone input (this happens automatically with wavesurfer)
-      // In the actual implementation, we might need to do more here
       
       setSnackbarMessage('Recording started');
       setSnackbarSeverity('success');
@@ -706,13 +645,10 @@ const RecordingControlPanel = () => {
     if (loadedSessionId || !mediaRecorder || recordingState !== RECORDING_STATES.RECORDING) return;
     
     try {
-      // Pause the media recorder
       mediaRecorder.pause();
       
-      // Update state
       dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.PAUSED });
       
-      // API call to pause session
       if (sessionId && token) {
         const pauseUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}/pause`);
         console.log(`[API] Pausing session: ${pauseUrl}`);
@@ -728,14 +664,12 @@ const RecordingControlPanel = () => {
           throw new Error(`API Error (${response.status}): ${await response.text() || response.statusText}`);
         }
         
-        // Simulate success
         setSnackbarMessage('Recording paused');
         setSnackbarSeverity('info');
         setSnackbarOpen(true);
       }
     } catch (error) {
       console.error('Error pausing session:', error);
-      setApiError(`Failed to pause session: ${error.message}`);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to sync pause state with server.' });
     }
   }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token]);
@@ -744,13 +678,10 @@ const RecordingControlPanel = () => {
     if (loadedSessionId || !mediaRecorder || recordingState !== RECORDING_STATES.PAUSED) return;
     
     try {
-      // Resume the media recorder
       mediaRecorder.resume();
       
-      // Update state
       dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.RECORDING });
       
-      // API call to resume session
       if (sessionId && token) {
         const resumeUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}/resume`);
         console.log(`[API] Resuming session: ${resumeUrl}`);
@@ -766,124 +697,250 @@ const RecordingControlPanel = () => {
           throw new Error(`API Error (${response.status}): ${await response.text() || response.statusText}`);
         }
         
-        // Simulate success
         setSnackbarMessage('Recording resumed');
         setSnackbarSeverity('info');
         setSnackbarOpen(true);
       }
     } catch (error) {
       console.error('Error resuming session:', error);
-      setApiError(`Failed to resume session: ${error.message}`);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to sync resume state with server.' });
     }
-  }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token]);
+  }, [loadedSessionId, mediaRecorder, recordingState, dispatch, sessionId, token, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
+
+  const retranscribeFinalAudio = useCallback(async (sessionId, completeAudioBlob) => {
+    if (!sessionId || !token) {
+      console.error('[FinalTranscription] Missing session ID or token');
+      return;
+    }
+    
+    if (!completeAudioBlob || completeAudioBlob.size === 0) {
+      console.error('[FinalTranscription] Missing or empty audio blob');
+      return;
+    }
+
+    try {
+      console.log(`[FinalTranscription] Starting final transcription of audio blob: ${(completeAudioBlob.size / 1024).toFixed(2)} KB`);
+      
+      setSnackbarMessage('Performing final transcription for improved accuracy...');
+      setSnackbarSeverity('info');
+      setSnackbarOpen(true);
+      
+      const formData = new FormData();
+      formData.append('file', completeAudioBlob, `session_${sessionId}.webm`);
+      
+      console.log('[FinalTranscription] Sending audio blob to transcribe-file endpoint...');
+      const transcribeResponse = await fetch(getGatewayUrl('/api/transcription/transcribe-file'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!transcribeResponse.ok) {
+        const errorText = await transcribeResponse.text();
+        throw new Error(`Failed to transcribe audio: ${transcribeResponse.status} - ${errorText}`);
+      }
+      
+      console.log('[FinalTranscription] Received response from transcribe-file endpoint');
+      const transcribeResult = await transcribeResponse.json();
+      console.log('[FinalTranscription] Response parsed:', transcribeResult);
+      
+      if (!transcribeResult.segments || !Array.isArray(transcribeResult.segments) || transcribeResult.segments.length === 0) {
+        console.warn('[FinalTranscription] No segments found in transcription result:', transcribeResult);
+        setSnackbarMessage('Final transcription produced no text segments');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      console.log(`[FinalTranscription] Received ${transcribeResult.segments.length} segments`);
+      console.log('[FinalTranscription] First segment:', transcribeResult.segments[0]);
+      console.log('[FinalTranscription] Last segment:', transcribeResult.segments[transcribeResult.segments.length - 1]);
+      
+      const sortedSegments = [...transcribeResult.segments].sort((a, b) => (a.start || 0) - (b.start || 0));
+      
+      let fullText = '';
+      sortedSegments.forEach(segment => {
+        if (segment.text) {
+          const speakerLabel = segment.speaker && segment.speaker !== 'UNKNOWN' 
+            ? `${segment.speaker}: ` 
+            : '';
+          
+          fullText += `${speakerLabel}${segment.text.trim()}\n`;
+        }
+      });
+      
+      if (!fullText) {
+        console.warn('[FinalTranscription] Generated transcript text is empty');
+        setSnackbarMessage('Final transcription produced no text');
+        setSnackbarSeverity('warning');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      console.log(`[FinalTranscription] Generated transcript text (${fullText.length} chars):`);
+      console.log(fullText.substring(0, 200) + (fullText.length > 200 ? '...' : ''));
+      
+      dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: fullText });
+      
+      console.log('[FinalTranscription] Updating database with new transcript text');
+      const updateResponse = await fetch(getGatewayUrl(`/api/transcription/sessions/${sessionId}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          full_transcript_text: fullText
+        })
+      });
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Failed to update transcript in database: ${updateResponse.status} - ${errorText}`);
+      }
+      
+      const updateResult = await updateResponse.json();
+      console.log('[FinalTranscription] Database update successful:', updateResult);
+      
+      setSnackbarMessage('Final transcript updated with enhanced accuracy');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('[FinalTranscription] Error:', error);
+      setSnackbarMessage(`Final transcript update had an issue: ${error.message}`);
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+    }
+  }, [token, dispatch, setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen]);
 
   const stopRecording = useCallback(async () => {
     if (loadedSessionId || !mediaRecorder || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) return;
     
-    const sessionToStop = sessionId; // Capture session ID before potential state changes
+    const sessionToStop = sessionId;
+    const currentAudioFilename = audioFilename || 'Untitled_Recording';
+
+    let successfullyStoppedOnBackend = false; 
+    let recordedAudioBlob = null;
 
     try {
-      // Stop the media recorder
       mediaRecorder.stop();
       dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.STOPPED });
       
-      // Stop all audio tracks
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
         setAudioStream(null);
       }
       
-      // Close WebSocket connection cleanly
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log('[WebSocket] Closing connection on stop...');
-        wsRef.current.close(1000, "Recording stopped by user"); // Close with normal code
-        wsRef.current = null; // Clear ref immediately
+        wsRef.current.close(1000, "Recording stopped by user");
       }
-      
-      const baseFilename = audioFilename || 'Untitled_Recording';
-      const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
-      
-      // API call to stop and finalize session
-      if (sessionId && token) {
-        // Prepare API payload
-        const stopPayload = {
-          audio_filename: baseFilename,
-          transcription_filename: baseFilename,
-        };
-        
-        const stopUrl = getGatewayUrl(`/api/transcription/sessions/${sessionId}/stop`);
-        console.log(`[API] Stopping session: ${stopUrl}`);
-        console.log(`[API] With payload:`, stopPayload);
-        
-        const response = await fetch(stopUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(stopPayload)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API Error (${response.status}): ${await response.text() || response.statusText}`);
+      setIsStreaming(false); 
+      isStreamingStateRef.current = false;
+
+      if (sessionToStop && token) {
+        console.log(`[API] Attempting to stop session ${sessionToStop} on backend.`);
+        setSnackbarMessage('Finalizing session on server...');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+
+        try {
+          const stopSessionUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/stop`);
+          const requestBody = {
+            audio_filename: currentAudioFilename,
+            transcription_filename: currentAudioFilename,
+          };
+          
+          const response = await fetch(stopSessionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[API] Error stopping session ${sessionToStop}:`, response.status, errorText);
+            setSnackbarMessage(`Server error finalizing session: ${errorText || response.statusText}`);
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+          } else {
+            const result = await response.json();
+            console.log(`[API] Session ${sessionToStop} stopped successfully on backend:`, result);
+            setSnackbarMessage('Session finalized and saved on server.');
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
+            successfullyStoppedOnBackend = true;
+            
+            dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
+          }
+        } catch (apiStopError) {
+          console.error(`[API] Network or other error stopping session ${sessionToStop}:`, apiStopError);
+          setSnackbarMessage(`Network error finalizing session: ${apiStopError.message}`);
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
         }
-        
-        const result = await response.json();
-        console.log('Stop session result:', result);
-        
-        setSnackbarMessage('Recording stopped and saved');
-        setSnackbarSeverity('success');
+      } else {
+        console.warn('[API] No session ID or token available to stop session on backend.');
+        setSnackbarMessage('No active server session to stop. Local recording only.');
+        setSnackbarSeverity('warning');
         setSnackbarOpen(true);
       }
       
-      // Save the complete Blob (no longer need chunks array here)
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
+          recordedAudioBlob = completeAudioBlob;
+          
           const downloadUrl = URL.createObjectURL(completeAudioBlob);
-          
-          // Display in waveform for visualization
-          if (wavesurferRef.current) {
-            wavesurferRef.current.loadBlob(completeAudioBlob);
+          if (waveformRef) {
+            waveformRef.current.loadBlob(completeAudioBlob);
           }
-          
-          // Create download link
           const a = document.createElement('a');
           a.href = downloadUrl;
-          a.download = `${baseFilename}.webm`;
+          a.download = `${currentAudioFilename}.webm`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
+          console.log('Audio also saved locally (backup).');
           
-          console.log('Audio saved locally');
+          if (successfullyStoppedOnBackend && recordedAudioBlob && sessionToStop) {
+            setTimeout(() => {
+              retranscribeFinalAudio(sessionToStop, recordedAudioBlob);
+            }, 1000);
+          }
         } catch (saveError) {
-          console.error('Error saving audio locally:', saveError);
+          console.error('Error processing local audio blob:', saveError);
         }
       } else {
         console.warn("No audio data was recorded to save locally.");
       }
-    } catch (error) {
-      console.error('Error stopping session:', error);
-      setApiError(`Failed to stop recording: ${error.message}`);
+
+    } catch (error) { 
+      console.error('Error stopping recording process:', error);
+      setSnackbarMessage(`Failed to stop recording: ${error.message}`);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to stop recording: ' + error.message });
     } finally {
-      // Clean up resources
       setAudioChunks([]);
       setMediaRecorder(null);
-      setIsStreaming(false);
-      // Clear the sender function from context on stop
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
     }
   }, [
-    loadedSessionId, mediaRecorder, recordingState, token,
+    loadedSessionId, mediaRecorder, recordingState, token, user,
     audioStream, dispatch, sessionId, 
-    audioFilename, selectedClassification, caveatType, customCaveat, 
-    audioChunks
+    audioFilename, 
+    audioChunks,
+    uploadAndTranscribeAudio, 
+    setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen,
+    retranscribeFinalAudio
   ]);
 
-  // --- Validation Logic ---
   const checkCanStartRecording = () => {
     if (loadedSessionId) return false;
     const hasFilename = audioFilename && audioFilename.trim() !== '';
@@ -913,43 +970,8 @@ const RecordingControlPanel = () => {
     if (missing.length > 0) startButtonTooltip = `Please provide: ${missing.join(', ')}`;
   }
 
-  // --- Playback Handlers ---
-  const handlePlayPause = () => {
-    if (wavesurferRef.current && isWaveformReady) {
-      wavesurferRef.current.playPause();
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleStopPlayback = () => {
-    if (wavesurferRef.current && isWaveformReady) {
-      wavesurferRef.current.stop();
-      setIsPlaying(false);
-      setPlaybackTime(0);
-    }
-  };
-
-  // Use useCallback for performance
-  const handleSliderChange = useCallback((event, newValue) => {
-      if (wavesurferRef.current && isWaveformReady && duration > 0) {
-          const newTime = newValue;
-          setPlaybackTime(newTime);
-      }
-  }, [isWaveformReady, duration]);
-
-  const handleSliderChangeCommitted = useCallback((event, newValue) => {
-       if (wavesurferRef.current && isWaveformReady && duration > 0) {
-           isSeekingRef.current = true;
-           const seekPosition = newValue / duration;
-           wavesurferRef.current.seekTo(seekPosition);
-           setTimeout(() => { isSeekingRef.current = false; }, 100);
-       }
-   }, [isWaveformReady, duration]);
-   
-  // Close WebSocket on unmount
   useEffect(() => {
     return () => {
-      // Clear the sender function from context on unmount
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
       if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
         console.log('[WebSocket] Closing connection on component unmount.');
@@ -959,11 +981,9 @@ const RecordingControlPanel = () => {
     };
   }, [dispatch]);
   
-  // Handle global network status changes
   useEffect(() => {
     const handleOnline = () => {
       setNetworkStatus('online');
-      // Attempt to reconnect if recording
       if (recordingState === RECORDING_STATES.RECORDING && sessionId) {
         connectWebSocket(sessionId);
       }
@@ -971,7 +991,7 @@ const RecordingControlPanel = () => {
     
     const handleOffline = () => {
       setNetworkStatus('offline');
-      setApiError('Network connection lost. Recording will continue locally.');
+      setSnackbarMessage('Network connection lost. Recording will continue locally.');
     };
     
     window.addEventListener('online', handleOnline);
@@ -987,34 +1007,20 @@ const RecordingControlPanel = () => {
     <Box>
       <Typography variant="h6" gutterBottom>Controls</Typography>
       
-      {/* Error Messages */}
-      {(recorderError || apiError) && (
+      {(recorderError || parentApiError) && (
         <Box className={classes.errorWrapper}>
           <ErrorIcon className={classes.errorIcon} />
           <Typography className={classes.errorText}>
-            {recorderError || apiError}
+            {recorderError || parentApiError}
           </Typography>
         </Box>
       )}
       
-      {/* Audio Visualizer */}
       <Box className={classes.audioVisualizer}>
-        {/* Status indicator */}
-        {isStreaming && (
-          <Typography className={classes.statusChip}>
-            Streaming
-          </Typography>
-        )}
-        
-        {/* Loading overlay */}
-        {isInitializing && (
-          <Box className={classes.loadingOverlay}>
-            <CircularProgress />
-          </Box>
-        )}
+        {isStreaming && ( <Typography className={classes.statusChip}>Streaming</Typography> )}
+        {isInitializing && ( <Box className={classes.loadingOverlay}><CircularProgress /></Box> )}
         
         <Box className={classes.waveform} ref={waveformRef}>
-          {/* Placeholder text shown initially */}
           {(!isPlaybackMode && recordingState === RECORDING_STATES.INACTIVE) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
               <Typography variant="body2" color="textSecondary">Awaiting audio input...</Typography>
@@ -1025,7 +1031,7 @@ const RecordingControlPanel = () => {
               <Typography variant="body2" color="textSecondary">No audio file found for this session.</Typography>
              </Box>
           )}
-          {(isPlaybackMode && audioUrl && !isWaveformReady) && (
+          {(isPlaybackMode && audioUrl && !parentIsWaveformReady) && (
                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                 <Typography variant="body2" color="textSecondary">Loading audio...</Typography>
                </Box>
@@ -1033,17 +1039,16 @@ const RecordingControlPanel = () => {
         </Box>
       </Box>
 
-      {/* Playback Slider (Only in Playback Mode) */} 
       {isPlaybackMode && (
           <Box className={classes.sliderContainer}>
               <Slider
                   aria-label="Audio Progress"
-                  value={playbackTime}
+                  value={parentCurrentPlaybackTime} 
                   min={0}
-                  max={duration}
-                  onChange={handleSliderChange}
-                  onChangeCommitted={handleSliderChangeCommitted}
-                  disabled={!isWaveformReady || duration === 0}
+                  max={parentDuration}
+                  onChange={onSliderChange}
+                  onChangeCommitted={onSliderChangeCommitted}
+                  disabled={!parentIsWaveformReady || parentDuration === 0}
                   valueLabelDisplay="auto"
                   valueLabelFormat={(value) => formatTime(value)}
                   step={0.1}
@@ -1051,11 +1056,9 @@ const RecordingControlPanel = () => {
           </Box>
       )}
 
-      {/* Recording/Playback Controls */}
       <Box className={classes.recordingControls}>
         {!isPlaybackMode ? (
           <>
-            {/* Recording Buttons */}
             {recordingState === RECORDING_STATES.INACTIVE && (
               <Tooltip title={isStartDisabled ? startButtonTooltip : 'Start Recording'} arrow>
                 <span>
@@ -1085,30 +1088,27 @@ const RecordingControlPanel = () => {
             )}
           </>
         ) : (
-          /* Playback Controls */
           <>
-            <Tooltip title={isPlaying ? "Pause" : "Play"} arrow>
+            <Tooltip title={isParentAudioPlaying ? "Pause" : "Play"} arrow>
               <span>
                 <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={isPlaying ? <PauseCircleFilledIcon /> : <PlayCircleFilledIcon />}
-                  onClick={handlePlayPause}
-                  disabled={!isWaveformReady || !audioUrl}
+                  variant="contained" color="primary"
+                  startIcon={isParentAudioPlaying ? <PauseCircleFilledIcon /> : <PlayCircleFilledIcon />}
+                  onClick={onPlayPause}
+                  disabled={!parentIsWaveformReady || !audioUrl}
                   size="large"
                 >
-                  {isPlaying ? 'Pause' : 'Play'}
+                  {isParentAudioPlaying ? 'Pause' : 'Play'}
                 </Button>
               </span>
             </Tooltip>
             <Tooltip title="Stop Playback" arrow>
               <span>
                 <Button
-                  variant="contained"
-                  className={classes.stopButton}
+                  variant="contained" className={classes.stopButton}
                   startIcon={<StopIcon />}
-                  onClick={handleStopPlayback}
-                  disabled={!isWaveformReady || !audioUrl}
+                  onClick={onStopPlayback}
+                  disabled={!parentIsWaveformReady || !audioUrl}
                   size="large"
                 >
                   Stop
@@ -1119,18 +1119,15 @@ const RecordingControlPanel = () => {
         )}
       </Box>
 
-      {/* Recording Info / Status */}
       <Box className={classes.recordingInfo}>
-        {/* Status Text/Indicator */} 
         <Typography variant="body2" color="textSecondary" sx={{ flexGrow: 1 }}>
           {isPlaybackMode ? 
-            (isWaveformReady ? (isPlaying ? 'Playing...' : 'Ready to Play') : 'Loading...') :
+            (parentIsWaveformReady ? (isParentAudioPlaying ? 'Playing...' : 'Ready to Play') : 'Loading...') :
             (recordingState === RECORDING_STATES.RECORDING ? 'Recording...' :
             recordingState === RECORDING_STATES.PAUSED ? 'Paused' :
             recordingState === RECORDING_STATES.STOPPED ? 'Stopped' : 'Ready to Record')}
         </Typography>
 
-        {/* Timer/Time Display */} 
         {!isPlaybackMode ? (
              <> 
                  {recordingState === RECORDING_STATES.RECORDING && <Box className={classes.recordingIndicator} />}
@@ -1142,12 +1139,11 @@ const RecordingControlPanel = () => {
              </>
          ) : (
             <Typography className={classes.playbackTimeContainer}>
-                {isWaveformReady ? `${formatTime(playbackTime)} / ${formatTime(duration)}` : '--:-- / --:--'}
+                {parentIsWaveformReady ? `${formatTime(parentCurrentPlaybackTime)} / ${formatTime(parentDuration)}` : '--:-- / --:--'}
             </Typography>
          )}
       </Box>
       
-      {/* Snackbar for notifications */}
       <Snackbar 
         open={snackbarOpen} 
         autoHideDuration={4000} 

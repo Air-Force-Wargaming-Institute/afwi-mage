@@ -13,6 +13,7 @@ import traceback # For detailed error logging
 import pathlib # For path manipulation
 import subprocess # For running ffmpeg
 import shutil # For cleaning up chunk directory
+import asyncio # Added for asyncio.sleep
 
 # Import config constants directly using relative path
 from config import DEVICE, BATCH_SIZE, ARTIFACT_STORAGE_BASE_PATH # Import new config
@@ -23,7 +24,9 @@ from schemas import (
      StopSessionRequest, StopSessionResponse, 
      ParticipantSchema, EventMetadataSchema, # Import needed schemas for responses/updates
      AddMarkerRequest, AddMarkerResponse, # Import marker schemas
-     GetTranscriptionResponse # Import new response model
+     GetTranscriptionResponse, # Import new response model
+     UpdateSessionRequest, # Ensure this is the one from schemas.py
+     UpdateSessionResponse as SchemaUpdateSessionResponse # Alias the one from schemas.py if needed
 )
 # Import the centralized model loader and getter using relative path
 from model_loader import get_models, are_models_loaded
@@ -104,7 +107,7 @@ async def start_session(
     #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve session after creation.")
     
     ws_scheme = "ws" if request.url.scheme == "http" else "wss"
-    ws_url = f"{ws_scheme}://{request.url.netloc}/api/transcription/stream/{session_id}"
+    ws_url = f"{ws_scheme}://{request.url.netloc}/api/ws/transcription/stream/{session_id}"
 
     return StartSessionResponse(
         session_id=session_id,
@@ -117,12 +120,14 @@ async def start_session(
             summary="Stop and finalize a recording session")
 async def stop_session(
     session_id: UUID, # Use UUID for path validation
-    stop_request: StopSessionRequest = Body(...),
+    stop_request: StopSessionRequest = Body(...), # Keep for future output format options
     db: AsyncSession = Depends(get_db_session) # Inject DB session
 ):
     """
-    Stops the recording session, applies speaker tags, generates final transcript,
-    saves artifacts (placeholder), and updates status in DB.
+    Signals the WebSocket to stop the recording session, finalize processing,
+    save artifacts, and updates status in DB.
+    The actual audio saving and final segment processing is now primarily handled
+    by the WebSocket handler upon detecting the 'stopped' status.
     """
     logger.info(f"Received stop request for session: {session_id}")
     session = await session_manager.get_session(db, str(session_id))
@@ -130,180 +135,126 @@ async def stop_session(
         logger.error(f"Stop request failed: Session {session_id} not found.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
 
-    if session.status == "stopped" or session.status == "cancelled":
-        logger.warning(f"Attempted to stop an already stopped/cancelled session: {session_id}")
+    # Check if session is already in a terminal state
+    if session.status in ["stopped", "completed", "cancelled", "error_processing", "error", "interrupted"]:
+        logger.warning(f"Attempted to stop session {session_id} which is already in a terminal status: '{session.status}'.")
         return StopSessionResponse(
              session_id=str(session_id),
-             status=session.status,
-             completion_timestamp=session.completion_time or session.last_update
+             status=session.status, # Return existing terminal status
+             completion_timestamp=session.completion_time or session.last_update # Use existing times
         )
 
-    # --- Final Processing --- 
-    logger.info(f"Starting final processing for session {session_id}...")
-    refined_segments = []
+    # Signal the WebSocket handler by setting the session status to "stopped"
+    # The WebSocket handler will detect this change, perform final processing 
+    # (including saving main_audio_accumulator and final transcription_segments),
+    # and then close the WebSocket connection.
+    logger.info(f"Setting session {session_id} status to 'stopped' to signal WebSocket handler.")
+    await session_manager.update_session_status(db, str(session_id), "stopped")
+
+    # Brief pause to allow WebSocket handler to process and save the audio/transcript.
+    # In a production system, a more robust mechanism (e.g., polling DB for audio_storage_path 
+    # or a direct signal) might be preferred over a fixed delay.
+    await asyncio.sleep(3) # Adjust delay as needed, or implement polling
+
+    # Re-fetch the session to get updated info (like audio_storage_path and final segments)
+    # that should have been populated by the WebSocket handler.
+    await db.refresh(session) 
+    logger.info(f"Refreshed session {session_id} data after signaling stop. Current status: {session.status}")
+
+    # The WebSocket handler should have updated session.transcription_segments and session.audio_storage_path.
+    # This route now finalizes any remaining metadata or text formatting if necessary.
+
+    final_audio_path_str = session.audio_storage_path
+    refined_segments = session.transcription_segments or []
     full_transcript_text = ""
     session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
-    chunk_dir_path = session_storage_path / "_chunks"
-    audio_path = None # Final audio path
-    transcript_path = None # Final transcript path
+    transcript_txt_path_str = None
     
     try:
-        # 0. Ensure Session Directory Exists (moved earlier in case chunks need reading)
-        try:
-             session_storage_path.mkdir(parents=True, exist_ok=True)
-             logger.info(f"Ensured session directory exists: {session_storage_path}")
-        except OSError as e:
-             logger.error(f"Failed to create session directory {session_storage_path}: {e}")
-             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create storage directory.")
+        # Ensure session storage directory exists (might be created by WS handler too)
+        session_storage_path.mkdir(parents=True, exist_ok=True)
 
-        # 1. Retrieve stored segments, markers, and chunk paths
-        segments = session.transcription_segments or []
-        markers = session.markers or []
-        audio_chunk_paths = session.audio_chunk_paths or [] # Get chunk paths
-        logger.info(f"Retrieved {len(segments)} segments, {len(markers)} markers, and {len(audio_chunk_paths)} audio chunk paths for session {session_id}.")
+        # FFmpeg concatenation logic is REMOVED. 
+        # final_audio_path_str is now sourced from session.audio_storage_path set by WS handler.
+        if not final_audio_path_str:
+            logger.warning(f"[{session_id}] audio_storage_path not set by WebSocket handler after stop signal.")
+            # This might indicate an issue or a race condition if sleep is too short.
 
-        # 2. Concatenate Audio Chunks using ffmpeg
-        if audio_chunk_paths:
-             # Define final audio path
-             audio_filename = f"{stop_request.audio_filename or session_id}.webm"
-             final_audio_path = session_storage_path / audio_filename
-             
-             # Create temporary list file for ffmpeg concat demuxer
-             list_file_path = chunk_dir_path / "concat_list.txt"
-             try:
-                 # Ensure chunk dir exists just in case
-                 chunk_dir_path.mkdir(exist_ok=True) 
-                 with open(list_file_path, 'w') as f:
-                     for chunk_path in audio_chunk_paths:
-                         # Need to escape special characters if any? Use absolute paths. Ensure format is correct.
-                         f.write(f"file '{chunk_path}'\n") 
-                 logger.info(f"Created ffmpeg concat list file: {list_file_path}")
-
-                 # Construct and run ffmpeg command
-                 ffmpeg_cmd = [
-                     "ffmpeg",
-                     "-f", "concat",
-                     "-safe", "0", # Allow unsafe file paths (absolute paths used here)
-                     "-i", str(list_file_path),
-                     "-c", "copy", # Fast concatenation without re-encoding
-                     str(final_audio_path)
-                 ]
-                 logger.info(f"Running ffmpeg command: {' '.join(ffmpeg_cmd)}")
-                 result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=False)
-
-                 if result.returncode == 0:
-                     logger.info(f"Successfully concatenated audio chunks to: {final_audio_path}")
-                     audio_path = final_audio_path # Set the final path for DB update
-                     
-                     # Clean up chunk files and list file
-                     try:
-                         os.remove(list_file_path)
-                         shutil.rmtree(chunk_dir_path) # Remove _chunks directory
-                         logger.info(f"Cleaned up audio chunks and list file for session {session_id}.")
-                     except Exception as cleanup_e:
-                         logger.error(f"Error during chunk cleanup for session {session_id}: {cleanup_e}")
-                 else:
-                     logger.error(f"ffmpeg concatenation failed for session {session_id}. Return code: {result.returncode}")
-                     logger.error(f"ffmpeg stderr: {result.stderr}")
-                     # Keep audio_path as None
-                     # Optionally, attempt to remove the (potentially incomplete) final file
-                     if final_audio_path.exists(): os.remove(final_audio_path) 
-
-             except Exception as concat_e:
-                 logger.error(f"Error during audio concatenation process for session {session_id}: {concat_e}", exc_info=True)
-                 # Keep audio_path as None
-                 if list_file_path.exists(): os.remove(list_file_path)
-                 if final_audio_path.exists(): os.remove(final_audio_path)
-
-        else:
-             logger.warning(f"No audio chunk paths found for session {session_id}. Cannot create final audio file.")
-
-        # 3. Extract Speaker Tag Events
-        speaker_tags = sorted(
-            [m for m in markers if m.get('marker_type') == 'speaker_tag_event'],
-            key=lambda x: x.get('timestamp', 0)
-        )
-        logger.info(f"Found {len(speaker_tags)} speaker tag events.")
-
-        # 4. Apply Speaker Tags to Segments
-        refined_segments = segments.copy()
-        tag_idx = 0
-        for i, segment in enumerate(refined_segments):
-            segment_start = segment.get('start')
-            segment_end = segment.get('end')
-            
-            while tag_idx < len(speaker_tags):
-                tag = speaker_tags[tag_idx]
-                tag_time = tag.get('timestamp')
-                tag_speaker = tag.get('speaker_id')
-                
-                if tag_time is None or tag_speaker is None:
-                     tag_idx += 1; continue
-                if segment_start is not None and tag_time < segment_start:
-                     tag_idx += 1; continue
-                if (segment_start is None or tag_time >= segment_start) and \
-                   (segment_end is None or tag_time <= segment_end):
-                    original_speaker = segment.get('speaker')
-                    if original_speaker != tag_speaker:
-                        refined_segments[i]['speaker'] = tag_speaker
-                    tag_idx += 1
-                elif segment_end is not None and tag_time > segment_end:
-                    break
-                else:
-                     tag_idx += 1
-
-        # 5. Generate Final Transcript Text
-        lines = []
-        for segment in refined_segments:
-            speaker = segment.get('speaker', 'UNKNOWN')
-            text = segment.get('text', '').strip()
-            if text:
-                lines.append(f"{speaker}: {text}")
-        full_transcript_text = "\n".join(lines)
-        logger.info(f"Generated final transcript text ({len(full_transcript_text)} chars) for session {session_id}.")
-
-        # 6. Save Final Transcript File(s)
-        transcript_filename_base = stop_request.transcription_filename or session_id
-        transcript_txt_filename = f"{transcript_filename_base}.txt"
-        transcript_path = session_storage_path / transcript_txt_filename
+        # Speaker tag application (if needed and if markers are separate from segments)
+        # Your existing logic for speaker tag application to `refined_segments` would go here
+        # if it wasn't already part of the WebSocket's segment finalization.
+        # For now, assuming WebSocket provides the final `refined_segments`.
         
-        # Save the .txt file
-        try:
-             with open(transcript_path, 'w', encoding='utf-8') as f:
-                 f.write(full_transcript_text)
-             logger.info(f"Saved transcript text file to: {transcript_path}")
-        except IOError as e:
-             logger.error(f"Failed to save transcript text file to {transcript_path}: {e}")
-             transcript_path = None
-        logger.warning(f"Generation/saving of other formats (PDF, DOCX) not implemented.")
+        # Generate Final Transcript Text from refined_segments
+        if refined_segments:
+            lines = []
+            for segment_data in refined_segments:
+                speaker = segment_data.get('speaker', 'UNKNOWN') # Assuming speaker is in segment_data
+                text = segment_data.get('text', '').strip()
+                if text:
+                    lines.append(f"{speaker}: {text}")
+            full_transcript_text = "\n".join(lines)
+            logger.info(f"Generated final transcript text ({len(full_transcript_text)} chars) for session {session_id} from DB segments.")
 
-    except Exception as e:
-        logger.error(f"Error during final processing for session {session_id}: {e}", exc_info=True)
-        logger.error(traceback.format_exc())
-        await session_manager.update_session_status(db, str(session_id), "error_processing")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed during final processing: {e}")
+            # Save Final Transcript File(s) if text was generated
+            if full_transcript_text:
+                transcript_filename_base = stop_request.transcription_filename or str(session_id)
+                transcript_txt_filename = f"{transcript_filename_base}.txt"
+                transcript_txt_full_path = session_storage_path / transcript_txt_filename
+                try:
+                    with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
+                        f.write(full_transcript_text)
+                    transcript_txt_path_str = str(transcript_txt_full_path.resolve())
+                    logger.info(f"Saved final transcript text file to: {transcript_txt_path_str}")
+                except IOError as e_io:
+                    logger.error(f"Failed to save transcript text file to {transcript_txt_full_path}: {e_io}")
+                    # transcript_txt_path_str remains None
+        else:
+            logger.info(f"[{session_id}] No refined segments found in DB, cannot generate final transcript text.")
 
-    # 7. Update Database with final artifacts and status
-    logger.info(f"Updating session {session_id} completion status in DB...")
-    # Use the actual paths (or None if saving/concatenation failed)
-    success = await session_manager.update_session_completion(
-        db,
-        str(session_id),
-        audio_path=str(audio_path) if audio_path else None, # Use final concatenated path
-        transcript_path=str(transcript_path) if transcript_path else None,
-        transcript_text=full_transcript_text,
-        final_segments=refined_segments
-    )
+        # Cleanup of _chunks directory (if it was ever created by the old save_audio_chunk)
+        # This can be removed if save_audio_chunk is fully deprecated and no longer writes there.
+        chunk_dir_to_remove = session_storage_path / "_chunks"
+        if chunk_dir_to_remove.exists() and chunk_dir_to_remove.is_dir():
+            try:
+                shutil.rmtree(chunk_dir_to_remove)
+                logger.info(f"Cleaned up _chunks directory: {chunk_dir_to_remove} for session {session_id}")
+            except Exception as e_cleanup:
+                logger.error(f"Error during _chunks directory cleanup for session {session_id}: {e_cleanup}")
 
-    if not success:
-         logger.error(f"Failed to update session {session_id} completion status in DB after processing.")
-         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update session completion status in DB after processing.")
+    except Exception as e_final_proc:
+        logger.error(f"Error during final post-processing for session {session_id}: {e_final_proc}", exc_info=True)
+        # Don't update status to error_processing here if WS handler already set it or a terminal state.
+        # This route primarily orchestrates the stop signal.
+        # Log the error, the response will reflect the current DB status.
 
-    logger.info(f"Session {session_id} stopped and processed successfully.")
+    # Update Database with final text transcript path and mark as 'completed' if it was 'stopped'.
+    # The WebSocket handler should have set audio_storage_path and transcription_segments.
+    # This call mainly finalizes status to 'completed' and saves text transcript path.
+    if session.status == "stopped": # Only update to completed if it was successfully stopped
+        logger.info(f"Updating session {session_id} as 'completed' in DB with final transcript path.")
+        update_success = await session_manager.update_session_completion(
+            db,
+            str(session_id),
+            audio_path=final_audio_path_str, # This should already be set by WS
+            transcript_path=transcript_txt_path_str,
+            transcript_text=full_transcript_text,
+            final_segments=refined_segments # These should also be set by WS
+        )
+        if not update_success:
+            logger.error(f"Failed to update session {session_id} to 'completed' in DB after processing.")
+            # Session status might remain 'stopped' or an error status if WS failed earlier.
+    else:
+        logger.info(f"Session {session_id} status is '{session.status}', not marking as 'completed' via stop_session route.")
+
+    # Re-fetch one last time to ensure the response reflects the absolute latest state.
+    await db.refresh(session)
+
+    logger.info(f"Session {session_id} stop process complete. Final status: {session.status}")
     return StopSessionResponse(
         session_id=str(session_id),
-        status="completed",
-        completion_timestamp=datetime.utcnow() 
+        status=session.status, # Return the actual current status from DB
+        completion_timestamp=session.completion_time or datetime.utcnow() # Provide completion time
     )
 
 @router.post("/api/transcription/sessions/{session_id}/pause", 
@@ -472,25 +423,17 @@ async def get_session_details(
     # Pydantic will validate the dictionary against SessionDetailsResponse
     return session_dict
     
-# Define request body model for updating session details
-class UpdateSessionRequest(BaseModel):
-     session_name: Optional[str] = None
-     event_metadata: Optional[EventMetadataSchema] = None
-     participants: Optional[List[ParticipantSchema]] = None
-     full_transcript_text: Optional[str] = None
-     # Add other editable fields if needed
-
-class UpdateSessionResponse(BaseModel):
+class UpdateSessionResponse(BaseModel): # This local definition is fine if it's what the route should return
      session_id: UUID
      status: str = "updated"
      updated_at: datetime
 
 @router.put("/api/transcription/sessions/{session_id}", 
-            response_model=UpdateSessionResponse, 
+            response_model=UpdateSessionResponse, # Uses the local UpdateSessionResponse
             summary="Update details of a session")
 async def update_session_details(
     session_id: UUID, 
-    update_data: UpdateSessionRequest,
+    update_data: UpdateSessionRequest, # Crucially, this should now refer to the imported schemas.UpdateSessionRequest
     db: AsyncSession = Depends(get_db_session)
 ):
     """Updates the editable details of a specific recording session."""
@@ -582,6 +525,47 @@ async def get_transcription(
         transcription_segments=session.transcription_segments,
         last_update=session.last_update
     )
+
+# --- START EDIT ---
+@router.delete("/api/transcription/sessions/{session_id}",
+               status_code=status.HTTP_204_NO_CONTENT,
+               summary="Delete a specific session")
+async def delete_session_endpoint(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session)
+    # current_user_id: str = Depends(get_current_user_id) # Optional: Add ownership check
+):
+    """
+    Deletes a specific transcription session by its ID.
+    This will remove the session record from the database.
+    """
+    logger.info(f"Received request to delete session: {session_id}")
+
+    # Optional: Add check to ensure user owns the session before deleting
+    # session_to_check = await session_manager.get_session(db, str(session_id))
+    # if not session_to_check:
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    # if session_to_check.user_id != current_user_id:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User not authorized to delete this session.")
+
+    success = await session_manager.delete_session(db, str(session_id))
+
+    if not success:
+        # session_manager.delete_session logs whether it was a 404 or a 500-type error
+        # We can assume if it failed after finding it, it's a server error.
+        # If it couldn't find it, get_session within delete_session would have logged.
+        # For simplicity, we can re-check existence if needed or rely on delete_session's outcome.
+        # Re-checking existence to give a more accurate error:
+        existing_session = await session_manager.get_session(db, str(session_id))
+        if not existing_session:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found, cannot delete.")
+        else:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete session from database.")
+
+    # If successful, FastAPI will automatically return a 204 No Content response.
+    # No need to return anything explicitly.
+    return
+# --- END EDIT ---
 
 # --- Existing File Upload Endpoint (Renamed for Clarity) ---
 

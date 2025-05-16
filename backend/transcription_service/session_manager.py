@@ -1,18 +1,26 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 # Remove io if no longer needed centrally
 # import io 
 
 # Use SQLAlchemy for DB operations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import delete # Add this import
 from sqlalchemy.dialects.postgresql import insert as pg_insert # For upsert if needed
+from sqlalchemy.orm.attributes import flag_modified
 
 from schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema, OutputFormatPreferencesSchema
 # Import the DB model and session getter
 from database import TranscriptionSession, get_db_session 
+
+# --- START EDIT ---
+import pathlib
+import shutil
+from config import ARTIFACT_STORAGE_BASE_PATH # Import base path
+# --- END EDIT ---
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +91,8 @@ class SessionManager:
          """Retrieves session data as a dictionary by ID."""
          session = await self.get_session(db, session_id)
          if session:
-             # Convert ORM object to dict - Adjust fields as needed for API responses
-             return {
+             logger.info(f"get_session_dict: Raw session.markers for {session_id}: {session.markers}")
+             session_data_to_return = {
                  "session_id": str(session.session_id),
                  "user_id": session.user_id,
                  "session_name": session.session_name,
@@ -102,6 +110,8 @@ class SessionManager:
                  "transcript_storage_path": session.transcript_storage_path,
                  "full_transcript_text": session.full_transcript_text,
              }
+             logger.info(f"get_session_dict: Dict being returned for {session_id}: {session_data_to_return}")
+             return session_data_to_return
          return None
 
     async def update_session_status(self, db: AsyncSession, session_id: str, status: str) -> bool:
@@ -149,15 +159,19 @@ class SessionManager:
             try:
                 marker_id = str(uuid.uuid4()) # Generate unique ID for the marker
                 marker_data["marker_id"] = marker_id
-                marker_data["added_at"] = datetime.utcnow() # Record when added
+                marker_data["added_at"] = datetime.utcnow().isoformat() # Record when added, as ISO string
 
                 # Ensure markers field is initialized as a list
                 if session.markers is None:
                     session.markers = []
                 
-                # SQLAlchemy detects changes to mutable JSON lists/dicts
-                session.markers.append(marker_data)
-                
+                # More forceful way to ensure SQLAlchemy detects the change
+                current_markers = list(session.markers or []) # Create a new list, or copy existing
+                current_markers.append(marker_data)
+                session.markers = current_markers # Reassign the entire list
+                # flag_modified might still be good practice, but reassignment is a stronger signal
+                flag_modified(session, "markers")
+
                 session.last_update = datetime.utcnow()
                 await db.commit()
                 logger.info(f"Added marker {marker_id} to session {session_id} in DB.")
@@ -180,13 +194,20 @@ class SessionManager:
                     "marker_type": "speaker_tag_event", # Specific type
                     "speaker_id": speaker_id,
                     "timestamp": timestamp,
-                    "added_at": datetime.utcnow()
+                    "added_at": datetime.utcnow().isoformat() # As ISO string
                 }
                 
+                # Ensure markers field is initialized as a list
                 if session.markers is None:
                     session.markers = []
                 
-                session.markers.append(event_data)
+                # More forceful way to ensure SQLAlchemy detects the change
+                current_speaker_events = list(session.markers or []) # Create a new list, or copy existing
+                current_speaker_events.append(event_data)
+                session.markers = current_speaker_events # Reassign the entire list
+                # flag_modified might still be good practice, but reassignment is a stronger signal
+                flag_modified(session, "markers")
+
                 session.last_update = datetime.utcnow()
                 await db.commit()
                 logger.info(f"Added speaker tag event for speaker {speaker_id} at {timestamp}s to session {session_id} in DB.")
@@ -252,23 +273,20 @@ class SessionManager:
              return []
              
     async def update_session_details(self, db: AsyncSession, session_id: str, update_data: dict) -> bool:
-         """Updates editable fields of a session (e.g., name, metadata, participants, transcript text)."""
+         """Updates editable fields of a session (e.g., name, metadata, participants, transcript text, markers)."""
          session = await self.get_session(db, session_id)
          if not session:
              logger.warning(f"Attempted to update details for non-existent session: {session_id}")
              return False
-         
-         # Only allow updates if session is completed?
-         # if session.status != "completed":
-         #     logger.warning(f"Attempted to update details for non-completed session: {session_id}")
-         #     return False
              
          try:
              updated = False
-             allowed_fields = ["session_name", "event_metadata", "participants", "full_transcript_text"]
+             allowed_fields = ["session_name", "event_metadata", "participants", "full_transcript_text", "markers"]
              for field, value in update_data.items():
                  if field in allowed_fields and value is not None:
                      setattr(session, field, value)
+                     if field == "event_metadata" or field == "participants" or field == "markers": # These are JSON fields
+                         flag_modified(session, field)
                      updated = True
                      
              if updated:
@@ -279,12 +297,53 @@ class SessionManager:
                  return True
              else:
                  logger.info(f"No valid fields provided to update for session {session_id}." )
-                 return False # Or True if no update needed?
+                 return False 
                  
          except Exception as e:
              await db.rollback()
              logger.error(f"Failed to update details for session {session_id} in DB: {e}", exc_info=True)
              return False
+
+    async def delete_session(self, db: AsyncSession, session_id: str) -> bool:
+        """Deletes a session from the database by ID and its associated artifact folder."""
+        session_uuid = uuid.UUID(session_id)
+        # --- START EDIT ---
+        # It's better to fetch the session first to get its path, then delete files, then DB record
+        session_to_delete = await self.get_session(db, session_id)
+
+        if not session_to_delete:
+            logger.warning(f"Attempted to delete non-existent session: {session_id}")
+            return False
+        
+        # Construct the session artifact path
+        # This assumes session_id is the folder name directly under ARTIFACT_STORAGE_BASE_PATH
+        session_artifact_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / session_id
+        # --- END EDIT ---
+
+        try:
+            # --- START EDIT ---
+            # Delete the session artifact folder from the filesystem
+            if session_artifact_path.exists():
+                if session_artifact_path.is_dir():
+                    shutil.rmtree(session_artifact_path)
+                    logger.info(f"Successfully deleted artifact directory: {session_artifact_path}")
+                else:
+                    # If it's a file and not a directory (should not happen based on structure)
+                    session_artifact_path.unlink()
+                    logger.info(f"Successfully deleted artifact file: {session_artifact_path}") # Log if it was a file
+            else:
+                logger.info(f"Artifact directory not found, skipping file deletion: {session_artifact_path}")
+            # --- END EDIT ---
+
+            stmt = delete(TranscriptionSession).where(TranscriptionSession.session_id == session_uuid)
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"Successfully deleted session {session_id} from DB.")
+            return True
+        except Exception as e:
+            await db.rollback() # Rollback DB changes if any error (including file system error) occurs
+            logger.error(f"Failed to delete session {session_id} (DB or files): {e}", exc_info=True)
+            return False
 
 # Instantiate the manager - Singleton pattern might be better, but this works for now.
 session_manager = SessionManager()

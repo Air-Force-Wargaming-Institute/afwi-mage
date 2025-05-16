@@ -1,7 +1,7 @@
 // RecordTranscribe.js
 // This component is used to record and transcribe audio in a new MAGE browserwindow.
 
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -85,7 +85,11 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: `1px solid ${theme.palette.divider}`
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    position: 'sticky',
+    top: 0,
+    backgroundColor: theme.palette.background.default,
+    zIndex: 1100,
   },
   content: {
     display: 'flex',
@@ -93,6 +97,7 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
     padding: theme.spacing(1.5),
     gap: theme.spacing(2),
+    paddingBottom: theme.spacing(8), // Ensure this doesn't get cut off by 100% height children
   },
   mainContentPanel: {
     display: 'flex',
@@ -102,12 +107,12 @@ const useStyles = makeStyles((theme) => ({
     height: '100%',
   },
   controlPanel: {
-    padding: theme.spacing(1.5),
+    // padding: theme.spacing(1.5), // REMOVED - GradientBorderPaper has its own padding
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1.5),
-    overflowY: 'auto',
-    height: '100%',
+    // gap: theme.spacing(1.5), // REMOVED - Will be applied to inner scrollable Box
+    // overflowY: 'auto', // REMOVED - GradientBorderPaper should not scroll
+    height: '100%', // Ensures GradientBorderPaper fills its Grid cell
   },
   audioVisualizer: {
     height: '100px',
@@ -299,6 +304,19 @@ const useStyles = makeStyles((theme) => ({
   initialLoadedData: {
     // Add initial data from context state
   },
+  stickyFooter: {
+    position: 'sticky',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: theme.spacing(1.5),
+    backgroundColor: theme.palette.background.paper,
+    borderTop: `1px solid ${theme.palette.divider}`,
+    zIndex: 1050,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  }
 }));
 
 // Helper function to format time in HH:MM:SS
@@ -326,9 +344,20 @@ const constructClassificationString = (baseClassification, caveatType, customCav
 };
 
 // Helper function to get banner style based on classification
-const getBannerStyle = (baseClassification, theme) => { // Now takes baseClassification
+const getBannerStyle = (baseClassification, theme, loadedSessionId) => { // Added loadedSessionId argument
   if (!baseClassification || baseClassification === 'SELECT A SECURITY CLASSIFICATION') {
-    return { display: 'none' }; // Hide banner if no classification
+    // If loadedSessionId exists but no classification, show a less intrusive default or a placeholder message
+    if (loadedSessionId) { // Use the passed loadedSessionId argument
+        return {
+            backgroundColor: theme.palette.grey[300],
+            color: theme.palette.getContrastText(theme.palette.grey[300]),
+            minHeight: '24px', 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        };
+    }
+    return { display: 'none' }; // Hide banner if no classification and not a loaded session
   }
   const upperClass = baseClassification.toUpperCase();
   let backgroundColor = theme.palette.grey[700]; // Default
@@ -343,7 +372,7 @@ const getBannerStyle = (baseClassification, theme) => { // Now takes baseClassif
 
   return {
     backgroundColor,
-    color: theme.palette.getContrastText(backgroundColor), 
+    color: theme.palette.getContrastText(backgroundColor),
   };
 };
 
@@ -354,80 +383,212 @@ const RecordTranscribe = () => {
   const { state, dispatch } = useTranscription();
   const { token } = useContext(AuthContext);
   
-  // Remove local refs and state related to recording controls/waveform
-  // const intervalRef = useRef(null);
-  // const waveformRef = useRef(null); 
-  // const wavesurferRef = useRef(null);
-  // const [audioStream, setAudioStream] = useState(null);
-  // const [mediaRecorder, setMediaRecorder] = useState(null);
-  // const [audioChunks, setAudioChunks] = useState([]);
-  // const [isInitializing, setIsInitializing] = useState(false);
-  
-  // Keep state not moved
-  // const transcriptionPanelRef = useRef(null); // For scrolling transcription
+  const {
+    sessionId,
+    recordingState,
+    transcriptionText,
+    audioFilename,
+    error,
+    participants,
+    classification: selectedClassification,
+    caveatType,
+    customCaveat,
+    eventMetadata,
+    loadedSessionId,
+    isDirty,
+    initialLoadedData,
+    markers,
+    audioUrl, // Already in context
+    playbackTime, // Already in context for dispatch, local for control
+    sendWebSocketMessage, // Added for RealtimeTaggingPanel access
+  } = state;
+
   const [confirmCloseDialog, setConfirmCloseDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  // const [customMarkerLabel, setCustomMarkerLabel] = useState(''); // Moved
   const [closeWarningType, setCloseWarningType] = useState('');
+  const [confirmNavigationDialog, setConfirmNavigationDialog] = useState(false);
+  const [navigationAction, setNavigationAction] = useState(null);
 
-  // Extract state from context
-  const {
-    sessionId,
-    recordingState, // Still needed for read-only checks maybe?
-    // recordingTime, // Managed by RecordingControlPanel
-    transcriptionText,
-    audioFilename, // Session Name
-    error, // Still needed for snackbar
-    participants, // Needed for participant manager
-    classification: selectedClassification, // Needed for forms
-    caveatType, // Needed for forms
-    customCaveat, // Needed for forms
-    eventMetadata, // Needed for forms
-    // markers: activeMarkers, // Handled by child
-    // availableMarkerTypes, // Handled by child
-    loadedSessionId, // Still needed for mode checks
-    // Assume context tracks initial loaded data for comparison
-    // initialSessionData // We'll check for existence/changes later
-    // Assume context tracks if changes were made
-    isDirty, // Add isDirty from context state
-    initialLoadedData // Add initial data from context state
-  } = state;
+  // --- START: WaveSurfer State Lifted from RecordingControlPanel --- 
+  const waveformRef = useRef(null); // This ref will be passed to RecordingControlPanel for the container
+  const wavesurferRef = useRef(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false); // Renamed from isPlaying for clarity
+  const [currentPlaybackTimeForSlider, setCurrentPlaybackTimeForSlider] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isWaveformReady, setIsWaveformReady] = useState(false);
+  const isSeekingRef = useRef(false); // To prevent audioprocess updates during seek
+  const [currentObjectUrl, setCurrentObjectUrl] = useState(null); // For managing blob URLs
+  const [apiError, setApiError] = useState(null); // For WaveSurfer/audio loading errors
+  // --- END: WaveSurfer State --- 
 
-  // --- START EDIT ---
-  // Effect to check for changes and update isDirty state
+  // Effect for isDirty check (remains the same)
   useEffect(() => {
     if (loadedSessionId && initialLoadedData) {
-      // Fields to compare
       const currentDataToCompare = {
         audioFilename: audioFilename,
         transcriptionText: transcriptionText,
         participants: participants,
         eventMetadata: eventMetadata,
-        classification: selectedClassification,
+        classification: selectedClassification === 'SELECT A SECURITY CLASSIFICATION' ? '' : selectedClassification,
         caveatType: caveatType,
         customCaveat: customCaveat,
+        markers: markers, // Ensure markers are part of the comparison
       };
       
-      // Compare current state with the initial loaded state
-      const areEqual = deepCompare(currentDataToCompare, initialLoadedData);
+      const initialComparableData = {
+        ...initialLoadedData,
+        classification: initialLoadedData.classification === 'SELECT A SECURITY CLASSIFICATION' ? '' : initialLoadedData.classification,
+        markers: initialLoadedData.markers || [], // Ensure initial markers are comparable
+      };
+
+      const areEqual = deepCompare(currentDataToCompare, initialComparableData);
       
-      // Dispatch action only if dirty state needs to change
       if (!areEqual && !isDirty) {
           dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: true });
       } else if (areEqual && isDirty) {
           dispatch({ type: ACTIONS.SET_IS_DIRTY, payload: false });
       }
     }
-    // Dependencies: Include all state variables being compared + loadedSessionId + initialLoadedData
   }, [
       loadedSessionId, initialLoadedData, audioFilename, transcriptionText, participants, 
-      eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch
+      eventMetadata, selectedClassification, caveatType, customCaveat, isDirty, dispatch, markers
   ]);
-  // --- END EDIT ---
 
-  // --- Helper function to check for unsaved form data ---
-  // This logic might need adjustment based on which component handles saving changes for loaded sessions
+  // --- START: WaveSurfer Initialization and Event Handling (Moved here) ---
+  useEffect(() => {
+    if (waveformRef.current && !wavesurferRef.current) { // Initialize only once
+      const wavesurfer = WaveSurfer.create({
+        container: waveformRef.current, // waveformRef is the div in RecordingControlPanel
+        waveColor: theme.palette.primary.light,
+        progressColor: theme.palette.secondary.main,
+        cursorColor: theme.palette.warning.main,
+        barWidth: 2, barRadius: 3, cursorWidth: 1, height: 80, barGap: 2,
+        responsive: true, normalize: true, partialRender: true, backend: 'WebAudio'
+      });
+      wavesurferRef.current = wavesurfer;
+
+      wavesurfer.on('ready', () => {
+        console.log('WaveSurfer ready (in RecordTranscribe)');
+        setAudioDuration(wavesurfer.getDuration());
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsWaveformReady(true);
+        setIsAudioPlaying(false); // Ensure playing is false on ready
+      });
+      wavesurfer.on('audioprocess', (time) => {
+        if (!isSeekingRef.current) {
+          setCurrentPlaybackTimeForSlider(time);
+          dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: time });
+        }
+      });
+      wavesurfer.on('finish', () => {
+        setIsAudioPlaying(false);
+        setCurrentPlaybackTimeForSlider(wavesurferRef.current.getDuration()); // Go to end
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: wavesurferRef.current.getDuration() });
+      });
+      wavesurfer.on('seek', (progress) => {
+        const newTime = progress * wavesurferRef.current.getDuration();
+        setCurrentPlaybackTimeForSlider(newTime);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: newTime });
+      });
+      wavesurfer.on('error', (err) => {
+        console.error('WaveSurfer error (in RecordTranscribe):', err);
+        setApiError(`WaveSurfer error: ${err.toString()}`);
+        setIsWaveformReady(false);
+      });
+    }
+    // Cleanup on component unmount
+    return () => {
+      if (wavesurferRef.current) {
+        wavesurferRef.current.unAll();
+        wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+      }
+      if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+        setCurrentObjectUrl(null);
+      }
+    };
+  }, [theme, dispatch]); // Removed currentObjectUrl from deps, managed internally
+
+  // Effect to load audio when audioUrl changes (Moved and adapted)
+  useEffect(() => {
+    if (wavesurferRef.current) {
+      if (currentObjectUrl) { // Revoke previous if any
+        URL.revokeObjectURL(currentObjectUrl);
+        setCurrentObjectUrl(null);
+      }
+      if (loadedSessionId && audioUrl) {
+        setIsWaveformReady(false); // Reset ready state
+        setAudioDuration(0);
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsAudioPlaying(false);
+
+        const fetchAndLoadAudio = async () => {
+          try {
+            if (!token) throw new Error("Auth token missing");
+            const response = await fetch(audioUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            setCurrentObjectUrl(objectUrl); 
+            wavesurferRef.current.load(objectUrl);
+          } catch (error) {
+            console.error("Error fetching or loading audio:", error);
+            setApiError(error.message);
+            setIsWaveformReady(false);
+          }
+        };
+        fetchAndLoadAudio();
+      } else if (!loadedSessionId) { // If new session or reset
+        wavesurferRef.current.empty();
+        setIsWaveformReady(false);
+        setAudioDuration(0);
+        setCurrentPlaybackTimeForSlider(0);
+        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+        setIsAudioPlaying(false);
+      }
+    }
+  }, [loadedSessionId, audioUrl, token, dispatch]);
+  // --- END: WaveSurfer Logic Moved ---
+
+  // --- START: Playback Handlers (Moved here) ---
+  const handlePlayPause = useCallback(() => {
+    if (wavesurferRef.current && isWaveformReady) {
+      dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: !isAudioPlaying }); 
+      wavesurferRef.current.playPause();
+      setIsAudioPlaying(wavesurferRef.current.isPlaying());
+    }
+  }, [isWaveformReady, dispatch, isAudioPlaying]);
+
+  const handleStopPlayback = useCallback(() => {
+    if (wavesurferRef.current && isWaveformReady) {
+      wavesurferRef.current.stop();
+      setIsAudioPlaying(false);
+      setCurrentPlaybackTimeForSlider(0);
+      dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+      dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: false }); 
+    }
+  }, [isWaveformReady, dispatch]);
+
+  const handleSliderChange = useCallback((event, newValue) => {
+    if (isWaveformReady && audioDuration > 0) {
+      setCurrentPlaybackTimeForSlider(newValue);
+    }
+  }, [isWaveformReady, audioDuration]);
+
+  const handleSliderChangeCommitted = useCallback((event, newValue) => {
+    if (wavesurferRef.current && isWaveformReady && audioDuration > 0) {
+      isSeekingRef.current = true;
+      const seekPosition = newValue / audioDuration;
+      wavesurferRef.current.seekTo(seekPosition);
+      // Event listener for 'seek' will dispatch SET_PLAYBACK_TIME
+      setTimeout(() => { isSeekingRef.current = false; }, 100);
+    }
+  }, [isWaveformReady, audioDuration]);
+
   const hasUnsavedFormData = () => {
     // Check only if not loading a session and in inactive state
     if (loadedSessionId || recordingState !== RECORDING_STATES.INACTIVE) return false;
@@ -445,36 +606,34 @@ const RecordTranscribe = () => {
     return isFilenameEntered || isMetadataEntered || isParticipantEntered || isClassificationSelected;
   };
   
-  // Generate a random color for participants (Keep - needed for add participant)
-  // const getRandomColor = () => {
-  //   const colors = ['#4285f4', '#ea4335', '#34a853', '#fbbc05', '#9c27b0', '#00bcd4', '#ff5722', '#3f51b5'];
-  //   return colors[Math.floor(Math.random() * colors.length)];
-  // };
-
-  // Handle beforeunload event (Keep)
+  // Effect to handle window close with unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = (event) => {
       const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
-      const hasData = hasUnsavedFormData();
-      const shouldWarn = isRecordingActive || (!loadedSessionId && hasData);
-      if (shouldWarn) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
+      const hasNewSessionData = hasUnsavedFormData(); // Use the existing helper
+
+      if (isRecordingActive || (loadedSessionId && isDirty) || (!loadedSessionId && hasNewSessionData)) {
+        event.preventDefault(); // Standard for most browsers
+        event.returnValue = ''; // Required for some browsers (displays a generic message)
+        return ''; // For older browsers
       }
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [recordingState, loadedSessionId, audioFilename, eventMetadata, participants, selectedClassification]);
-
-  // Handle close window button (Keep)
+  }, [isDirty, loadedSessionId, recordingState, hasUnsavedFormData]); // Add dependencies
+  
   const handleCloseWindow = () => {
     const isRecordingActive = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
     const hasData = hasUnsavedFormData();
     if (isRecordingActive) {
       setCloseWarningType('recording'); 
+      setConfirmCloseDialog(true);
+    } else if (isDirty && loadedSessionId) { // Check isDirty for loaded sessions
+      setCloseWarningType('unsavedChanges');
       setConfirmCloseDialog(true);
     } else if (!loadedSessionId && hasData) {
       setCloseWarningType('formData'); 
@@ -484,17 +643,6 @@ const RecordTranscribe = () => {
     }
   };
 
-  // Display error message in snackbar (Keep)
-  useEffect(() => {
-    if (error) { // Check error from state
-      setSnackbarMessage(error);
-      setSnackbarOpen(true);
-      // Optionally clear the error after showing
-      // dispatch({ type: ACTIONS.SET_ERROR, payload: null });
-    }
-  }, [error]);
-
-  // Cancel recording function (Keep - handles dialog interaction)
   const cancelRecording = async () => {
     if (loadedSessionId) {
         dispatch({ type: ACTIONS.START_NEW_SESSION });
@@ -524,51 +672,36 @@ const RecordTranscribe = () => {
     }
   };
   
-  // Add a new participant placeholder (Keep - belongs to participant manager section)
-  // const addNewParticipantPlaceholder = () => { ... };
-
-  // Handle changes in the inline participant fields (Keep - belongs to participant manager section)
-  // const handleParticipantChange = (id, field, value) => { ... };
-
-  // Remove participant function (Keep - belongs to participant manager section)
-  // const removeParticipant = (id) => { ... };
-
-  // Auto-scroll transcription panel (Keep)
-  // useEffect(() => {
-  //   if (transcriptionPanelRef.current) {
-  //     transcriptionPanelRef.current.scrollTop = transcriptionPanelRef.current.scrollHeight;
-  //   }
-  // }, [transcriptionText]); // Scroll when text changes
-
-  // Determine if fields should be disabled (Keep - used by multiple sections)
-  // Disable forms ONLY if actively recording or paused, allow editing loaded sessions
-  const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
-  
-  // Construct the full classification string for display (Keep)
-  const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
-
-  // --- Save Changes Logic (for loaded sessions) ---
   const handleSaveChanges = async () => {
       if (!loadedSessionId || !token) {
           setSnackbarMessage("Cannot save: No session loaded or not authenticated.");
           setSnackbarOpen(true);
           return;
       }
+      if (!isDirty) {
+          setSnackbarMessage("No changes to save.");
+          setSnackbarOpen(true);
+          return;
+      }
 
-      // Prepare payload with current state data
-      const updatePayload = {
-          session_name: audioFilename,
-          event_metadata: eventMetadata,
-          participants: participants,
-          full_transcript_text: transcriptionText // Assuming transcript text is editable
+      const fullClassificationToSave = constructClassificationString(selectedClassification, caveatType, customCaveat);
+
+      const finalPayload = {
+        session_name: audioFilename,
+        event_metadata: { 
+            ...eventMetadata, 
+            classification: fullClassificationToSave || null, 
+        },
+        participants: participants,
+        full_transcript_text: transcriptionText,
+        markers: markers.map(marker => { // Ensure markers are in the format expected by backend
+            const { id, ...restOfMarker } = marker; // Assuming frontend uses 'id'
+            return {
+                ...restOfMarker,
+                marker_id: id // Or whatever the backend expects for existing/new markers during PUT
+            };
+        }),
       };
-
-      // Remove null/undefined values? The backend might handle this.
-      // Example: Clean payload if needed
-      // const cleanedPayload = Object.entries(updatePayload).reduce((acc, [key, value]) => {
-      //     if (value !== null && value !== undefined) acc[key] = value;
-      //     return acc;
-      // }, {});
 
       try {
           const saveUrl = getGatewayUrl(`/api/transcription/sessions/${loadedSessionId}`);
@@ -578,7 +711,7 @@ const RecordTranscribe = () => {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify(updatePayload) // Send the full current state
+              body: JSON.stringify(finalPayload)
           });
 
           if (!response.ok) {
@@ -589,12 +722,7 @@ const RecordTranscribe = () => {
           const result = await response.json();
           setSnackbarMessage("Changes saved successfully.");
           setSnackbarOpen(true);
-          // Optionally: Dispatch an action to reset the 'isDirty' state or update 'initialSessionData' in context
-          // dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
-          // --- START EDIT ---
-          // Dispatch action to mark session as saved (resets isDirty and updates initialLoadedData)
           dispatch({ type: ACTIONS.MARK_SESSION_SAVED });
-          // --- END EDIT ---
           console.log("Save successful:", result);
 
       } catch (error) {
@@ -605,14 +733,51 @@ const RecordTranscribe = () => {
       }
   };
 
+  const isFormDisabled = recordingState === RECORDING_STATES.RECORDING || recordingState === RECORDING_STATES.PAUSED;
+  const isTaggingPanelReadOnly = loadedSessionId ? !isAudioPlaying : (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED);
+
+  const fullClassificationDisplay = constructClassificationString(selectedClassification, caveatType, customCaveat);
+
+  const handleNavigationAttempt = (actionToPerform) => {
+    if (isDirty && loadedSessionId) {
+      setNavigationAction(() => actionToPerform); // Store the action
+      setConfirmNavigationDialog(true);
+    } else {
+      actionToPerform(); // Perform action directly if no unsaved changes
+    }
+  };
+
+  const proceedWithNavigation = () => {
+    if (navigationAction) {
+      navigationAction();
+    }
+    setConfirmNavigationDialog(false);
+    setNavigationAction(null);
+  };
+
+  const saveAndProceedWithNavigation = async () => {
+    await handleSaveChanges(); // Assumes handleSaveChanges will set isDirty to false on success
+    // Check if save was successful (isDirty became false) before proceeding
+    if (!isDirty) { // Access updated isDirty from state (use the destructured isDirty)
+        proceedWithNavigation();
+    } else {
+        // If save failed, do not proceed with navigation, keep dialog open or show error
+        setSnackbarMessage("Save failed. Please resolve errors before navigating.");
+        setSnackbarOpen(true);
+        // Optionally, do not close the navigation dialog here
+    }
+  };
+
   return (
     <Box className={classes.root}>
       {/* Classification Banner */}
       <Box
         className={classes.classificationBanner}
-        sx={{ ...getBannerStyle(selectedClassification, theme), display: fullClassificationDisplay ? 'block' : 'none'}}
+        sx={{ ...getBannerStyle(selectedClassification, theme, loadedSessionId), // Pass loadedSessionId here
+              display: (fullClassificationDisplay || (loadedSessionId && selectedClassification === 'SELECT A SECURITY CLASSIFICATION')) ? 'flex' : 'none' 
+            }}
       >
-        {fullClassificationDisplay}
+        {fullClassificationDisplay || (loadedSessionId && selectedClassification === 'SELECT A SECURITY CLASSIFICATION' ? 'NO CLASSIFICATION SET' : '')}
       </Box>
 
       {/* Header */}
@@ -631,7 +796,7 @@ const RecordTranscribe = () => {
       <Box className={classes.content}>
         {/* Left Panel: Session Browser */}
         <Grid item xs={12} md={2} style={{ height: '100%', overflowY: 'auto' }}>
-          <SessionBrowserPanel />
+          <SessionBrowserPanel onNavigationAttempt={handleNavigationAttempt} />
         </Grid>
 
         {/* Right Panel: Main Area */}
@@ -640,34 +805,41 @@ const RecordTranscribe = () => {
               {/* Inner Left Column (Controls/Info/Forms) */}
               <Grid item xs={12} md={5} style={{ height: '100%' }}>
                 <GradientBorderPaper className={classes.controlPanel}>
-                  {/* Recording Controls */}
-                  <RecordingControlPanel />
-                  <Divider />
+                  {/* Inner Box to handle scrolling and layout of children */}
+                  <Box
+                    style={{
+                      height: '100%', // Fill GradientBorderPaper
+                      overflowY: 'auto', // Enable vertical scrolling for content
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: theme.spacing(1.5), // Layout for direct children
+                      // The theme.spacing(3) padding comes from GradientBorderPaper itself
+                    }}
+                  >
+                    {/* Pass WaveSurfer related props to RecordingControlPanel */}
+                    <RecordingControlPanel
+                      waveformRef={waveformRef} // Pass the ref for the div container
+                      isAudioPlaying={isAudioPlaying}
+                      currentPlaybackTime={currentPlaybackTimeForSlider} // Use local for slider
+                      duration={audioDuration}
+                      isWaveformReady={isWaveformReady}
+                      onPlayPause={handlePlayPause}
+                      onStopPlayback={handleStopPlayback}
+                      onSliderChange={handleSliderChange}
+                      onSliderChangeCommitted={handleSliderChangeCommitted}
+                      apiError={apiError} // Pass WaveSurfer specific errors
+                    />
+                    <Divider />
 
-                  {/* Session Metadata Form */}
-                  <SessionMetadataForm isReadOnly={isFormDisabled} />
-                  <Divider />
+                    {/* Session Metadata Form */}
+                    <SessionMetadataForm isReadOnly={isFormDisabled} />
+                    <Divider />
 
-                  {/* Participants Form */}
-                  <ParticipantManager isReadOnly={isFormDisabled} />
-                  <Divider />
-
-                  {/* Save Changes button (Remains, logic needs review) */}
-                  {loadedSessionId && (
-                     <Button 
-                         variant="contained" 
-                         color="secondary" 
-                         size="small" 
-                         startIcon={<SaveIcon />} 
-                         onClick={handleSaveChanges} 
-                         // disabled={!isDirty || isFormDisabled} // Enable button based on changes
-                         disabled={isFormDisabled || !isDirty}
-                         style={{ marginTop: '8px' }}
-                     >
-                          Save Changes
-                      </Button>
-                  )}
-
+                    {/* Participants Form */}
+                    <ParticipantManager isReadOnly={isFormDisabled} />
+                    <Divider />
+                    {/* Ensure no extra empty elements here if not needed */}
+                  </Box>
                 </GradientBorderPaper>
               </Grid>
 
@@ -681,7 +853,11 @@ const RecordTranscribe = () => {
 
                   {/* Realtime Tagging Panel */}
                   <Box sx={{ px: 1.5, pb: 1 }}>
-                    <RealtimeTaggingPanel isReadOnly={isFormDisabled} />
+                    <RealtimeTaggingPanel 
+                        isReadOnly={isTaggingPanelReadOnly} 
+                        isAudioPlaying={isAudioPlaying} // Pass playing state
+                        // playbackTime is already in context, RealtimeTaggingPanel will use it
+                    />
                   </Box>
 
                   <Divider sx={{ mx: 2 }}/>
@@ -702,10 +878,29 @@ const RecordTranscribe = () => {
       {/* Status Bar */}
       <Box className={classes.statusBar}>
         <Typography variant="body2" color="textSecondary">
-          {sessionId ? `Session ID: ${sessionId}` : 'No active session'}
+          {error ? <span style={{color: theme.palette.error.main}}>{error}</span> : (sessionId ? `Session ID: ${sessionId}` : 'No active session')}
         </Typography>
-        <Box></Box>
+        <Box>
+            {/* Display isDirty status for debugging if needed */}
+            {/* {loadedSessionId && <Chip label={isDirty ? "Unsaved Changes" : "Saved"} size="small" color={isDirty ? "secondary" : "primary"} />} */}
+        </Box>
       </Box>
+
+      {/* Sticky Footer for Save Button */}
+      {loadedSessionId && (
+        <Paper className={classes.stickyFooter} elevation={3}>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="medium"
+            startIcon={<SaveIcon />}
+            onClick={handleSaveChanges}
+            disabled={isFormDisabled || !isDirty}
+          >
+            Save Changes
+          </Button>
+        </Paper>
+      )}
 
       {/* Dialogs */}
       <Dialog open={confirmCloseDialog} onClose={() => setConfirmCloseDialog(false)}>
@@ -713,19 +908,56 @@ const RecordTranscribe = () => {
         <DialogContent>
           <DialogContentText>
             {closeWarningType === 'recording' && 'You have an active recording session. Closing now will discard your recording. Do you want to continue?'}
-            {closeWarningType === 'formData' && 'You have unsaved changes in the new session form. Closing now will discard this information. Do you want to continue?'}
+            {closeWarningType === 'formData' && 'You have unsaved changes in the new session form. Closing now will discard this information. Do you want tocontinue?'}
+            {closeWarningType === 'unsavedChanges' && 'You have unsaved changes. Closing now will discard these changes. Do you want to continue?'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmCloseDialog(false)} color="primary">Cancel</Button>
-          <Button onClick={() => { if (closeWarningType === 'recording') { cancelRecording(); } window.close(); }} color="error">
-             {closeWarningType === 'recording' ? 'Discard Recording & Close' : 'Discard Changes & Close'}
+          <Button 
+            onClick={() => { 
+              if (closeWarningType === 'recording') { 
+                // Potentially call a method on RecordingControlPanel to stop and discard
+                // For now, this assumes `cancelRecording` or a direct dispatch handles it.
+                // dispatch({ type: ACTIONS.RESET_STATE }); // Or a more specific cancel action
+              } 
+              window.close(); 
+            }} 
+            color="error"
+          >
+             {closeWarningType === 'recording' ? 'Discard & Close' : 'Discard Changes & Close'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmNavigationDialog} onClose={() => setConfirmNavigationDialog(false)}>
+        <DialogTitle>Unsaved Changes</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You have unsaved changes. Do you want to save them before navigating away?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setConfirmNavigationDialog(false); setNavigationAction(null); }} color="inherit">
+            Cancel Navigation
+          </Button>
+          <Button onClick={proceedWithNavigation} color="error">
+            Discard Changes
+          </Button>
+          <Button onClick={saveAndProceedWithNavigation} color="primary" variant="contained">
+            Save and Continue
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar */}
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} message={snackbarMessage} />
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={6000} 
+        onClose={() => setSnackbarOpen(false)} 
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} 
+        message={snackbarMessage} 
+      />
     </Box>
   );
 };

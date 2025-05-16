@@ -88,3 +88,17 @@ class GetTranscriptionResponse(BaseModel):
     full_transcript_text: Optional[str] = None
     transcription_segments: Optional[List[TranscriptionSegmentSchema]] = None
     last_update: datetime # Timestamp of when the session was last updated (e.g., completion) 
+
+# Define request body model for updating session details
+class UpdateSessionRequest(BaseModel):
+     session_name: Optional[str] = None
+     event_metadata: Optional[EventMetadataSchema] = None
+     participants: Optional[List[ParticipantSchema]] = None
+     full_transcript_text: Optional[str] = None
+     markers: Optional[List[Dict[str, Any]]] = None # Allow updating markers
+     # Add other editable fields if needed
+
+class UpdateSessionResponse(BaseModel):
+     session_id: UUID # Changed from str to UUID to match other responses
+     status: str = "updated"
+     updated_at: datetime # Changed from completion_timestamp to updated_at for clarity 
