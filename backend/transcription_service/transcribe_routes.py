@@ -54,6 +54,47 @@ def format_time(seconds: float) -> str:
     s = math.floor(seconds % 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
+# --- NEW HELPER FUNCTION ---
+def generate_transcript_with_markers(segments: List[dict], markers: List[dict]) -> str:
+    """
+    Generates a single transcript string by interleaving transcription segments
+    and timeline markers chronologically.
+    """
+    processed_items = []
+
+    for seg in segments:
+        processed_items.append({
+            "time": seg.get("start"),
+            "type": "segment",
+            "text": seg.get("text", "").strip(),
+            "speaker": seg.get("speaker", "UNKNOWN")
+        })
+
+    for marker in markers:
+        processed_items.append({
+            "time": marker.get("timestamp"),
+            "type": "marker",
+            "marker_type": marker.get("marker_type", "generic_marker")
+        })
+
+    # Filter out items with no time for sorting
+    processed_items = [item for item in processed_items if item["time"] is not None]
+    # Sort by time
+    processed_items.sort(key=lambda x: x["time"])
+
+    transcript_lines = []
+    for item in processed_items:
+        formatted_timestamp = format_time(item["time"])
+        if item["type"] == "segment":
+            if item["text"]: # Only add segment if there's text
+                transcript_lines.append(f"[{formatted_timestamp}] {item['speaker']}: {item['text']}")
+        elif item["type"] == "marker":
+            marker_display_type = item['marker_type'].upper()
+            transcript_lines.append(f"[{formatted_timestamp}] (***{marker_display_type}***)")
+
+    return '\n'.join(transcript_lines)
+# --- END NEW HELPER FUNCTION ---
+
 # --- START EDIT ---
 # Dependency to get authenticated user ID from header
 async def get_current_user_id(request: Request) -> str:
@@ -168,62 +209,101 @@ async def stop_session(
     logger.info(f"Setting session {session_id} status to 'stopped' to signal WebSocket handler.")
     await session_manager.update_session_status(db, str(session_id), "stopped")
 
-    # Brief pause to allow WebSocket handler to process and save the audio/transcript.
-    # In a production system, a more robust mechanism (e.g., polling DB for audio_storage_path 
-    # or a direct signal) might be preferred over a fixed delay.
-    await asyncio.sleep(3) # Adjust delay as needed, or implement polling
+    # --- MODIFIED: Polling for WebSocket finalization ---
+    max_wait_seconds = 20  # Max time to wait for WebSocket to finalize
+    poll_interval_seconds = 0.75 # How often to check DB
+    waited_seconds = 0
+    ws_processing_assumed_complete = False
+
+    logger.info(f"[{session_id}] Waiting for WebSocket handler to save final audio and all segments...")
+    while waited_seconds < max_wait_seconds:
+        await db.refresh(session) # Get the latest state from DB
+        
+        # Check conditions indicating WS has finished its main DB updates:
+        if session.audio_storage_path and session.completion_time:
+            logger.info(f"[{session_id}] WebSocket finalized: audio_storage_path and completion_time are set.")
+            ws_processing_assumed_complete = True
+            break
+        
+        if session.status not in ["recording", "paused", "stopped"]: # If WS changed status to terminal
+            logger.info(f"[{session_id}] WebSocket finalized: session status is now '{session.status}'.")
+            ws_processing_assumed_complete = True
+            break
+            
+        if session.completion_time and session.status == "stopped":
+             logger.info(f"[{session_id}] WebSocket handler set completion_time. Assuming finalization.")
+             ws_processing_assumed_complete = True
+             break
+
+        await asyncio.sleep(poll_interval_seconds)
+        waited_seconds += poll_interval_seconds
+        logger.debug(f"[{session_id}] Polling for WS finalization... waited {waited_seconds:.1f}s. Current status: {session.status}, audio_path: {session.audio_storage_path}, completion_time: {session.completion_time}")
+
+    if not ws_processing_assumed_complete:
+        logger.warning(f"[{session_id}] Timed out waiting for WebSocket handler to fully signal completion after {max_wait_seconds}s. Proceeding with available data.")
+    # --- END MODIFICATION ---
 
     # Re-fetch the session to get updated info (like audio_storage_path and final segments)
     # that should have been populated by the WebSocket handler.
     await db.refresh(session) 
-    logger.info(f"Refreshed session {session_id} data after signaling stop. Current status: {session.status}")
+    logger.info(f"Refreshed session {session_id} data after polling/timeout. Final status from DB: {session.status}")
 
     # The WebSocket handler should have updated session.transcription_segments and session.audio_storage_path.
     # This route now finalizes any remaining metadata or text formatting if necessary.
 
     final_audio_path_str = session.audio_storage_path
     refined_segments = session.transcription_segments or []
+    markers_from_db = session.markers or []
+    
+    logger.info(f"[{session_id}] Using {len(refined_segments)} segments (from WebSocket processing) and {len(markers_from_db)} markers for final transcript generation.")
     
     # Generate an intermediate full_transcript_text from live segments (can include timestamps)
     # This version is saved to the DB and might be overwritten by the frontend's retranscribe.
-    intermediate_full_transcript_text = ""
-    if refined_segments:
-        lines = []
-        for segment_data in refined_segments:
-            speaker = segment_data.get('speaker', 'UNKNOWN')
-            text = segment_data.get('text', '').strip()
-            start_time_seconds = segment_data.get('start')
-            formatted_timestamp = format_time(start_time_seconds)
-            if text:
-                lines.append(f"[{formatted_timestamp}] {speaker}: {text}")
-        intermediate_full_transcript_text = "\n".join(lines)
-        logger.info(f"Generated intermediate transcript text for DB for session {session_id}.")
+    if refined_segments or markers_from_db:
+        intermediate_full_transcript_text = generate_transcript_with_markers(refined_segments, markers_from_db)
+        logger.info(f"Generated final transcript text with markers for DB for session {session_id}.")
     else:
-        logger.info(f"[{session_id}] No refined segments for intermediate transcript text.")
+        intermediate_full_transcript_text = ""
+        logger.info(f"[{session_id}] No refined segments or markers for final transcript text.")
 
     # Update Database with final text transcript path and mark as 'completed' if it was 'stopped'.
     # The WebSocket handler should have set audio_storage_path and transcription_segments.
     # This call mainly finalizes status to 'completed' and saves text transcript path.
-    if session.status == "stopped": # Only update to completed if it was successfully stopped
-        logger.info(f"Updating session {session_id} as 'completed' in DB (intermediate).")
-        update_success = await session_manager.update_session_completion(
-            db,
-            str(session_id),
-            audio_path=final_audio_path_str,
-            # transcript_path=transcript_txt_path_str, # Removed, will be set by update_session_details
-            transcript_text=intermediate_full_transcript_text, # Save intermediate text
-            final_segments=refined_segments
-        )
-        if not update_success:
-            logger.error(f"Failed to update session {session_id} to 'completed' in DB after processing.")
-            # Session status might remain 'stopped' or an error status if WS failed earlier.
+    
+    final_status_for_db = session.status
+    final_completion_time = session.completion_time
+    
+    if final_status_for_db == "stopped":
+        final_status_for_db = "completed"
+        if not final_completion_time:
+            final_completion_time = datetime.utcnow()
+    elif final_status_for_db not in ["completed", "interrupted", "error", "cancelled"]:
+        logger.warning(f"[{session_id}] Unexpected session status '{final_status_for_db}' after WS processing. Setting to 'completed'.")
+        final_status_for_db = "completed"
+        if not final_completion_time:
+            final_completion_time = datetime.utcnow()
+
+    update_success = await session_manager.update_session_completion(
+        db,
+        str(session_id),
+        audio_path=final_audio_path_str,
+        transcript_text=intermediate_full_transcript_text,
+        final_segments=refined_segments
+    )
+    
+    if update_success:
+        session.status = final_status_for_db
+        session.completion_time = final_completion_time
+        # session.last_update is set by update_session_completion
+        await db.commit()
+        logger.info(f"Session {session_id} finalized in DB. Status: {session.status}")
     else:
-        logger.info(f"Session {session_id} status is '{session.status}', not marking as 'completed' via stop_session route.")
+        logger.error(f"Failed to update session {session_id} completion details in DB after processing.")
 
     # Re-fetch one last time to ensure the response reflects the absolute latest state.
     await db.refresh(session)
 
-    logger.info(f"Session {session_id} stop process complete. Final status: {session.status}")
+    logger.info(f"Session {session_id} stop process complete. Final API status: {session.status}")
     return StopSessionResponse(
         session_id=str(session_id),
         status=session.status,
@@ -416,7 +496,6 @@ async def update_session_details(
     if not update_dict:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No update data provided.")
     
-    # Extract full_transcript_text if provided by the client for file writing
     client_provided_full_transcript_text = update_dict.get("full_transcript_text")
         
     success = await session_manager.update_session_details(db, str(session_id), update_dict)
@@ -432,33 +511,64 @@ async def update_session_details(
 
     # If update was successful AND client_provided_full_transcript_text is not None
     # (meaning it was explicitly sent, even if empty string), write the .txt file.
+    # --- MODIFICATION START for update_session_details ---
+    session_after_update = await session_manager.get_session(db, str(session_id)) # Re-fetch to get all current data
+    if not session_after_update:
+        logger.error(f"Session {session_id} not found after presumed successful update. Cannot proceed with transcript file writing.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Session data inconsistent after update.")
+
+    text_to_write_to_file = ""
+
     if client_provided_full_transcript_text is not None:
-        session_after_update = await session_manager.get_session(db, str(session_id))
-        if session_after_update:
-            session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
-            session_storage_path.mkdir(parents=True, exist_ok=True)
+        text_to_write_to_file = client_provided_full_transcript_text
+        logger.info(f"Using client-provided full_transcript_text for session {session_id}.")
+    elif "markers" in update_dict or "transcription_segments" in update_dict: # Check if relevant fields were updated
+        logger.info(f"Regenerating full_transcript_text for session {session_id} due to updated markers/segments.")
+        current_segments = session_after_update.transcription_segments or []
+        current_markers = session_after_update.markers or []
+        
+        text_to_write_to_file = generate_transcript_with_markers(current_segments, current_markers)
+        
+        session_after_update.full_transcript_text = text_to_write_to_file
+        session_after_update.last_update = datetime.utcnow()
+        try:
+            await db.commit()
+            await db.refresh(session_after_update)
+            logger.info(f"Successfully saved regenerated full_transcript_text to DB for session {session_id}.")
+        except Exception as e_commit:
+            await db.rollback()
+            logger.error(f"Failed to commit regenerated full_transcript_text to DB for session {session_id}: {e_commit}")
+    else:
+        text_to_write_to_file = session_after_update.full_transcript_text or ""
+        logger.info(f"Using existing full_transcript_text from DB for session {session_id} for file writing.")
+    # --- MODIFICATION END for update_session_details ---
+    
+    # Write the determined transcript text to file
+    # if client_provided_full_transcript_text is not None: # This condition is now handled by text_to_write_to_file logic
+    # session_after_update = await session_manager.get_session(db, str(session_id)) # Already fetched
+    # if session_after_update: # Already checked
+    session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
+    session_storage_path.mkdir(parents=True, exist_ok=True)
 
-            # Use session_name for the file, fallback to session_id
-            filename_base = session_after_update.session_name or str(session_id)
-            transcript_txt_filename = f"{filename_base}.txt"
-            transcript_txt_full_path = session_storage_path / transcript_txt_filename
+    # Use session_name for the file, fallback to session_id
+    filename_base = session_after_update.session_name or str(session_id)
+    transcript_txt_filename = f"{filename_base}.txt"
+    transcript_txt_full_path = session_storage_path / transcript_txt_filename
 
-            try:
-                with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
-                    f.write(client_provided_full_transcript_text)
-                logger.info(f"Saved/Updated final transcript text file to: {transcript_txt_full_path} (via update_session_details)")
+    try:
+        with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
+            f.write(text_to_write_to_file)
+        logger.info(f"Saved/Updated final transcript text file to: {transcript_txt_full_path} (via update_session_details)")
 
-                # Update transcript_storage_path in the DB if it's different or needs to be set
-                if session_after_update.transcript_storage_path != str(transcript_txt_full_path.resolve()):
-                    session_after_update.transcript_storage_path = str(transcript_txt_full_path.resolve())
-                    session_after_update.last_update = datetime.utcnow()
-                    await db.commit() # Commit this specific change
-                    logger.info(f"Updated transcript_storage_path in DB to {transcript_txt_full_path}")
-            except IOError as e_io:
-                logger.error(f"Failed to save transcript text file to {transcript_txt_full_path} (via update_session_details): {e_io}")
-        else:
-            logger.error(f"Session {session_id} not found after update, cannot write transcript file.")
-             
+        # Update transcript_storage_path in the DB if it's different or needs to be set
+        if session_after_update.transcript_storage_path != str(transcript_txt_full_path.resolve()):
+            session_after_update.transcript_storage_path = str(transcript_txt_full_path.resolve())
+            session_after_update.last_update = datetime.utcnow()
+            await db.commit() # Commit this specific change
+            logger.info(f"Updated transcript_storage_path in DB to {transcript_txt_full_path}")
+    except IOError as e_io:
+        logger.error(f"Failed to save transcript text file to {transcript_txt_full_path} (via update_session_details): {e_io}")
+
     return SchemaUpdateSessionResponse(session_id=session_id, updated_at=datetime.utcnow())
 
 # --- Marker Endpoint --- 

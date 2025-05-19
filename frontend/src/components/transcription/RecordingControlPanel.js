@@ -892,6 +892,42 @@ const RecordingControlPanel = ({
             successfullyStoppedOnBackend = true;
             
             dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
+
+            if (successfullyStoppedOnBackend && sessionToStop) {
+              console.log(`[API] Fetching final transcript for session ${sessionToStop}`);
+              setSnackbarMessage('Fetching final transcript...');
+              setSnackbarSeverity('info');
+              setSnackbarOpen(true);
+
+              try {
+                const transcriptUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/transcription`);
+                const transcriptResponse = await fetch(transcriptUrl, {
+                  method: 'GET',
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!transcriptResponse.ok) {
+                  const errorText = await transcriptResponse.text();
+                  throw new Error(`Failed to fetch final transcript: ${transcriptResponse.status} ${errorText}`);
+                }
+                const transcriptData = await transcriptResponse.json();
+                dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: transcriptData.full_transcript_text || "" });
+                // Optionally, if you also want to update segments in the context from transcriptData.transcription_segments:
+                // dispatch({ type: 'SET_FINAL_SEGMENTS', payload: transcriptData.transcription_segments || [] });
+                // This would require defining SET_FINAL_SEGMENTS action in TranscriptionContext.
+
+                setSnackbarMessage('Final transcript loaded.');
+                setSnackbarSeverity('success');
+                setSnackbarOpen(true);
+
+              } catch (fetchTranscriptError) {
+                console.error('[API] Error fetching final transcript:', fetchTranscriptError);
+                setSnackbarMessage(`Error fetching final transcript: ${fetchTranscriptError.message}`);
+                setSnackbarSeverity('error');
+                setSnackbarOpen(true);
+                // The transcript in context might be slightly stale if this fails, but session is stopped.
+              }
+            }
           }
         } catch (apiStopError) {
           console.error(`[API] Network or other error stopping session ${sessionToStop}:`, apiStopError);
@@ -909,11 +945,13 @@ const RecordingControlPanel = ({
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
-          recordedAudioBlob = completeAudioBlob;
+          // Keep recordedAudioBlob if it's used for local display or backup, 
+          // but it's not strictly needed for the new flow if not used elsewhere.
+          // recordedAudioBlob = completeAudioBlob; 
           
           const downloadUrl = URL.createObjectURL(completeAudioBlob);
-          if (waveformRef) {
-            waveformRef.current.loadBlob(completeAudioBlob);
+          if (waveformRef && waveformRef.current) {
+            waveformRef.current.loadBlob(completeAudioBlob); // For local display if needed
           }
           const a = document.createElement('a');
           a.href = downloadUrl;
@@ -924,9 +962,9 @@ const RecordingControlPanel = ({
           URL.revokeObjectURL(downloadUrl);
           console.log('Audio also saved locally (backup).');
           
-          if (successfullyStoppedOnBackend && recordedAudioBlob && sessionToStop) {
-            retranscribeFinalAudio(sessionToStop, recordedAudioBlob);
-          }
+          // --- Call to retranscribeFinalAudio has been removed from here ---
+          // The backend now handles the final transcript generation comprehensively.
+
         } catch (saveError) {
           console.error('Error processing local audio blob:', saveError);
         }
