@@ -578,6 +578,31 @@ function ReportDesignerPage() {
     try {
       // Special case for Word export - use backend endpoint
       if (format === 'docx') {
+        // If there are unsaved changes, save the report first
+        if (hasUnsavedChanges) {
+          setSnackbar({
+            open: true,
+            message: 'Saving report before Word export...', 
+            severity: 'info'
+          });
+          await handleSave(); // Wait for save to complete
+          // Check if save was successful, if not, stop export
+          if (error) { // Assuming handleSave sets an error state
+             setSnackbar({
+                open: true,
+                message: 'Failed to save report. Word export aborted.',
+                severity: 'error'
+            });
+            handleExportMenuClose();
+            return;
+          }
+           setSnackbar({
+            open: true,
+            message: 'Report saved. Proceeding with Word export.',
+            severity: 'success'
+          });
+        }
+
         setSnackbar({
           open: true,
           message: 'Preparing Word document, please wait...',
@@ -604,8 +629,8 @@ function ReportDesignerPage() {
         // Get filename suggestion
         const contentDisposition = response.headers['content-disposition'];
         const suggestedName = contentDisposition
-          ? contentDisposition.split('filename=')[1].replace(/"/g, '')
-          : `${currentDefinition.title.replace(/\s+/g, '_')}.docx`;
+          ? contentDisposition.split('filename=')[1].replace(/"/g, '').replace(/\.docx$/, '-docx.docx')
+          : `${currentDefinition.title.replace(/\s+/g, '_')}-docx.docx`;
         
         // Check if the File System Access API is available
         if ('showSaveFilePicker' in window) {
@@ -715,7 +740,7 @@ function ReportDesignerPage() {
       const blob = new Blob([fileContent], { type: fileType });
       
       // Suggested file name
-      const suggestedName = `${reportTitle.replace(/\s+/g, '_')}.${fileExtension}`;
+      const suggestedName = `${reportTitle.replace(/\s+/g, '_')}-${fileExtension}.${fileExtension}`;
       
       // Check if the File System Access API is available
       if ('showSaveFilePicker' in window) {
@@ -835,22 +860,27 @@ function ReportDesignerPage() {
 
   const getReportText = () => {
     if (!currentDefinition || !currentDefinition.elements) return '';
-    
+
     return currentDefinition.elements.map(element => {
+      let content = '';
       if (element.type === 'explicit') {
-        let content = element.content || '';
-        if (element.format && element.format.startsWith('h')) {
-          const level = parseInt(element.format.substring(1), 10) || 1;
-          const prefix = '#'.repeat(level) + ' ';
-          return prefix + content;
-        } else if (element.format === 'bulletList') {
-          return content.split('\n').map(line => `- ${line}`).join('\n');
-        } else if (element.format === 'numberedList') {
-          return content.split('\n').map((line, i) => `${i+1}. ${line}`).join('\n');
-        }
-        return content;
+        content = element.content || '';
+      } else if (element.type === 'generative') {
+        // Use ai_generated_content for generative sections
+        // Fallback to a placeholder if content is not yet generated or if there was an error
+        content = element.ai_generated_content || `[Content for '${element.title || 'generative section'}' not generated or error occurred]`;
       }
-      return '';
+
+      if (element.format && element.format.startsWith('h')) {
+        const level = parseInt(element.format.substring(1), 10) || 1;
+        const prefix = '#'.repeat(level) + ' ';
+        return prefix + content;
+      } else if (element.format === 'bulletList') {
+        return content.split('\n').map(line => `- ${line}`).join('\n');
+      } else if (element.format === 'numberedList') {
+        return content.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
+      }
+      return content;
     }).filter(Boolean).join('\n\n');
   };
 
