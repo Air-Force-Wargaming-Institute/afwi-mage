@@ -32,6 +32,8 @@ import { GradientText, SubtleGlowPaper } from '../../styles/StyledComponents';
 import { getGatewayUrl } from '../../config';
 import axios from 'axios';
 import { AuthContext } from '../../contexts/AuthContext';
+import ReportTextEditorModal from './ReportTextEditorModal';
+import FullscreenIcon from '@material-ui/icons/Fullscreen';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -201,6 +203,20 @@ const useStyles = makeStyles((theme) => ({
   regenerateTooltip: {
     maxWidth: 280,
   },
+  textFieldContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  expandButton: {
+    position: 'absolute',
+    right: theme.spacing(0.5),
+    top: theme.spacing(0.5),
+    zIndex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    }
+  },
 }));
 
 // Available format options
@@ -228,6 +244,16 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   const [editingTitle, setEditingTitle] = useState(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const isTemplate = definition?.isTemplate || false;
+  
+  // State for the new Text Editor Modal
+  const [isReportTextEditorOpen, setIsReportTextEditorOpen] = useState(false);
+  const [reportTextEditorConfig, setReportTextEditorConfig] = useState({
+    title: '',
+    value: '',
+    elementId: null,
+    field: '',
+    placeholder: '',
+  });
   
   const fetchVectorStores = async () => {
     if (!token) return;
@@ -432,6 +458,30 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
 
   const areAllCollapsed = () => {
     return (definition?.elements || []).every(element => collapsedElements[element.id]);
+  };
+
+  // Helper functions for the ReportTextEditorModal
+  const handleOpenReportTextEditor = (elementId, field, currentValue, title, placeholder) => {
+    setReportTextEditorConfig({
+      elementId,
+      field,
+      value: currentValue,
+      title,
+      placeholder,
+    });
+    setIsReportTextEditorOpen(true);
+  };
+
+  const handleCloseReportTextEditor = () => {
+    setIsReportTextEditorOpen(false);
+  };
+
+  const handleReportTextEditorSave = (newValue) => {
+    const { elementId, field } = reportTextEditorConfig;
+    if (elementId && field) {
+      handleElementChange(elementId, field, newValue);
+    }
+    handleCloseReportTextEditor();
   };
 
   return (
@@ -662,43 +712,77 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
                 </Box>
                 
                 {element.type === 'explicit' ? (
-                  <TextField
-                    multiline
-                    rows={2}
-                    fullWidth
-                    variant="outlined"
-                    margin="dense"
-                    size="small"
-                    value={isBulletFormat(element) ? getBulletItems(element).join('\n') : element.content || ''}
-                    onChange={(e) => {
-                      if (isBulletFormat(element)) {
-                        handleBulletChange(element.id || index, e.target.value, element);
-                      } else {
-                        handleElementChange(element.id || index, 'content', e.target.value);
+                  <Box className={classes.textFieldContainer}>
+                    <TextField
+                      multiline
+                      rows={2}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      size="small"
+                      value={isBulletFormat(element) ? getBulletItems(element).join('\\n') : element.content || ''}
+                      onChange={(e) => {
+                        if (isBulletFormat(element)) {
+                          handleBulletChange(element.id || index, e.target.value, element);
+                        } else {
+                          handleElementChange(element.id || index, 'content', e.target.value);
+                        }
+                      }}
+                      label={
+                        isBulletFormat(element) ? 
+                        'Content: Use line breaks for new items.' : 
+                        element.format === 'numberedList' ? 
+                        'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
+                        element.format === 'paragraph' ? 
+                        'Content: Line breaks will be preserved.' : 
+                        'Content: Formatting is controlled by the buttons above.'
                       }
-                    }}
-                    label={
-                      isBulletFormat(element) ? 
-                      'Content: Use line breaks for new items.' : 
-                      element.format === 'numberedList' ? 
-                      'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
-                      element.format === 'paragraph' ? 
-                      'Content: Line breaks will be preserved.' : 
-                      'Content: Formatting is controlled by the buttons above.'
-                    }
-                  />
+                    />
+                    <Tooltip title="Open Fullscreen Editor">
+                      <IconButton
+                        size="small"
+                        className={classes.expandButton}
+                        onClick={() => handleOpenReportTextEditor(
+                          element.id || index,
+                          'content',
+                          element.content || '',
+                          `Edit Content for ${element.title || 'Element ' + (index + 1)}`,
+                          isBulletFormat(element) ? 'Enter bullet items (one item per line)...': 'Enter element content...'
+                        )}
+                      >
+                        <FullscreenIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 ) : (
-                  <TextField
-                    label="AI Prompt - Provide instructions for MAGE to generate this element."
-                    multiline
-                    rows={2}
-                    fullWidth
-                    variant="outlined"
-                    margin="dense"
-                    size="small"
-                    value={element.instructions || ''}
-                    onChange={(e) => handleElementChange(element.id || index, 'instructions', e.target.value)}
-                  />
+                  <Box className={classes.textFieldContainer}>
+                    <TextField
+                      label="AI Prompt - Provide instructions for MAGE to generate this element."
+                      multiline
+                      rows={2}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      size="small"
+                      value={element.instructions || ''}
+                      onChange={(e) => handleElementChange(element.id || index, 'instructions', e.target.value)}
+                    />
+                    <Tooltip title="Open Fullscreen Editor">
+                      <IconButton
+                        size="small"
+                        className={classes.expandButton}
+                        onClick={() => handleOpenReportTextEditor(
+                          element.id || index,
+                          'instructions',
+                          element.instructions || '',
+                          `Edit AI Prompt for ${element.title || 'Element ' + (index + 1)}`,
+                          'Enter AI prompt instructions...'
+                        )}
+                      >
+                        <FullscreenIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 )}
               </Box>
             </Collapse>
@@ -731,6 +815,16 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
       >
         Add Element to End
       </Button>
+
+      <ReportTextEditorModal
+        open={isReportTextEditorOpen}
+        onClose={handleCloseReportTextEditor}
+        title={reportTextEditorConfig.title}
+        value={reportTextEditorConfig.value}
+        onChange={handleReportTextEditorSave}
+        placeholder={reportTextEditorConfig.placeholder}
+        // rows={15} // Optionally set a different default row count for this modal instance
+      />
     </Box>
   );
 }
