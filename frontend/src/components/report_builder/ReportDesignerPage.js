@@ -90,6 +90,7 @@ const useStyles = makeStyles((theme) => ({
   },
   leftPanel: {
     minWidth: '400px',
+    flexShrink: 0,
     borderRight: `1px solid ${theme.palette.divider}`,
     overflowY: 'auto',
     padding: theme.spacing(2),
@@ -110,7 +111,8 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   rightPanel: {
-    minWidth: '800px',
+    flexGrow: 1,
+    minWidth: 0,
     overflowY: 'auto',
     padding: theme.spacing(2),
     height: 'calc(100vh - 64px)',

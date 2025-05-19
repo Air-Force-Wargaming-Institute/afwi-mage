@@ -41,9 +41,20 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.background.default,
     position: 'relative', // For positioning edit/save buttons
   },
+  stickyButtonWrapper: { // New style for the sticky container
+    position: 'sticky',
+    top: -theme.spacing(1), // Adjust for parent padding to be ts(1) from border
+    left: 0,
+    width: '100%',
+    zIndex: 10, // Ensure it's above other content
+    display: 'flex',
+    justifyContent: 'flex-end', // Push buttons to the right
+    paddingRight: theme.spacing(1), // Position buttons ts(1) from the visual right border
+    pointerEvents: 'none', // Allow clicks to pass through empty areas
+    marginBottom: theme.spacing(1), // Add some space below the sticky bar if needed
+  },
   editorArea: { // Style for the editing mode
     width: '100%',
-    height: '100%', // Take full height when editing
     fontFamily: theme.typography.fontFamily,
     fontSize: '1rem',
     lineHeight: 1.5,
@@ -55,18 +66,20 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
   },
   editButton: {
-    position: 'absolute',
-    top: theme.spacing(1),
-    right: theme.spacing(1),
-    zIndex: 1,
+    // Position styles removed, handled by stickyButtonWrapper
+    // top: theme.spacing(1),
+    // right: theme.spacing(1),
+    // zIndex: 1,
+    pointerEvents: 'auto', // Ensure the button itself is clickable
   },
   saveCancelContainer: {
-    position: 'absolute',
-    top: theme.spacing(1),
-    right: theme.spacing(1),
-    zIndex: 1,
+    // Position styles removed, handled by stickyButtonWrapper
+    // top: theme.spacing(1),
+    // right: theme.spacing(1),
+    // zIndex: 1,
     display: 'flex',
     gap: theme.spacing(1),
+    pointerEvents: 'auto', // Ensure the container (and its buttons) are clickable
   },
   toolbar: {
     display: 'flex',
@@ -640,6 +653,31 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
   return (
     <Box className={classes.root}>
       <Box className={classes.previewArea}>
+        {/* Sticky container for buttons at the top */}
+        <Box className={classes.stickyButtonWrapper}>
+          {isEditing ? (
+            // saveCancelContainer is now just a flex row, not for positioning
+            <Box className={classes.saveCancelContainer}>
+              <Button variant="contained" color="primary" onClick={handleSaveClick} size="small">
+                Apply Changes
+              </Button>
+              <Button variant="outlined" onClick={handleCancelClick} size="small">
+                Cancel
+              </Button>
+            </Box>
+          ) : (
+            <Button
+              className={classes.editButton} // editButton class is now for non-positional styles
+              variant="outlined"
+              size="small"
+              onClick={handleEditClick}
+            >
+              Edit
+            </Button>
+          )}
+        </Box>
+
+        {/* Actual content that scrolls */}
         {isEditing ? (
           <>
             <TextareaAutosize
@@ -648,34 +686,11 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
               onChange={handleEditorChange}
               placeholder="Edit report content..."
             />
-            <Box className={classes.saveCancelContainer}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSaveClick}
-                size="small"
-              >
-                Save
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleCancelClick}
-                size="small"
-              >
-                Cancel
-              </Button>
-            </Box>
+            {/* saveCancelContainer was previously here, now buttons are in stickyButtonWrapper above */}
           </>
         ) : (
           <>
-            <Button
-              className={classes.editButton}
-              variant="outlined"
-              size="small"
-              onClick={handleEditClick}
-            >
-              Edit
-            </Button>
+            {/* editButton was previously here, now in stickyButtonWrapper above */}
             <Box className={classes.markdown}>
               {renderElements()}
             </Box>
