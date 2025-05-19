@@ -136,9 +136,9 @@ async def start_session(
             response_model=StopSessionResponse,
             summary="Stop and finalize a recording session")
 async def stop_session(
-    session_id: UUID, # Use UUID for path validation
-    stop_request: StopSessionRequest = Body(...), # Keep for future output format options
-    db: AsyncSession = Depends(get_db_session) # Inject DB session
+    session_id: UUID,
+    stop_request: StopSessionRequest = Body(...),
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
     Signals the WebSocket to stop the recording session, finalize processing,
@@ -201,18 +201,6 @@ async def stop_session(
     else:
         logger.info(f"[{session_id}] No refined segments for intermediate transcript text.")
 
-    # REMOVE .txt file writing logic from here.
-    # The transcript_storage_path and file will be handled by update_session_details.
-
-    # Cleanup _chunks directory (if it was used)
-    session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
-    if session_storage_path.exists() and session_storage_path.is_dir():
-        try:
-            shutil.rmtree(session_storage_path)
-            logger.info(f"Cleaned up _chunks directory: {session_storage_path} for session {session_id}")
-        except Exception as e_cleanup:
-            logger.error(f"Error during _chunks directory cleanup for session {session_id}: {e_cleanup}")
-
     # Update Database with final text transcript path and mark as 'completed' if it was 'stopped'.
     # The WebSocket handler should have set audio_storage_path and transcription_segments.
     # This call mainly finalizes status to 'completed' and saves text transcript path.
@@ -238,8 +226,8 @@ async def stop_session(
     logger.info(f"Session {session_id} stop process complete. Final status: {session.status}")
     return StopSessionResponse(
         session_id=str(session_id),
-        status=session.status, # Return the actual current status from DB
-        completion_timestamp=session.completion_time or datetime.utcnow() # Provide completion time
+        status=session.status,
+        completion_timestamp=session.completion_time or datetime.utcnow()
     )
 
 @router.post("/api/transcription/sessions/{session_id}/pause", 
