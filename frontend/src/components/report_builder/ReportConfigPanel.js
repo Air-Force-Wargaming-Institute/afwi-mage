@@ -229,10 +229,28 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const isTemplate = definition?.isTemplate || false;
   
-  // New generic handler for simple field changes
-  const handleFieldChange = (e) => {
-    const { name, value } = e.target;
-    onChange({ type: 'UPDATE_REPORT_FIELD', field: name, value: value });
+  const fetchVectorStores = async () => {
+    if (!token) return;
+    
+    setIsLoadingVectorStores(true);
+    setVectorStoreError(null);
+    try {
+      const response = await axios.get(
+        getGatewayUrl('/api/report_builder/vector_stores'),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      setVectorStores(response.data);
+    } catch (error) {
+      console.error('Error fetching vector stores:', error);
+      setVectorStoreError(error.response?.data?.detail || error.message);
+      setVectorStores([]);
+    } finally {
+      setIsLoadingVectorStores(false);
+    }
   };
 
   useEffect(() => {
@@ -268,34 +286,11 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
     }
   }, [definition, onChange, currentReportId]);
 
-  // Load vector stores from API
-  useEffect(() => {
-    const fetchVectorStores = async () => {
-      if (!token) return; // Skip if no token available
-      
-      setIsLoadingVectorStores(true);
-      setVectorStoreError(null);
-      try {
-        const response = await axios.get(
-          getGatewayUrl('/api/report_builder/vector_stores'),
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
-        );
-        setVectorStores(response.data);
-      } catch (error) {
-        console.error('Error fetching vector stores:', error);
-        setVectorStoreError(error.response?.data?.detail || error.message);
-        setVectorStores([]);
-      } finally {
-        setIsLoadingVectorStores(false);
-      }
-    };
-    
-    fetchVectorStores();
-  }, [token]);
+  // New generic handler for simple field changes
+  const handleFieldChange = (e) => {
+    const { name, value } = e.target;
+    onChange({ type: 'UPDATE_REPORT_FIELD', field: name, value: value });
+  };
 
   const createNewElement = () => ({
     id: `element-${Date.now()}`,
@@ -472,6 +467,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
               name="vectorStoreId"
               value={definition?.vectorStoreId || ''}
               onChange={handleFieldChange}
+              onOpen={fetchVectorStores}
             >
               <MenuItem value="">
                 <em>None</em>
