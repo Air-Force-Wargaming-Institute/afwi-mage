@@ -718,6 +718,19 @@ const RecordingControlPanel = ({
       return;
     }
 
+    // Helper function to format timestamps (HH:MM:SS)
+    const formatTimestampForFile = (seconds) => {
+      if (seconds === null || seconds === undefined) return "00:00:00";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      return [
+        h.toString().padStart(2, '0'),
+        m.toString().padStart(2, '0'),
+        s.toString().padStart(2, '0')
+      ].join(':');
+    };
+
     try {
       console.log(`[FinalTranscription] Starting final transcription of audio blob: ${(completeAudioBlob.size / 1024).toFixed(2)} KB`);
       
@@ -746,45 +759,44 @@ const RecordingControlPanel = ({
       const transcribeResult = await transcribeResponse.json();
       console.log('[FinalTranscription] Response parsed:', transcribeResult);
       
-      if (!transcribeResult.segments || !Array.isArray(transcribeResult.segments) || transcribeResult.segments.length === 0) {
-        console.warn('[FinalTranscription] No segments found in transcription result:', transcribeResult);
-        setSnackbarMessage('Final transcription produced no text segments');
+      if (!transcribeResult.segments || !Array.isArray(transcribeResult.segments)) { // Allow empty segments array
+        console.warn('[FinalTranscription] No segments array in transcription result:', transcribeResult);
+        setSnackbarMessage('Final transcription produced no segments data.');
         setSnackbarSeverity('warning');
         setSnackbarOpen(true);
-        return;
+        // Update DB with empty text if appropriate, or handle as error
+        dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: "" }); 
+        // Optionally PUT empty text to backend here if that's the desired outcome
+        // For now, we'll let it proceed to generate empty fullTextWithTimestamps
       }
       
-      console.log(`[FinalTranscription] Received ${transcribeResult.segments.length} segments`);
-      console.log('[FinalTranscription] First segment:', transcribeResult.segments[0]);
-      console.log('[FinalTranscription] Last segment:', transcribeResult.segments[transcribeResult.segments.length - 1]);
+      const sortedSegments = transcribeResult.segments ? [...transcribeResult.segments].sort((a, b) => (a.start || 0) - (b.start || 0)) : [];
       
-      const sortedSegments = [...transcribeResult.segments].sort((a, b) => (a.start || 0) - (b.start || 0));
-      
-      let fullText = '';
+      let fullTextWithTimestamps = '';
       sortedSegments.forEach(segment => {
-        if (segment.text) {
-          const speakerLabel = segment.speaker && segment.speaker !== 'UNKNOWN' 
-            ? `${segment.speaker}: ` 
-            : '';
-          
-          fullText += `${speakerLabel}${segment.text.trim()}\n`;
+        if (segment.text && segment.text.trim() !== "") { // Ensure text is not just whitespace
+          // Provide a default speaker label if 'speaker' is missing or UNKNOWN
+          const speakerName = segment.speaker && segment.speaker !== 'UNKNOWN' ? segment.speaker : 'SPEAKER';
+          const speakerLabel = `${speakerName}: `;
+          const startTime = formatTimestampForFile(segment.start); // segment.start should exist
+          fullTextWithTimestamps += `[${startTime}] ${speakerLabel}${segment.text.trim()}\n`;
         }
       });
       
-      if (!fullText) {
-        console.warn('[FinalTranscription] Generated transcript text is empty');
-        setSnackbarMessage('Final transcription produced no text');
-        setSnackbarSeverity('warning');
-        setSnackbarOpen(true);
-        return;
+      if (transcribeResult.segments && transcribeResult.segments.length > 0 && !fullTextWithTimestamps) {
+        console.warn('[FinalTranscription] Segments found, but all had empty or whitespace-only text. Transcript will be empty.');
+      } else if (!fullTextWithTimestamps && (!transcribeResult.segments || transcribeResult.segments.length === 0)) {
+        console.warn('[FinalTranscription] Generated transcript text is empty. Original segments were likely empty or missing.');
       }
       
-      console.log(`[FinalTranscription] Generated transcript text (${fullText.length} chars):`);
-      console.log(fullText.substring(0, 200) + (fullText.length > 200 ? '...' : ''));
+      // Ensure fullTextWithTimestamps is at least an empty string if no valid segments found
+      fullTextWithTimestamps = fullTextWithTimestamps || "";
+
+      console.log(`[FinalTranscription] Generated transcript text with timestamps (${fullTextWithTimestamps.length} chars).`);
       
-      dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: fullText });
+      dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: fullTextWithTimestamps });
       
-      console.log('[FinalTranscription] Updating database with new transcript text');
+      console.log('[FinalTranscription] Updating database with new transcript text (with timestamps)');
       const updateResponse = await fetch(getGatewayUrl(`/api/transcription/sessions/${sessionId}`), {
         method: 'PUT',
         headers: {
@@ -792,7 +804,9 @@ const RecordingControlPanel = ({
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          full_transcript_text: fullText
+          full_transcript_text: fullTextWithTimestamps,
+          // Optionally, if the backend should also store these re-transcribed segments:
+          // transcription_segments: sortedSegments, 
         })
       });
       
@@ -911,9 +925,7 @@ const RecordingControlPanel = ({
           console.log('Audio also saved locally (backup).');
           
           if (successfullyStoppedOnBackend && recordedAudioBlob && sessionToStop) {
-            setTimeout(() => {
-              retranscribeFinalAudio(sessionToStop, recordedAudioBlob);
-            }, 1000);
+            retranscribeFinalAudio(sessionToStop, recordedAudioBlob);
           }
         } catch (saveError) {
           console.error('Error processing local audio blob:', saveError);

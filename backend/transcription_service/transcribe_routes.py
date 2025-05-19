@@ -14,6 +14,7 @@ import pathlib # For path manipulation
 import subprocess # For running ffmpeg
 import shutil # For cleaning up chunk directory
 import asyncio # Added for asyncio.sleep
+import math # Add math for floor operation
 
 # Import config constants directly using relative path
 from config import DEVICE, BATCH_SIZE, ARTIFACT_STORAGE_BASE_PATH # Import new config
@@ -36,6 +37,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Helper function to format time in HH:MM:SS
+def format_time(seconds: float) -> str:
+    if seconds is None:
+        return "00:00:00"
+    if not isinstance(seconds, (int, float)):
+        try:
+            seconds = float(seconds) # Attempt conversion
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid type for seconds: {seconds}. Returning placeholder.")
+            return "00:00:00" 
+
+    h = math.floor(seconds / 3600)
+    m = math.floor((seconds % 3600) / 60)
+    s = math.floor(seconds % 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 # --- START EDIT ---
 # Dependency to get authenticated user ID from header
@@ -166,80 +183,48 @@ async def stop_session(
 
     final_audio_path_str = session.audio_storage_path
     refined_segments = session.transcription_segments or []
-    full_transcript_text = ""
-    session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
-    transcript_txt_path_str = None
     
-    try:
-        # Ensure session storage directory exists (might be created by WS handler too)
-        session_storage_path.mkdir(parents=True, exist_ok=True)
+    # Generate an intermediate full_transcript_text from live segments (can include timestamps)
+    # This version is saved to the DB and might be overwritten by the frontend's retranscribe.
+    intermediate_full_transcript_text = ""
+    if refined_segments:
+        lines = []
+        for segment_data in refined_segments:
+            speaker = segment_data.get('speaker', 'UNKNOWN')
+            text = segment_data.get('text', '').strip()
+            start_time_seconds = segment_data.get('start')
+            formatted_timestamp = format_time(start_time_seconds)
+            if text:
+                lines.append(f"[{formatted_timestamp}] {speaker}: {text}")
+        intermediate_full_transcript_text = "\n".join(lines)
+        logger.info(f"Generated intermediate transcript text for DB for session {session_id}.")
+    else:
+        logger.info(f"[{session_id}] No refined segments for intermediate transcript text.")
 
-        # FFmpeg concatenation logic is REMOVED. 
-        # final_audio_path_str is now sourced from session.audio_storage_path set by WS handler.
-        if not final_audio_path_str:
-            logger.warning(f"[{session_id}] audio_storage_path not set by WebSocket handler after stop signal.")
-            # This might indicate an issue or a race condition if sleep is too short.
+    # REMOVE .txt file writing logic from here.
+    # The transcript_storage_path and file will be handled by update_session_details.
 
-        # Speaker tag application (if needed and if markers are separate from segments)
-        # Your existing logic for speaker tag application to `refined_segments` would go here
-        # if it wasn't already part of the WebSocket's segment finalization.
-        # For now, assuming WebSocket provides the final `refined_segments`.
-        
-        # Generate Final Transcript Text from refined_segments
-        if refined_segments:
-            lines = []
-            for segment_data in refined_segments:
-                speaker = segment_data.get('speaker', 'UNKNOWN') # Assuming speaker is in segment_data
-                text = segment_data.get('text', '').strip()
-                if text:
-                    lines.append(f"{speaker}: {text}")
-            full_transcript_text = "\n".join(lines)
-            logger.info(f"Generated final transcript text ({len(full_transcript_text)} chars) for session {session_id} from DB segments.")
-
-            # Save Final Transcript File(s) if text was generated
-            if full_transcript_text:
-                transcript_filename_base = stop_request.transcription_filename or str(session_id)
-                transcript_txt_filename = f"{transcript_filename_base}.txt"
-                transcript_txt_full_path = session_storage_path / transcript_txt_filename
-                try:
-                    with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
-                        f.write(full_transcript_text)
-                    transcript_txt_path_str = str(transcript_txt_full_path.resolve())
-                    logger.info(f"Saved final transcript text file to: {transcript_txt_path_str}")
-                except IOError as e_io:
-                    logger.error(f"Failed to save transcript text file to {transcript_txt_full_path}: {e_io}")
-                    # transcript_txt_path_str remains None
-        else:
-            logger.info(f"[{session_id}] No refined segments found in DB, cannot generate final transcript text.")
-
-        # Cleanup of _chunks directory (if it was ever created by the old save_audio_chunk)
-        # This can be removed if save_audio_chunk is fully deprecated and no longer writes there.
-        chunk_dir_to_remove = session_storage_path / "_chunks"
-        if chunk_dir_to_remove.exists() and chunk_dir_to_remove.is_dir():
-            try:
-                shutil.rmtree(chunk_dir_to_remove)
-                logger.info(f"Cleaned up _chunks directory: {chunk_dir_to_remove} for session {session_id}")
-            except Exception as e_cleanup:
-                logger.error(f"Error during _chunks directory cleanup for session {session_id}: {e_cleanup}")
-
-    except Exception as e_final_proc:
-        logger.error(f"Error during final post-processing for session {session_id}: {e_final_proc}", exc_info=True)
-        # Don't update status to error_processing here if WS handler already set it or a terminal state.
-        # This route primarily orchestrates the stop signal.
-        # Log the error, the response will reflect the current DB status.
+    # Cleanup _chunks directory (if it was used)
+    session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
+    if session_storage_path.exists() and session_storage_path.is_dir():
+        try:
+            shutil.rmtree(session_storage_path)
+            logger.info(f"Cleaned up _chunks directory: {session_storage_path} for session {session_id}")
+        except Exception as e_cleanup:
+            logger.error(f"Error during _chunks directory cleanup for session {session_id}: {e_cleanup}")
 
     # Update Database with final text transcript path and mark as 'completed' if it was 'stopped'.
     # The WebSocket handler should have set audio_storage_path and transcription_segments.
     # This call mainly finalizes status to 'completed' and saves text transcript path.
     if session.status == "stopped": # Only update to completed if it was successfully stopped
-        logger.info(f"Updating session {session_id} as 'completed' in DB with final transcript path.")
+        logger.info(f"Updating session {session_id} as 'completed' in DB (intermediate).")
         update_success = await session_manager.update_session_completion(
             db,
             str(session_id),
-            audio_path=final_audio_path_str, # This should already be set by WS
-            transcript_path=transcript_txt_path_str,
-            transcript_text=full_transcript_text,
-            final_segments=refined_segments # These should also be set by WS
+            audio_path=final_audio_path_str,
+            # transcript_path=transcript_txt_path_str, # Removed, will be set by update_session_details
+            transcript_text=intermediate_full_transcript_text, # Save intermediate text
+            final_segments=refined_segments
         )
         if not update_success:
             logger.error(f"Failed to update session {session_id} to 'completed' in DB after processing.")
@@ -429,7 +414,7 @@ class UpdateSessionResponse(BaseModel): # This local definition is fine if it's 
      updated_at: datetime
 
 @router.put("/api/transcription/sessions/{session_id}", 
-            response_model=UpdateSessionResponse, # Uses the local UpdateSessionResponse
+            response_model=SchemaUpdateSessionResponse, # Uses the aliased UpdateSessionResponse
             summary="Update details of a session")
 async def update_session_details(
     session_id: UUID, 
@@ -442,6 +427,9 @@ async def update_session_details(
     
     if not update_dict:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No update data provided.")
+    
+    # Extract full_transcript_text if provided by the client for file writing
+    client_provided_full_transcript_text = update_dict.get("full_transcript_text")
         
     success = await session_manager.update_session_details(db, str(session_id), update_dict)
     
@@ -453,8 +441,37 @@ async def update_session_details(
         else:
              # Update failed for other reason (logged in manager)
              raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update session details.")
+
+    # If update was successful AND client_provided_full_transcript_text is not None
+    # (meaning it was explicitly sent, even if empty string), write the .txt file.
+    if client_provided_full_transcript_text is not None:
+        session_after_update = await session_manager.get_session(db, str(session_id))
+        if session_after_update:
+            session_storage_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / str(session_id)
+            session_storage_path.mkdir(parents=True, exist_ok=True)
+
+            # Use session_name for the file, fallback to session_id
+            filename_base = session_after_update.session_name or str(session_id)
+            transcript_txt_filename = f"{filename_base}.txt"
+            transcript_txt_full_path = session_storage_path / transcript_txt_filename
+
+            try:
+                with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
+                    f.write(client_provided_full_transcript_text)
+                logger.info(f"Saved/Updated final transcript text file to: {transcript_txt_full_path} (via update_session_details)")
+
+                # Update transcript_storage_path in the DB if it's different or needs to be set
+                if session_after_update.transcript_storage_path != str(transcript_txt_full_path.resolve()):
+                    session_after_update.transcript_storage_path = str(transcript_txt_full_path.resolve())
+                    session_after_update.last_update = datetime.utcnow()
+                    await db.commit() # Commit this specific change
+                    logger.info(f"Updated transcript_storage_path in DB to {transcript_txt_full_path}")
+            except IOError as e_io:
+                logger.error(f"Failed to save transcript text file to {transcript_txt_full_path} (via update_session_details): {e_io}")
+        else:
+            logger.error(f"Session {session_id} not found after update, cannot write transcript file.")
              
-    return UpdateSessionResponse(session_id=session_id, updated_at=datetime.utcnow())
+    return SchemaUpdateSessionResponse(session_id=session_id, updated_at=datetime.utcnow())
 
 # --- Marker Endpoint --- 
 
