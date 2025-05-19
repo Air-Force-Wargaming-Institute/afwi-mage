@@ -5,6 +5,7 @@ import {
   Box, 
   makeStyles, 
   Button, 
+  ButtonGroup,
   Typography, 
   AppBar, 
   Toolbar, 
@@ -143,6 +144,7 @@ function ReportDesignerPage() {
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [saveMenuAnchor, setSaveMenuAnchor] = useState(null);
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [isNewReport, setIsNewReport] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
@@ -255,6 +257,9 @@ function ReportDesignerPage() {
       
       // If we have a reportId, fetch the existing report or template
       if (reportId) {
+        setIsNewReport(false); // Ensure this is false when loading an existing report
+        setIsNewTemplate(false); // Ensure this is false when loading an existing template
+
         // Determine the API endpoint based on whether we're editing a template or report
         const endpoint = isTemplate 
           ? getGatewayUrl(`/api/report_builder/templates/${reportId}`)
@@ -377,17 +382,41 @@ function ReportDesignerPage() {
     };
   }, [hasUnsavedChanges]);
 
-  const handleDefinitionChange = (newDefinition) => {
-    // Ensure the isTemplate flag is preserved
+  // Diagnostic useEffect to track title changes in currentDefinition
+  useEffect(() => {
+    console.log('[DEBUG] ReportDesignerPage - currentDefinition.title updated to:', currentDefinition?.title);
+  }, [currentDefinition?.title]);
+
+  const handleDefinitionChange = (newDefinitionOrAction) => {
     const urlParams = new URLSearchParams(window.location.search);
-    const isTemplate = urlParams.get('isTemplate') === 'true';
+    const isTemplateFromUrl = urlParams.get('isTemplate') === 'true';
+
+    if (newDefinitionOrAction && newDefinitionOrAction.type === 'UPDATE_REPORT_FIELD') {
+      const { field, value } = newDefinitionOrAction;
+      setCurrentDefinition(prevDef => {
+        const updatedDef = {
+          ...prevDef,
+          [field]: value,
+        };
+        // Ensure isTemplate is correctly maintained based on URL and definition type
+        // Use prevDef.isTemplate as the reliable source from current state before this field update
+        updatedDef.isTemplate = isTemplateFromUrl || prevDef.isTemplate; 
+        console.log(`[DEBUG] handleDefinitionChange (UPDATE_REPORT_FIELD) - field: ${field}, value: ${value}. New title in updatedDef: ${updatedDef.title}`);
+        return updatedDef;
+      });
+    } else { // Assume it's the full newDefinition object (e.g., from element changes)
+      const newDefinition = newDefinitionOrAction;
+      setCurrentDefinition(prevDef => { 
+        const updatedDef = {
+          ...newDefinition, 
+        };
+        // Ensure isTemplate is correctly maintained using the incoming newDefinition's isTemplate flag
+        updatedDef.isTemplate = isTemplateFromUrl || newDefinition.isTemplate;
+        console.log('[DEBUG] handleDefinitionChange (FULL_OBJECT) - newDefinition.title:', newDefinition?.title);
+        return updatedDef;
+      });
+    }
     
-    setCurrentDefinition({
-      ...newDefinition,
-      isTemplate: isTemplate || newDefinition.isTemplate
-    });
-    
-    // Set flag for unsaved changes
     setHasUnsavedChanges(true);
   };
 
@@ -397,6 +426,13 @@ function ReportDesignerPage() {
     setIsSaving(true);
     setError(null);
     
+    // Debug: Log the state of currentDefinition.title just before building apiData
+    console.log('[DEBUG] In handleSave - currentDefinition.title:', currentDefinition.title);
+    console.log('[DEBUG] In handleSave - currentDefinition.id:', currentDefinition.id);
+    console.log('[DEBUG] In handleSave - isNewReport:', isNewReport);
+    console.log('[DEBUG] In handleSave - isNewTemplate:', isNewTemplate);
+    console.log('[DEBUG] In handleSave - currentDefinition.isTemplate:', currentDefinition.isTemplate);
+
     try {
       // Check if we're editing a template
       const isTemplate = currentDefinition.isTemplate || false;
@@ -439,7 +475,14 @@ function ReportDesignerPage() {
         // Update the definition with the new ID
         setCurrentDefinition(prev => ({
           ...prev,
-          id: response.data.id
+          id: response.data.id,
+          title: response.data.name || response.data.title, // API uses 'name'
+          description: response.data.description,
+          elements: response.data.content?.elements || prev.elements,
+          isTemplate: true, // This is a new template
+          category: response.data.category || 'Custom',
+          updatedAt: response.data.updatedAt,
+          createdAt: response.data.createdAt
         }));
         
         // No longer a new template
@@ -471,7 +514,17 @@ function ReportDesignerPage() {
         // Update the definition with the new ID
         setCurrentDefinition(prev => ({
           ...prev,
-          id: response.data.id
+          id: response.data.id,
+          title: response.data.name || response.data.title, // API uses 'name'
+          description: response.data.description,
+          elements: response.data.content?.elements || prev.elements,
+          vectorStoreId: response.data.vectorStoreId,
+          status: response.data.status || 'draft',
+          type: response.data.type || 'Custom',
+          templateId: response.data.templateId !== undefined ? response.data.templateId : prev.templateId, // if created from template
+          isTemplate: false, // This is a new report
+          updatedAt: response.data.updatedAt,
+          createdAt: response.data.createdAt
         }));
         
         // No longer a new report
@@ -508,6 +561,23 @@ function ReportDesignerPage() {
       
       console.log(`${isTemplate ? 'Template' : 'Report'} saved successfully:`, response.data);
       
+      // Update the current definition with the response from the server
+      setCurrentDefinition(prev => ({
+        ...prev,
+        id: response.data.id || prev.id,
+        title: response.data.name || response.data.title, // API might use 'name' for title
+        description: response.data.description,
+        vectorStoreId: !isTemplate ? response.data.vectorStoreId : prev.vectorStoreId,
+        elements: response.data.content?.elements || prev.elements,
+        isTemplate: isTemplate, // Ensure this is correctly maintained
+        type: !isTemplate ? (response.data.type || prev.type) : prev.type,
+        status: !isTemplate ? (response.data.status || prev.status) : prev.status,
+        templateId: !isTemplate ? (response.data.templateId !== undefined ? response.data.templateId : prev.templateId) : prev.templateId,
+        category: isTemplate ? (response.data.category || prev.category) : prev.category,
+        updatedAt: response.data.updatedAt || prev.updatedAt,
+        // Preserve other fields that might not be in the response or are UI-specific
+      }));
+      
       // Reset the unsaved changes flag after successful save
       setHasUnsavedChanges(false);
       
@@ -533,11 +603,28 @@ function ReportDesignerPage() {
       });
     } catch (error) {
       console.error(`Failed to save ${currentDefinition.isTemplate ? 'template' : 'report'}:`, error);
-      setError(error.response?.data?.detail || `Failed to save ${currentDefinition.isTemplate ? 'template' : 'report'}`);
+      
+      let saveErrorMessage = 'An unknown error occurred during save.'; // Default user-facing message
+
+      if (error.response?.data?.detail) {
+        if (typeof error.response.data.detail === 'string') {
+          saveErrorMessage = error.response.data.detail;
+        } else if (error.response.data.detail.message && typeof error.response.data.detail.message === 'string') {
+          saveErrorMessage = error.response.data.detail.message;
+        } else if (error.message) { 
+            // If detail is an object but detail.message isn't a string, or detail.message is absent
+            saveErrorMessage = error.message;
+        }
+        // If detail is an object, detail.message is not a string/absent, and error.message is also absent, it keeps the default.
+      } else if (error.message) {
+        saveErrorMessage = error.message;
+      }
+
+      setError(saveErrorMessage); // Set the general error state with the parsed message
       
       setSnackbar({
         open: true,
-        message: `Failed to save: ${error.response?.data?.detail || error.message}`,
+        message: `Failed to save: ${saveErrorMessage}`, // Use the parsed message for the snackbar
         severity: 'error'
       });
     } finally {
@@ -572,6 +659,14 @@ function ReportDesignerPage() {
 
   const handleExportMenuClose = () => {
     setExportMenuAnchor(null);
+  };
+
+  const handleSaveMenuClick = (event) => {
+    setSaveMenuAnchor(event.currentTarget);
+  };
+
+  const handleSaveMenuClose = () => {
+    setSaveMenuAnchor(null);
   };
 
   const handleExportFormat = async (format) => {
@@ -858,6 +953,76 @@ function ReportDesignerPage() {
     }
   };
 
+  const handleSaveTemplateAsNewReport = async () => {
+    const reportName = window.prompt("Enter a name for the new report:", `Report from ${currentDefinition.title || 'template'}`);
+    if (!reportName) {
+      handleExportMenuClose();
+      return; // User cancelled
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const newReportData = {
+        name: reportName,
+        description: currentDefinition.description || '',
+        content: {
+          elements: currentDefinition.elements.map(el => ({ ...el, id: undefined })) // Ensure elements get new IDs if necessary by backend
+        },
+        isTemplate: false, // Explicitly set as not a template
+        templateId: currentDefinition.id, // Link to the original template
+        vectorStoreId: '', // Or some default, or prompt user if needed
+        status: 'draft',
+        type: 'Template-based' // Indicate it was derived from a template
+      };
+
+      const response = await axios.post(
+        getGatewayUrl('/api/report_builder/reports'),
+        newReportData,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const savedReport = response.data;
+      console.log('New report created from template:', savedReport);
+
+      // Update application state to reflect the new report
+      setCurrentDefinition({
+        ...savedReport, // Assuming backend returns the full new report object including new ID
+        title: savedReport.name, // Ensure title is mapped from name
+        isTemplate: false // Ensure this is set correctly in the state
+      });
+      setIsNewReport(false); // It's now an existing report
+      setHasUnsavedChanges(false); // Freshly saved
+
+      // Update the URL to the new report's designer page
+      history.push(`/report-designer/${savedReport.id}`);
+
+      setSnackbar({
+        open: true,
+        message: 'Template saved as new report successfully',
+        severity: 'success'
+      });
+
+    } catch (error) {
+      console.error("Failed to save template as new report:", error);
+      setError(error.response?.data?.detail || "Failed to save template as new report");
+      setSnackbar({
+        open: true,
+        message: `Failed to save as new report: ${error.response?.data?.detail || error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsSaving(false);
+      handleExportMenuClose();
+    }
+  };
+
   const getReportText = () => {
     if (!currentDefinition || !currentDefinition.elements) return '';
 
@@ -965,6 +1130,7 @@ function ReportDesignerPage() {
           // Create a new "flat" definition for the React state
           const newFlatDefinition = {
             ...apiResponseData, // Spread top-level properties like id, name, status, etc.
+            title: apiResponseData.name || apiResponseData.title, // Ensure title is correctly mapped from API's name or title
             elements: apiResponseData.content.elements, // Hoist elements
           };
           delete newFlatDefinition.content; // Remove the nested 'content' property
@@ -1109,6 +1275,7 @@ function ReportDesignerPage() {
         // Create a new "flat" definition for the React state
         const newFlatDefinition = {
           ...apiResponseData, // Spread top-level properties like id, name, status, etc.
+          title: apiResponseData.name || apiResponseData.title, // Ensure title is correctly mapped from API's name or title
           elements: apiResponseData.content.elements, // Hoist elements
         };
         delete newFlatDefinition.content; // Remove the nested 'content' property
@@ -1200,16 +1367,57 @@ function ReportDesignerPage() {
             {hasUnsavedChanges && ' *'}
           </Typography>
           <Box>
-            <Button
-              startIcon={<SaveIcon />}
-              onClick={handleSave}
-              disabled={isSaving}
+            {/* Save Button (Pure Dropdown) */}
+            <Button 
+              startIcon={<SaveIcon />} 
+              endIcon={<ArrowDropDownIcon />}
+              onClick={handleSaveMenuClick} 
+              disabled={isSaving} // Still disable if any save operation is in progress
               color="primary"
               variant="contained"
               style={{ marginRight: 16 }}
+              aria-controls={saveMenuAnchor ? 'save-options-menu' : undefined}
+              aria-expanded={saveMenuAnchor ? 'true' : undefined}
+              aria-haspopup="menu"
             >
-              {isSaving ? 'Saving...' : currentDefinition.isTemplate ? 'Save Template' : 'Save Report'}
+              Save
             </Button>
+            <Menu
+              id="save-options-menu"
+              anchorEl={saveMenuAnchor}
+              open={Boolean(saveMenuAnchor)}
+              onClose={handleSaveMenuClose}
+              keepMounted
+            >
+              {/* Options when editing a Report */}
+              {!currentDefinition.isTemplate && [
+                <MenuItem key="save-report" onClick={() => { handleSave(); handleSaveMenuClose(); }}>
+                  Save Report
+                </MenuItem>,
+                <MenuItem key="save-as-template" onClick={() => { handleSaveAsTemplate(); handleSaveMenuClose(); }}>
+                  Save as Template
+                </MenuItem>
+              ]}
+
+              {/* Options when editing a Template */}
+              {currentDefinition.isTemplate && [
+                // Option to update current template (if not a system template and not a new template)
+                !isNewTemplate && currentDefinition.category !== 'System' && (
+                  <MenuItem key="update-template" onClick={() => { handleSave(); handleSaveMenuClose(); }}>
+                    Update Current Template
+                  </MenuItem>
+                ),
+                // Option to save template as a new report
+                <MenuItem key="template-to-report" onClick={() => { handleSaveTemplateAsNewReport(); handleSaveMenuClose(); }}>
+                  Save as New Report
+                </MenuItem>,
+                // Option to save template as a new template (e.g., system template as user template, or user template as another user template)
+                <MenuItem key="template-to-new-template" onClick={() => { handleSaveAsTemplate(); handleSaveMenuClose(); }}>
+                  Save as New Template
+                </MenuItem>
+              ].filter(Boolean) // Filter out null items if category is System for the first option
+            }
+            </Menu>
 
             {/* Add Generate Report button - only show for reports (not templates) */}
             {!currentDefinition.isTemplate && (
@@ -1225,6 +1433,7 @@ function ReportDesignerPage() {
               </Button>
             )}
 
+            {/* --- Export Button (Pure Dropdown) --- */}
             {!currentDefinition.isTemplate && (
               <Button
                 startIcon={<PublishIcon />}
@@ -1232,23 +1441,27 @@ function ReportDesignerPage() {
                 color="primary"
                 variant="outlined"
                 style={{ marginRight: 16 }}
-                onClick={handleExportClick}
+                onClick={handleExportClick} 
+                aria-controls={exportMenuAnchor ? 'export-options-menu' : undefined}
+                aria-expanded={exportMenuAnchor ? 'true' : undefined}
+                aria-haspopup="menu"
               >
                 Export
               </Button>
             )}
             <Menu
-              id="export-menu"
-              anchorEl={exportMenuAnchor}
+              id="export-options-menu" 
+              anchorEl={exportMenuAnchor} 
               keepMounted
               open={Boolean(exportMenuAnchor)}
-              onClose={handleExportMenuClose}
+              onClose={handleExportMenuClose} 
             >
-              <MenuItem onClick={() => handleExportFormat('txt')}>Text (.txt)</MenuItem>
-              <MenuItem onClick={() => handleExportFormat('md')}>Markdown (.md)</MenuItem>
-              <MenuItem onClick={() => handleExportFormat('html')}>HTML (.html)</MenuItem>
-              <MenuItem onClick={() => handleExportFormat('json')}>JSON (.json)</MenuItem>
-              <MenuItem onClick={() => handleExportFormat('docx')}>Word (.docx)</MenuItem>
+              {/* Menu Items for Export - only shown when !currentDefinition.isTemplate was already handled by parent button */}
+              <MenuItem onClick={() => handleExportFormat('txt')}>Export as Text (.txt)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('md')}>Export as Markdown (.md)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('html')}>Export as HTML (.html)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('json')}>Export as JSON (.json)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('docx')}>Export as Word (.docx)</MenuItem>
             </Menu>
             <IconButton edge="end" onClick={handleClose}>
               <CloseIcon />

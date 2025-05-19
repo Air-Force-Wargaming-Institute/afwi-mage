@@ -93,95 +93,73 @@ async def update_report(report_id: str, report_update: ReportCreate):
     if not existing_report:
         raise HTTPException(status_code=404, detail="Report not found")
     
-    updated_data = report_update.dict(exclude_unset=True)
-    current_report_data = existing_report.dict()
+    updated_data = report_update.dict(exclude_unset=True) # Data from the request payload
+    current_report_data = existing_report.dict() # Data loaded from the file
     
-    # Handle content separately to ensure proper element type handling
+    # Step 1: Update all top-level fields from the payload, EXCEPT for 'content'.
+    # This ensures 'name', 'description', 'vectorStoreId', 'type', 'status', etc., are updated.
+    for key, value in updated_data.items():
+        if key != 'content':
+            current_report_data[key] = value
+
+    # Step 2: Handle the 'content' field and its 'elements' separately with merging logic.
     if 'content' in updated_data and isinstance(updated_data['content'], dict):
+        # Ensure 'content' object exists in current_report_data (it should for an update)
+        if 'content' not in current_report_data or not isinstance(current_report_data.get('content'), dict):
+            current_report_data['content'] = {'elements': []} # Initialize if somehow missing
+        
+        # Update elements if they are provided in the payload's content
         if 'elements' in updated_data['content']:
-            # Create a new elements list
-            new_elements = []
-            
-            # Process each element from the update
-            for updated_element in updated_data['content']['elements']:
-                # If this is an update to an existing element, find the original
-                original_element = None
-                if 'id' in updated_element:
-                    for existing_element in current_report_data['content']['elements']:
-                        if existing_element['id'] == updated_element['id']:
-                            original_element = existing_element
-                            break
+            new_elements_list = []
+            # Create a map of existing elements by ID for efficient lookup
+            existing_elements_map = {
+                el['id']: el 
+                for el in current_report_data['content'].get('elements', []) 
+                if isinstance(el, dict) and 'id' in el
+            }
+
+            for element_payload in updated_data['content']['elements']:
+                if not isinstance(element_payload, dict):
+                    # Skip malformed elements in payload, or handle as an error
+                    continue 
                 
-                # Handle the element based on its type
-                if updated_element.get('type') == 'explicit':
-                    # For explicit elements, only update content and other properties
-                    # Always ensure ai_generated_content is null for explicit elements
-                    if original_element:
-                        # Start with original and update with new values
-                        element_copy = original_element.copy()
-                        for key, value in updated_element.items():
-                            element_copy[key] = value
-                        # Ensure ai_generated_content is explicitly set to None
-                        element_copy['ai_generated_content'] = None
-                        new_elements.append(element_copy)
-                    else:
-                        # New element, just add it
-                        # Ensure ai_generated_content is explicitly set to None
-                        element_copy = updated_element.copy()
-                        element_copy['ai_generated_content'] = None
-                        new_elements.append(element_copy)
-                        
-                elif updated_element.get('type') == 'generative':
-                    # For generative elements, carefully handle instructions and ai_generated_content
-                    if original_element:
-                        # Start with original and update with new values
-                        element_copy = original_element.copy()
-                        
-                        # Update each field from the updated element
-                        for key, value in updated_element.items():
-                            # Always update ai_generated_content if explicitly provided, even if null
-                            # This allows the frontend to clear the content if needed
-                            if key == 'ai_generated_content':
-                                # Only update if the value is provided (could be null/None to clear it)
-                                if key in updated_element:
-                                    element_copy[key] = value
-                            else:
-                                # Always update other fields
-                                element_copy[key] = value
-                        
-                        # Ensure ai_generated_content is present (even if null)
-                        if 'ai_generated_content' not in element_copy:
-                            element_copy['ai_generated_content'] = None
-                        
-                        new_elements.append(element_copy)
-                    else:
-                        # New generative element
-                        element_copy = updated_element.copy()
-                        # Ensure ai_generated_content is present (even if null)
-                        if 'ai_generated_content' not in element_copy:
-                            element_copy['ai_generated_content'] = None
-                        new_elements.append(element_copy)
-                else:
-                    # Unknown type, ensure ai_generated_content is at least null
-                    element_copy = updated_element.copy()
-                    element_copy['ai_generated_content'] = None
-                    new_elements.append(element_copy)
+                element_id = element_payload.get('id')
+                
+                # Start with the existing element's data if an ID match is found
+                working_element = {}
+                if element_id and element_id in existing_elements_map:
+                    working_element.update(existing_elements_map[element_id])
+                
+                # Override with values from the payload for this element
+                working_element.update(element_payload)
+
+                # Ensure type-specific handling for ai_generated_content and default type
+                element_type = working_element.get('type')
+                if element_type == 'explicit':
+                    working_element['ai_generated_content'] = None
+                elif element_type == 'generative':
+                    # Ensure ai_generated_content field exists, even if it's null from payload
+                    if 'ai_generated_content' not in working_element:
+                        working_element['ai_generated_content'] = None
+                else: # Default handling for unknown or missing type
+                    if not element_type: # If type is missing from payload and not existing
+                        working_element['type'] = 'explicit' # Default to 'explicit'
+                    working_element['ai_generated_content'] = None # Default for safety
+                
+                new_elements_list.append(working_element)
             
-            # Replace elements list
-            current_report_data['content']['elements'] = new_elements
+            current_report_data['content']['elements'] = new_elements_list
             
-        # Update any other content fields
-        for key, value in updated_data['content'].items():
-            if key != 'elements':
-                current_report_data['content'][key] = value
-    else:
-        # Update other fields normally
-        for key, value in updated_data.items():
-            if key != 'content':
-                current_report_data[key] = value
+        # Update any other direct properties of the 'content' object (besides 'elements')
+        # For example, if content could have its own description: content: { description: "...", elements: [] }
+        for content_key, content_value in updated_data['content'].items():
+            if content_key != 'elements':
+                current_report_data['content'][content_key] = content_value
     
+    # Step 3: Update the 'updatedAt' timestamp.
     current_report_data['updatedAt'] = now
     
+    # Create a Report model instance from the merged data and save it.
     updated_instance = Report(**current_report_data)
     save_report_to_file(updated_instance)
     

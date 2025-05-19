@@ -328,25 +328,48 @@ async def generate_export_markdown(report: Report) -> str:
     has_missing_content = False
     
     for element in report.content.elements:
-        if element.title:
-            markdown_parts.append(f"## {element.title}\n")
+        element_content_parts = [] # To build content for the current element
         
+        actual_content = ""
         if element.type == 'explicit':
-            # For explicit elements, directly use the content
             if element.content:
-                markdown_parts.append(f"{element.content}\n")
+                actual_content = element.content
         elif element.type == 'generative':
-            # For generative elements, use the generated content if available
             if element.ai_generated_content:
-                # Use the AI-generated content directly (no instructions)
-                markdown_parts.append(f"{element.ai_generated_content}\n")
+                actual_content = element.ai_generated_content
             else:
-                # If no generated content exists, log a warning - this content should be generated first
                 has_missing_content = True
-                logger.warning(f"Missing AI-generated content for section '{element.title or 'Untitled'}' - generation required")
-                # Skip this section in the output
+                logger.warning(f"Missing AI-generated content for section '{element.title or 'Untitled'}' - generation required. Skipping in export.")
+                markdown_parts.append("\n") # Add spacing even if skipped
+                continue
 
-        markdown_parts.append("\n")  # Add spacing
+        if not actual_content.strip(): # Skip if content is empty or just whitespace
+            markdown_parts.append("\n") # Add spacing even if skipped
+            continue
+
+        # Apply formatting based on element.format
+        if element.format and element.format.startswith('h'):
+            try:
+                level = int(element.format[1:])
+                if 1 <= level <= 6:
+                    element_content_parts.append(f"{'#' * level} {actual_content}\n")
+                else: # Default to paragraph if level is invalid
+                    element_content_parts.append(f"{actual_content}\n")
+            except ValueError: # Default to paragraph if format is like 'hX' but X is not a number
+                element_content_parts.append(f"{actual_content}\n")
+        elif element.format == 'bulletList':
+            lines = actual_content.split('\n')
+            for line in lines:
+                element_content_parts.append(f"- {line}\n")
+        elif element.format == 'numberedList':
+            lines = actual_content.split('\n')
+            for i, line in enumerate(lines):
+                element_content_parts.append(f"{i + 1}. {line}\n")
+        else: # Default to paragraph
+            element_content_parts.append(f"{actual_content}\n")
+        
+        markdown_parts.append("".join(element_content_parts))
+        markdown_parts.append("\n")  # Add spacing after the element's content
     
     if has_missing_content:
         logger.warning(f"Report {report.id} has sections with missing AI-generated content")

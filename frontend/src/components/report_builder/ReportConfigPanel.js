@@ -232,6 +232,12 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   console.log('ReportConfigPanel - isTemplate:', isTemplate); // Debug logging
   console.log('ReportConfigPanel - definition:', definition); // Debug logging
 
+  // New generic handler for simple field changes
+  const handleFieldChange = (e) => {
+    const { name, value } = e.target;
+    onChange({ type: 'UPDATE_REPORT_FIELD', field: name, value: value });
+  };
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const templateKey = urlParams.get('templateKey');
@@ -293,15 +299,6 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
     
     fetchVectorStores();
   }, [token]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    onChange({ ...definition, [name]: value });
-  };
-
-  const handleVectorStoreChange = (e) => {
-    onChange({ ...definition, vectorStoreId: e.target.value });
-  };
 
   const createNewElement = () => ({
     id: `element-${Date.now()}`,
@@ -451,37 +448,37 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
         <GradientText variant="h6" component="h2" gutterBottom>
           {isTemplate ? 'Template Configuration' : 'Report Configuration'}
         </GradientText>
-        <TextField 
-          label={isTemplate ? "Template Title" : "Report Title"} 
-          name="title" 
-          value={definition?.title || ''} 
-          onChange={handleInputChange} 
-          fullWidth 
-          margin="dense" 
-          variant="outlined" 
-          size="small"
+        <TextField
+          label={isTemplate ? "Template Title" : "Report Title"}
+          value={definition?.title || ''}
+          name="title"
+          onChange={handleFieldChange}
+          fullWidth
+          className={classes.configSection}
+          disabled={isTemplate && definition?.category === 'System'}
         />
-        <TextField 
-          label={isTemplate ? "Template Description" : "Report Description"} 
-          name="description" 
-          value={definition?.description || ''} 
-          onChange={handleInputChange} 
-          fullWidth 
-          margin="dense" 
-          variant="outlined" 
-          multiline 
-          rows={2}
-          size="small"
+        <TextField
+          label="Description"
+          value={definition?.description || ''}
+          name="description"
+          onChange={handleFieldChange}
+          multiline
+          rows={3}
+          fullWidth
+          className={classes.configSection}
         />
         {!isTemplate && (
-          <FormControl fullWidth margin="dense" variant="outlined" size="small">
-            <InputLabel>Vector Store</InputLabel>
+          <FormControl fullWidth className={classes.configSection} disabled={isLoadingVectorStores || !!vectorStoreError}>
+            <InputLabel id="vector-store-label">Vector Store</InputLabel>
             <Select
-              value={vectorStores.length === 0 ? "none_available" : (definition?.vectorStoreId || '')}
-              onChange={handleVectorStoreChange}
-              label="Vector Store"
-              disabled={isLoadingVectorStores || vectorStores.length === 0}
+              labelId="vector-store-label"
+              name="vectorStoreId"
+              value={definition?.vectorStoreId || ''}
+              onChange={handleFieldChange}
             >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
               {isLoadingVectorStores && (
                 <MenuItem disabled value="loading">
                   <em>Loading vector stores...</em>
@@ -495,11 +492,6 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
               {vectorStores.length === 0 && (
                 <MenuItem disabled value="none_available">
                   <em>None Available</em>
-                </MenuItem>
-              )}
-              {vectorStores.length > 0 && (
-                <MenuItem value="">
-                  <em>None</em>
                 </MenuItem>
               )}
               {vectorStores.length > 0 && 
