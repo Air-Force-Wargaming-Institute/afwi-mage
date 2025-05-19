@@ -1339,6 +1339,7 @@ function ReportDesignerPage() {
   };
 
   const handleRegenerateSection = async (elementId) => {
+    setIsGenerating(true); // Lock down Generate Report button
     try {
       if (!currentDefinition.id) {
         setSnackbar({
@@ -1509,6 +1510,7 @@ function ReportDesignerPage() {
         severity: 'error'
       });
     }
+    setIsGenerating(false); // Release Generate Report button
   };
 
   const handleCloseErrorDialog = () => {
