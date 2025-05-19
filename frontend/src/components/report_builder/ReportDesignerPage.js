@@ -719,18 +719,19 @@ function ReportDesignerPage() {
   const handleClose = () => {
     // Check if there are unsaved changes
     if (hasUnsavedChanges) {
-      const confirmLeave = window.confirm('You have unsaved changes. Are you sure you want to leave?');
+      const confirmLeave = window.confirm('You have unsaved changes. Are you sure you want to leave this page? All unsaved data will be lost.');
       if (!confirmLeave) {
         return; // Stay on the page if user cancels
       }
     }
     
-    // Redirect to reports by default or handle according to what's being edited
-    if (currentDefinition.isTemplate) {
-      window.close(); // Close the window since it was opened in a new window
-    } else {
-      history.push('/reports');
-    }
+    // If checks pass or user confirms, close the window
+    window.close();
+
+    // Fallback navigation for cases where window.close() might not work (e.g., tab not opened by script)
+    // This part might be optional or adjusted based on how ReportDesignerPage is opened.
+    // If it's always opened by window.open(), window.close() should suffice.
+    // history.push('/reports'); // Original fallback
   };
 
   const handleSnackbarClose = () => {
