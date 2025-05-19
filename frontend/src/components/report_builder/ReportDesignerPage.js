@@ -31,6 +31,7 @@ import ReportPreviewPanel from './ReportPreviewPanel';
 import axios from 'axios';
 import { getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
+import { v4 as uuidv4 } from 'uuid';
 
 // Helper functions
 const getDefaultReport = () => ({
@@ -88,7 +89,6 @@ const useStyles = makeStyles((theme) => ({
     overflow: 'hidden',
   },
   leftPanel: {
-    width: '20%',
     minWidth: '400px',
     borderRight: `1px solid ${theme.palette.divider}`,
     overflowY: 'auto',
@@ -110,7 +110,7 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   rightPanel: {
-    width: '80%',
+    minWidth: '800px',
     overflowY: 'auto',
     padding: theme.spacing(2),
     height: 'calc(100vh - 64px)',
@@ -153,6 +153,23 @@ function ReportDesignerPage() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [scrollToElementId, setScrollToElementId] = useState(null);
   const [highlightElementId, setHighlightElementId] = useState(null);
+  const [pageTitlePrefix, setPageTitlePrefix] = useState('');
+
+  const toolbarRef = useRef(null);
+  const titleBoxRef = useRef(null);
+  const buttonsBoxRef = useRef(null);
+
+  const [titleBoxStyle, setTitleBoxStyle] = useState({
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    // maxWidth will be set by useEffect
+  });
 
   useEffect(() => {
     if (token) {
@@ -161,12 +178,14 @@ function ReportDesignerPage() {
       
       // Check URL parameters
       const urlParams = new URLSearchParams(window.location.search);
-      const isTemplate = urlParams.get('isTemplate') === 'true';
-      const fromTemplate = urlParams.get('fromTemplate') === 'true';
+      const isTemplateParam = urlParams.get('isTemplate') === 'true';
+      const fromTemplateParam = urlParams.get('fromTemplate') === 'true';
       
-      // If there's no reportId but isTemplate is true, we're creating a new template
-      if (!reportId && isTemplate) {
+      // If there's no reportId but isTemplateParam is true, we're creating a new template
+      if (!reportId && isTemplateParam) {
         setIsNewTemplate(true);
+        setIsNewReport(false);
+        setPageTitlePrefix('New Template: ');
         setCurrentDefinition({
           id: null,
           title: 'New Template',
@@ -180,11 +199,13 @@ function ReportDesignerPage() {
       }
       
       // If there's no reportId but not a template, we're creating a new report
-      if (!reportId && !isTemplate) {
+      if (!reportId && !isTemplateParam) {
         setIsNewReport(true);
+        setIsNewTemplate(false);
         
         // Check if this is a template-based report
-        if (fromTemplate) {
+        if (fromTemplateParam) {
+          setPageTitlePrefix('Template Report: ');
           try {
             // Get the template from session storage
             const templateData = JSON.parse(sessionStorage.getItem('selectedTemplate'));
@@ -217,28 +238,40 @@ function ReportDesignerPage() {
               
               // Create a new report definition based on the template
               setCurrentDefinition({
-                id: null,
-                title: `New from: ${templateData.name}`,
+                id: uuidv4(),
+                title: templateData.name,
                 description: templateData.description || '',
                 elements: transformedElements,
                 templateId: templateData.id,
                 type: 'Template-based',
                 isTemplate: false
               });
+            } else {
+              // Fallback to custom report if no template data in session
+              setPageTitlePrefix('Custom Report: ');
+              setCurrentDefinition({
+                ...getDefaultReport(),
+                title: 'New Custom Report',
+                isTemplate: false,
+              });
             }
           } catch (e) {
             console.error("Error loading template from session storage:", e);
             // Fall back to empty report if template loading fails
+            setPageTitlePrefix('Custom Report: ');
             setCurrentDefinition({
               ...getDefaultReport(),
-              title: 'New Custom Report'
+              title: 'New Custom Report',
+              isTemplate: false,
             });
           }
         } else {
           // Just a standard custom report
+          setPageTitlePrefix('Custom Report: ');
           setCurrentDefinition({
             ...getDefaultReport(),
-            title: 'New Custom Report'
+            title: 'New Custom Report',
+            isTemplate: false,
           });
         }
         
@@ -249,11 +282,14 @@ function ReportDesignerPage() {
       
       // If we have a reportId, fetch the existing report or template
       if (reportId) {
-        setIsNewReport(false); // Ensure this is false when loading an existing report
-        setIsNewTemplate(false); // Ensure this is false when loading an existing template
+        setIsNewReport(false); 
+        setIsNewTemplate(false);
 
         // Determine the API endpoint based on whether we're editing a template or report
-        const endpoint = isTemplate 
+        // The 'isTemplateParam' from URL might be relevant here if opening a template directly by ID
+        const effectiveIsTemplate = isTemplateParam || (currentDefinition && currentDefinition.isTemplate);
+
+        const endpoint = effectiveIsTemplate 
           ? getGatewayUrl(`/api/report_builder/templates/${reportId}`)
           : getGatewayUrl(`/api/report_builder/reports/${reportId}`);
         
@@ -268,9 +304,13 @@ function ReportDesignerPage() {
         .then(response => {
           const data = response.data;
           
-          // Transform the API response to the format expected by ReportConfigPanel
           if (data) {
-            // Extract elements from the report/template content
+            if (data.isTemplate || effectiveIsTemplate) { // Check actual data or URL param
+              setPageTitlePrefix('Template: ');
+            } else {
+              setPageTitlePrefix('Prior Report: ');
+            }
+            // Transform the API response to the format expected by ReportConfigPanel
             const elements = data.content?.elements || [];
             
             // Transform elements to add required properties and IDs
@@ -298,52 +338,43 @@ function ReportDesignerPage() {
             // Set the definition with proper mapping of API data
             setCurrentDefinition({
               id: data.id,
-              title: isTemplate ? data.name : data.name,
+              title: data.name, // Use data.name for both templates and reports as the editable title
               description: data.description,
               elements: transformedElements,
               vectorStoreId: data.vectorStoreId || '',
               status: data.status || 'draft',
-              isTemplate: isTemplate,
+              isTemplate: data.isTemplate || effectiveIsTemplate, // Prioritize actual data flag
               createdAt: data.createdAt,
               updatedAt: data.updatedAt,
-              type: data.type || (isTemplate ? undefined : 'Custom'),
-              ...(isTemplate && { category: data.category || 'Custom' })
+              type: data.type || ( (data.isTemplate || effectiveIsTemplate) ? undefined : 'Custom'),
+              ...((data.isTemplate || effectiveIsTemplate) && { category: data.category || 'Custom' })
             });
             
             // Reset unsaved changes flag after initial load
             setHasUnsavedChanges(false);
           } else {
-            setCurrentDefinition(prevDef => ({
-              ...getDefaultReport(),
-              id: reportId,
-              isTemplate: isTemplate
-            }));
-            
-            // Reset unsaved changes flag for new report/template
+             // Fallback logic if data is unexpectedly null/undefined
+            if (effectiveIsTemplate) {
+              setPageTitlePrefix('Template: ');
+              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Template Error', isTemplate: true });
+            } else {
+              setPageTitlePrefix('Prior Report: ');
+              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Report Error', isTemplate: false });
+            }
             setHasUnsavedChanges(false);
           }
         })
         .catch(err => {
-          console.error(`Error fetching ${isTemplate ? 'template' : 'report'}:`, err);
-          setError(err.response?.data?.detail || `Failed to load ${isTemplate ? 'template' : 'report'}`);
+          console.error(`Error fetching ${effectiveIsTemplate ? 'template' : 'report'}:`, err);
+          setError(err.response?.data?.detail || `Failed to load ${effectiveIsTemplate ? 'template' : 'report'}`);
           
-          // Create a new template/report if API call fails
-          if (isTemplate) {
-            // For new templates, initialize with empty content
-            setCurrentDefinition({
-              id: reportId,
-              title: 'New Template',
-              description: '',
-              elements: [],
-              isTemplate: true
-            });
+          // Fallback for error
+          if (effectiveIsTemplate) {
+            setPageTitlePrefix('Template: '); // Or "Error: Template"
+            setCurrentDefinition({ id: reportId, title: 'Error Loading', description: '', elements: [], isTemplate: true });
           } else {
-            // Fallback to default report if API call fails
-            setCurrentDefinition(prevDef => ({
-              ...getDefaultReport(),
-              id: reportId,
-              isTemplate: isTemplate
-            }));
+            setPageTitlePrefix('Prior Report: '); // Or "Error: Report"
+            setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Error Loading', isTemplate: false });
           }
         })
         .finally(() => {
@@ -377,6 +408,83 @@ function ReportDesignerPage() {
   // Diagnostic useEffect to track title changes in currentDefinition
   useEffect(() => {
   }, [currentDefinition?.title]);
+
+  useEffect(() => {
+    const updateTitlePosition = () => {
+      if (!titleBoxRef.current || !buttonsBoxRef.current || !toolbarRef.current) {
+        return;
+      }
+
+      const titleEl = titleBoxRef.current;
+      const buttonsEl = buttonsBoxRef.current;
+      const toolbarEl = toolbarRef.current;
+
+      const titleContentWidth = titleEl.scrollWidth;
+      const buttonsLeftOffset = buttonsEl.offsetLeft;
+      const toolbarWidth = toolbarEl.offsetWidth;
+      
+      const safetyMargin = 24;
+
+      const titleRightEdgeIfFullCentered = (toolbarWidth / 2) + (titleContentWidth / 2);
+
+      if (titleContentWidth === 0 && toolbarWidth === 0) {
+        // Still waiting for initial layout, defer further action or use defaults
+        // This helps prevent setting a tiny width if called too early before any dimensions
+        return;
+      }
+
+      if (titleRightEdgeIfFullCentered + safetyMargin > buttonsLeftOffset && buttonsLeftOffset > 0) { // Added buttonsLeftOffset > 0 to ensure buttons are actually to the right
+        const availableWidthForTitleBox = Math.max(0, buttonsLeftOffset - safetyMargin);
+        
+        setTitleBoxStyle({
+          position: 'absolute',
+          left: '0px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: `${availableWidthForTitleBox}px`,
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        });
+      } else {
+        const maxHalfWidth = Math.max(0, (buttonsLeftOffset > 0 ? buttonsLeftOffset : toolbarWidth) - safetyMargin - (toolbarWidth / 2));
+        const maxAllowedTitleWidth = Math.max(0, maxHalfWidth * 2, titleContentWidth > 0 ? 150 : 0); // Ensure a minimum sensible width if calculations are odd initially
+
+        setTitleBoxStyle({
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          maxWidth: `${maxAllowedTitleWidth}px`,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        });
+      }
+    };
+
+    // Initial calculation - deferred to next animation frame
+    const animationFrameId = requestAnimationFrame(updateTitlePosition);
+
+    // Recalculate on window resize
+    window.addEventListener('resize', updateTitlePosition);
+    
+    let titleObserver;
+    if (titleBoxRef.current) {
+      titleObserver = new ResizeObserver(updateTitlePosition);
+      titleObserver.observe(titleBoxRef.current);
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId); // Cancel the frame if component unmounts before it runs
+      window.removeEventListener('resize', updateTitlePosition);
+      if (titleObserver) {
+        titleObserver.disconnect();
+      }
+    };
+  }, [currentDefinition.title, pageTitlePrefix]);
 
   const handleDefinitionChange = (newDefinitionOrAction) => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1416,14 +1524,25 @@ function ReportDesignerPage() {
   return (
     <Box className={classes.root}>
       <AppBar className={classes.appBar}>
-        <Toolbar className={classes.toolbar}>
-          <Typography variant="h6">
-            {currentDefinition.isTemplate 
-              ? `Template: ${currentDefinition.title || 'New Template'}`
-              : `Report: ${currentDefinition.title || 'New Report'}`}
-            {hasUnsavedChanges && ' *'}
-          </Typography>
-          <Box>
+        <Toolbar ref={toolbarRef} className={classes.toolbar} style={{ position: 'relative', justifyContent: 'flex-end' }}>
+          {/* Title Box - styled dynamically */}
+          <Box ref={titleBoxRef} style={titleBoxStyle}>
+            <Typography variant="h2" style={{ 
+              // Ellipsis styles are now primarily on the Box,
+              // Typography will inherit width/max-width.
+              // Explicitly ensure it doesn't break out if Box somehow allows it.
+              whiteSpace: 'nowrap', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis',
+              display: 'inline', // Helps if parent Box is using text-align effectively
+            }}>
+              {pageTitlePrefix}{currentDefinition.title || ''}
+              {hasUnsavedChanges && ' *'}
+            </Typography>
+          </Box>
+          
+          {/* Buttons Box - used for measurement */}
+          <Box ref={buttonsBoxRef}>
             {/* Save Button (Pure Dropdown) */}
             <Button 
               startIcon={<SaveIcon />} 

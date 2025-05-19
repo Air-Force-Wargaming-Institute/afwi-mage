@@ -12,7 +12,9 @@ import {
   Divider, 
   makeStyles,
   CircularProgress,
-  Snackbar
+  Snackbar,
+  Input,
+  TextField
 } from '@material-ui/core';
 import DeleteIcon from '@material-ui/icons/Delete';
 import VerifiedUserIcon from '@material-ui/icons/VerifiedUser';
@@ -184,6 +186,13 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 14,
     marginRight: theme.spacing(0.5),
   },
+  templateNameClickable: {
+    cursor: 'pointer',
+    display: 'inline-block',
+    '&:hover': {
+      textDecoration: 'underline',
+    },
+  },
 }));
 
 function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refreshTemplates }) {
@@ -191,6 +200,8 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
   const { token } = useContext(AuthContext);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [editingTemplateName, setEditingTemplateName] = useState('');
 
   // Sort templates to show system templates at the top
   const getSortedTemplates = () => {
@@ -207,6 +218,9 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
   };
 
   const handleSelectTemplate = (template) => {
+    if (editingTemplateId === template.id) {
+      return;
+    }
     onCreateNew({ type: 'template', data: template });
   };
 
@@ -288,6 +302,73 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
     setSnackbarOpen(false);
   };
 
+  const startEditTemplateName = (event, template) => {
+    event.stopPropagation(); // Prevent ListItem's onClick
+    if (template.category === 'Custom') {
+      setEditingTemplateId(template.id);
+      setEditingTemplateName(template.name);
+    }
+  };
+
+  const cancelEditTemplateName = () => {
+    setEditingTemplateId(null);
+    setEditingTemplateName('');
+  };
+
+  const handleEditingNameChange = (event) => {
+    setEditingTemplateName(event.target.value);
+  };
+
+  const handleEditingKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleSaveTemplateName();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEditTemplateName();
+    }
+  };
+  
+  // Modified to allow clicking away to save
+  const handleSaveOrCancelEdit = (event) => {
+    if (event.relatedTarget && event.relatedTarget.tagName !== 'INPUT') {
+      handleSaveTemplateName();
+    } else if (!event.relatedTarget) { 
+      handleSaveTemplateName();
+    }
+  };
+
+  const handleSaveTemplateName = async () => {
+    if (!editingTemplateId || !editingTemplateName.trim()) {
+      cancelEditTemplateName();
+      if (editingTemplateId) refreshTemplates(); // Refresh if name was cleared to original
+      return;
+    }
+
+    const originalTemplate = templates.find(t => t.id === editingTemplateId);
+    if (originalTemplate && originalTemplate.name === editingTemplateName.trim()) {
+      cancelEditTemplateName();
+      return; // Name hasn't changed
+    }
+
+    try {
+      await axios.put(
+        getGatewayUrl(`/api/report_builder/templates/${editingTemplateId}`),
+        { name: editingTemplateName.trim() },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+      setSnackbarMessage('Template name updated successfully');
+      setSnackbarOpen(true);
+      refreshTemplates(); // Refresh the list from the server
+    } catch (e) {
+      console.error("Failed to update template name:", e);
+      setSnackbarMessage(`Error updating template name: ${e.response?.data?.detail || e.message}`);
+      setSnackbarOpen(true);
+    } finally {
+      cancelEditTemplateName();
+    }
+  };
+
   return (
     <Paper className={classes.root} elevation={3}>
       <GradientText variant="h6" component="h2" gutterBottom>
@@ -322,7 +403,7 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
               data-template-id={template.id}
               button 
               className={`${classes.templateItem} ${template.category === 'Custom' ? classes.customTemplate : classes.systemTemplate}`} 
-              onClick={() => handleSelectTemplate(template)}
+              onClick={() => editingTemplateId !== template.id && handleSelectTemplate(template)}
             >
               <Box display="flex" flexDirection="column" width="100%">
                 <Box display="flex" alignItems="center" mb={0.5}>
@@ -342,9 +423,35 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
                   >
                     {template.name.charAt(0).toUpperCase()}
                   </Box>
-                  <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
-                    {template.name}
-                  </Typography>
+                  {editingTemplateId === template.id && template.category === 'Custom' ? (
+                    <TextField
+                      fullWidth
+                      value={editingTemplateName}
+                      onChange={handleEditingNameChange}
+                      onKeyDown={handleEditingKeyDown}
+                      onBlur={handleSaveOrCancelEdit}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      variant="outlined"
+                      size="small"
+                      style={{ margin: '5px 0' }}
+                    />
+                  ) : (
+                    <Typography 
+                        variant="subtitle1" 
+                        style={{ 
+                            fontWeight: 600, 
+                            marginLeft: 8, 
+                            cursor: template.category === 'Custom' ? 'pointer' : 'default' 
+                        }}
+                        className={template.category === 'Custom' ? classes.templateNameClickable : ''}
+                        onClick={(e) => {
+                            startEditTemplateName(e, template);
+                        }}
+                    >
+                      {template.name}
+                    </Typography>
+                  )}
                 </Box>
                 
                 {template.description && (
@@ -375,7 +482,7 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
                 </Box>
               </Box>
               
-              {template.category === 'Custom' && (
+              {template.category === 'Custom' && editingTemplateId !== template.id && (
                 <Box className={classes.templateActions}>
                   <IconButton 
                     edge="end" 

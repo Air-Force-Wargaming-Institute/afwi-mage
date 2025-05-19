@@ -14,9 +14,9 @@ import {
   FormControl,
   Select,
   MenuItem,
-  InputLabel
+  InputLabel,
+  TextField
 } from '@material-ui/core';
-import EditIcon from '@material-ui/icons/Edit';
 import DeleteIcon from '@material-ui/icons/Delete';
 import { GradientText } from '../../styles/StyledComponents';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -71,6 +71,13 @@ const useStyles = makeStyles((theme) => ({
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
     },
+    '& .report-name-clickable': {
+      cursor: 'pointer',
+      display: 'inline-block',
+      '&:hover': {
+        textDecoration: 'underline',
+      },
+    },
   },
   loadingContainer: {
     display: 'flex',
@@ -94,6 +101,8 @@ function PriorReportsList({ onViewEdit }) {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [sortOption, setSortOption] = useState('updatedDesc');
+  const [editingReportId, setEditingReportId] = useState(null);
+  const [editingReportName, setEditingReportName] = useState('');
 
   const fetchReports = async () => {
     setLoading(true);
@@ -169,6 +178,79 @@ function PriorReportsList({ onViewEdit }) {
     setSortOption(event.target.value);
   };
 
+  const startEditReportName = (event, report) => {
+    event.stopPropagation(); // Prevent ListItem's main onClick (onViewEdit)
+    setEditingReportId(report.id);
+    setEditingReportName(report.name);
+  };
+
+  const cancelEditReportName = () => {
+    setEditingReportId(null);
+    setEditingReportName('');
+  };
+
+  const handleEditingNameChange = (event) => {
+    setEditingReportName(event.target.value);
+  };
+
+  const handleSaveOrCancelEdit = (event) => {
+    if (event.relatedTarget && event.relatedTarget.tagName !== 'INPUT') {
+      handleSaveReportName();
+    } else if (!event.relatedTarget) {
+      handleSaveReportName();
+    }
+  };
+
+  const handleEditingKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleSaveReportName();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEditReportName();
+    }
+  };
+
+  const handleSaveReportName = async () => {
+    if (!editingReportId || !editingReportName.trim()) {
+      setEditingReportId(null);
+      setEditingReportName('');
+      // If name was cleared, refresh to show original name or handle as desired
+      if (editingReportId) fetchReports(); 
+      return;
+    }
+
+    const originalReport = reports.find(r => r.id === editingReportId);
+    if (originalReport && originalReport.name === editingReportName.trim()) {
+      setEditingReportId(null);
+      setEditingReportName('');
+      return; // Name hasn't changed
+    }
+
+    try {
+      await axios.put(
+        getGatewayUrl(`/api/report_builder/reports/${editingReportId}`),
+        { name: editingReportName.trim() }, // API expects an object with the name
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      setSnackbarMessage('Report name updated successfully');
+      setSnackbarOpen(true);
+      fetchReports(); // Refresh the list
+    } catch (e) {
+      console.error("Failed to update report name:", e);
+      setSnackbarMessage(`Error updating report name: ${e.response?.data?.detail || e.message}`);
+      setSnackbarOpen(true);
+    } finally {
+      setEditingReportId(null);
+      setEditingReportName('');
+    }
+  };
+
   const handleDelete = async (reportId) => {
     try {
       const response = await axios.delete(getGatewayUrl(`/api/report_builder/reports/${reportId}`), {
@@ -221,74 +303,95 @@ function PriorReportsList({ onViewEdit }) {
 
   return (
     <Paper className={classes.root} elevation={3}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-        <GradientText variant="h6" component="h2" gutterBottom>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+        <GradientText variant="h5" component="h2">
           Prior Reports
         </GradientText>
         <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
           <InputLabel id="sort-reports-label">Sort By</InputLabel>
           <Select
             labelId="sort-reports-label"
-            id="sort-reports"
             value={sortOption}
             onChange={handleSortChange}
             label="Sort By"
           >
-            <MenuItem value="updatedDesc">Most Recently Updated</MenuItem>
-            <MenuItem value="updatedAsc">Least Recently Updated</MenuItem>
+            <MenuItem value="updatedDesc">Last Updated (Newest)</MenuItem>
+            <MenuItem value="updatedAsc">Last Updated (Oldest)</MenuItem>
             <MenuItem value="nameAsc">Name (A-Z)</MenuItem>
             <MenuItem value="nameDesc">Name (Z-A)</MenuItem>
           </Select>
         </FormControl>
       </Box>
-      <Box className={classes.listContainer}>
-        <List disablePadding>
-          {reports && reports.length > 0 ? (
-            getSortedReports().map((report) => (
+      {loading && (
+        <div className={classes.loadingContainer}>
+          <CircularProgress />
+          <Typography style={{ marginLeft: '10px' }}>Loading reports...</Typography>
+        </div>
+      )}
+      {error && <Typography className={classes.errorMessage}>{error}</Typography>}
+      {!loading && !error && reports.length === 0 && (
+        <Typography style={{ textAlign: 'center', padding: '20px' }}>No prior reports found.</Typography>
+      )}
+      {!loading && !error && reports.length > 0 && (
+        <Box className={classes.listContainer}>
+          <List disablePadding>
+            {getSortedReports().map((report) => (
               <ListItem 
                 key={report.id} 
-                button 
-                className={classes.listItem} 
-                onClick={() => onViewEdit(report)}
+                divider 
+                className={classes.listItem}
+                onClick={editingReportId !== report.id ? () => onViewEdit(report) : undefined}
+                button={editingReportId !== report.id}
               >
-                <ListItemText
-                  primary={report.name}
-                  secondary={
-                    <>
-                      {report.description}
-                      <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
-                        <span style={{ fontWeight: 500 }}>Status:</span> {report.status.charAt(0).toUpperCase() + report.status.slice(1)} 
-                        {' | '}
-                        <span style={{ fontWeight: 500 }}>Updated:</span> {new Date(report.updatedAt).toLocaleString(undefined, { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric', 
-                          hour: '2-digit', 
-                          minute: '2-digit', 
-                          hour12: false
-                        })}
-                      </Typography>
-                    </>
-                  }
-                  primaryTypographyProps={{ style: { fontWeight: 500 } }}
-                />
-                <ListItemSecondaryAction>
-                  <IconButton edge="end" aria-label="edit" onClick={(e) => { e.stopPropagation(); onViewEdit(report); }}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton edge="end" aria-label="delete" onClick={(e) => { e.stopPropagation(); handleDelete(report.id); }}>
-                    <DeleteIcon />
-                  </IconButton>
-                </ListItemSecondaryAction>
+                {editingReportId === report.id ? (
+                  <TextField
+                    fullWidth
+                    value={editingReportName}
+                    onChange={handleEditingNameChange}
+                    onKeyDown={handleEditingKeyDown}
+                    onBlur={handleSaveOrCancelEdit}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    variant="outlined"
+                    size="small"
+                    style={{ margin: '5px 0'}}
+                  />
+                ) : (
+                  <ListItemText
+                    primary={
+                      <span 
+                        className="report-name-clickable"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditReportName(e, report);
+                        }}
+                      >
+                        {report.name}
+                      </span>
+                    }
+                    secondary={`Last updated: ${new Date(report.updatedAt).toLocaleDateString()}`}
+                  />
+                )}
+                {editingReportId !== report.id && (
+                  <ListItemSecondaryAction>
+                    <IconButton 
+                      edge="end" 
+                      aria-label="delete" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(report.id);
+                      }}
+                      title="Delete Report"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                )}
               </ListItem>
-            ))
-          ) : (
-            <ListItem>
-              <ListItemText primary="No prior reports found." />
-            </ListItem>
-          )}
-        </List>
-      </Box>
+            ))}
+          </List>
+        </Box>
+      )}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}

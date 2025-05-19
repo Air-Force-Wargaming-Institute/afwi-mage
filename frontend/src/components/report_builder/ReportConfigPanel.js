@@ -39,21 +39,24 @@ const useStyles = makeStyles((theme) => ({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(2.5),
+    gap: theme.spacing(1.5),
   },
   configSection: {
-    marginBottom: theme.spacing(2),
+    marginBottom: theme.spacing(1),
   },
   elementsContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1.5),
+    gap: theme.spacing(1),
   },
   elementItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(1),
-    padding: theme.spacing(1.5),
+    gap: theme.spacing(0.25),
+    paddingTop: theme.spacing(1),
+    paddingLeft: theme.spacing(1),
+    paddingRight: theme.spacing(1),
+    paddingBottom: theme.spacing(0.25),
     position: 'relative',
     '&:hover .insertButtonOverlay': {
       opacity: 1,
@@ -63,14 +66,14 @@ const useStyles = makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing(0.5),
+    marginBottom: theme.spacing(0.25),
     borderBottom: `1px solid ${theme.palette.divider}`,
-    paddingBottom: theme.spacing(0.5),
+    paddingBottom: theme.spacing(0.25),
     cursor: 'pointer',
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
     },
-    padding: theme.spacing(0.5),
+    padding: theme.spacing(0.25),
     borderRadius: theme.shape.borderRadius,
   },
   elementTitleText: {
@@ -79,26 +82,30 @@ const useStyles = makeStyles((theme) => ({
   },
   elementActions: {
     display: 'flex',
-    gap: theme.spacing(0.5),
+    gap: theme.spacing(0.25),
   },
   elementControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1.5),
-    marginBottom: theme.spacing(1),
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(0.5),
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   typeToggleButtonGroup: {
   },
+  typeToggleButton: {
+    minWidth: '36px',
+    padding: theme.spacing(0.25, 1.5),
+  },
   formatButtonGroup: {
   },
   formatButton: {
     minWidth: '36px',
-    padding: theme.spacing(0.5, 1),
+    padding: theme.spacing(0.25, 0.5),
   },
   formatIconButton: {
-    padding: theme.spacing(0.75),
+    padding: theme.spacing(0.5),
   },
   insertButtonContainer: {
     display: 'flex',
@@ -106,34 +113,34 @@ const useStyles = makeStyles((theme) => ({
   },
   bulletList: {
     listStyleType: 'disc',
-    paddingLeft: theme.spacing(3),
-    margin: theme.spacing(1, 0),
+    paddingLeft: theme.spacing(1.5),
+    margin: theme.spacing(0.5, 0),
   },
   bulletItem: {
     display: 'list-item',
-    marginBottom: theme.spacing(0.5),
+    marginBottom: theme.spacing(0.25),
     '&:last-child': {
       marginBottom: 0,
     },
   },
   elementContent: {
-    padding: theme.spacing(1),
+    padding: theme.spacing(0.5),
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing(2),
+    marginBottom: theme.spacing(1),
     width: '100%',
   },
   sectionContent: {
-    marginLeft: theme.spacing(2),
+    marginLeft: theme.spacing(1),
     borderLeft: `2px solid ${theme.palette.divider}`,
-    paddingLeft: theme.spacing(2),
+    paddingLeft: theme.spacing(1),
   },
   collapseButton: {
-    padding: theme.spacing(0.5),
-    marginRight: theme.spacing(1),
+    padding: theme.spacing(0.25),
+    marginRight: theme.spacing(0.5),
     '&:hover': {
       backgroundColor: 'transparent',
     },
@@ -141,7 +148,7 @@ const useStyles = makeStyles((theme) => ({
   sectionTitle: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1),
+    gap: theme.spacing(0.5),
   },
   elementTitle: {
     flex: 1,
@@ -150,7 +157,7 @@ const useStyles = makeStyles((theme) => ({
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
       borderRadius: theme.shape.borderRadius,
-      padding: theme.spacing(0.5),
+      padding: theme.spacing(0.25),
     },
   },
   elementTitleInput: {
@@ -160,7 +167,7 @@ const useStyles = makeStyles((theme) => ({
       fontWeight: 500,
     },
     '& .MuiInputBase-input': {
-      padding: theme.spacing(0.5),
+      padding: theme.spacing(0.25),
     },
   },
   insertButtonOverlay: {
@@ -170,7 +177,7 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     display: 'flex',
     justifyContent: 'center',
-    padding: theme.spacing(1),
+    padding: theme.spacing(0.5),
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderTop: `1px solid ${theme.palette.divider}`,
     opacity: 0,
@@ -192,8 +199,8 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   regenerateButton: {
-    marginTop: theme.spacing(1),
-    marginBottom: theme.spacing(1),
+    marginTop: theme.spacing(0.5),
+    marginBottom: theme.spacing(0.5),
     backgroundColor: theme.palette.primary.light,
     color: '#fff',
     '&:hover': {
@@ -209,8 +216,8 @@ const useStyles = makeStyles((theme) => ({
   },
   expandButton: {
     position: 'absolute',
-    right: theme.spacing(0.5),
-    top: theme.spacing(0.5),
+    right: theme.spacing(0.25),
+    top: theme.spacing(0.25),
     zIndex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
     '&:hover': {
@@ -496,7 +503,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
           name="title"
           onChange={handleFieldChange}
           fullWidth
-          className={classes.configSection}
+          style={{ marginBottom: theme.spacing(1) }}
           disabled={isTemplate && definition?.category === 'System'}
         />
         <TextField
@@ -507,10 +514,10 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
           multiline
           rows={3}
           fullWidth
-          className={classes.configSection}
+          style={{ marginBottom: theme.spacing(1) }}
         />
         {!isTemplate && (
-          <FormControl fullWidth className={classes.configSection} disabled={isLoadingVectorStores || !!vectorStoreError}>
+          <FormControl fullWidth style={{ marginBottom: theme.spacing(1) }} disabled={isLoadingVectorStores || !!vectorStoreError}>
             <InputLabel id="vector-store-label">Vector Store</InputLabel>
             <Select
               labelId="vector-store-label"
@@ -629,7 +636,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
                 <Box className={classes.elementControls}>
                   <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
                     <Button
-                      className={classes.formatButton}
+                      className={classes.typeToggleButton}
                       variant={element.type === 'explicit' ? 'contained' : 'outlined'}
                       color={element.type === 'explicit' ? 'primary' : 'default'}
                       onClick={() => handleElementChange(element.id || index, 'type', 'explicit')}
@@ -637,7 +644,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
                       Explicit
                     </Button>
                     <Button
-                      className={classes.formatButton}
+                      className={classes.typeToggleButton}
                       variant={element.type === 'generative' ? 'contained' : 'outlined'}
                       color={element.type === 'generative' ? 'primary' : 'default'}
                       onClick={() => handleElementChange(element.id || index, 'type', 'generative')}
