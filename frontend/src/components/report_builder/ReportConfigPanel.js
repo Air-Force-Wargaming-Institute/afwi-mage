@@ -229,9 +229,6 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const isTemplate = definition?.isTemplate || false;
   
-  console.log('ReportConfigPanel - isTemplate:', isTemplate); // Debug logging
-  console.log('ReportConfigPanel - definition:', definition); // Debug logging
-
   // New generic handler for simple field changes
   const handleFieldChange = (e) => {
     const { name, value } = e.target;

@@ -164,12 +164,8 @@ function ReportDesignerPage() {
       const isTemplate = urlParams.get('isTemplate') === 'true';
       const fromTemplate = urlParams.get('fromTemplate') === 'true';
       
-      console.log('Template mode:', isTemplate);
-      console.log('From template mode:', fromTemplate);
-      
       // If there's no reportId but isTemplate is true, we're creating a new template
       if (!reportId && isTemplate) {
-        console.log('Creating new template - no reportId');
         setIsNewTemplate(true);
         setCurrentDefinition({
           id: null,
@@ -185,12 +181,10 @@ function ReportDesignerPage() {
       
       // If there's no reportId but not a template, we're creating a new report
       if (!reportId && !isTemplate) {
-        console.log('Creating new report - no reportId');
         setIsNewReport(true);
         
         // Check if this is a template-based report
         if (fromTemplate) {
-          console.log('Creating from template');
           try {
             // Get the template from session storage
             const templateData = JSON.parse(sessionStorage.getItem('selectedTemplate'));
@@ -231,8 +225,6 @@ function ReportDesignerPage() {
                 type: 'Template-based',
                 isTemplate: false
               });
-              
-              console.log('Set template-based report definition');
             }
           } catch (e) {
             console.error("Error loading template from session storage:", e);
@@ -384,7 +376,6 @@ function ReportDesignerPage() {
 
   // Diagnostic useEffect to track title changes in currentDefinition
   useEffect(() => {
-    console.log('[DEBUG] ReportDesignerPage - currentDefinition.title updated to:', currentDefinition?.title);
   }, [currentDefinition?.title]);
 
   const handleDefinitionChange = (newDefinitionOrAction) => {
@@ -399,9 +390,7 @@ function ReportDesignerPage() {
           [field]: value,
         };
         // Ensure isTemplate is correctly maintained based on URL and definition type
-        // Use prevDef.isTemplate as the reliable source from current state before this field update
         updatedDef.isTemplate = isTemplateFromUrl || prevDef.isTemplate; 
-        console.log(`[DEBUG] handleDefinitionChange (UPDATE_REPORT_FIELD) - field: ${field}, value: ${value}. New title in updatedDef: ${updatedDef.title}`);
         return updatedDef;
       });
     } else { // Assume it's the full newDefinition object (e.g., from element changes)
@@ -412,7 +401,6 @@ function ReportDesignerPage() {
         };
         // Ensure isTemplate is correctly maintained using the incoming newDefinition's isTemplate flag
         updatedDef.isTemplate = isTemplateFromUrl || newDefinition.isTemplate;
-        console.log('[DEBUG] handleDefinitionChange (FULL_OBJECT) - newDefinition.title:', newDefinition?.title);
         return updatedDef;
       });
     }
@@ -426,13 +414,6 @@ function ReportDesignerPage() {
     setIsSaving(true);
     setError(null);
     
-    // Debug: Log the state of currentDefinition.title just before building apiData
-    console.log('[DEBUG] In handleSave - currentDefinition.title:', currentDefinition.title);
-    console.log('[DEBUG] In handleSave - currentDefinition.id:', currentDefinition.id);
-    console.log('[DEBUG] In handleSave - isNewReport:', isNewReport);
-    console.log('[DEBUG] In handleSave - isNewTemplate:', isNewTemplate);
-    console.log('[DEBUG] In handleSave - currentDefinition.isTemplate:', currentDefinition.isTemplate);
-
     try {
       // Check if we're editing a template
       const isTemplate = currentDefinition.isTemplate || false;
@@ -494,8 +475,6 @@ function ReportDesignerPage() {
           '', 
           `/report-designer/${response.data.id}?isTemplate=true`
         );
-        
-        console.log('New template created:', response.data);
       } 
       // If it's a new report (no id), create it
       else if (isNewReport && !isTemplate) {
@@ -537,8 +516,6 @@ function ReportDesignerPage() {
           '', 
           `/report-designer/${response.data.id}${fromTemplateParam}`
         );
-        
-        console.log('New report created:', response.data);
       }
       else {
         // Determine endpoint based on whether we're saving a template or report
@@ -558,8 +535,6 @@ function ReportDesignerPage() {
           }
         );
       }
-      
-      console.log(`${isTemplate ? 'Template' : 'Report'} saved successfully:`, response.data);
       
       // Update the current definition with the response from the server
       setCurrentDefinition(prev => ({
@@ -590,7 +565,6 @@ function ReportDesignerPage() {
             itemType: isTemplate ? 'template' : 'report',
             itemId: response.data.id
           }, window.location.origin);
-          console.log('Notified parent window of save');
         } catch (e) {
           console.error('Failed to notify parent window:', e);
         }
@@ -932,8 +906,6 @@ function ReportDesignerPage() {
         }
       );
       
-      console.log('Template created successfully:', response.data);
-      
       setSnackbar({
         open: true,
         message: 'Report saved as template successfully',
@@ -989,7 +961,6 @@ function ReportDesignerPage() {
       );
 
       const savedReport = response.data;
-      console.log('New report created from template:', savedReport);
 
       // Update application state to reflect the new report
       setCurrentDefinition({
@@ -1059,6 +1030,28 @@ function ReportDesignerPage() {
       return;
     }
 
+    // Save the current state of the report before generating
+    try {
+      await handleSave(); 
+      // If handleSave throws an error, it will be caught by its own try/catch, 
+      // and a snackbar will be shown. We might want to prevent generation here
+      // if save failed, but handleSave doesn't explicitly return success/failure.
+      // For now, assume if it doesn't throw and stop execution, it was "successful enough"
+      // or the user was notified of an issue.
+    } catch (saveError) {
+      // This catch block might not be strictly necessary if handleSave handles its own errors
+      // and doesn't re-throw them in a way that should stop this function.
+      // However, if handleSave could throw an error that isn't caught internally and
+      // we want to stop generation, this would be the place.
+      console.error("Failed to save report before generation:", saveError);
+      setSnackbar({
+        open: true,
+        message: `Could not save report changes before generation: ${saveError.message}`,
+        severity: 'error'
+      });
+      return; // Stop generation if save fails
+    }
+
     const generativeElements = currentDefinition.elements.filter(el => el.type === 'generative');
     if (generativeElements.length === 0) {
       setSnackbar({
@@ -1082,32 +1075,33 @@ function ReportDesignerPage() {
       };
     });
     setGeneratingElements(initialGeneratingState);
-    setGenerationProgress({ current: 0, total: generativeElements.length });
+    // When Generate Report is clicked, we intend to regenerate all, so progress starts from 0.
+    let completedCount = 0; 
+    setGenerationProgress({ current: completedCount, total: generativeElements.length });
 
     // Sequentially generate content for each generative element
     // We will use a mutable copy of currentDefinition to update it step-by-step
     let currentReportState = JSON.parse(JSON.stringify(currentDefinition));
-    let completedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
+    // The original line for completedCount is removed as we set it to 0 above for full regeneration.
+    // let completedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
     
-    // Update progress based on already completed elements
-    setGenerationProgress({ current: completedCount, total: generativeElements.length });
+    // Update progress based on already completed elements -- This is now handled by initializing completedCount to 0.
+    // setGenerationProgress({ current: completedCount, total: generativeElements.length });
 
     for (const elementToProcess of generativeElements) {
-      // Check if this element already has content and is 'completed' (idempotency, or skip if allowing retry on error)
-      const existingElementData = currentReportState.elements.find(e => e.id === elementToProcess.id);
-      if (existingElementData && existingElementData.ai_generated_content && existingElementData.generation_status === 'completed') {
-        // Already processed and completed in a previous step/run, reflect this in generatingElements and progress
-        setGeneratingElements(prev => ({
-          ...prev,
-          [elementToProcess.id]: {
-            status: 'completed',
-            content: existingElementData.ai_generated_content,
-            error: null
-          }
-        }));
-        // completedCount was already set, so progress is fine
-        continue; // Move to the next element
-      }
+      // The check for existing/completed content is removed to force regeneration.
+      // const existingElementData = currentReportState.elements.find(e => e.id === elementToProcess.id);
+      // if (existingElementData && existingElementData.ai_generated_content && existingElementData.generation_status === 'completed') {
+      //   setGeneratingElements(prev => ({
+      //     ...prev,
+      //     [elementToProcess.id]: {
+      //       status: 'completed',
+      //       content: existingElementData.ai_generated_content,
+      //       error: null
+      //     }
+      //   }));
+      //   continue;
+      // }
 
       // Mark current element as 'generating' in the UI
       setGeneratingElements(prev => ({
@@ -1118,10 +1112,41 @@ function ReportDesignerPage() {
       try {
         setSnackbar({ open: true, message: `Generating section: ${elementToProcess.title || 'Untitled Section'}...`, severity: 'info' });
         
+        // Prepare the payload according to the backend's Report schema (similar to handleRegenerateSection)
+        const payload = {
+          id: currentReportState.id,
+          name: currentReportState.title, // Map title to name
+          description: currentReportState.description,
+          vectorStoreId: currentReportState.vectorStoreId,
+          type: currentReportState.type || 'Custom', // Ensure type is present
+          templateId: currentReportState.templateId,
+          status: currentReportState.status || 'draft', // Ensure status is present
+          content: { // Nest elements under content
+            elements: currentReportState.elements
+          },
+          createdAt: currentReportState.createdAt, 
+          updatedAt: currentReportState.updatedAt 
+        };
+
+        // Remove undefined fields to avoid sending them if not set
+        Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+        if (payload.content?.elements === undefined) { // Check if content or content.elements is undefined
+            if (payload.content) delete payload.content.elements;
+            else payload.content = { elements: [] }; // Ensure content.elements exists if content itself was undefined
+        } else if (payload.content.elements === null) {
+            payload.content.elements = []; // Ensure elements is an array if it's null
+        }
+        
+        // Call the backend API to regenerate the specific section
         const response = await axios.post(
-          getGatewayUrl(`/api/report_builder/reports/${currentReportState.id}/generate_next_element`),
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          getGatewayUrl(`/api/report_builder/reports/${currentReportState.id}/sections/${elementToProcess.id}/regenerate`),
+          payload, // Send the transformed payload
+          { 
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json' // Ensure correct content type
+            }
+          }
         );
 
         const apiResponseData = response.data; // Store the raw API response
@@ -1205,6 +1230,38 @@ function ReportDesignerPage() {
 
   const handleRegenerateSection = async (elementId) => {
     try {
+      if (!currentDefinition.id) {
+        setSnackbar({
+          open: true,
+          message: 'Please save the report before generating content for a section.',
+          severity: 'warning'
+        });
+        // Reset generation status for this element if it was set
+        setGeneratingElements(prev => ({
+          ...prev,
+          [elementId]: { ...(prev[elementId] || {}), status: 'idle' } // Preserve other info like content/error if any
+        }));
+        return;
+      }
+
+      // Save the current state of the report before regenerating a section
+      try {
+        await handleSave();
+      } catch (saveError) {
+        console.error("Failed to save report before regenerating section:", saveError);
+        setSnackbar({
+          open: true,
+          message: `Could not save report changes before section regeneration: ${saveError.message}`,
+          severity: 'error'
+        });
+        // Reset generation status for this element
+        setGeneratingElements(prev => ({
+          ...prev,
+          [elementId]: { ...(prev[elementId] || {}), status: 'error', error: 'Save failed before regeneration' } 
+        }));
+        return; // Stop regeneration if save fails
+      }
+
       // Find the element to regenerate
       const element = currentDefinition.elements.find(el => el.id === elementId);
       

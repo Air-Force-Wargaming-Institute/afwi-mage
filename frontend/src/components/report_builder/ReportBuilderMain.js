@@ -142,7 +142,6 @@ const ReportBuilderMain = () => {
             
             // Add event listener to refresh data when window regains focus
             const handleFocus = () => {
-                console.log("Window focused, refreshing data");
                 fetchData();
             };
             
@@ -155,7 +154,6 @@ const ReportBuilderMain = () => {
                 
                 // Check if this is a message from the report designer
                 if (event.data && event.data.type === 'REPORT_BUILDER_SAVE') {
-                    console.log("Received save notification from designer:", event.data);
                     fetchData(); // Refresh the data
                 }
             };
