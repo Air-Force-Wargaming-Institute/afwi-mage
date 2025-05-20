@@ -33,6 +33,14 @@ def load_all_models(language_code: str = "en"):
         # Ensure alignment model for the requested language is loaded if needed later
         if language_code not in models["align"]:
              _load_alignment_model(language_code)
+        # Ensure diarize model is also checked or loaded if it was skipped initially due to no token
+        if not models["diarize"] and HF_TOKEN: # Attempt to load if token now available
+            logger.info("Attempting to load diarization model as HF_TOKEN might be available now.")
+            try:
+                models["diarize"] = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+                logger.info("Diarization model loaded successfully on deferred attempt.")
+            except Exception as e:
+                logger.error(f"Failed to load diarization model on deferred attempt: {e}", exc_info=True)
         return
 
     logger.info("--- Starting Model Loading ---")
@@ -51,18 +59,32 @@ def load_all_models(language_code: str = "en"):
         )
         logger.info("WhisperX model loaded successfully.")
 
-        # 2. Load Diarization Model - SKIPPED
-        logger.info("Loading Diarization model (SKIPPED)...")
-        # Requires HF_TOKEN if model is gated and not cached
-        # models["diarize"] = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
-        # logger.info("Diarization model loaded successfully.")
-        logger.warning("Diarization model loading has been SKIPPED.")
+        # 2. Load Diarization Model
+        logger.info(f"Loading Diarization model (device: {DEVICE})...")
+        if not HF_TOKEN:
+            logger.warning("HF_TOKEN not provided. Diarization model loading might fail if the model is gated and not cached. Diarization will be skipped if model fails to load.")
+            models["diarize"] = None # Explicitly set to None
+        else:
+            try:
+                models["diarize"] = whisperx.diarize.DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+                logger.info("Diarization model loaded successfully.")
+            except Exception as e:
+                logger.error(f"Failed to load diarization model: {e}", exc_info=True)
+                logger.error("Ensure you have accepted PyAnnote model terms on Hugging Face if needed (e.g., for pyannote/speaker-diarization-3.1).")
+                models["diarize"] = None # Set to None on failure
 
         # 3. Load Alignment Model (for the default language initially)
         _load_alignment_model(language_code)
 
-        models_loaded = True # Set flag on successful load
-        logger.info("--- Model Loading Complete (Diarization SKIPPED) ---")
+        models_loaded = True # Set flag on successful load (even if diarization is None)
+        if models["whisper"] and models["align"].get(language_code):
+            if models["diarize"]:
+                logger.info("--- Model Loading Complete (Whisper, Diarize, Align for default lang) ---")
+            else:
+                logger.info("--- Model Loading Complete (Whisper, Align for default lang - Diarization SKIPPED/Failed) ---")
+        else:
+            logger.warning("--- Core model loading (Whisper or Align) might have failed despite models_loaded=True ---")
+
 
     except ImportError as e:
         logger.error(f"ImportError during model loading: {e}. Ensure all dependencies are installed.", exc_info=True)
@@ -110,8 +132,8 @@ def get_models(language_code: str = "en"):
     if language_code not in models["align"]:
         _load_alignment_model(language_code)
 
-    # Return None for diarize model as it's skipped
-    return models["whisper"], None, models["align"].get(language_code) # diarize model is None
+    # Return the diarize model, which might be None if loading failed or was skipped
+    return models["whisper"], models["diarize"], models["align"].get(language_code)
 
 def reset_models():
     """Resets the model state."""
@@ -123,7 +145,8 @@ def reset_models():
     logger.warning("Models have been reset due to loading errors.")
 
 def are_models_loaded() -> bool:
-     """Checks if the core models (Whisper, Align) are loaded.""" # Removed Diarize from docstring
-     # Diarization model is no longer considered critical for "loaded" state
-     return models_loaded and models["whisper"] is not None
+     """Checks if the core models (Whisper, Align) are loaded. Diarization is optional for basic service functioning."""
+     # Diarization model is optional for the service to be "loaded"
+     # but features requiring it will be disabled if it's not available.
+     return models_loaded and models["whisper"] is not None and bool(models["align"]) # Check if align dict is not empty
  

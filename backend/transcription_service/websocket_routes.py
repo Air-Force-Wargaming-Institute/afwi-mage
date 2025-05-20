@@ -13,6 +13,11 @@ import pathlib # Import pathlib
 from typing import Optional, Tuple, List, Dict # Updated typing
 from sqlalchemy.orm.attributes import flag_modified # <-- ADD THIS IMPORT
 
+# START EDIT: Add tempfile and pandas imports
+import tempfile 
+import pandas as pd
+# END EDIT
+
 from websocket_manager import manager # Import the manager instance
 from model_loader import get_models, are_models_loaded # Import model loading utilities
 from config import (
@@ -90,28 +95,33 @@ async def process_live_transcription_update_sliding_window(
         return [], current_transcribed_duration_seconds
 
     try:
-        full_segment_audio = AudioSegment.from_file(io.BytesIO(full_audio_bytes), format=AUDIO_FORMAT)
-        total_duration_seconds = len(full_segment_audio) / 1000.0
+        full_segment_audio_pydub = AudioSegment.from_file(io.BytesIO(full_audio_bytes), format=AUDIO_FORMAT)
+        total_duration_seconds = len(full_segment_audio_pydub) / 1000.0
 
         if total_duration_seconds <= current_transcribed_duration_seconds:
             logger.debug(f"[{session_id}] No new audio beyond {current_transcribed_duration_seconds:.2f}s for sliding window.")
             return [], current_transcribed_duration_seconds
 
         start_ms = int(current_transcribed_duration_seconds * 1000)
-        end_ms = int(total_duration_seconds * 1000)
         
-        new_audio_slice = full_segment_audio[start_ms:end_ms]
-        duration_of_slice_seconds = len(new_audio_slice) / 1000.0
+        new_audio_slice_pydub = full_segment_audio_pydub[start_ms:]
+        duration_of_slice_seconds = len(new_audio_slice_pydub) / 1000.0
 
-        # Avoid processing tiny slivers of audio which might be due to timing issues or very small final chunks
-        if duration_of_slice_seconds <= 0.1: # Increased threshold slightly
-            logger.debug(f"[{session_id}] New audio slice too short ({duration_of_slice_seconds:.3f}s), skipping transcription for this pass.")
-            return [], total_duration_seconds # Return new total duration, but no new segments
+        MIN_SLICE_DURATION_FOR_PROCESSING = 0.5 # Minimum duration to attempt any processing
+        if duration_of_slice_seconds < MIN_SLICE_DURATION_FOR_PROCESSING:
+            logger.debug(f"[{session_id}] New audio slice too short ({duration_of_slice_seconds:.3f}s) for processing, skipping.")
+            return [], total_duration_seconds 
 
         logger.info(f"[{session_id}] Sliding window: Processing new slice from {current_transcribed_duration_seconds:.2f}s to {total_duration_seconds:.2f}s (slice duration: {duration_of_slice_seconds:.2f}s)")
         
-        new_audio_slice_resampled = new_audio_slice.set_frame_rate(TARGET_SAMPLE_RATE)
-        samples_np = np.array(new_audio_slice_resampled.get_array_of_samples()).astype(np.float32) / 32768.0
+        new_audio_slice_resampled_pydub = new_audio_slice_pydub.set_frame_rate(TARGET_SAMPLE_RATE)
+        samples_np = np.array(new_audio_slice_resampled_pydub.get_array_of_samples()).astype(np.float32) / 32768.0
+
+        audio_for_align_diarize = None
+        # Use a temporary file for whisperx.load_audio for alignment and diarization
+        with tempfile.NamedTemporaryFile(suffix=f".{AUDIO_FORMAT.lower()}", delete=True) as tmp_audio_file_for_slice:
+            new_audio_slice_resampled_pydub.export(tmp_audio_file_for_slice.name, format=AUDIO_FORMAT.lower())
+            audio_for_align_diarize = whisperx.load_audio(tmp_audio_file_for_slice.name)
 
         session_db_obj = await session_manager.get_session(db, session_id)
         if not session_db_obj:
@@ -119,13 +129,13 @@ async def process_live_transcription_update_sliding_window(
             return [], total_duration_seconds
             
         current_language = session_db_obj.detected_language or "en"
-        whisper_model, _, align_model_tuple = get_models(language_code=current_language)
+        whisper_model, diarize_model, align_model_tuple = get_models(language_code=current_language)
 
         if not whisper_model:
              logger.error(f"[{session_id}] Whisper model not loaded for sliding window. Cannot process.")
-             # Consider sending a status update to the client if this happens
              return [], total_duration_seconds 
 
+        # 1. Transcribe (on the numpy array of the new slice)
         transcription_result = whisper_model.transcribe(samples_np, batch_size=BATCH_SIZE)
         detected_language_for_slice = transcription_result.get("language", current_language)
         
@@ -133,46 +143,128 @@ async def process_live_transcription_update_sliding_window(
              logger.info(f"[{session_id}] Language for slice ({detected_language_for_slice}) differs from session ({current_language}). Updating session.")
              await session_manager.set_detected_language(db, session_id, detected_language_for_slice)
              current_language = detected_language_for_slice # Update for alignment model
-             _, _, align_model_tuple = get_models(language_code=current_language)
+             whisper_model, diarize_model, align_model_tuple = get_models(language_code=current_language)
              
         raw_segments_from_slice = transcription_result.get("segments", [])
         if not raw_segments_from_slice:
             logger.info(f"[{session_id}] No segments transcribed from the current audio slice.")
             return [], total_duration_seconds
 
-        final_segments_for_slice = []
+        # 2. Align Transcription
+        aligned_segments_data = {"segments": raw_segments_from_slice, "word_segments": []} # Ensure word_segments key exists
         if align_model_tuple:
             align_model, align_metadata = align_model_tuple
             try:
-                aligned_result = whisperx.align(raw_segments_from_slice, align_model, align_metadata, samples_np, DEVICE, return_char_alignments=False)
-                final_segments_for_slice = aligned_result.get("segments", [])
-                logger.debug(f"[{session_id}] Alignment complete for slice. Got {len(final_segments_for_slice)} aligned segments.")
+                logger.debug(f"[{session_id}] Aligning {len(raw_segments_from_slice)} raw segments...")
+                aligned_segments_data = whisperx.align(raw_segments_from_slice, align_model, align_metadata, audio_for_align_diarize, DEVICE, return_char_alignments=False)
+                logger.debug(f"[{session_id}] Alignment complete. Got {len(aligned_segments_data.get('segments',[]))} aligned segments.")
             except Exception as align_e:
                 logger.error(f"[{session_id}] Error during alignment for slice: {align_e}", exc_info=True)
-                final_segments_for_slice = raw_segments_from_slice # Fallback to raw if alignment fails
+                # Fallback to raw segments if alignment fails, ensure structure is compatible
+                aligned_segments_data = {"segments": raw_segments_from_slice, 
+                                         "word_segments": [word for seg in raw_segments_from_slice for word in seg.get("words", [])]} 
+
         else:
             logger.warning(f"[{session_id}] Alignment model for {current_language} not available for slice. Using raw segments.")
-            final_segments_for_slice = raw_segments_from_slice
-            
+            # Ensure structure for assign_word_speakers if using raw segments
+            aligned_segments_data = {"segments": raw_segments_from_slice, 
+                                     "word_segments": [word for seg in raw_segments_from_slice for word in seg.get("words", [])]} 
+
+        # 3. Diarize Speakers
+        diarization_df = None
+        if diarize_model and duration_of_slice_seconds >= 2.0: # Only run diarization if model available and slice is reasonably long
+            try:
+                num_participants = len(session_db_obj.participants) if session_db_obj.participants else 0
+                min_speakers_param = 1 # At least one speaker expected
+                max_speakers_param = num_participants if num_participants > 0 else None # None lets pyannote decide if no participants info
+                
+                logger.info(f"[{session_id}] Running diarization. Min Speakers: {min_speakers_param}, Max Speakers: {max_speakers_param}")
+                diarization_pyannote_annotation = diarize_model(audio_for_align_diarize, min_speakers=min_speakers_param, max_speakers=max_speakers_param)
+                
+                # CORRECTED LOGIC FOR HANDLING PYANNOTE OUTPUT AND INITIALIZING DATAFRAME
+                if diarization_pyannote_annotation is not None and not isinstance(diarization_pyannote_annotation, pd.DataFrame):
+                    # It's an Annotation object, check its labels
+                    if not diarization_pyannote_annotation.labels(): 
+                        logger.info(f"[{session_id}] Diarization Annotation has no speaker labels.")
+                        diarization_df = pd.DataFrame(columns=['speaker', 'start', 'end'])
+                    else:
+                        turns = []
+                        for turn, _, speaker_label in diarization_pyannote_annotation.itertracks(yield_label=True):
+                            turns.append({'start': turn.start, 'end': turn.end, 'speaker': speaker_label})
+                        if turns:
+                            diarization_df = pd.DataFrame(turns)
+                            logger.debug(f"[{session_id}] Diarization complete. Found {len(diarization_df)} speaker turns.")
+                        else:
+                            logger.info(f"[{session_id}] Diarization Annotation had labels, but no turns extracted.")
+                            diarization_df = pd.DataFrame(columns=['speaker', 'start', 'end'])
+                elif isinstance(diarization_pyannote_annotation, pd.DataFrame): # If it's already a DataFrame (e.g. from a previous step or future refactor)
+                    logger.info(f"[{session_id}] Diarization result is already a DataFrame.")
+                    diarization_df = diarization_pyannote_annotation # Use as is
+                else: # Handles case where diarization_pyannote_annotation is None
+                     logger.info(f"[{session_id}] Diarization did not produce a valid Annotation object (it was None or unexpected type).")
+                     diarization_df = pd.DataFrame(columns=['speaker', 'start', 'end']) # Ensure df is initialized
+                            
+            except Exception as diarize_e:
+                logger.error(f"[{session_id}] Error during diarization for slice: {diarize_e}", exc_info=True)
+                diarization_df = None # Explicitly None on error
+        elif not diarize_model:
+            logger.warning(f"[{session_id}] Diarization model not available. Skipping speaker assignment.")
+        elif duration_of_slice_seconds < 2.0:
+            logger.info(f"[{session_id}] Audio slice too short ({duration_of_slice_seconds:.2f}s) for diarization. Skipping speaker assignment.")
+
+        # 4. Assign Word Speakers
+        final_segments_for_slice_with_speaker = aligned_segments_data.get("segments", [])
+        if diarization_df is not None and not diarization_df.empty:
+            try:
+                # Ensure aligned_segments_data has 'word_segments' if not produced by whisperx.align
+                if 'word_segments' not in aligned_segments_data or not aligned_segments_data['word_segments']:
+                    if aligned_segments_data.get('segments'): # if segments exist, try to create word_segments from them
+                        word_segments_from_segments = []
+                        for seg in aligned_segments_data['segments']:
+                            if 'words' in seg and isinstance(seg['words'], list):
+                                word_segments_from_segments.extend(seg['words'])
+                        aligned_segments_data['word_segments'] = word_segments_from_segments
+                    else: # No segments means no words
+                        aligned_segments_data['word_segments'] = []
+                
+                logger.debug(f"[{session_id}] Assigning speakers. Aligned segments: {len(aligned_segments_data.get('segments', []))}, Word segments: {len(aligned_segments_data.get('word_segments', []))}, Diarization turns: {len(diarization_df)}")
+                result_with_speakers_assigned = whisperx.assign_word_speakers(diarization_df, aligned_segments_data)
+                final_segments_for_slice_with_speaker = result_with_speakers_assigned.get("segments", [])
+                logger.debug(f"[{session_id}] Speaker assignment complete. {len(final_segments_for_slice_with_speaker)} segments now have speaker labels.")
+            except Exception as assign_e:
+                logger.error(f"[{session_id}] Error assigning speakers: {assign_e}", exc_info=True)
+                # Fallback to aligned segments if speaker assignment fails
+        elif diarization_df is not None and diarization_df.empty:
+            logger.info(f"[{session_id}] No speaker turns from diarization to assign. Using segments without explicit speaker update.")
+        else:
+            logger.info(f"[{session_id}] Diarization data not available/valid. Using segments without speaker updates.")
+
         output_segments_this_call = []
-        for seg_data in final_segments_for_slice:
+        for seg_data in final_segments_for_slice_with_speaker:
              relative_start = seg_data.get("start")
              relative_end = seg_data.get("end")
              abs_start = (relative_start + current_transcribed_duration_seconds) if relative_start is not None else None
              abs_end = (relative_end + current_transcribed_duration_seconds) if relative_end is not None else None
 
-             word_confidences = [w.get('score', 0) for w in seg_data.get('words', []) if 'score' in w]
+             # Ensure 'words' exists and is a list of dicts before trying to access 'score'
+             segment_words = seg_data.get('words', [])
+             word_confidences = []
+             if isinstance(segment_words, list):
+                 for w in segment_words:
+                     if isinstance(w, dict) and 'score' in w:
+                         word_confidences.append(w['score'])
+             
              segment_confidence = sum(word_confidences) / len(word_confidences) if word_confidences else None
 
              output_segments_this_call.append({
-                 "speaker": "UNKNOWN", # Diarization is skipped
+                 "speaker": seg_data.get("speaker", "UNKNOWN"), 
                  "text": seg_data.get("text", "").strip(),
                  "start": abs_start,
                  "end": abs_end,
                  "confidence": segment_confidence
              })
         
-        logger.info(f"[{session_id}] Produced {len(output_segments_this_call)} segments from this slice.")
+        logger.info(f"[{session_id}] Produced {len(output_segments_this_call)} speaker-aware segments from this slice.")
         return output_segments_this_call, total_duration_seconds
 
     except CouldntDecodeError:
