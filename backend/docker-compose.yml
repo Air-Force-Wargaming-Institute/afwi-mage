@@ -35,9 +35,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
       - UPLOAD_SERVICE_URL=http://upload:8005
       - EXTRACTION_SERVICE_URL=http://extraction:8002
-      - GENERATION_SERVICE_URL=http://generation:8003
       - AGENT_SERVICE_URL=http://agent:8001
-      - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
       - WORKBENCH_SERVICE_URL=http://workbench:8020
       - VLLM_INSTANCES=http://vllm:8000/v1=generate
@@ -109,36 +107,6 @@ services:
       - ./models:/app/models
       - ./extraction_service:/app
       - nltk_data_volume:/app/nltk_data
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-
-  generation:
-    build: ./generation_service
-    ports:
-      - "8003:8003"
-    volumes:
-      - ../data:/app/data
-      - ./models:/app/models
-      - ./generation_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-
-  review:
-    build: ./review_service
-    ports:
-      - "8004:8004"
-    volumes:
-      - ../data:/app/data
-      - ../models:/app/models
-      - ./review_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
     depends_on:
       - init-data
     networks:
@@ -326,44 +294,44 @@ services:
       - app-network
     command: uvicorn app:app --host 0.0.0.0 --port 8011 --reload --timeout-keep-alive 75 --limit-concurrency 100 --backlog 100
 
-  transcription:
-    build: ./transcription_service
-    ports:
-      - "8021:8021"
-    volumes:
-      - ../data/transcription/sessions:/app/data/sessions
-      - ../data/transcription/whisper_models:/app/.cache/whisperx
-      - ../data/transcription/huggingface_cache:/app/.cache/huggingface
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-      - TRANSCRIPTION_SERVICE_PORT=8021
-      - ARTIFACT_STORAGE_BASE_PATH=/app/data/sessions
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/transcriptiondb
-      - MODEL_CACHE_DIR=/app/.cache/whisperx
-      - HF_HOME=/app/.cache/huggingface
-      - DEFAULT_MODEL=large-v2
-      - DEVICE=cuda
-      - COMPUTE_TYPE=float16
-      - BATCH_SIZE=16
-      - HF_TOKEN=${HF_TOKEN:-}
-      - NVIDIA_VISIBLE_DEVICES=all
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=info
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    depends_on:
-      init-data:
-        condition: service_completed_successfully
-      db:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: unless-stopped
+  # transcription:
+  #   build: ./transcription_service
+  #   ports:
+  #     - "8021:8021"
+  #   volumes:
+  #     - ../data/transcription/sessions:/app/data/sessions
+  #     - ../data/transcription/whisper_models:/app/.cache/whisperx
+  #     - ../data/transcription/huggingface_cache:/app/.cache/huggingface
+  #   environment:
+  #     - CORE_SERVICE_URL=http://core:8000
+  #     - TRANSCRIPTION_SERVICE_PORT=8021
+  #     - ARTIFACT_STORAGE_BASE_PATH=/app/data/sessions
+  #     - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/transcriptiondb
+  #     - MODEL_CACHE_DIR=/app/.cache/whisperx
+  #     - HF_HOME=/app/.cache/huggingface
+  #     - DEFAULT_MODEL=large-v2
+  #     - DEVICE=cuda
+  #     - COMPUTE_TYPE=float16
+  #     - BATCH_SIZE=16
+  #     - HF_TOKEN=${HF_TOKEN:-}
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #     - PYTHONUNBUFFERED=1
+  #     - LOG_LEVEL=info
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   depends_on:
+  #     init-data:
+  #       condition: service_completed_successfully
+  #     db:
+  #       condition: service_healthy
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
 
   # frontend:
   #   build: ../frontend

@@ -23,6 +23,7 @@ $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
 $listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
 $deploymentZipsDirName = "DeploymentZIPs"
+$pipLogFileName = "${ServiceName}_pip_download.log" # New: Log file name
 
 # Resolve absolute paths
 try {
@@ -31,12 +32,28 @@ try {
     $localWheelsDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $localWheelsDirRelative
     $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
     $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
+    $pipLogFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $pipLogFileName # New: Log file path
     $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
     $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
     $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 } catch {
     Write-Error "[$ServiceName] Error resolving initial paths: $_"
     exit 1
+}
+
+# --- Initial Cleanup ---
+Write-Host "[$ServiceName] Performing initial cleanup..." -ForegroundColor DarkGray
+if (Test-Path $localWheelsDirAbsolute -PathType Container) {
+    Write-Host "[$ServiceName] Removing existing local wheels directory: $localWheelsDirAbsolute" -ForegroundColor DarkGray
+    Remove-Item -Path $localWheelsDirAbsolute -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path $listFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing downloaded wheels list: $listFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $listFilePath -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path $pipLogFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing pip download log file: $pipLogFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $pipLogFilePath -Force -ErrorAction SilentlyContinue
 }
 
 # --- Pre-checks ---
@@ -84,7 +101,15 @@ $dockerArgs = @(
     $bashCommand
 )
 
-$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
+Write-Host "[$ServiceName] Docker command output will be logged to: $pipLogFilePath" -ForegroundColor Yellow
+# Ensure a fresh log file for each run by deleting the old one if it exists (also done in initial cleanup, but good for clarity here)
+if (Test-Path $pipLogFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing log file before Docker run: $pipLogFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $pipLogFilePath -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "[$ServiceName] Executing Docker command..."
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -FilePath $pipLogFilePath -Append | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
@@ -112,83 +137,93 @@ if ($wheelsInCache.Count -eq 0) {
     Write-Host "[$ServiceName] Found $($wheelsInCache.Count) Linux-compatible wheel files in central cache $wheelsDirAbsolute." -ForegroundColor Green
 }
 
-Write-Host "[$ServiceName] Generating list of required wheels for ${listFilePath}" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Generating list of required wheels for ${listFilePath} from log file: $pipLogFilePath" -ForegroundColor Cyan
 try {
     # We'll extract wheel information from the Docker output by looking for package references
     $requiredWheels = @()
     $processedPackages = @{}  # Use a hashtable for faster lookups
     
-    # Extract all wheel filenames directly mentioned in the output
-    # Look for patterns like "File was already downloaded /wheels/package-name.whl"
-    # or "Saved /wheels/package-name.whl" or "Downloading package-name.whl"
-    foreach ($line in $dockerCommandOutput) {
-        if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
-            $wheelName = $matches[1]
-            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
-        } elseif ($line -match 'Saved /wheels/([^/]+\.whl)') { # Common pattern for actual downloads
-            $wheelName = $matches[1]
-            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
-        } elseif ($line -match 'Downloading ([^/]+\.whl)') { # Another download pattern
-            $wheelName = $matches[1]
-            if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
-        }
-    }
+    if (-not (Test-Path $pipLogFilePath -PathType Leaf)) {
+        Write-Warning "[$ServiceName] Log file $pipLogFilePath not found. Cannot parse for wheels."
+    } else {
+        $logFileContent = Get-Content -Path $pipLogFilePath -ErrorAction SilentlyContinue
+        if ($null -eq $logFileContent) {
+            Write-Warning "[$ServiceName] Could not read the log file $pipLogFilePath or it is empty. Wheel list might be incomplete."
+        } else {
+            Write-Host "[$ServiceName] Processing log file $pipLogFilePath for specific wheel information..."
+            # Extract all wheel filenames directly mentioned in the output
+            # Look for patterns like "File was already downloaded /wheels/package-name.whl"
+            # or "Saved /wheels/package-name.whl" or "Downloading package-name.whl"
+            foreach ($line in $logFileContent) {
+                if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
+                    $wheelName = $matches[1]
+                    if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+                } elseif ($line -match 'Saved /wheels/([^/]+\.whl)') { # Common pattern for actual downloads
+                    $wheelName = $matches[1]
+                    if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+                } elseif ($line -match 'Downloading ([^/]+\.whl)') { # Another download pattern
+                    $wheelName = $matches[1]
+                    if (-not $processedPackages.ContainsKey($wheelName)) { $processedPackages[$wheelName] = $true }
+                }
+            }
 
-    # From lines like "Successfully downloaded fastapi pydantic ...", extract those package names
-    # and find the corresponding wheel files from $wheelsInCache.
-    # This regex captures the package names after "Successfully downloaded"
-    $successfullyDownloadedPattern = 'Successfully downloaded\\s+(.*)'
-    $dockerOutputString = $dockerCommandOutput -join [System.Environment]::NewLine
-    
-    if ($dockerOutputString -match $successfullyDownloadedPattern) {
-        $packageListString = $matches[1]
-        $packageNames = $packageListString -split '\\s+' | Where-Object { $_ } # Split by space and remove empty strings
-        
-        foreach ($packageName in $packageNames) {
-            $packageNameClean = $packageName.Trim()
-            $packageNameUnderscore = $packageNameClean.Replace('-', '_') # Handle hyphen/underscore variations
+            # From lines like "Successfully downloaded fastapi pydantic ...", extract those package names
+            # and find the corresponding wheel files from $wheelsInCache.
+            # This regex captures the package names after "Successfully downloaded"
+            $successfullyDownloadedPattern = 'Successfully downloaded\\s+(.*)'
+            $logFileContentString = $logFileContent -join [System.Environment]::NewLine # Use log content here
             
-            $matchingWheels = $wheelsInCache | Where-Object {
-                $_.Name -like "$packageNameClean-*.whl" -or
-                $_.Name -like "$packageNameUnderscore-*.whl"
-            }
-            
-            foreach ($wheel in $matchingWheels) {
-                if (-not $processedPackages.ContainsKey($wheel.Name)) {
-                    $processedPackages[$wheel.Name] = $true
-                }
-            }
-        }
-    }
-    
-    # Convert the hashtable keys to an array and sort
-    $requiredWheels = $processedPackages.Keys | Sort-Object
-    
-    # Fallback if pip output parsing yielded no wheels (e.g., all from cache, different log format)
-    if ($requiredWheels.Count -eq 0) {
-        Write-Warning "[$ServiceName] No wheels identified from primary pip output parsing. Attempting fallback: checking 'Collecting' lines."
-        # Fallback: Try to match based on "Collecting" lines if the primary method failed
-        foreach ($line in $dockerCommandOutput) {
-            if ($line -match '^Collecting ([a-zA-Z0-9._-]+)') {
-                $packageName = $matches[1].Trim()
-                $packageNameUnderscore = $packageName.Replace('-', '_')
+            if ($logFileContentString -match $successfullyDownloadedPattern) {
+                $packageListString = $matches[1]
+                $packageNames = $packageListString -split '\\s+' | Where-Object { $_ } # Split by space and remove empty strings
                 
-                $matchingWheels = $wheelsInCache | Where-Object {
-                    $_.Name -like "$packageName-*.whl" -or
-                    $_.Name -like "$packageNameUnderscore-*.whl"
-                }
-                foreach ($wheel in $matchingWheels) {
-                    if (-not $processedPackages.ContainsKey($wheel.Name)) {
-                        $processedPackages[$wheel.Name] = $true
+                foreach ($packageName in $packageNames) {
+                    $packageNameClean = $packageName.Trim()
+                    $packageNameUnderscore = $packageNameClean.Replace('-', '_') # Handle hyphen/underscore variations
+                    
+                    $matchingWheels = $wheelsInCache | Where-Object {
+                        $_.Name -like "$packageNameClean-*.whl" -or
+                        $_.Name -like "$packageNameUnderscore-*.whl"
+                    }
+                    
+                    foreach ($wheel in $matchingWheels) {
+                        if (-not $processedPackages.ContainsKey($wheel.Name)) {
+                            $processedPackages[$wheel.Name] = $true
+                        }
                     }
                 }
             }
+            
+            # Convert the hashtable keys to an array and sort
+            $requiredWheels = $processedPackages.Keys | Sort-Object
+            
+            # Fallback if pip output parsing yielded no wheels (e.g., all from cache, different log format)
+            if ($requiredWheels.Count -eq 0) {
+                Write-Warning "[$ServiceName] No wheels identified from primary pip output parsing from log file. Attempting fallback: checking 'Collecting' lines in log."
+                # Fallback: Try to match based on "Collecting" lines if the primary method failed
+                foreach ($line in $logFileContent) { # Use log content here
+                    if ($line -match '^Collecting ([a-zA-Z0-9._-]+)') {
+                        $packageName = $matches[1].Trim()
+                        $packageNameUnderscore = $packageName.Replace('-', '_')
+                        
+                        $matchingWheels = $wheelsInCache | Where-Object {
+                            $_.Name -like "$packageName-*.whl" -or
+                            $_.Name -like "$packageNameUnderscore-*.whl"
+                        }
+                        foreach ($wheel in $matchingWheels) {
+                            if (-not $processedPackages.ContainsKey($wheel.Name)) {
+                                $processedPackages[$wheel.Name] = $true
+                            }
+                        }
+                    }
+                }
+                $requiredWheels = $processedPackages.Keys | Sort-Object
+            }
         }
-        $requiredWheels = $processedPackages.Keys | Sort-Object
-    }
+    } # End of else for log file readable
 
     if ($requiredWheels.Count -eq 0) {
-        Write-Error "[$ServiceName] No wheels were identified from pip output parsing. This is unexpected. Check Docker logs. The list file will be empty or reflect all cache items as a last resort."
+        Write-Error "[$ServiceName] No wheels were identified from pip output parsing from the log file ($pipLogFilePath). This is unexpected. Check Docker logs. The list file will be empty or reflect all cache items as a last resort."
         # As a last resort if other methods fail, list all wheels in cache for this service,
         # though this defeats the purpose of precise listing. Or leave it empty.
         # For now, we'll leave it potentially empty or let it fail if no wheels, to highlight the issue.
@@ -196,9 +231,10 @@ try {
         # if a full list is preferred over an empty one on complete failure of parsing.
         # However, the problem description implies we want *accurate* lists, so an empty list upon failure is more indicative.
     } else {
-        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) required wheel files by parsing pip output." -ForegroundColor Green
+        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) required wheel files by parsing pip output from log file." -ForegroundColor Green
     }
     
+    $requiredWheels = $requiredWheels | Where-Object { $_ -notlike 'pip-*.whl' } # Exclude pip wheels
     $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List of required wheels saved to $listFilePath." -ForegroundColor Green
 

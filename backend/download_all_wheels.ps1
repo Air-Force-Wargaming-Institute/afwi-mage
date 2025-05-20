@@ -12,10 +12,7 @@ $ServiceDirs = @(
     "direct_chat_service",
     "embedding_service",
     "extraction_service",   # Has NLTK
-    "generation_service",
     "ollama",             # Skipped (no requirements.txt)
-    "process_tracking_service", # Skipped (no requirements.txt)
-    "review_service",
     "transcription_service",# Skipped (no requirements.txt)
     "upload_service",
     "vLLM",               # Skipped (no requirements.txt)

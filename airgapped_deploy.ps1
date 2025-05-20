@@ -35,29 +35,6 @@ $DockerImagesDir = Join-Path -Path $PackageBaseDir -ChildPath "docker_images"
 $TempDeployRoot = Join-Path -Path $PackageBaseDir -ChildPath "temp_deployment_area" # For extracting zips
 
 # --- Helper Functions ---
-function Load-DockerImages {
-    Write-Host "--- Loading Docker Images from $DockerImagesDir ---" -ForegroundColor Green
-    if (-not (Test-Path $DockerImagesDir -PathType Container)) {
-        Write-Warning "Docker images directory not found: $DockerImagesDir"
-        return
-    }
-    $imageTars = Get-ChildItem -Path $DockerImagesDir -Filter "*.tar"
-    if ($imageTars.Count -eq 0) {
-        Write-Warning "No Docker image .tar files found in $DockerImagesDir."
-        return
-    }
-    foreach ($tarFile in $imageTars) {
-        Write-Host "Loading image from $($tarFile.FullName)..."
-        try {
-            docker load -i $tarFile.FullName
-            Write-Host "Successfully loaded $($tarFile.Name)." -ForegroundColor Cyan
-        } catch {
-            Write-Error "Failed to load Docker image $($tarFile.FullName). Error: $($_.Exception.Message)"
-        }
-    }
-    Write-Host "--- Docker Image Loading Complete ---" -ForegroundColor Green
-}
-
 function Get-AvailableBackendServices {
     if (-not (Test-Path $BackendServicesZipsDir -PathType Container)) {
         Write-Warning "Backend services Zips directory not found: $BackendServicesZipsDir"
@@ -175,6 +152,9 @@ function Deploy-ServiceOrContext {
     Push-Location $buildContextPath
     try {
         docker build -t $imageTagName . 
+        if ($LASTEXITCODE -ne 0) {
+            throw "Docker build failed with exit code $LASTEXITCODE. See Docker output above for details."
+        }
         Write-Host "Successfully built Docker image '$imageTagName'." -ForegroundColor Cyan
         Write-Host "To run this service (as part of docker-compose), ensure the image name '$imageTagName' is referenced in the docker-compose.yml from the backend_support directory."
         Write-Host "Consult service-specific documentation or the main docker-compose.yml for run details."
@@ -192,7 +172,25 @@ Write-Host "Airgapped Deployment Script Started." -ForegroundColor Cyan
 Write-Host "Expected Package Base Directory: $PackageBaseDir"
 
 # Step 0: Load Docker Images
-Load-DockerImages
+$shouldLoadImages = Read-Host "Do you want to load Docker images now? (y/n)"
+if ($shouldLoadImages -eq 'y') {
+    Write-Host "Invoking Docker image loader script..."
+    try {
+        $ImageLoaderScriptPath = Join-Path -Path $DeploymentScriptsDir -ChildPath "load_docker_images.ps1"
+        if (Test-Path $ImageLoaderScriptPath -PathType Leaf) {
+            # Pass the PackageBaseDir as a parameter to the image loader script
+            & $ImageLoaderScriptPath -PackageBaseDirForImages $PackageBaseDir
+        } else {
+            Write-Error "Docker image loader script (load_docker_images.ps1) not found in $DeploymentScriptsDir."
+            Write-Warning "Skipping Docker image loading. This might cause issues if images are not pre-loaded."
+        }
+    } catch {
+        Write-Error "An error occurred while trying to run load_docker_images.ps1: $($_.Exception.Message)"
+        Write-Warning "Proceeding without guaranteed image loading. This might cause issues."
+    }
+} else {
+    Write-Host "Skipping Docker image loading based on user input." -ForegroundColor Yellow
+}
 
 # Step 1: Discover Available Items
 $AvailableBackendServices = Get-AvailableBackendServices
@@ -286,4 +284,4 @@ foreach ($itemInfoToDeploy in $ItemsToDeploy) {
 Write-Host "`n--- Airgapped Deployment Script Finished ---" -ForegroundColor Magenta
 Write-Host "All selected images should now be built or loaded."
 Write-Host "To start the services, navigate to the '../backend_support/' directory from here,"
-Write-Host "and use the modified 'docker-compose.yml' file. Example: docker compose up -d" 
+Write-Host "and use the modified 'docker-compose.yml' file. Example: docker compose up -d"

@@ -7,19 +7,12 @@ WORKDIR /build
 COPY requirements.txt /build/
 COPY wheels/ /build/wheels/
 
-# Install dependencies from local wheels with special handling for problematic packages
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels $(grep -v "unstructured-inference" requirements.txt | grep -v "faiss-gpu-cu12" | grep -v "^#") && \
-    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps unstructured-inference && \
-    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps faiss-gpu-cu12
-
 # Create a new virtual environment
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
 # Install dependencies into the virtual environment with special handling
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels $(grep -v "unstructured-inference" requirements.txt | grep -v "faiss-gpu-cu12" | grep -v "^#") && \
-    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps unstructured-inference && \
-    pip install --no-cache-dir --no-index --find-links=/build/wheels --no-deps faiss-gpu-cu12
+RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
 
 # Second stage: Create the final image
 FROM afwi-mage-base:3.12-slim

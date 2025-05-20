@@ -7,6 +7,28 @@ param(
 )
 
 $ServiceName = "core_service"
+
+Write-Host "[$ServiceName] Cleaning up artifacts from previous runs..." -ForegroundColor DarkGray
+
+# Define the target wheels directory relative to the script location
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$localWheelsDirRelative = "wheels" # Local wheels dir for this service
+$localWheelsDirAbsolute = Join-Path -Path $scriptDir -ChildPath $localWheelsDirRelative
+
+# Delete local wheels directory if it exists
+if (Test-Path $localWheelsDirAbsolute -PathType Container) {
+    Write-Host "[$ServiceName] Removing existing local wheels directory: $localWheelsDirAbsolute" -ForegroundColor DarkGray
+    Remove-Item -Path $localWheelsDirAbsolute -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Define and delete downloaded_wheels_list.txt if it exists
+$listFileName = "downloaded_wheels_list.txt"
+$listFilePath = Join-Path -Path $scriptDir -ChildPath $listFileName
+if (Test-Path $listFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing downloaded wheels list: $listFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $listFilePath -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "[$ServiceName] Downloading Linux-compatible wheels for airgapped installation..." -ForegroundColor Cyan
 
 # Check if Docker is available
@@ -16,11 +38,8 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 # --- Path Definitions ---
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $wheelsDirRelative = "../backend_wheels"
-$localWheelsDirRelative = "./wheels"
 $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
-$listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
 $deploymentZipsDirName = "DeploymentZIPs"
 
@@ -28,9 +47,7 @@ $deploymentZipsDirName = "DeploymentZIPs"
 try {
     $scriptDirAbsolute = (Resolve-Path -Path $scriptDir).Path
     $wheelsDirAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $wheelsDirRelative)).Path
-    $localWheelsDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $localWheelsDirRelative
     $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
-    $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
     $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
     $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
     $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
@@ -84,7 +101,20 @@ $dockerArgs = @(
     $bashCommand
 )
 
-$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
+# Define log file path
+$logFileName = "${ServiceName}_pip_download.log"
+$logFilePath = Join-Path -Path $scriptDir -ChildPath $logFileName
+Write-Host "[$ServiceName] Docker command output will be logged to: $logFilePath" -ForegroundColor Yellow
+
+# Ensure a fresh log file for each run by deleting the old one if it exists
+if (Test-Path $logFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing log file: $logFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $logFilePath -Force -ErrorAction SilentlyContinue
+}
+
+# Execute Docker command and capture all output
+Write-Host "[$ServiceName] Executing Docker command..."
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -FilePath $logFilePath -Append | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
@@ -114,38 +144,33 @@ if ($wheelsInCache.Count -eq 0) {
 
 Write-Host "[$ServiceName] Generating list of required wheels for ${listFilePath}" -ForegroundColor Cyan
 try {
-    # We'll extract wheel information from the Docker output by looking for package references
+    # We'll extract wheel information from the log file
     $requiredWheels = @()
     $processedPackages = @{}  # Use a hashtable for faster lookups
     
-    # Extract all wheel filenames directly mentioned in the output
-    # Look for patterns like "File was already downloaded /wheels/package-name.whl"
-    foreach ($line in $dockerCommandOutput) {
-        # Match wheels directly mentioned in the output
-        if ($line -match 'File was already downloaded /wheels/([^/]+\.whl)') {
-            $wheelName = $matches[1]
-            $processedPackages[$wheelName] = $true
-        } elseif ($line -match 'Downloading ([^/]+\.whl)') {
-            $wheelName = $matches[1]
-            $processedPackages[$wheelName] = $true
-        }
-        
-        # Also try to match packages that pip is collecting
-        # This will help find transitive dependencies mentioned in the output
-        if ($line -match '^Collecting ([a-zA-Z0-9._-]+)') {
-            $packageName = $matches[1].Trim()
-            # Convert dashes to underscores as needed in wheel filenames
-            $packageNameUnderscore = $packageName.Replace('-', '_')
-            
-            # Find all wheels that match this package name
-            $matchingWheels = $wheelsInCache | Where-Object { 
-                $_.Name -like "$packageName-*.whl" -or 
-                $_.Name -like "$packageNameUnderscore-*.whl"
-            }
-            
-            foreach ($wheel in $matchingWheels) {
-                if (-not $processedPackages.ContainsKey($wheel.Name)) {
-                    $processedPackages[$wheel.Name] = $true
+    # Read the content of the log file created earlier
+    if (-not (Test-Path $logFilePath -PathType Leaf)) {
+        Write-Warning "[$ServiceName] Log file $logFilePath not found. Cannot parse for wheels."
+    } else {
+        $logFileContent = Get-Content -Path $logFilePath -ErrorAction SilentlyContinue
+        if ($null -eq $logFileContent) {
+            Write-Warning "[$ServiceName] Could not read the log file $logFilePath or it is empty. Wheel list might be incomplete."
+        } else {
+            Write-Host "[$ServiceName] Processing log file $logFilePath for specific wheel information..."
+            foreach ($line in $logFileContent) { 
+                $trimmedLine = $line.Trim()
+                # Regex to capture filename from 'File was already downloaded /wheels/FILENAME.whl'
+                if ($trimmedLine -match 'File was already downloaded /wheels/([^ ]+\.whl)') {
+                    $wheelName = $matches[1]
+                    if ($wheelName -notlike 'pip-*.whl') {
+                        $processedPackages[$wheelName] = $true
+                    }
+                # Regex to capture filename from 'Downloading FILENAME.whl'
+                } elseif ($trimmedLine -match 'Downloading ([^ ]+\.whl)') {
+                    $wheelName = $matches[1]
+                     if ($wheelName -notlike 'pip-*.whl') {
+                        $processedPackages[$wheelName] = $true
+                    }
                 }
             }
         }
@@ -156,7 +181,7 @@ try {
     
     # If no wheels were found, fall back to the requirements.txt approach
     if ($requiredWheels.Count -eq 0) {
-        Write-Warning "[$ServiceName] No wheels identified from pip output. Trying to match from requirements.txt instead."
+        Write-Warning "[$ServiceName] No wheels identified from log file. Trying to match from requirements.txt instead."
         
         # Get the list of requirements from the requirements.txt file
         $requiredPackages = Get-Content $requirementsFileAbsolute | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
@@ -196,11 +221,11 @@ try {
         $requiredWheels = $wheelsInCache | ForEach-Object { $_.Name }
         Write-Warning "[$ServiceName] Using all available wheels as a fallback: $($requiredWheels.Count) files"
     } else {
-        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) wheel files from pip output." -ForegroundColor Green
-        Write-Host "[$ServiceName] Using the identified wheels to ensure minimal dependencies are included." -ForegroundColor Yellow
+        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) wheel files from log file." -ForegroundColor Green
+        Write-Host "[$ServiceName] Using the identified wheels to ensure minimal dependencies are included." -ForegroundColor Green
     }
     
-    # Save the list to the file
+    $requiredWheels = $requiredWheels | Where-Object { $_ -notlike 'pip-*.whl' }
     $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List of required wheels saved to $listFilePath." -ForegroundColor Green
 } catch {

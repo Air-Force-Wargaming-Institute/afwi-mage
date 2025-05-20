@@ -195,28 +195,6 @@ http:
         - "auth-middleware"
         - "security-headers"
         
-    # Generation Service Router
-    generation-router:
-      rule: "PathPrefix(`/api/generate`) || Path(`/api/generation/health`)"
-      service: "generation-service"
-      entryPoints:
-        - "web"
-      middlewares:
-        - "cors-headers"
-        - "auth-middleware"
-        - "security-headers"
-        
-    # Review Service Router
-    review-router:
-      rule: "PathPrefix(`/api/review`) || Path(`/api/review/health`)"
-      service: "review-service"
-      entryPoints:
-        - "web"
-      middlewares:
-        - "cors-headers"
-        - "auth-middleware"
-        - "security-headers"
-        
     # Embedding Service Router
     embedding-router:
       rule: "PathPrefix(`/api/embedding`) || Path(`/api/embedding/health`)"
@@ -349,26 +327,6 @@ http:
           - url: "http://extraction:8002"
         healthCheck:
           path: "/api/extraction/health"
-          interval: "120s"
-          timeout: "5s"
-          followRedirects: true
-          
-    generation-service:
-      loadBalancer:
-        servers:
-          - url: "http://generation:8003"
-        healthCheck:
-          path: "/api/generation/health"
-          interval: "120s"
-          timeout: "5s"
-          followRedirects: true
-          
-    review-service:
-      loadBalancer:
-        servers:
-          - url: "http://review:8004"
-        healthCheck:
-          path: "/api/review/health"
           interval: "120s"
           timeout: "5s"
           followRedirects: true

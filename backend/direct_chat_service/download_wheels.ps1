@@ -9,13 +9,9 @@ param(
 $ServiceName = "direct_chat_service"
 Write-Host "[$ServiceName] Downloading Linux-compatible wheels for airgapped installation..." -ForegroundColor Cyan
 
-# Check if Docker is available
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "[$ServiceName] Error: Docker is required but not found in PATH. Please install Docker."
-    exit 1
-}
+Write-Host "[$ServiceName] Cleaning up artifacts from previous runs..." -ForegroundColor DarkGray
 
-# --- Path Definitions ---
+# --- Path Definitions (early definitions for cleanup) ---
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $wheelsDirRelative = "../backend_wheels"
 $localWheelsDirRelative = "./wheels"
@@ -23,21 +19,40 @@ $nltkDataDirRelative = "./nltk_data" # Standard location for NLTK data
 $listFileName = "downloaded_wheels_list.txt"
 $requirementsFile = "requirements.txt"
 $deploymentZipsDirName = "DeploymentZIPs"
+$logFileName = "${ServiceName}_pip_download.log"
 
-# Resolve absolute paths
-try {
-    $scriptDirAbsolute = (Resolve-Path -Path $scriptDir).Path
-    $wheelsDirAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $wheelsDirRelative)).Path
-    $localWheelsDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $localWheelsDirRelative
-    $nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
-    $listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
-    $requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
-    $backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
-    $deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
-} catch {
-    Write-Error "[$ServiceName] Error resolving initial paths: $_"
+# Resolve absolute paths for cleanup targets
+$scriptDirAbsoluteForCleanup = (Resolve-Path -Path $scriptDir).Path
+$localWheelsDirAbsoluteForCleanup = Join-Path -Path $scriptDirAbsoluteForCleanup -ChildPath $localWheelsDirRelative
+$listFilePathForCleanup = Join-Path -Path $scriptDirAbsoluteForCleanup -ChildPath $listFileName
+
+# Delete local wheels directory if it exists
+if (Test-Path $localWheelsDirAbsoluteForCleanup -PathType Container) {
+    Write-Host "[$ServiceName] Removing existing local wheels directory: $localWheelsDirAbsoluteForCleanup" -ForegroundColor DarkGray
+    Remove-Item -Path $localWheelsDirAbsoluteForCleanup -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Define and delete downloaded_wheels_list.txt if it exists
+if (Test-Path $listFilePathForCleanup -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing downloaded wheels list: $listFilePathForCleanup" -ForegroundColor DarkGray
+    Remove-Item -Path $listFilePathForCleanup -Force -ErrorAction SilentlyContinue
+}
+
+# Check if Docker is available
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Error "[$ServiceName] Error: Docker is required but not found in PATH. Please install Docker."
     exit 1
 }
+
+# --- Path Definitions ---
+$scriptDirAbsolute = (Resolve-Path -Path $scriptDir).Path
+$wheelsDirAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $wheelsDirRelative)).Path
+$nltkDataDirAbsolute = Join-Path -Path $scriptDirAbsolute -ChildPath $nltkDataDirRelative
+$listFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $listFileName
+$logFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $logFileName
+$requirementsFileAbsolute = (Resolve-Path -Path (Join-Path -Path $scriptDirAbsolute -ChildPath $requirementsFile)).Path
+$backendRootDir = (Resolve-Path (Join-Path -Path $scriptDirAbsolute -ChildPath "..")).Path
+$deploymentZipsDirAbsolute = Join-Path -Path $backendRootDir -ChildPath $deploymentZipsDirName
 
 # --- Pre-checks ---
 if (-not (Test-Path $requirementsFileAbsolute -PathType Leaf)) {
@@ -84,7 +99,14 @@ $dockerArgs = @(
     $bashCommand
 )
 
-$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
+# Ensure a fresh log file for each run by deleting the old one if it exists
+Write-Host "[$ServiceName] Docker command output will be logged to: $logFilePath" -ForegroundColor Yellow
+if (Test-Path $logFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing log file: $logFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $logFilePath -Force -ErrorAction SilentlyContinue
+}
+
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -FilePath $logFilePath -Append | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
@@ -93,44 +115,86 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # --- List Downloaded Wheels & Save List ---
-Write-Host "[$ServiceName] Listing ALL downloaded files (wheels and sdist) from $wheelsDirAbsolute (central cache)..." -ForegroundColor Cyan
-$allDownloadedFilesInCache = Get-ChildItem -Path $wheelsDirAbsolute
-if ($allDownloadedFilesInCache.Count -eq 0) {
-    Write-Warning "[$ServiceName] No files (wheels or sdist) found in central cache $wheelsDirAbsolute. This is unusual if Docker command succeeded."
-} else {
-    Write-Host "[$ServiceName] Found $($allDownloadedFilesInCache.Count) files in ${wheelsDirAbsolute}."
-    $wheelCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }).Count
-    $sdistCountInCache = ($allDownloadedFilesInCache | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.zip" }).Count
-    $otherCountInCache = $allDownloadedFilesInCache.Count - $wheelCountInCache - $sdistCountInCache
-    Write-Host "[$ServiceName] File types in cache: $wheelCountInCache wheels, $sdistCountInCache source distributions, $otherCountInCache other files."
-}
+# $allDownloadedFilesInCache = Get-ChildItem -Path $wheelsDirAbsolute # No longer primary source for the list
 
-$wheelsInCache = $allDownloadedFilesInCache | Where-Object { $_.Name -like "*.whl" }
-
-if ($wheelsInCache.Count -eq 0) {
-     Write-Warning "[$ServiceName] No wheel files found in central cache $wheelsDirAbsolute."
-} else {
-    Write-Host "[$ServiceName] Found $($wheelsInCache.Count) Linux-compatible wheel files in central cache $wheelsDirAbsolute." -ForegroundColor Green
-}
-
-Write-Host "[$ServiceName] Generating list of required wheels for ${listFilePath}" -ForegroundColor Cyan
+Write-Host "[$ServiceName] Parsing Docker output from log file to identify required wheels for ${listFilePath}" -ForegroundColor Cyan
 try {
-    # Generate a list of physically available wheels in the cache
-    # rather than trying to parse pip output which includes many package versions that aren't actually downloaded
-    $requiredWheels = $wheelsInCache | Select-Object -ExpandProperty Name | Sort-Object
+    $identifiedWheels = @()
+
+    if (-not (Test-Path $logFilePath -PathType Leaf)) {
+        Write-Warning "[$ServiceName] Log file $logFilePath not found. Cannot parse for wheels."
+    } else {
+        $logFileContent = Get-Content -Path $logFilePath -ErrorAction SilentlyContinue
+        if ($null -eq $logFileContent) {
+            Write-Warning "[$ServiceName] Could not read the log file $logFilePath or it is empty. Wheel list might be incomplete."
+        } else {
+            # Regex to find wheel files mentioned in Docker output from lines like:
+            # "Saved /wheels/some_package-1.2.3-py3-none-any.whl"
+            # "File was already downloaded /wheels/another_package-4.5.6-py3-none-any.whl"
+            # "Collecting somepackage==1.0 (from -r /reqs/requirements.txt (line X))" followed by "Using cached some_package-1.0-py3-none-any.whl (9.0 kB)" or "File was already downloaded /wheels/..."
+            # It's important to only get the basename of the .whl file.
+            
+            # First pass: Explicit "Saved" or "File was already downloaded"
+            $logFileContent | ForEach-Object {
+                if ($_ -match "(?i)Saved /wheels/([a-zA-Z0-9_.-]+\.whl)") { 
+                    $wheelName = $Matches[1].Trim()
+                    if ($wheelName -notcontains "..") {
+                         $identifiedWheels += $wheelName
+                    }
+                } elseif ($_ -match "(?i)File was already downloaded /wheels/([a-zA-Z0-9_.-]+\.whl)") { 
+                    $wheelName = $Matches[1].Trim()
+                    if ($wheelName -notcontains "..") {
+                         $identifiedWheels += $wheelName
+                    }
+                } elseif ($_ -match "(?i)Using cached ([a-zA-Z0-9_.-]+\.whl)") { 
+                    $wheelName = $Matches[1].Trim()
+                    if ($wheelName -notcontains "..") {
+                        $identifiedWheels += $wheelName
+                    }
+                }
+            }
+            
+            # Second pass: For lines like "Processing /wheels/numpy-1.26.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            # and other lines that might just contain the path to a wheel file.
+            $logFileContent | ForEach-Object {
+                if ($_ -match "(?i)/wheels/([a-zA-Z0-9_.-]+\.whl)") { 
+                    $wheelName = $Matches[1].Trim()
+                    if ($wheelName -notcontains ".." -and $wheelName -notcontains " ") { 
+                         $identifiedWheels += $wheelName
+                    }
+                }
+            }
+        }
+    }
+    # Deduplicate and sort
+    $requiredWheels = $identifiedWheels | Sort-Object -Unique
     
     if ($requiredWheels.Count -eq 0) {
-        Write-Error "[$ServiceName] No wheels were found in the cache. Check Docker output for errors."
-        exit 1
+        # Fallback or error if parsing fails to find any wheels, 
+        # but pip download might have still populated the cache.
+        # This indicates a potential issue with parsing or pip output format change.
+        Write-Warning "[$ServiceName] Could not identify specific wheels from Docker output. Will attempt to list ALL wheels from cache as a fallback. THIS MAY INCLUDE EXTRA WHEELS."
+        
+        # Fallback to original behavior IF NO WHEELS AT ALL were identified from output.
+        # This is a safety net, but the goal is for the parsing above to work.
+        $allWheelsInCacheFALLBACK = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl" | Select-Object -ExpandProperty Name
+        if ($allWheelsInCacheFALLBACK.Count -gt 0) {
+            $requiredWheels = $allWheelsInCacheFALLBACK | Sort-Object -Unique
+            Write-Warning "[$ServiceName] Fallback: Identified $($requiredWheels.Count) wheels from the cache directory."
+        } else {
+            Write-Error "[$ServiceName] No wheels were identified from Docker output AND no wheels found in the cache directory $wheelsDirAbsolute. Check Docker output for errors."
+            exit 1
+        }
     } else {
-        Write-Host "[$ServiceName] Using $($requiredWheels.Count) actual wheels found in cache." -ForegroundColor Green
+        Write-Host "[$ServiceName] Identified $($requiredWheels.Count) specific wheel files from Docker output log for this service." -ForegroundColor Green
     }
     
     # Save the list to the file
     $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List of required wheels saved to $listFilePath." -ForegroundColor Green
 
-    # Retain source package listing if any were found by original script logic
+    # Listing of source packages can remain as it's informational
+    $allDownloadedFilesInCache = Get-ChildItem -Path $wheelsDirAbsolute # Still useful for sdist warning
     $sourcePackages = $allDownloadedFilesInCache | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.zip" }
     if ($sourcePackages.Count -gt 0) {
         Write-Host "[$ServiceName] The following packages were found as source packages in the cache:" -ForegroundColor Yellow

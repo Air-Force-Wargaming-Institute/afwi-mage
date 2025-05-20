@@ -71,13 +71,17 @@ $dockerArgs = @(
     "-v", "$normalizedRequirementsPath`:/reqs/requirements.txt:ro",
     "python:3.12-slim",
     "bash", "-c",
-    'pip install --upgrade pip && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt || echo "Pip download finished, some packages might be source only."'
+    'pip install --upgrade pip --root-user-action=ignore && pip download --dest /wheels --prefer-binary --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: -r /reqs/requirements.txt'
 )
-& docker @dockerArgs
+# Execute Docker command and capture all output
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "[$ServiceName] Error downloading wheels using Docker. Exit code: $LASTEXITCODE"
-    exit $LASTEXITCODE
+    Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages or the command itself failed. The generated wheel list might be incomplete or inaccurate."
+    # Potentially exit here if a completely successful download is critical
+    # exit $LASTEXITCODE
+} else {
+    Write-Host "[$ServiceName] Docker wheel download command finished successfully." -ForegroundColor Green
 }
 
 # List the downloaded wheels from the target directory
@@ -89,39 +93,74 @@ foreach ($wheel in $wheels) {
 }
 
 # Save the list of downloaded wheels to a file in the script's directory (agent_service)
-$outputFileName = "downloaded_wheels_list.txt"
-$outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
+$outputFilePath = Join-Path -Path $scriptDir -ChildPath "downloaded_wheels_list.txt"
+
+Write-Host "[$ServiceName] Generating list of required wheels for ${outputFilePath} based on Docker command output..." -ForegroundColor Cyan
+
 try {
-    # $wheels.Name | Out-File -FilePath $outputFilePath -Encoding utf8 # Old method: just dump all wheel names
+    $requiredWheelsFromOutput = @{} # Use a hashtable to store unique wheel names
+    $VerbosePreference = "Continue" # Enable verbose output for debugging this block
 
-    # Regenerate list based on requirements.txt to include only necessary wheels
-    $requirementsFileForList = Join-Path -Path $scriptDir -ChildPath "requirements.txt"
-    $requiredPackages = Get-Content $requirementsFileForList | Where-Object { $_ -notmatch '^(#|\s*$)' } | ForEach-Object { 
-        $packageName = ($_ -split '[<>=!~\[\]\s]')[0].Trim()
-        if ($packageName) { $packageName }
-    }
-
-    $foundWheels = @()
-    foreach ($reqItem in $requiredPackages) {
-        $escapedReqHyphen = [regex]::Escape($reqItem)
-        $escapedReqUnderscore = [regex]::Escape($reqItem.Replace('-', '_'))
-
-        $matchingWheel = $wheels | Where-Object { 
-            $_.Name -match "^${escapedReqHyphen}(-|_)" -or 
-            $_.Name -match "^${escapedReqUnderscore}(-|_)" 
-        } | Select-Object -First 1
-
-        if ($matchingWheel) {
-            $foundWheels += $matchingWheel.Name
-        } else {
-            Write-Warning "[$ServiceName] No downloaded wheel found for requirement '$reqItem' in $wheelsDirAbsolute (central backend_wheels)"
+    foreach ($line in $dockerCommandOutput) {
+        # Write-Host "DEBUG Line: $line" # Uncomment for very detailed line-by-line debugging
+        if ($line -match 'File was already downloaded\s*/wheels/\s*([^/]+\.whl)') {
+            $wheelName = $matches[1].Trim()
+            if (-not ([string]::IsNullOrWhiteSpace($wheelName)) -and (-not $requiredWheelsFromOutput.ContainsKey($wheelName))) {
+                $requiredWheelsFromOutput[$wheelName] = $true
+                Write-Verbose "[$ServiceName] Identified from 'already downloaded': $wheelName"
+            }
+        } elseif ($line -match 'Saved\s*/wheels/\s*([^/]+\.whl)') {
+            $wheelName = $matches[1].Trim()
+            if (-not ([string]::IsNullOrWhiteSpace($wheelName)) -and (-not $requiredWheelsFromOutput.ContainsKey($wheelName))) {
+                $requiredWheelsFromOutput[$wheelName] = $true
+                Write-Verbose "[$ServiceName] Identified from 'Saved': $wheelName"
+            }
         }
     }
-    $foundWheels | Out-File -FilePath $outputFilePath -Encoding utf8
-    Write-Host "List of required wheels saved to: $outputFilePath" -ForegroundColor Green
+    $VerbosePreference = "SilentlyContinue" # Reset verbose preference
+
+    $finalWheelList = $requiredWheelsFromOutput.Keys | Sort-Object
+    
+    if ($finalWheelList.Count -eq 0) {
+        Write-Warning "[$ServiceName] No specific wheel files identified from 'File was already downloaded' or 'Saved' lines in pip output."
+        Write-Warning "[$ServiceName] As a fallback, attempting to list all .whl files from the Docker output log."
+        
+        # Fallback: try to find any .whl file mentioned in the log that exists in the cache
+        # This is less precise but better than nothing if primary parsing fails.
+        $allWheelsInCache = Get-ChildItem -Path $wheelsDirAbsolute -Filter "*.whl" | Select-Object -ExpandProperty Name
+        $potentialWheelsFromLog = @{}
+        foreach ($line in $dockerCommandOutput) {
+            if ($line -match '([a-zA-Z0-9._-]+?-\d+\.\d+(?:\.\d+)?(?:-[^-]+)?-py[23]\d?-none-any\.whl|[a-zA-Z0-9._-]+?-\d+\.\d+(?:\.\d+)?(?:-[^-]+)?-cp\d+-cp\d+m?-manylinux[^.]+\.whl)') {
+                $foundWheelInLog = $matches[0] # The full wheel name
+                if ($allWheelsInCache -contains $foundWheelInLog) {
+                    if (-not $potentialWheelsFromLog.ContainsKey($foundWheelInLog)) {
+                        $potentialWheelsFromLog[$foundWheelInLog] = $true
+                        Write-Verbose "[$ServiceName] Fallback: Identified from general log and cache: $foundWheelInLog"
+                    }
+                }
+            }
+        }
+        $finalWheelList = $potentialWheelsFromLog.Keys | Sort-Object
+
+        if ($finalWheelList.Count -eq 0) {
+            Write-Warning "[$ServiceName] Fallback also failed to identify specific wheels. The list might be incomplete or all wheels will be copied if using 'download_all_wheels.ps1' logic."
+            # As an ultimate fallback, the script could list ALL wheels from $wheelsDirAbsolute, but this is usually too broad for a single service.
+            # $finalWheelList = $allWheelsInCache
+        }
+    }
+
+    if ($finalWheelList.Count -gt 0) {
+        $finalWheelList | Out-File -FilePath $outputFilePath -Encoding utf8
+        Write-Host "[$ServiceName] List of $($finalWheelList.Count) required wheels saved to: $outputFilePath" -ForegroundColor Green
+        # Write-Host ($finalWheelList -join "`n") # Optionally print the list
+    } else {
+        Write-Warning "[$ServiceName] No wheels were identified to be written to $outputFilePath. The file will be empty or not updated."
+        # Ensure an empty file is written if no wheels, so downstream doesn't use an old list
+        Set-Content -Path $outputFilePath -Value "" -Encoding utf8
+    }
 
 } catch {
-    Write-Host "Error saving wheel list to file: $_" -ForegroundColor Red
+    Write-Error "[$ServiceName] Error generating or saving wheel list to file '$outputFilePath': $_"
 }
 
 # Automatically run the script to copy wheels from the list to the local wheels directory

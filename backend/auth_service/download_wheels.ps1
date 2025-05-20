@@ -84,7 +84,18 @@ $dockerArgs = @(
     $bashCommand
 )
 
-$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
+# Define log file path
+$logFileName = "${ServiceName}_pip_download.log"
+$logFilePath = Join-Path -Path $scriptDirAbsolute -ChildPath $logFileName
+Write-Host "[$ServiceName] Docker command output will be logged to: $logFilePath" -ForegroundColor Yellow
+
+# Ensure a fresh log file for each run by deleting the old one if it exists
+if (Test-Path $logFilePath -PathType Leaf) {
+    Write-Host "[$ServiceName] Removing existing log file: $logFilePath" -ForegroundColor DarkGray
+    Remove-Item -Path $logFilePath -Force -ErrorAction SilentlyContinue
+}
+
+$dockerCommandOutput = & docker @dockerArgs 2>&1 | Tee-Object -FilePath $logFilePath -Append | Tee-Object -Variable dockerFullOutputForLogging | ForEach-Object { Write-Host $_; $_ }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "[$ServiceName] Docker command finished with a non-zero exit code: $LASTEXITCODE. Pip download might have failed for some packages. The generated wheel list might be incomplete."
@@ -197,10 +208,10 @@ try {
         Write-Warning "[$ServiceName] Using all available wheels as a fallback: $($requiredWheels.Count) files"
     } else {
         Write-Host "[$ServiceName] Identified $($requiredWheels.Count) wheel files from pip output." -ForegroundColor Green
-        Write-Host "[$ServiceName] Using the identified wheels to ensure minimal dependencies are included." -ForegroundColor Yellow
+        Write-Host "[$ServiceName] Using the identified wheels to ensure minimal dependencies are included." -ForegroundColor Green
     }
     
-    # Save the list to the file
+    $requiredWheels = $requiredWheels | Where-Object { $_ -notlike 'pip-*.whl' } # Exclude pip wheels
     $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List of required wheels saved to $listFilePath." -ForegroundColor Green
 } catch {

@@ -1,9 +1,0 @@
-# Web framework and related
-fastapi==0.115.12 
-uvicorn[standard]==0.34.2
-python-multipart==0.0.20 
-pydantic==2.11.4
-
-# Note: python-dotenv might be needed if you plan to use environment variables,
-# though it's not explicitly shown in the current code
-python-dotenv==1.1.0

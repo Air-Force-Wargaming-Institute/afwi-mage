@@ -21,6 +21,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Define the list of standard backend services to be packaged and included in docker-compose modifications.
+# This list specifically EXCLUDES 'transcription' and 'wargame' services,
+# and ensures 'report_builder' is INCLUDED.
+$StandardBackendServicesToPackage = @(
+    "core", "chat", "agent", "extraction", 
+    "upload", "embedding", "workbench", "auth", "direct_chat_service", 
+    "report_builder", "api_gateway"
+)
+
 # Get the absolute path for the output directory
 $AbsoluteOutputDirectory = Resolve-Path -Path $OutputDirectory -ErrorAction SilentlyContinue
 if (-not $AbsoluteOutputDirectory) {
@@ -36,13 +45,14 @@ $BackendSupportDir = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "backen
 $BuildContextsDir = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "build_contexts" # New
 $VLLMContextDir = Join-Path -Path $BuildContextsDir -ChildPath "vllm_context"       # New
 $OllamaContextDir = Join-Path -Path $BuildContextsDir -ChildPath "ollama_context"   # New
+$DbContextDir = Join-Path -Path $BuildContextsDir -ChildPath "db_context"         # NEW: For db build context
 $FrontendContextDir = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "frontend_context" # New (for frontend Dockerfile context)
 $DockerImagesDir = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "docker_images"
 $DeploymentScriptsDir = Join-Path -Path $AbsoluteOutputDirectory -ChildPath "deployment_scripts"
 
 foreach ($dir in @(
     $AbsoluteOutputDirectory, $BackendServicesDir, $BackendSupportDir, 
-    $BuildContextsDir, $VLLMContextDir, $OllamaContextDir, $FrontendContextDir, # Added new dirs
+    $BuildContextsDir, $VLLMContextDir, $OllamaContextDir, $DbContextDir, $FrontendContextDir, # Added new dirs
     $DockerImagesDir, $DeploymentScriptsDir
 )) {
     if (-not (Test-Path $dir -PathType Container)) {
@@ -64,6 +74,36 @@ if (-not (Test-Path $backendDir -PathType Container)) {
 
 Push-Location $backendDir
 try {
+    Write-Host "Cleaning up previous wheel artifacts for backend services..." -ForegroundColor Cyan
+    $allPotentialServiceDirs = Get-ChildItem -Path "." -Directory # Current location is $backendDir
+    foreach ($serviceSubDir in $allPotentialServiceDirs) {
+        $serviceName = $serviceSubDir.Name
+        # Exclude known non-standard-service directories or output directories from this specific cleanup
+        if ($serviceName -eq "DeploymentZIPs" -or $serviceName -eq "vLLM" -or $serviceName -eq "ollama") {
+            Write-Host "  Skipping wheel cleanup for special directory: $serviceName"
+            continue
+        }
+
+        Write-Host "  Processing service: $serviceName for wheel artifact cleanup"
+        $wheelsListFilePath = Join-Path -Path $serviceSubDir.FullName -ChildPath "downloaded_wheels_list.txt"
+        $wheelsDirPath = Join-Path -Path $serviceSubDir.FullName -ChildPath "wheels"
+
+        if (Test-Path $wheelsListFilePath -PathType Leaf) {
+            Write-Host "    Deleting file: $wheelsListFilePath"
+            Remove-Item -Path $wheelsListFilePath -Force -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "    File not found (no action needed): $wheelsListFilePath"
+        }
+
+        if (Test-Path $wheelsDirPath -PathType Container) {
+            Write-Host "    Deleting directory: $wheelsDirPath"
+            Remove-Item -Path $wheelsDirPath -Recurse -Force -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "    Directory not found (no action needed): $wheelsDirPath"
+        }
+    }
+    Write-Host "Backend service wheel artifact cleanup finished." -ForegroundColor Green
+
     Write-Host "Running download_all_wheels.ps1 for backend..."
     if (Test-Path ".\\download_all_wheels.ps1") {
         .\\download_all_wheels.ps1 # This should populate ./DeploymentZIPs/
@@ -71,8 +111,25 @@ try {
 
         $sourceDeploymentZipsDir = Join-Path -Path $backendDir -ChildPath "DeploymentZIPs"
         if (Test-Path $sourceDeploymentZipsDir -PathType Container) {
-            Write-Host "Copying backend service packages from $sourceDeploymentZipsDir to $BackendServicesDir ..."
-            Copy-Item -Path (Join-Path $sourceDeploymentZipsDir "*") -Destination $BackendServicesDir -Recurse -Force
+            Write-Host "Copying selected backend service packages from $sourceDeploymentZipsDir to $BackendServicesDir..."
+            foreach ($serviceKey in $StandardBackendServicesToPackage) {
+                $actualServiceNameForZip = $serviceKey
+                if ($serviceKey -ne "direct_chat_service") {
+                    $actualServiceNameForZip = "${serviceKey}_service"
+                }
+                $serviceZipFile = "${actualServiceNameForZip}_airgapped.zip"
+                
+                $logServiceName = $serviceKey # For consistent warning messages
+
+                $sourceServiceZipPath = Join-Path -Path $sourceDeploymentZipsDir -ChildPath $serviceZipFile
+                
+                if (Test-Path $sourceServiceZipPath -PathType Leaf) {
+                    Write-Host "  Copying $serviceZipFile (for service $logServiceName)..."
+                    Copy-Item -Path $sourceServiceZipPath -Destination $BackendServicesDir -Force
+                } else {
+                    Write-Warning "  Package '$serviceZipFile' for service '$logServiceName' not found in $sourceDeploymentZipsDir. Skipping."
+                }
+            }
         } else {
             Write-Warning "Backend DeploymentZIPs directory not found after running download_all_wheels.ps1."
         }
@@ -95,19 +152,23 @@ try {
         $composeContent = Get-Content $airgapComposePath -Raw
         
         # Change include paths
-        $composeContent = $composeContent -replace 'include:\\s*\\n\\s*-\\s*vLLM/docker-compose.vllm.yml', "include:`r`n  - ./compose_parts/docker-compose.vllm.yml"
-        $composeContent = $composeContent -replace 'include:\\s*\\n\\s*-\\s*ollama/docker-compose.ollama.yml', "include:`r`n  - ./compose_parts/docker-compose.ollama.yml"
+        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*vLLM/docker-compose.vllm.yml', "include:`r`n  - ./compose_parts/docker-compose.vllm.yml"
+        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*ollama/docker-compose.ollama.yml', "include:`r`n  - ./compose_parts/docker-compose.ollama.yml"
         
-        # List of services built by airgapped_deploy scripts (standard backend services)
-        $builtServices = @("core", "chat", "agent", "extraction", "generation", "review", "upload", "embedding", "workbench", "auth", "direct_chat_service")
-        foreach ($service in $builtServices) {
+        # Modify build directives to image directives for services listed in $StandardBackendServicesToPackage
+        foreach ($service in $StandardBackendServicesToPackage) {
             # Regex to find 'build: ./service_name' or 'build: path: ./service_name' etc. and replace
-            $buildRegex = "(\\n\\s*${service}:\\s*(?:[^#\\n]*\\n)*?\\s*)build:\\s*.*?(\\n\\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
+            $buildRegex = "(\n\s*${service}:\s*(?:[^#\n]*\n)*?\s*)build:\s*.*?(\n\s*(?:ports:|volumes:|environment:|depends_on:|networks:|command:|container_name:|image:|extra_hosts:|healthcheck:|restart:|deploy:|shm_size:|ipc:|ulimits:|$))"
             $replaceWith = "`$1image: ${service}-airgapped:latest`$2" # Use PowerShell string expansion carefully
             $composeContent = [regex]::Replace($composeContent, $buildRegex, $replaceWith, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         }
         # For vLLM and Ollama (which will also be built by airgapped_deploy)
         # These are handled in their respective included files if modification is needed there
+        
+        # NEW: Modify build directive for 'db' service to point to its new context
+        $dbBuildRegex = '(\n\s*db:\s*(?:[^#\n]*\n)*?\s*build:\s*)context:\s*\.(?:\s*\n\s*dockerfile:\s*db/Dockerfile)?'
+        $dbReplaceWith = "`$1build: ../build_contexts/db_context" # Point to the new context directory
+        $composeContent = [regex]::Replace($composeContent, $dbBuildRegex, $dbReplaceWith, [System.Text.RegularExpressions.RegexOptions]::Singleline)
         
         Set-Content -Path $airgapComposePath -Value $composeContent -Encoding UTF8
         Write-Host "Modified $airgapComposePath."
@@ -152,6 +213,13 @@ try {
         Write-Host "Copying Ollama build context from $ollamaSourceDir to $OllamaContextDir ..."
         Copy-Item -Path (Join-Path $ollamaSourceDir "*") -Destination $OllamaContextDir -Recurse -Force
     } else { Write-Warning "Ollama source directory ($ollamaSourceDir) not found."}
+
+    # NEW: Copy db build context
+    $dbSourceDir = Join-Path -Path $backendDir -ChildPath "db"
+    if (Test-Path $dbSourceDir -PathType Container) {
+        Write-Host "Copying db build context from $dbSourceDir to $DbContextDir ..."
+        Copy-Item -Path (Join-Path $dbSourceDir "*") -Destination $DbContextDir -Recurse -Force
+    } else { Write-Warning "db source directory ($dbSourceDir) not found."}
 
 } finally {
     Pop-Location
@@ -222,6 +290,7 @@ Write-Host "
 === Copying Deployment Scripts ===" -ForegroundColor Green
 $airgapDeployPs1Source = Join-Path -Path (Get-Location) -ChildPath "airgapped_deploy.ps1" 
 $airgapDeployShSource = Join-Path -Path (Get-Location) -ChildPath "airgapped_deploy.sh"   
+$loadImageScriptSource = Join-Path -Path (Get-Location) -ChildPath "load_docker_images.ps1"
 
 if (Test-Path $airgapDeployPs1Source) {
     Copy-Item -Path $airgapDeployPs1Source -Destination $DeploymentScriptsDir -Force
@@ -232,6 +301,12 @@ if (Test-Path $airgapDeployShSource) {
     Copy-Item -Path $airgapDeployShSource -Destination $DeploymentScriptsDir -Force
 } else {
     Write-Warning "$airgapDeployShSource not found at workspace root. It should be created there."
+}
+
+if (Test-Path $loadImageScriptSource) {
+    Copy-Item -Path $loadImageScriptSource -Destination $DeploymentScriptsDir -Force
+} else {
+    Write-Warning "$loadImageScriptSource not found at workspace root. It should be created there."
 }
 
 # Create a README for the package

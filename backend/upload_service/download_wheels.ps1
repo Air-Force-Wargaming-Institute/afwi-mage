@@ -164,7 +164,8 @@ try {
         Write-Host "[$ServiceName] Using the identified $($requiredWheels.Count) wheels." -ForegroundColor Yellow
     }
     
-    $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
+    $requiredWheels = $requiredWheels | Where-Object { $_ -notlike 'pip-*.whl' }
+    Out-File -InputObject $requiredWheels -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
 
 } catch {

@@ -228,7 +228,8 @@ try {
         Write-Host "[$ServiceName] Identified $($requiredWheels.Count) required wheel files after all parsing stages." -ForegroundColor Green
     }
     
-    $requiredWheels | Out-File -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
+    $requiredWheels = $requiredWheels | Where-Object { $_ -notlike 'pip-*.whl' } # Exclude pip wheels
+    Out-File -InputObject $requiredWheels -FilePath $listFilePath -Encoding utf8 -ErrorAction Stop
     Write-Host "[$ServiceName] List saved successfully." -ForegroundColor Green
 
 } catch {

@@ -8,7 +8,7 @@ COPY requirements.txt /build/
 COPY wheels/ /build/wheels/
 
 # Install dependencies from local wheels
-RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
+#RUN pip install --no-cache-dir --no-index --find-links=/build/wheels -r requirements.txt
 
 # Create a new virtual environment
 RUN python -m venv /venv
