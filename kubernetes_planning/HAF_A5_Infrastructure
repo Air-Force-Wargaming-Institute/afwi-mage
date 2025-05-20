@@ -1,0 +1,132 @@
+# HAF A5 Infrastructure Details for MAGE Kubernetes Deployment
+
+This document outlines the infrastructure details provided by the HAF A5 office for the MAGE Kubernetes deployment, along with MAGE team suggestions and points for further clarification.
+
+## 1. Hardware Infrastructure
+
+**Compute:**
+*   **Server Model:** Dell PowerEdge R760XA
+*   **TPM:** Trusted Platform Module 2.0 V5
+*   **Chassis:** 2.5" Chassis with up to 8 SAS/SATA Drives
+*   **CPUs:** 2 x Intel Xeon Gold 6526Y (2.8GHz, 16 Cores/32 Threads each, 37.5M Cache, Turbo, HT, 195W, DDR5-5200)
+*   **RAM:** 16 x 16GB RDIMM, 5600MT/s, Single Rank (Total 256GB per server)
+
+**Storage:**
+*   **Type:** Local SSDs
+*   **Configuration per server:**
+    *   2 x 800GB SSD SAS, Mixed Use, up to 24Gbps, 512e, 2.5" Hot Plug, AG Drive, 3DWPD (Likely for OS / high-performance K8s components like etcd)
+    *   2 x 1.92TB SSD SAS, Read Intensive, up to 24Gbps, 512e, 2.5" Hot-Plug, AG Drive (Likely for application data, container images, PVs)
+    *   BOSS-N1 controller card + with 2 x M.2 480GB (RAID 1) (Typically used for OS boot)
+*   **Note:** Details on total cluster capacity and specific provisioning (mount points, LUNs) will depend on the number of servers and final OS/K8s setup.
+*   **Suggestion for ReadWriteMany (RWX) Access:** For Kubernetes PersistentVolumes requiring RWX access (e.g., shared data across multiple pods, some model sharing strategies), the current local storage setup on each node won't directly support this. An NFS server (which could be hosted on one of the Linux servers if capacity/performance allows, or a dedicated machine) or a more advanced distributed file system would be needed. This should be discussed if RWX volumes are anticipated by MAGE application components.
+
+**GPU:**
+*   **Model:** 4 x NVIDIA L40S per server
+*   **Details:** PCIe, 350W, 48GB VRAM Passive, Double Wide, Full Height
+*   **Chassis GPU Capability:** Riser Config 0, 4x16 FH Slots (Gen5), 4x16 FH DW GPU Capable Slots (Gen5)
+*   **NVIDIA Drivers:** Open to suggested NVIDIA drivers and version.
+    *   **Suggestion:** Use official NVIDIA drivers compatible with the chosen Linux distribution, the NVIDIA Kubernetes Device Plugin, and the CUDA toolkit version required by MAGE's GPU-accelerated services (e.g., `transcription_service` based on `nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04`). The specific driver version will depend on the chosen kernel and CUDA compatibility at the time of setup. Regularly check NVIDIA's documentation for the latest recommended drivers for the L40S in a Kubernetes environment.
+
+**Networking Hardware:**
+*   **Primary:** Broadcom 57414 Dual Port 10/25GbE SFP28, OCP NIC 3.0
+*   **Secondary/Management:** Broadcom 5720 Dual Port 1GbE LOM
+*   **Additional PCIe NIC:** Broadcom 57414 Dual Port 10/25GbE SFP28 Adapter, PCIe Full Height, V2
+*   **Note:** High-speed networking is well-suited for Kubernetes cluster communication and data-intensive workloads.
+
+## 2. Operating System & Software
+
+**Operating System (OS):**
+*   **Chosen OS:** Ubuntu Server 24.04 LTS (Noble Numbat), or the latest available LTS version at the time of deployment, will be used for all Kubernetes nodes (control plane and workers).
+*   **Rationale:** Ubuntu Server 24.04 LTS provides the longest support window, the latest stable kernel and system software for optimal hardware compatibility (including NVIDIA L40S GPUs), enhanced security features, and is widely supported by RKE2 and the Kubernetes ecosystem. This aligns with the need for a stable, secure, and maintainable platform for the MAGE application stack.
+
+**System Configuration:**
+*   **NTP Server Address:** Can provide on SIPR.
+*   **Internal DNS Server Addresses:** Can provide on SIPR.
+    *   **Note:** These are essential for cluster time synchronization and name resolution.
+
+**Package Management:**
+*   **Current Practice:** "Open to suggested; we are a Windows shop so normally deal with transferred CUs."
+    *   **Suggestion for Ubuntu:** For an air-gapped Ubuntu environment, an internal `apt` package mirror/repository is crucial. This involves:
+        *   Downloading all necessary OS packages (`.deb` files) and updates from the internet on a connected system.
+        *   Transferring these packages securely to the air-gapped network.
+        *   Setting up a local repository server (e.g., using `apt-mirror`).
+        *   Configuring all Kubernetes nodes to use this internal repository for OS updates and package installations.
+
+**Restrictions:**
+*   **Software Installation:** No restrictions at the moment on installing new software or kernel modules.
+*   **Mandatory Agents:** No mandatory security/monitoring agents specified at this time.
+    *   **Note:** This flexibility is good for installing Kubernetes components and MAGE dependencies. Standard security hardening for the chosen OS should still be applied.
+
+**System Resource Monitoring & Alerting:**
+*   **Existing Tools:** Open to suggested; nothing currently in place.
+*   **Access to Monitoring:** Team will need to rely on Kubernetes-internal monitoring.
+    *   **Suggestion:** Deploy a comprehensive monitoring stack within Kubernetes, such as Prometheus for metrics collection and Grafana for dashboards. This will monitor both Kubernetes components and MAGE application performance. Alerts can be configured using Prometheus Alertmanager.
+
+## 3. Networking Configuration
+
+**IP Addressing:**
+*   **Allocation Method:** DHCP. IP range details for nodes, pods, services can be provided on SIPR.
+    *   **Suggestion:** For Kubernetes control plane nodes and worker nodes, **static IP addresses are strongly recommended** for stability, easier troubleshooting, and reliable cluster certificate generation. While DHCP can be used, it can introduce complexities if IPs change unexpectedly. Pod and Service IP ranges are managed internally by Kubernetes once the initial node IPs are set.
+
+**Firewalls & Segmentation:**
+*   **Details:** N/A (implies an open internal network or rules will be adapted as needed).
+    *   **Action Item:** MAGE team to provide a list of standard ports Kubernetes (RKE2) will use for communication between control plane and worker nodes, etcd, kubelet, API server, CNI, etc., to assist with any necessary firewall configurations if they are implemented later.
+*   **VLANs:** No specific VLANs mentioned to use.
+
+**Proxies/Load Balancers:**
+*   **Existing Infrastructure:** N/A.
+    *   **Note:** An internal load balancing solution for exposing the Kubernetes API server (if deploying a multi-master HA control plane) or for Ingress controller traffic might be needed. RKE2 includes options for this, or it can be configured externally if desired.
+
+## 4. Virtualization (If servers are VMs)
+
+*   **Platform:** "MAGE use and can be setup as needed."
+    *   **Interpretation:** The provided hardware specifications (Dell PowerEdge R760XA) suggest these are **physical servers (bare-metal)**. This is generally preferred for high-performance Kubernetes clusters, especially with direct GPU access. If virtualization is introduced, hypervisor details and resource allocation strategies would be needed.
+
+## 5. Security & Access
+
+**Privileged Access:**
+*   **Level:** "MAGE use and can be setup as needed."
+    *   **Assumption:** Sufficient privileged access (root or full sudo) will be provided on the servers for OS installation/configuration, RKE2 installation, and initial setup tasks.
+
+**Existing Centralized Systems:**
+*   **Logging/Monitoring Integration:** "MAGE use and can be setup as needed."
+    *   **Interpretation:** No existing centralized systems are currently mandated for integration. MAGE will deploy its own Kubernetes-native logging (e.g., EFK stack) and monitoring (Prometheus/Grafana) solutions.
+
+## 6. Air-Gap Specific Infrastructure
+
+**Private Container Registry (Harbor):**
+*   **Existing:** Implied none. HAF A5 is open to suggestions.
+    *   **Plan:** MAGE project plans to use Harbor. This will need to be deployed within the HAF A5 air-gapped network on one or more of the provided servers (or dedicated VMs if preferred by HAF A5, though server resources seem sufficient).
+
+**Offline Artifact Repository:**
+*   **Recommendation:** **Sonatype Nexus Repository OSS** is recommended as the centralized offline artifact repository.
+    *   **Rationale:** Nexus Repository OSS is a robust, free, and multi-format repository manager supporting `apt` (for Ubuntu .deb packages), `pypi` (for Python packages), `helm` (for Kubernetes charts), and `raw` (for binaries like RKE2/Harbor installers, ISOs, etc.) repositories. This allows for organized, secure, and efficient management of all necessary software artifacts within the air-gapped environment. It can be populated in a staging environment and then its data transferred to the air-gapped instance.
+    *   **Deployment:** This will need to be deployed within the HAF A5 air-gapped network, ideally on a dedicated VM or one of the physical servers with sufficient storage and resources.
+*   **Artifacts to Store:**
+    *   OS packages for Ubuntu Server 24.04 LTS (a full mirror).
+    *   Python wheels and source distributions for MAGE and its dependencies.
+    *   Helm charts for Kubernetes deployments (MAGE application, Traefik, Harbor, Prometheus, Grafana, etc.).
+    *   Binary installers (RKE2, Harbor, kubectl, etc.) and other configuration files.
+
+**System Backups (Bare-metal/VM level):**
+*   **Status:** "Pending and answer on this issue of backups."
+    *   **Note:** This is crucial for disaster recovery of the underlying Kubernetes nodes. While MAGE will manage application-level backups (e.g., database dumps), OS/Node level backup capability by HAF A5 is important.
+
+## 7. Summary of Key MAGE Team Suggestions & Recommendations
+
+*   **Operating System:** Ubuntu Server 24.04 LTS (or latest LTS) has been selected for all Kubernetes nodes.
+*   **Package Management (Ubuntu):** Implement an internal `apt` OS package mirror for Ubuntu Server 24.04 LTS within the air-gapped environment, hosted via Sonatype Nexus Repository OSS.
+*   **NVIDIA Drivers:** Use official NVIDIA drivers compatible with L40S, Ubuntu Server 24.04 LTS, its kernel, CUDA, and the K8s device plugin.
+*   **IP Addressing for K8s Nodes:** Strongly recommend static IPs for control-plane and worker nodes.
+*   **ReadWriteMany (RWX) Storage:** If MAGE requires RWX persistent volumes, plan for an NFS server or similar shared storage solution.
+*   **Monitoring/Logging:** Plan to deploy Prometheus/Grafana and an EFK-like stack within Kubernetes.
+*   **Private Container Registry:** Deploy Harbor locally within the air-gapped network.
+*   **Offline Artifact Repository:** Deploy **Sonatype Nexus Repository OSS** locally to store all offline installation and build artifacts (OS packages, Python packages, Helm charts, binaries).
+
+## 8. Outstanding Questions/Points for Clarification with HAF A5
+
+*   Confirmation on the **strategy for ReadWriteMany (RWX) storage** if required by MAGE applications.
+*   Details of **NTP and DNS server addresses** (to be provided over SIPR).
+*   Details of **IP address ranges** for K8s nodes, pods, and services (to be provided over SIPR), and discussion on static vs. DHCP for nodes.
+*   Procedures and capabilities for **bare-metal/VM-level backups** of the servers.
+*   Process for **transferring initial software installers** (Ubuntu Server 24.04 LTS ISO, Harbor & Sonatype Nexus Repository OSS installers, RKE2 binaries, initial `apt` package sets for 24.04 LTS) into the air-gapped environment.
