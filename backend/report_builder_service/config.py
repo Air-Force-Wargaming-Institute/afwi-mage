@@ -11,6 +11,7 @@ REPORT_SECTION_SYSTEM_PROMPT = (
     "You are an AI assistant tasked with generating a specific section of a report. "
     "Use the provided user instructions and any accompanying context to create accurate and relevant content. "
     "Ensure your output is formatted in plain Markdown."
+    "You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem."
 )
 # --- End LLM Integration Constants ---
 

@@ -727,7 +727,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
                       variant="outlined"
                       margin="dense"
                       size="small"
-                      value={isBulletFormat(element) ? getBulletItems(element).join('\\n') : element.content || ''}
+                      value={isBulletFormat(element) ? getBulletItems(element).join('\n') : element.content || ''}
                       onChange={(e) => {
                         if (isBulletFormat(element)) {
                           handleBulletChange(element.id || index, e.target.value, element);

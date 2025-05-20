@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Dict, Any, List
 import json
 from datetime import datetime
+import re
 
 from config import (
     logger, EMBEDDING_SERVICE_BASE_URL, VLLM_CHAT_COMPLETIONS_URL, 
@@ -204,6 +205,14 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
         logger.error(f"Unexpected error during LLM call for element {element.id}: {str(e)}", exc_info=True)
         raise RuntimeError(f"Unexpected error during content generation: {str(e)}")
 
+# Helper function to filter out thinking tags
+def _filter_thinking_tags(text: str) -> str:
+    """Removes <think>...</think> tags and their content."""
+    if not text:
+        return ""
+    # Non-greedy match for anything between <thinking> and </thinking>
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+
 def estimate_tokens(text: str) -> int:
     """
     Estimate the number of tokens in a text string.
@@ -342,6 +351,9 @@ async def generate_export_markdown(report: Report) -> str:
                 logger.warning(f"Missing AI-generated content for section '{element.title or 'Untitled'}' - generation required. Skipping in export.")
                 markdown_parts.append("\n") # Add spacing even if skipped
                 continue
+
+        # Filter thinking tags from the content
+        actual_content = _filter_thinking_tags(actual_content)
 
         if not actual_content.strip(): # Skip if content is empty or just whitespace
             markdown_parts.append("\n") # Add spacing even if skipped
