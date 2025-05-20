@@ -591,7 +591,9 @@ async def add_marker(
     db: AsyncSession = Depends(get_db_session),
     current_user_id: str = Depends(get_current_user_id) # Inject user ID
 ):
-    """Adds a marker to the specified session's timeline."""
+    # ADD THIS LOG:
+    logger.info(f"BACKEND_LIVE_MARKER_REQUEST: Received marker_request.dict(): {marker_request.dict()}")
+
     session = await session_manager.get_session(db, str(session_id))
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
@@ -608,6 +610,9 @@ async def add_marker(
     user_id = current_user_id
     marker_dict = marker_request.dict()
     marker_dict['user_id'] = user_id
+    
+    # ADD THIS LOG:
+    logger.info(f"BACKEND_LIVE_MARKER_DICT_TO_SAVE: marker_dict before calling add_marker_to_session: {marker_dict}")
     
     marker_id = await session_manager.add_marker_to_session(db, str(session_id), marker_dict)
     

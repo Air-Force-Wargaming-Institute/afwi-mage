@@ -236,6 +236,8 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
           classification: fullClassification,
         };
         
+        console.log('FRONTEND_LIVE_MARKER_PAYLOAD:', JSON.stringify(apiMarkerPayload));
+        
         const markerEndpoint = getGatewayUrl(`/api/transcription/sessions/${sessionId}/markers`);
         const response = await fetch(markerEndpoint, {
           method: 'POST',

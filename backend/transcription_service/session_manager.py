@@ -161,6 +161,9 @@ class SessionManager:
                 marker_data["marker_id"] = marker_id
                 marker_data["added_at"] = datetime.utcnow().isoformat() # Record when added, as ISO string
 
+                # ADD THIS LOG:
+                logger.info(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Raw marker_data being processed: {marker_data}")
+
                 # Ensure markers field is initialized as a list
                 if session.markers is None:
                     session.markers = []
@@ -173,10 +176,16 @@ class SessionManager:
                 flag_modified(session, "markers")
 
                 session.last_update = datetime.utcnow()
+
+                # ADD THIS LOG (right before commit):
+                logger.info(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Content of session.markers before commit: {session.markers}")
+
                 await db.commit()
                 logger.info(f"Added marker {marker_id} to session {session_id} in DB.")
                 return marker_id
             except Exception as e:
+                # ADD THIS LOG for errors:
+                logger.error(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Error during save: {e}, marker_data was: {marker_data}", exc_info=True)
                 await db.rollback()
                 logger.error(f"Failed to add marker to session {session_id} in DB: {e}", exc_info=True)
                 return None
