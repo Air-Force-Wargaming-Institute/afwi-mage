@@ -18,7 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Tooltip // Added Tooltip import
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import SaveIcon from '@material-ui/icons/Save';
@@ -1350,16 +1351,15 @@ function ReportDesignerPage() {
   const handleRegenerateSection = async (elementId) => {
     setIsGenerating(true); // Lock down Generate Report button
     try {
-      if (!currentDefinition.id) {
+      if (isNewReport) { // Ensure this uses isNewReport
         setSnackbar({
           open: true,
           message: 'Please save the report before generating content for a section.',
           severity: 'warning'
         });
-        // Reset generation status for this element if it was set
         setGeneratingElements(prev => ({
           ...prev,
-          [elementId]: { ...(prev[elementId] || {}), status: 'idle' } // Preserve other info like content/error if any
+          [elementId]: { ...(prev[elementId] || {}), status: 'idle' }
         }));
         return;
       }
@@ -1518,8 +1518,9 @@ function ReportDesignerPage() {
         message: `Error regenerating section: ${errorMessage}`,
         severity: 'error'
       });
+    } finally {
+      setIsGenerating(false); // Release Generate Report button
     }
-    setIsGenerating(false); // Release Generate Report button
   };
 
   const handleCloseErrorDialog = () => {
@@ -1610,16 +1611,20 @@ function ReportDesignerPage() {
 
             {/* Add Generate Report button - only show for reports (not templates) */}
             {!currentDefinition.isTemplate && (
-              <Button
-                startIcon={isGenerating ? <CircularProgress size={20} color="inherit" /> : <AutorenewIcon />}
-                onClick={handleGenerateReport}
-                disabled={isGenerating || !currentDefinition.id}
-                color="secondary"
-                variant="contained"
-                style={{ marginRight: 16 }}
-              >
-                {isGenerating ? `Generating... ${generationProgress.current}/${generationProgress.total}` : 'Generate Report'}
-              </Button>
+              <Tooltip title={(isNewReport && !isGenerating ? "Please save the document before AI generation." : undefined)}>
+                <span>
+                  <Button
+                    startIcon={isGenerating ? <CircularProgress size={20} color="inherit" /> : <AutorenewIcon />}
+                    onClick={handleGenerateReport}
+                    disabled={isGenerating || isNewReport}
+                    color="secondary"
+                    variant="contained"
+                    style={{ marginRight: 16 }}
+                  >
+                    {isGenerating ? `Generating... ${generationProgress.current}/${generationProgress.total}` : 'Generate Report'}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
 
             {/* --- Export Button (Pure Dropdown) --- */}
@@ -1667,6 +1672,7 @@ function ReportDesignerPage() {
             onRegenerateSection={handleRegenerateSection}
             isGenerating={isGenerating}
             generatingElements={generatingElements}
+            isNewReport={isNewReport}
           />
         </Box>
         <Box className={classes.rightPanel}>

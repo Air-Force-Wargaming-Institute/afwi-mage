@@ -43,11 +43,11 @@ To enhance the Report Builder with improved content handling for AI-generated "t
 *User Stories & Tasks:*
 
 *   **As a user, when I export a report containing Markdown tables, I want the tables to be rendered correctly and legibly in the exported document (e.g., Word).**
-    *   [ ] **Investigation (`report_builder_service`):** Analyze the current Markdown to Word export process (likely involving `pandoc` or a similar library if that was chosen for Word export) to identify why tables are not rendering correctly.
-    *   [ ] **Library Configuration/Update (`report_builder_service`):** Adjust the conversion library's settings, or update the library, to improve table handling. This might involve specifying Markdown extensions (e.g., `pipe_tables`, `grid_tables`) or custom Lua filters if using Pandoc.
-    *   [ ] **Alternative Libraries (if needed) (`report_builder_service`):** If the current library is insufficient, research and integrate an alternative Python library for Markdown-to-Word conversion that has better table support.
-    *   [ ] **Testing:** Create test reports with various complex Markdown tables.
-    *   [ ] **Testing:** Verify that exported Word documents render these tables accurately.
+    *   [x] **Investigation (`report_builder_service`):** Analyze the current Markdown to Word export process (likely involving `pandoc` or a similar library if that was chosen for Word export) to identify why tables are not rendering correctly.
+    *   [x] **Library Configuration/Update (`report_builder_service`):** Adjust the conversion library's settings, or update the library, to improve table handling. This might involve specifying Markdown extensions (e.g., `pipe_tables`, `grid_tables`) or custom Lua filters if using Pandoc.
+    *   [x] **Alternative Libraries (if needed) (`report_builder_service`):** If the current library is insufficient, research and integrate an alternative Python library for Markdown-to-Word conversion that has better table support.
+    *   [x] **Testing:** Create test reports with various complex Markdown tables.
+    *   [x] **Testing:** Verify that exported Word documents render these tables accurately.
 
 **Phase 3: PDF Export Functionality**
 

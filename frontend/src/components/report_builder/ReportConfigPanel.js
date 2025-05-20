@@ -240,7 +240,7 @@ const formatOptions = [
   // Add more formats like blockquote, code block if needed
 ];
 
-function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerateSection, isGenerating, generatingElements = {} }) {
+function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerateSection, isGenerating, generatingElements = {}, isNewReport }) {
   const classes = useStyles();
   const theme = useTheme();
   const { token } = useContext(AuthContext);
@@ -695,25 +695,30 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
                   {element.type === 'generative' && onRegenerateSection && (
                     <Tooltip 
                       title={
-                        <Typography variant="body2">
-                          {element.ai_generated_content ? 
-                            "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
-                            "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
-                        </Typography>
+                        isNewReport ? "Please save the document before AI generation." :
+                        !definition?.id ? "Please save the document before AI generation." : (
+                          <Typography variant="body2">
+                            {element.ai_generated_content ? 
+                              "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
+                              "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
+                          </Typography>
+                        )
                       }
                       classes={{ tooltip: classes.regenerateTooltip }}
                       placement="top"
                     >
-                      <Button
-                        variant="contained"
-                        disabled={isGenerating}
-                        className={classes.regenerateButton}
-                        size="small"
-                        onClick={() => onRegenerateSection(element.id)}
-                        startIcon={generatingElements[element.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
-                      >
-                        {element.ai_generated_content ? 'Regenerate' : 'Generate'}
-                      </Button>
+                      <span>
+                        <Button
+                          variant="contained"
+                          disabled={isGenerating || isNewReport || !definition?.id}
+                          className={classes.regenerateButton}
+                          size="small"
+                          onClick={() => onRegenerateSection(element.id)}
+                          startIcon={generatingElements[element.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
+                        >
+                          {element.ai_generated_content ? 'Regenerate' : 'Generate'}
+                        </Button>
+                      </span>
                     </Tooltip>
                   )}
                 </Box>
