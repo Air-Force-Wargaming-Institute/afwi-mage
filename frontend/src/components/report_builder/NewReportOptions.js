@@ -193,6 +193,17 @@ const useStyles = makeStyles((theme) => ({
       textDecoration: 'underline',
     },
   },
+  templateDescription: {
+    display: '-webkit-box',
+    '-webkit-line-clamp': 2,
+    '-webkit-box-orient': 'vertical',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    lineHeight: '1.4em',
+    maxHeight: '2.8em',
+    marginLeft: 32,
+    whiteSpace: 'normal',
+  },
 }));
 
 function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refreshTemplates }) {
@@ -453,12 +464,9 @@ function NewReportOptions({ onCreateNew, onCreateTemplate, templates = [], refre
                     </Typography>
                   )}
                 </Box>
-                
-                {template.description && (
-                  <Typography variant="body2" color="textSecondary" style={{ marginLeft: 32 }}>
-                    {template.description}
-                  </Typography>
-                )}
+                <Typography variant="body2" color="textSecondary" className={classes.templateDescription}>
+                  {template.description}
+                </Typography>
                 
                 <Box display="flex" alignItems="center" mt={0.5} style={{ marginLeft: 32 }}>
                   <Box 

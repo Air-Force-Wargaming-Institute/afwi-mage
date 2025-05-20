@@ -94,7 +94,7 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     borderRight: `1px solid ${theme.palette.divider}`,
     overflowY: 'auto',
-    padding: theme.spacing(2),
+    padding: theme.spacing(1),
     height: 'calc(100vh - 64px)',
     '& ::-webkit-scrollbar': {
       width: '8px',

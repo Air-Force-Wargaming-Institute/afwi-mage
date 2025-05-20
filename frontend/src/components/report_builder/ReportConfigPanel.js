@@ -43,6 +43,8 @@ const useStyles = makeStyles((theme) => ({
   },
   configSection: {
     marginBottom: theme.spacing(1),
+    position: 'relative',
+    zIndex: 1,
   },
   elementsContainer: {
     display: 'flex',
@@ -131,7 +133,17 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing(1),
-    width: '100%',
+    width: `calc(100% + ${theme.spacing(1) * 2}px)`,
+    position: 'sticky',
+    top: -theme.spacing(1),
+    zIndex: 2,
+    backgroundColor: `#121212`,
+    paddingTop: theme.spacing(1),
+    paddingBottom: theme.spacing(1),
+    paddingLeft: theme.spacing(1),
+    paddingRight: theme.spacing(1),
+    marginLeft: -theme.spacing(1),
+    marginRight: -theme.spacing(1),
   },
   sectionContent: {
     marginLeft: theme.spacing(1),
@@ -151,13 +163,13 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(0.5),
   },
   elementTitle: {
-    flex: 1,
+    cursor: 'pointer',
     fontWeight: 500,
     fontSize: '0.95rem',
+    padding: theme.spacing(0.25),
+    borderRadius: theme.shape.borderRadius,
     '&:hover': {
       backgroundColor: theme.palette.action.hover,
-      borderRadius: theme.shape.borderRadius,
-      padding: theme.spacing(0.25),
     },
   },
   elementTitleInput: {
@@ -437,6 +449,11 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
     // Set the initial editing value to the current title (or empty string if null)
     const element = definition?.elements?.find(el => el.id === elementId);
     setEditingTitleValue(element?.title || '');
+
+    // If the element is currently collapsed, expand it when its title is clicked for editing.
+    if (collapsedElements[elementId]) {
+      toggleElement(elementId);
+    }
   };
 
   const handleTitleChange = (e) => {
@@ -572,10 +589,14 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
 
       <Box className={classes.elementsContainer}>
         {(definition?.elements || []).map((element, index) => (
-          <SubtleGlowPaper key={element.id || index} className={classes.elementItem} elevation={2}>
+          <SubtleGlowPaper 
+            key={element.id || index} 
+            className={classes.elementItem} 
+            elevation={2}
+            onClick={() => toggleElement(element.id)}
+          >
             <Box 
               className={classes.elementHeader}
-              onClick={() => toggleElement(element.id)}
             >
               <Box style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                 <IconButton 
@@ -632,7 +653,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
             </Box>
 
             <Collapse in={!collapsedElements[element.id]}>
-              <Box className={classes.elementContent}>
+              <Box className={classes.elementContent} onClick={(e) => e.stopPropagation()}>
                 <Box className={classes.elementControls}>
                   <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
                     <Button
@@ -799,13 +820,16 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
               </Box>
             </Collapse>
 
-            <Box className={classes.insertButtonContainer}>
+            <Box className={classes.insertButtonContainer} >
               <Button 
                 size="small"
                 variant="text"
                 color="primary" 
                 startIcon={<AddIcon />} 
-                onClick={() => handleInsertElementBelow(index)}
+                onClick={(e) => { 
+                  e.stopPropagation();
+                  handleInsertElementBelow(index);
+                }}
               >
                 Insert Element Below
               </Button>
