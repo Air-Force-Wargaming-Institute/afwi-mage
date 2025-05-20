@@ -35,8 +35,8 @@ To enhance the Report Builder with improved content handling for AI-generated "t
 *   **As a user, I want to be able to expand the collapsed `<think_tags>` content on click, so I can inspect the AI's thought process if needed.**
     *   (Tasks for implementing the collapsible UI under the first user story directly address this.)
 *   **As a user, I want `<think_tags>` and their content to be excluded when I export the report (to any format), so the final document is clean.**
-    *   [ ] **Clarify Tag Format (`report_builder_service`):** Confirm if the tags are `<thinking>...</thinking>`, `<think>...</think>`, or if both need to be supported. Update any existing filtering logic if necessary.
-    *   [ ] **Ensure No Export (`report_builder_service`):** Verify and ensure that the `generate_export_markdown` function (and any new export functions) correctly strips all variants of these thinking tags before generating the exportable content.
+    *   [x] **Clarify Tag Format (`report_builder_service`):** Confirm if the tags are `<thinking>...</thinking>`, `<think>...</think>`, or if both need to be supported. Update any existing filtering logic if necessary.
+    *   [x] **Ensure No Export (`report_builder_service`):** Verify and ensure that the `generate_export_markdown` function (and any new export functions) correctly strips all variants of these thinking tags before generating the exportable content.
 
 **Phase 2: Improved Markdown Table Export**
 

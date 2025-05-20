@@ -1118,6 +1118,14 @@ function ReportDesignerPage() {
         content = element.ai_generated_content || `[Content for '${element.title || 'generative section'}' not generated or error occurred]`;
       }
 
+      // Filter out <think> and <thinking> tags and their content
+      if (content && typeof content === 'string') {
+        // Remove <thinking>...</thinking> tags
+        content = content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
+        // Remove <think>...</think> tags
+        content = content.replace(/<think>[\s\S]*?<\/think>/g, '');
+      }
+
       if (element.format && element.format.startsWith('h')) {
         const level = parseInt(element.format.substring(1), 10) || 1;
         const prefix = '#'.repeat(level) + ' ';

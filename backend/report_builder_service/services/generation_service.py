@@ -207,11 +207,14 @@ async def generate_element_content(element: ReportElement, vector_store_id: Opti
 
 # Helper function to filter out thinking tags
 def _filter_thinking_tags(text: str) -> str:
-    """Removes <think>...</think> tags and their content."""
+    """Removes <think>...</think> and <thinking>...</thinking> tags and their content."""
     if not text:
         return ""
     # Non-greedy match for anything between <thinking> and </thinking>
-    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<thinking>.*?</thinking>", "", text, flags=re.DOTALL)
+    # Non-greedy match for anything between <think> and </think>
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    return text
 
 def estimate_tokens(text: str) -> int:
     """
