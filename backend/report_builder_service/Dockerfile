@@ -5,7 +5,14 @@ WORKDIR /app
 # Install pandoc and additional dependencies for Markdown to Word conversion
 RUN apt-get update && \
     apt-get install -y pandoc build-essential wget python3-dev && \
-    apt-get clean && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    # System dependencies for WeasyPrint
+    libpango-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
+    libpangoft2-1.0-0 \
+    # Add other system dependencies here if needed
+    && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.txt

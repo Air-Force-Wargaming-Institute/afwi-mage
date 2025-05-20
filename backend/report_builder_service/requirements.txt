@@ -3,5 +3,9 @@ uvicorn[standard]==0.23.2
 pydantic==2.4.2
 httpx==0.25.0 # For making async HTTP requests
 python-docx==1.1.2
-pypandoc==1.15
-python-multipart==0.0.6 # For handling file uploads 
+mistune==3.1.1
+markdown2==2.5.3
+requests==2.32.3
+bleach==6.2.0
+WeasyPrint==65.1 # Added for PDF export
+pypandoc==1.15 # For Word export and pandoc verification 

@@ -30,6 +30,7 @@ ERROR_CODE_TO_STATUS = {
     # 500 - internal server errors
     ErrorCodes.GENERATION_FAILED: 500,
     ErrorCodes.GENERATION_RUNTIME_ERROR: 500,
+    ErrorCodes.PDF_EXPORT_FAILED: 500,
     ErrorCodes.UNKNOWN_ERROR: 500
 }
 
@@ -45,6 +46,7 @@ ERROR_CODE_TO_TITLE = {
     ErrorCodes.MAGE_SERVICE_ERROR: "MAGE Service Error",
     ErrorCodes.GENERATION_FAILED: "Generation Failed",
     ErrorCodes.GENERATION_RUNTIME_ERROR: "Runtime Error",
+    ErrorCodes.PDF_EXPORT_FAILED: "PDF Export Failed",
     ErrorCodes.UNKNOWN_ERROR: "Unknown Error"
 }
 
@@ -60,6 +62,7 @@ ERROR_CODE_TO_SUGGESTION = {
     ErrorCodes.MAGE_SERVICE_ERROR: "A required MAGE service is currently unavailable. Please try again later.",
     ErrorCodes.GENERATION_FAILED: "Generation failed. Please try again with different instructions.",
     ErrorCodes.GENERATION_RUNTIME_ERROR: "An error occurred during generation. Please try again or contact support.",
+    ErrorCodes.PDF_EXPORT_FAILED: "Failed to export the report to PDF. Please try again or check the report content.",
     ErrorCodes.UNKNOWN_ERROR: "An unexpected error occurred. Please try again or contact support."
 }
 
@@ -167,4 +170,16 @@ def get_status_code_for_error(error_code: str) -> int:
     Returns:
         int: The corresponding HTTP status code
     """
-    return ERROR_CODE_TO_STATUS.get(error_code, 500)  # Default to 500 if not found 
+    return ERROR_CODE_TO_STATUS.get(error_code, 500)  # Default to 500 if not found
+
+# Custom Service Layer Error
+class ServiceError(Exception):
+    """Custom exception for service layer errors."""
+    def __init__(self, error_code: str, message: str, details: Optional[Dict] = None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.message = message
+        self.details = details if details is not None else {}
+
+    def __str__(self):
+        return f"{self.error_code}: {self.message}" + (f" (Details: {self.details})") if self.details else "" 

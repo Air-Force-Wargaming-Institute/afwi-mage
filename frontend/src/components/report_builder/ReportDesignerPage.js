@@ -30,7 +30,7 @@ import AutorenewIcon from '@material-ui/icons/Autorenew';
 import ReportConfigPanel from './ReportConfigPanel';
 import ReportPreviewPanel from './ReportPreviewPanel';
 import axios from 'axios';
-import { getGatewayUrl } from '../../config';
+import { getGatewayUrl, getApiUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -756,115 +756,129 @@ function ReportDesignerPage() {
   };
 
   const handleExportFormat = async (format) => {
-    try {
-      // Special case for Word export - use backend endpoint
-      if (format === 'docx') {
-        // If there are unsaved changes, save the report first
-        if (hasUnsavedChanges) {
-          setSnackbar({
-            open: true,
-            message: 'Saving report before Word export...', 
-            severity: 'info'
-          });
-          await handleSave(); // Wait for save to complete
-          // Check if save was successful, if not, stop export
-          if (error) { // Assuming handleSave sets an error state
-             setSnackbar({
-                open: true,
-                message: 'Failed to save report. Word export aborted.',
-                severity: 'error'
-            });
-            handleExportMenuClose();
-            return;
-          }
-           setSnackbar({
-            open: true,
-            message: 'Report saved. Proceeding with Word export.',
-            severity: 'success'
-          });
-        }
+    if (!currentDefinition || !currentDefinition.id) {
+      setSnackbar({
+        open: true,
+        message: 'Please save the report before exporting.',
+        severity: 'warning',
+      });
+      return;
+    }
 
-        setSnackbar({
-          open: true,
-          message: 'Preparing Word document, please wait...',
-          severity: 'info'
-        });
-        
-        // Call the backend Word export endpoint
-        const response = await axios.get(
-          getGatewayUrl(`/api/report_builder/reports/${currentDefinition.id}/export/word`),
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            },
-            responseType: 'blob'  // Important: we want a binary response
+    setSnackbar({ open: true, message: `Exporting report as ${format.toUpperCase()}...`, severity: 'info' });
+    setIsLoading(true); // Show loading indicator
+
+    try {
+      if (format === 'docx') {
+        try {
+          const docxExportUrl = getApiUrl('REPORT_BUILDER', `/api/report_builder/reports/${currentDefinition.id}/export/word`);
+          console.log('Attempting to export DOCX from URL:', docxExportUrl);
+          const response = await axios.get(
+            docxExportUrl,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: 'blob',
+            }
+          );
+          const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+          const contentDisposition = response.headers['content-disposition'];
+          
+          const baseTitleDocx = typeof currentDefinition.title === 'string' ? currentDefinition.title : 'report';
+          const suggestedName = contentDisposition
+            ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+            : `${(baseTitleDocx || 'report').replace(/\s+/g, '_')}.docx`;
+
+          if ('showSaveFilePicker' in window) {
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName,
+              types: [{
+                description: 'Word Document',
+                accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] },
+              }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            setSnackbar({ open: true, message: 'Report exported as DOCX successfully', severity: 'success' });
+          } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = suggestedName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setSnackbar({ open: true, message: 'Report exported as DOCX (saved to downloads folder)', severity: 'success' });
           }
-        );
-        
-        // Create a blob from the response
-        const blob = new Blob([response.data], { 
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-        });
-        
-        // Get filename suggestion
-        const contentDisposition = response.headers['content-disposition'];
-        const suggestedName = contentDisposition
-          ? contentDisposition.split('filename=')[1].replace(/"/g, '').replace(/\.docx$/, '-docx.docx')
-          : `${currentDefinition.title.replace(/\s+/g, '_')}-docx.docx`;
-        
-        // Check if the File System Access API is available
-        if ('showSaveFilePicker' in window) {
-          // Use the File System Access API
-          const options = {
-            suggestedName,
-            types: [{
-              description: 'Word Document',
-              accept: {
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
-              }
-            }]
-          };
-          
-          // Show the file picker
-          const fileHandle = await window.showSaveFilePicker(options);
-          
-          // Get a writable stream
-          const writable = await fileHandle.createWritable();
-          
-          // Write the blob to the file
-          await writable.write(blob);
-          
-          // Close the stream
-          await writable.close();
-          
+        } catch (err) {
+          console.error('Error exporting DOCX:', err);
           setSnackbar({
             open: true,
-            message: 'Report exported as DOCX successfully',
-            severity: 'success'
+            message: `Failed to export DOCX: ${err.response?.data?.detail?.message || err.message}`,
+            severity: 'error',
           });
-        } else {
-          // Fallback to the old method for browsers that don't support the File System Access API
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = suggestedName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          
-          setSnackbar({
-            open: true,
-            message: 'Report exported as DOCX (saved to downloads folder)',
-            severity: 'success'
-          });
+        } finally {
+          setIsLoading(false); // This finally block for DOCX should remain
+          handleExportMenuClose(); // This finally block for DOCX should remain
         }
-        
-        handleExportMenuClose();
         return;
       }
-      
+
+      if (format === 'pdf') {
+        try {
+          const pdfExportUrl = getApiUrl('REPORT_BUILDER', `/api/report_builder/reports/${currentDefinition.id}/export/pdf`);
+          console.log('Attempting to export PDF from URL:', pdfExportUrl);
+          const response = await axios.get(
+            pdfExportUrl,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: 'blob',
+            }
+          );
+          const blob = new Blob([response.data], { type: 'application/pdf' });
+          const contentDisposition = response.headers['content-disposition'];
+
+          const baseTitlePdf = typeof currentDefinition.title === 'string' ? currentDefinition.title : 'report';
+          const suggestedName = contentDisposition
+            ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+            : `${(baseTitlePdf || 'report').replace(/\s+/g, '_')}.pdf`;
+
+          if ('showSaveFilePicker' in window) {
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName,
+              types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            setSnackbar({ open: true, message: 'Report exported as PDF successfully', severity: 'success' });
+          } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = suggestedName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setSnackbar({ open: true, message: 'Report exported as PDF (saved to downloads folder)', severity: 'success' });
+          }
+        } catch (err) {
+          console.error('Error exporting PDF:', err);
+          setSnackbar({
+            open: true,
+            message: `Failed to export PDF: ${err.response?.data?.detail?.message || err.message}`,
+            severity: 'error',
+          });
+        } finally {
+          setIsLoading(false); // This finally block for PDF should remain
+          handleExportMenuClose(); // This finally block for PDF should remain
+        }
+        return;
+      }
+
+      // Fallback for other formats (txt, md, html, json)
       const reportText = getReportText();
       const reportTitle = currentDefinition.title || 'report';
       let fileContent, fileType, fileExtension;
@@ -971,15 +985,22 @@ function ReportDesignerPage() {
         });
       }
     } catch (err) {
-      console.error('Error exporting file:', err);
+      console.error('Error exporting file (main catch):', err); // Updated log message
       setSnackbar({
         open: true,
         message: `Failed to export report: ${err.message}`,
         severity: 'error'
       });
+      // setIsLoading(false) and handleExportMenuClose() are now in the main finally block below
+      // so they are removed from here.
+    } finally {
+      // This is the new main finally block.
+      // It will execute after the main try completes or if an error is caught by the main catch.
+      // It ensures that for the fallback formats (txt, md, html, json), or if an error
+      // occurs outside the docx/pdf specific try/catch blocks, loading is stopped.
+      setIsLoading(false);
+      handleExportMenuClose();
     }
-    
-    handleExportMenuClose();
   };
 
   const handleSaveAsTemplate = async () => {
@@ -1656,6 +1677,7 @@ function ReportDesignerPage() {
               <MenuItem onClick={() => handleExportFormat('html')}>Export as HTML (.html)</MenuItem>
               <MenuItem onClick={() => handleExportFormat('json')}>Export as JSON (.json)</MenuItem>
               <MenuItem onClick={() => handleExportFormat('docx')}>Export as Word (.docx)</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('pdf')}>Export as PDF (.pdf)</MenuItem>
             </Menu>
             <IconButton edge="end" onClick={handleClose}>
               <CloseIcon />

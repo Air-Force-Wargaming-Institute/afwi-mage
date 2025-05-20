@@ -338,22 +338,23 @@ async def generate_export_markdown(report: Report) -> str:
     # Process each element in the report
     logger.info(f"Processing {len(report.content.elements)} elements for export")
     has_missing_content = False
-    
-    for element in report.content.elements:
-        element_content_parts = [] # To build content for the current element
-        
-        actual_content = ""
+    for element_index, element in enumerate(report.content.elements):
+        element_content_parts = [] # For collecting parts of the current element's content
+
+        # Skip elements with no content unless they are headings (which might just use their title)
+        is_heading = element.format and element.format.startswith('h')
+        # Determine actual content to use
+        actual_content = None
         if element.type == 'explicit':
-            if element.content:
-                actual_content = element.content
+            actual_content = element.content if element.content is not None else (element.title if is_heading and element.title is not None else '')
         elif element.type == 'generative':
-            if element.ai_generated_content:
-                actual_content = element.ai_generated_content
-            else:
+            actual_content = element.ai_generated_content if element.ai_generated_content is not None else ''
+            if not actual_content: # Check if AI content is missing for a generative section
+                logger.warning(f"Element {element.id} (generative) has no ai_generated_content for export.")
                 has_missing_content = True
-                logger.warning(f"Missing AI-generated content for section '{element.title or 'Untitled'}' - generation required. Skipping in export.")
-                markdown_parts.append("\n") # Add spacing even if skipped
-                continue
+        
+        if actual_content is None: # Should not happen if logic above is correct
+             actual_content = ""
 
         # Filter thinking tags from the content
         actual_content = _filter_thinking_tags(actual_content)

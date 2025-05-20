@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import config
 from config import logger, BASE_DIR, DATA_DIR, REPORTS_DIR, TEMPLATES_DIR
@@ -18,6 +19,20 @@ from init_templates import init_templates
 
 # Create FastAPI app
 app = FastAPI(title="Report Builder Service")
+
+# CORS Middleware Configuration
+origins = [
+    "http://localhost:3000",  # Allow your frontend origin
+    # Add other origins if needed, e.g., your deployed frontend URL
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all standard methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows all headers, including Authorization
+)
 
 # Add router for API endpoints
 app.include_router(api_router)

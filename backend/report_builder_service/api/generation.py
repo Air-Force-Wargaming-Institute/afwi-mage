@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, Request, HTTPException, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import httpx
@@ -14,7 +14,8 @@ from services.generation_service import (
     generate_element_content, get_preceding_content, get_context_within_limit, 
     generate_export_markdown, estimate_tokens
 )
-from utils.errors import create_error_response, get_status_code_for_error
+from services.export_service import export_report_to_pdf_service
+from utils.errors import create_error_response, get_status_code_for_error, ServiceError
 from config import (
     REPORTS_DIR, EMBEDDING_SERVICE_BASE_URL, TOKEN_LIMIT, REGENERATION_TOKEN_LIMIT, logger
 )
@@ -495,6 +496,42 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
         return create_error_response(
             ErrorCodes.UNKNOWN_ERROR,
             f"An unexpected error occurred during Word export: {str(e)}"
+        )
+
+@router.get("/reports/{report_id}/export/pdf")
+async def export_report_to_pdf(report_id: str):
+    """
+    Export a report to PDF format.
+    """
+    logger.info(f"Received request to export report {report_id} to PDF")
+    try:
+        pdf_bytes, report_name = await export_report_to_pdf_service(report_id)
+        
+        safe_filename = f"{report_name.replace(' ', '_')}.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={safe_filename}"}
+        )
+    except ServiceError as se:
+        logger.error(f"Service error exporting report {report_id} to PDF: {se.message}", exc_info=True)
+        error_response = create_error_response(se.error_code, se.message, se.details)
+        return JSONResponse(
+            status_code=get_status_code_for_error(se.error_code),
+            content=error_response
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error exporting report {report_id} to PDF: {str(e)}", exc_info=True)
+        # Use a more specific error code if available, otherwise UNKNOWN_ERROR
+        error_code = ErrorCodes.PDF_EXPORT_FAILED if hasattr(ErrorCodes, 'PDF_EXPORT_FAILED') else ErrorCodes.UNKNOWN_ERROR
+        error_response = create_error_response(
+            error_code,
+            f"An unexpected error occurred during PDF export: {str(e)}"
+        )
+        return JSONResponse(
+            status_code=get_status_code_for_error(error_code),
+            content=error_response
         )
 
 @router.post("/reports/{report_id}/generate_next_element", response_model=Union[Report, ErrorResponse])
