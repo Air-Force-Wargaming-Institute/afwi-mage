@@ -402,6 +402,16 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
             # Write markdown to temp file
             with open(temp_md_path, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
+
+            # --- Debug: Write markdown_content to a known file for inspection ---
+            debug_md_file_path = "/tmp/debug_markdown.md"
+            try:
+                with open(debug_md_file_path, "w", encoding="utf-8") as debug_f:
+                    debug_f.write(markdown_content)
+                logger.info(f"DEBUG MARKDOWN content written to {debug_md_file_path}. Use 'docker cp <container_id>:{debug_md_file_path} .' to retrieve it.")
+            except Exception as e:
+                logger.error(f"Failed to write debug markdown file: {e}")
+            # --- End Debug ---
             
             # Use pypandoc to convert from markdown to docx
             # Setup additional options for pandoc
@@ -430,6 +440,7 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
             pypandoc.convert_file(
                 str(temp_md_path),
                 "docx",
+                format='gfm',
                 outputfile=str(temp_docx_path),
                 extra_args=pandoc_args
             )
