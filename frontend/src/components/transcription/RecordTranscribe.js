@@ -865,7 +865,7 @@ const RecordTranscribe = () => {
                   {/* Transcription Display Section */}
                   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <Typography variant="h5" align="center" gutterBottom sx={{ pt: 1.5, pb: 1 }}>
-                       {loadedSessionId ? 'Session Transcript' : 'Live Transcription'}
+                       {loadedSessionId ? 'Session Transcript (editable)' : 'Live Transcription'}
                     </Typography>
                     <TranscriptionDisplay />
                   </Box>

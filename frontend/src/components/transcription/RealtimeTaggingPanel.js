@@ -398,12 +398,12 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
       // Update all markers on the backend
       await updateMarkersOnBackend(optimisticNewMarkers);
 
-      setSnackbarMessage(`Tagged speaker (playback): ${participant.name} at ${formatTime(timestampForMarker)}`);
+      setSnackbarMessage(`Tagged speaker: ${participant.name} at ${formatTime(timestampForMarker)}`);
       setSnackbarOpen(true);
 
     } catch (error) {
       console.error('Error tagging speaker during playback:', error);
-      setSpeakerError(`Failed to tag speaker (playback): ${error.message}`);
+      setSpeakerError(`Failed to tag speaker: ${error.message}`);
       // Optionally revert optimistic update if backend fails
       // dispatch({ type: ACTIONS.REMOVE_MARKER, payload: newSpeakerTagMarker.id });
     } finally {
@@ -543,7 +543,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
         {/* New Section: Tag Speaker During Playback */}
         {loadedSessionId && (
           <Box sx={{ pt: 1.5 }} className={classes.speakerTagsSection}>
-            <Typography variant="h6" className={classes.formTitle}>Tag Speaker (Playback)</Typography>
+            <Typography variant="h6" className={classes.formTitle}>Tag Speakers</Typography>
             <Box className={classes.speakerTagsContainer} sx={{ mt: 0.5 }}>
               {participants.filter(p => p.name && p.name.trim() !== '').map((participant) => (
                 <Chip
