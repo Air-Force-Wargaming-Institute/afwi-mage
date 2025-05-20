@@ -310,22 +310,36 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
       setSpeakerError(null);
       setPendingSpeakerId(participant.id);
       
-      const currentTime = currentMarkerTime;
-      console.log(`Attempting speaker tag: ${participant.name} (ID: ${participant.id}) at time ${formatTime(currentTime)}`);
+      const currentTime = currentMarkerTime; 
       
       if (sendWebSocketMessage) {
         const speakerTagPayload = {
           type: "speaker_tag",
           speaker_id: participant.id,
-          speaker_name: participant.name,
-          speaker_role: participant.role,
+          speaker_name: participant.name, 
+          speaker_role: participant.role,   
           timestamp: currentTime
         };
         
-        console.log('[WebSocket] Sending speaker_tag message:', speakerTagPayload);
         const success = sendWebSocketMessage(speakerTagPayload);
 
         if (success) {
+          // Optimistically add marker for live tagging
+          const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
+          const optimisticLiveSpeakerMarker = {
+            id: `speakertag-live-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            marker_type: "speaker_tag_event",
+            speaker_id: participant.id,
+            speaker_name: participant.name,
+            speaker_role: participant.role,
+            timestamp: currentTime,
+            description: `Speaker: ${participant.name} (${participant.role || 'N/A'}) at ${formatTime(currentTime)}`,
+            classification: fullClassification, 
+            user_id: user?.username || 'unknown-user',
+            added_at: new Date().toISOString(),
+          };
+          dispatch({ type: ACTIONS.ADD_MARKER, payload: optimisticLiveSpeakerMarker });
+          
           setSnackbarMessage(`Tagged speaker: ${participant.name} at ${formatTime(currentTime)}`);
           setSnackbarOpen(true);
         } else {
@@ -467,12 +481,17 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
             </Button>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-            {Array.isArray(activeMarkers) && activeMarkers.map((marker) => {
+            {Array.isArray(activeMarkers) && activeMarkers
+              .filter(marker => marker.marker_type !== 'speaker_tag_event') // Exclude speaker tags
+              .map((marker) => {
                 const markerTypeDetails = availableMarkerTypes.find(mt => mt.type === marker.marker_type);
+                // Default label for non-speaker tags
+                const chipLabel = `${markerTypeDetails?.label || marker.marker_type} at ${formatTime(marker.timestamp)}`;
+                
                 return (
                     <Chip
                         key={marker.id}
-                        label={`${markerTypeDetails?.label || marker.marker_type} at ${formatTime(marker.timestamp)}`}
+                        label={chipLabel}
                         color="primary" 
                         size="small"
                         onDelete={(loadedSessionId && !globalIsReadOnly) ? () => handleRemoveMarker(marker.id) : undefined}
@@ -540,7 +559,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
             </Box>
         )}
 
-        {/* New Section: Tag Speaker During Playback */}
+        {/* New Section: Tag Speaker During Playback - Renamed to "Tag Speakers" */}
         {loadedSessionId && (
           <Box sx={{ pt: 1.5 }} className={classes.speakerTagsSection}>
             <Typography variant="h6" className={classes.formTitle}>Tag Speakers</Typography>
@@ -592,6 +611,32 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
             )}
           </Box>
         )}
+
+        {/* New Display Section for Speaker Tag Markers */}
+        <Box className={classes.formSection} sx={{ mt: 2 }}>
+            <Typography variant="h6" className={classes.formTitle}>Tagged Speaker Events</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+            {Array.isArray(activeMarkers) && activeMarkers
+                .filter(marker => marker.marker_type === 'speaker_tag_event') // Only speaker tags
+                .map((marker) => {
+                // Custom label for speaker tags
+                const chipLabel = `${marker.speaker_name || 'Speaker'} at ${formatTime(marker.timestamp)}`;
+                return (
+                    <Chip
+                        key={marker.id}
+                        label={chipLabel}
+                        // Use participant's color if available, or a default for speaker tags
+                        style={{ backgroundColor: participants.find(p=>p.id === marker.speaker_id)?.color || theme.palette.info.light }}
+                        size="small"
+                        onDelete={(loadedSessionId && !globalIsReadOnly) ? () => handleRemoveMarker(marker.id) : undefined}
+                        deleteIcon={(loadedSessionId && !globalIsReadOnly) ? <DeleteIcon /> : undefined}
+                        className={classes.markerChip} // Can reuse or define new style
+                        disabled={(!loadedSessionId && globalIsReadOnly) || (loadedSessionId && globalIsReadOnly)}
+                    />
+                );
+            })}
+            </Box>
+        </Box>
 
         <Snackbar
             open={snackbarOpen}
