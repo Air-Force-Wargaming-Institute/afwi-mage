@@ -72,6 +72,7 @@ Thumbs.db
 *.csv
 *.xlsx
 *.xls
+*.whl
 !requirements.txt
 !README.md
 

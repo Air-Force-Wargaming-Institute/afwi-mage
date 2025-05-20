@@ -8,6 +8,10 @@ RUN mkdir -p /root/.ollama/models && \
 COPY nomic-embed-text-v1.5.f32.gguf /root/.ollama/models/
 # COPY Modelfile /root/.ollama/models/Modelfile
 COPY entrypoint.sh /entrypoint.sh
+
+# Convert Windows line endings (CRLF) to Unix line endings (LF)
+RUN sed -i 's/\r$//' /entrypoint.sh
+
 RUN chmod +x /entrypoint.sh
 
 # Set offline environment variables and optimizations
