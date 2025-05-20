@@ -29,9 +29,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/dbn
 # Microservice URLs
 UPLOAD_SERVICE_URL = os.getenv("UPLOAD_SERVICE_URL", "http://upload:8005")
 EXTRACTION_SERVICE_URL = os.getenv("EXTRACTION_SERVICE_URL", "http://extraction:8002")
-GENERATION_SERVICE_URL = os.getenv("GENERATION_SERVICE_URL", "http://generation:8003")
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://agent:8001")
-REVIEW_SERVICE_URL = os.getenv("REVIEW_SERVICE_URL", "http://review:8004")
 EMBEDDING_SERVICE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://embedding:8006")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8010")
 

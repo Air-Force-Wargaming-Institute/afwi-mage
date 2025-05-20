@@ -35,9 +35,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
       - UPLOAD_SERVICE_URL=http://upload:8005
       - EXTRACTION_SERVICE_URL=http://extraction:8002
-      - GENERATION_SERVICE_URL=http://generation:8003
       - AGENT_SERVICE_URL=http://agent:8001
-      - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
       - WORKBENCH_SERVICE_URL=http://workbench:8020
       - VLLM_INSTANCES=http://vllm:8000/v1=generate
@@ -113,37 +111,6 @@ services:
       - init-data
     networks:
       - app-network
-
-  generation:
-    build: ./generation_service
-    ports:
-      - "8003:8003"
-    volumes:
-      - ../data:/app/data
-      - ./models:/app/models
-      - ./generation_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-
-  review:
-    build: ./review_service
-    ports:
-      - "8004:8004"
-    volumes:
-      - ../data:/app/data
-      - ../models:/app/models
-      - ./review_service:/app
-    environment:
-      - CORE_SERVICE_URL=http://core:8000
-    depends_on:
-      - init-data
-    networks:
-      - app-network
-
   upload:
     build: ./upload_service
     ports:

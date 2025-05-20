@@ -9,9 +9,7 @@
       - DATABASE_URL=postgresql://postgres:password@db:5432/dbname
       - UPLOAD_SERVICE_URL=http://upload:8005
       - EXTRACTION_SERVICE_URL=http://extraction:8002
-      - GENERATION_SERVICE_URL=http://generation:8003
       - AGENT_SERVICE_URL=http://agent:8001
-      - REVIEW_SERVICE_URL=http://review:8004
       - EMBEDDING_SERVICE_URL=http://embedding:8006
       - DEBUG=1
       - PYTHONUNBUFFERED=1
