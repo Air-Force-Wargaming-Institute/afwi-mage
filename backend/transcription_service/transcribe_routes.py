@@ -74,7 +74,9 @@ def generate_transcript_with_markers(segments: List[dict], markers: List[dict]) 
         processed_items.append({
             "time": marker.get("timestamp"),
             "type": "marker",
-            "marker_type": marker.get("marker_type", "generic_marker")
+            "marker_type": marker.get("marker_type", "generic_marker"),
+            "speaker_name": marker.get("speaker_name"),
+            "speaker_role": marker.get("speaker_role")
         })
 
     # Filter out items with no time for sorting
@@ -90,7 +92,12 @@ def generate_transcript_with_markers(segments: List[dict], markers: List[dict]) 
                 transcript_lines.append(f"[{formatted_timestamp}] {item['speaker']}: {item['text']}")
         elif item["type"] == "marker":
             marker_display_type = item['marker_type'].upper()
-            transcript_lines.append(f"[{formatted_timestamp}] (***{marker_display_type}***)")
+            if item['marker_type'] == "speaker_tag_event":
+                speaker_name_display = item.get('speaker_name', 'Unknown Speaker')
+                speaker_role_display = f" ({item.get('speaker_role', 'N/A')})" if item.get('speaker_role') else ""
+                transcript_lines.append(f"[{formatted_timestamp}]        (*** SPEAKER: {speaker_name_display}{speaker_role_display} ***)")
+            else:
+                transcript_lines.append(f"[{formatted_timestamp}]        (***{marker_display_type}***)")
 
     return '\n'.join(transcript_lines)
 # --- END NEW HELPER FUNCTION ---

@@ -127,7 +127,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
     customCaveat,
     sendWebSocketMessage,
     playbackTime,
-    isPlaying,
+    isPlaying: isContextAudioPlaying,
   } = state;
 
   const [customMarkerLabel, setCustomMarkerLabel] = useState('');
@@ -143,11 +143,12 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
   const [speakerError, setSpeakerError] = useState(null);
   const [pendingSpeakerId, setPendingSpeakerId] = useState(null);
 
-  const canAddMarkers = 
-    (recordingState === RECORDING_STATES.RECORDING) ||
-    (loadedSessionId && isAudioPlaying);
+  const canAddMarkersDuringPlayback = loadedSessionId && isContextAudioPlaying;
 
-  const currentMarkerTime = (loadedSessionId && isAudioPlaying) ? playbackTime : 
+  const canAddMarkers =
+    (recordingState === RECORDING_STATES.RECORDING) || canAddMarkersDuringPlayback;
+
+  const currentMarkerTime = canAddMarkersDuringPlayback ? playbackTime :
                             (recordingState === RECORDING_STATES.RECORDING ? recordingTime : playbackTime);
 
   // New function to update markers on the backend for a loaded session
@@ -203,6 +204,9 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
       return;
     }
     
+    // Determine if this is a live recording marker or a playback marker
+    const isPlaybackMarker = loadedSessionId && canAddMarkersDuringPlayback;
+    
     try {
       setIsAddingMarker(true);
       setMarkerError(null);
@@ -218,13 +222,13 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
         description: `${markerType.label} at ${formatTime(timestampForMarker)}`,
         classification: fullClassification,
         user_id: user?.username || 'unknown-user',
-        added_at: new Date().toISOString(), // Add added_at for new markers
+        added_at: new Date().toISOString(), 
       };
       
       const optimisticNewMarkers = [...activeMarkers, newMarkerPayload];
       dispatch({ type: ACTIONS.ADD_MARKER, payload: newMarkerPayload });
 
-      if (!loadedSessionId && sessionId && token) {
+      if (!loadedSessionId && sessionId && token) { // Live session, new marker via POST
         const apiMarkerPayload = {
           marker_type: markerType.type,
           timestamp: timestampForMarker,
@@ -249,8 +253,8 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
         const responseData = await response.json();
         console.log('Marker added successfully via API (live session):', responseData);
         // For live sessions, we don't call updateMarkersOnBackend as it's a new marker to a live session not PUTting all markers.
-      } else if (loadedSessionId && token) {
-        // Marker added to an already loaded session, update all markers on backend
+      } else if (loadedSessionId && token) { // Loaded session, marker added during playback or review
+        // This will be called for markers added via "Add Marker" buttons AND for new speaker tags during playback
         await updateMarkersOnBackend(optimisticNewMarkers);
       }
 
@@ -313,6 +317,8 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
         const speakerTagPayload = {
           type: "speaker_tag",
           speaker_id: participant.id,
+          speaker_name: participant.name,
+          speaker_role: participant.role,
           timestamp: currentTime
         };
         
@@ -356,6 +362,55 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
 
   const markerButtonsDisabled = isAddingMarker || !canAddMarkers;
   const finalIsReadOnlyForCustomMarker = globalIsReadOnly || isAddingCustomMarker;
+
+  // New handler for tagging speaker during playback
+  const handlePlaybackSpeakerTagClick = async (participant) => {
+    if (!loadedSessionId || !canAddMarkersDuringPlayback || !token) {
+      setSnackbarMessage('Can only tag speakers during active playback of a loaded session.');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      setTaggingSpeaker(true); // Reuse existing loading state or create a new one if distinct visual feedback is needed
+      setSpeakerError(null);
+      setPendingSpeakerId(participant.id); // For visual feedback on the button
+
+      const timestampForMarker = playbackTime; // Use playbackTime
+      const fullClassification = constructClassificationString(selectedClassification, caveatType, customCaveat);
+
+      const newSpeakerTagMarker = {
+        id: `speakertag-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        marker_type: "speaker_tag_event",
+        speaker_id: participant.id,
+        speaker_name: participant.name,
+        speaker_role: participant.role,
+        timestamp: timestampForMarker,
+        description: `Speaker: ${participant.name} (${participant.role || 'N/A'}) at ${formatTime(timestampForMarker)}`,
+        classification: fullClassification, // Or decide if speaker tags need classification
+        user_id: user?.username || 'unknown-user',
+        added_at: new Date().toISOString(),
+      };
+
+      const optimisticNewMarkers = [...activeMarkers, newSpeakerTagMarker];
+      dispatch({ type: ACTIONS.ADD_MARKER, payload: newSpeakerTagMarker });
+
+      // Update all markers on the backend
+      await updateMarkersOnBackend(optimisticNewMarkers);
+
+      setSnackbarMessage(`Tagged speaker (playback): ${participant.name} at ${formatTime(timestampForMarker)}`);
+      setSnackbarOpen(true);
+
+    } catch (error) {
+      console.error('Error tagging speaker during playback:', error);
+      setSpeakerError(`Failed to tag speaker (playback): ${error.message}`);
+      // Optionally revert optimistic update if backend fails
+      // dispatch({ type: ACTIONS.REMOVE_MARKER, payload: newSpeakerTagMarker.id });
+    } finally {
+      setTaggingSpeaker(false);
+      setPendingSpeakerId(null);
+    }
+  };
 
   return (
     <Box>
@@ -434,7 +489,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
 
         {!loadedSessionId && (
             <Box sx={{ pt: 1.5 }} className={classes.speakerTagsSection}>
-            <Typography variant="h6" className={classes.formTitle}>Tag Current Speaker</Typography>
+            <Typography variant="h6" className={classes.formTitle}>Tag Current Speaker (Live)</Typography>
             <Box className={classes.speakerTagsContainer} sx={{ mt: 0.5 }}>
                 {participants.filter(p => p.name && p.name.trim() !== '').map((participant) => (
                 <Chip
@@ -483,6 +538,59 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
               </Typography>
             )}
             </Box>
+        )}
+
+        {/* New Section: Tag Speaker During Playback */}
+        {loadedSessionId && (
+          <Box sx={{ pt: 1.5 }} className={classes.speakerTagsSection}>
+            <Typography variant="h6" className={classes.formTitle}>Tag Speaker (Playback)</Typography>
+            <Box className={classes.speakerTagsContainer} sx={{ mt: 0.5 }}>
+              {participants.filter(p => p.name && p.name.trim() !== '').map((participant) => (
+                <Chip
+                  key={`playback-${participant.id}`}
+                  avatar={<Avatar style={{ backgroundColor: participant.color || theme.palette.primary.main, width: 24, height: 24, fontSize: '0.8rem' }}>{participant.name.charAt(0)}</Avatar>}
+                  label={pendingSpeakerId === participant.id && taggingSpeaker ? 'Tagging...' : participant.name}
+                  onClick={() => handlePlaybackSpeakerTagClick(participant)}
+                  size="medium"
+                  disabled={
+                    globalIsReadOnly ||
+                    !canAddMarkersDuringPlayback || // Only enabled if playing
+                    taggingSpeaker || 
+                    pendingSpeakerId === participant.id
+                  }
+                  sx={{ 
+                    cursor: 'pointer', 
+                    border: '1px solid', 
+                    borderColor: participant.color || theme.palette.primary.light, 
+                    backgroundColor: 'transparent', 
+                    '& .MuiChip-label': { 
+                      paddingLeft: '8px', 
+                      paddingRight: '8px' 
+                    }, 
+                    '&:hover': { 
+                      backgroundColor: participant.color ? `${participant.color}2A` : theme.palette.action.hover 
+                    }, 
+                    '&.Mui-disabled': { 
+                      borderColor: theme.palette.action.disabledBackground, 
+                      opacity: 0.6, 
+                      cursor: 'not-allowed', 
+                      '&:hover': { 
+                        backgroundColor: 'transparent' 
+                      }
+                    }
+                  }}
+                />
+              ))}
+              {participants.filter(p => p.name && p.name.trim() !== '').length === 0 && (
+                <Typography variant="body2" color="textSecondary">Add participants with names to enable speaker tagging.</Typography>
+              )}
+            </Box>
+            {speakerError && ( // Consider if a separate error state for playback tagging is needed
+              <Typography variant="body2" className={classes.errorMessage}>
+                {speakerError}
+              </Typography>
+            )}
+          </Box>
         )}
 
         <Snackbar

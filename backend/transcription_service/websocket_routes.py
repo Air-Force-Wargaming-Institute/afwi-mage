@@ -294,9 +294,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                          if msg_type == "speaker_tag":
                              speaker_id = message_data.get("speaker_id")
                              timestamp = message_data.get("timestamp") # This is recording time in seconds
+                             speaker_name = message_data.get("speaker_name")
+                             speaker_role = message_data.get("speaker_role")
                              if speaker_id and isinstance(timestamp, (int, float)):
-                                 logger.info(f"[{session_id}] Received speaker tag: Spk={speaker_id}, T={timestamp:.2f}s")
-                                 await session_manager.add_speaker_tag_event(db, session_id, speaker_id, timestamp)
+                                 logger.info(f"[{session_id}] Received speaker tag: SpkID={speaker_id}, Name='{speaker_name}', Role='{speaker_role}', T={timestamp:.2f}s")
+                                 await session_manager.add_speaker_tag_event(db, session_id, speaker_id, timestamp, speaker_name, speaker_role)
                              else:
                                  logger.warning(f"[{session_id}] Invalid speaker_tag msg: {message_data}")
                          else:

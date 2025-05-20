@@ -184,7 +184,7 @@ class SessionManager:
             logger.warning(f"Attempted to add marker to non-existent session: {session_id}")
             return None
 
-    async def add_speaker_tag_event(self, db: AsyncSession, session_id: str, speaker_id: str, timestamp: float) -> bool:
+    async def add_speaker_tag_event(self, db: AsyncSession, session_id: str, speaker_id: str, timestamp: float, speaker_name: Optional[str] = None, speaker_role: Optional[str] = None) -> bool:
         """Adds a speaker tag event to the session's markers list."""
         session = await self.get_session(db, session_id)
         if session:
@@ -193,6 +193,8 @@ class SessionManager:
                     "marker_id": str(uuid.uuid4()),
                     "marker_type": "speaker_tag_event", # Specific type
                     "speaker_id": speaker_id,
+                    "speaker_name": speaker_name, # New field
+                    "speaker_role": speaker_role, # New field
                     "timestamp": timestamp,
                     "added_at": datetime.utcnow().isoformat() # As ISO string
                 }
