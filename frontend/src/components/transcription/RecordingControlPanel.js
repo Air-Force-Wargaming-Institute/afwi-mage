@@ -224,6 +224,7 @@ const RecordingControlPanel = ({
     classification: selectedClassification,
     caveatType,
     customCaveat,
+    isFinalizingTranscript,
   } = state;
 
   const intervalRef = useRef(null);
@@ -833,15 +834,21 @@ const RecordingControlPanel = ({
   const stopRecording = useCallback(async () => {
     if (loadedSessionId || !mediaRecorder || (recordingState !== RECORDING_STATES.RECORDING && recordingState !== RECORDING_STATES.PAUSED)) return;
     
+    // Set loading state immediately
+    dispatch({ type: ACTIONS.SET_IS_FINALIZING_TRANSCRIPT, payload: true });
+    setSnackbarMessage('Finalizing session...'); // General message initially
+    setSnackbarSeverity('info');
+    setSnackbarOpen(true);
+
     const sessionToStop = sessionId;
     const currentAudioFilename = audioFilename || 'Untitled_Recording';
 
-    let successfullyStoppedOnBackend = false; 
-    let recordedAudioBlob = null;
+    let successfullyStoppedOnBackend = false;
 
     try {
       mediaRecorder.stop();
-      dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.STOPPED });
+      // Recording state is set to STOPPED, UI will reflect this part quickly
+      dispatch({ type: ACTIONS.SET_RECORDING_STATE, payload: RECORDING_STATES.STOPPED }); 
       
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
@@ -857,9 +864,7 @@ const RecordingControlPanel = ({
 
       if (sessionToStop && token) {
         console.log(`[API] Attempting to stop session ${sessionToStop} on backend.`);
-        setSnackbarMessage('Finalizing session on server...');
-        setSnackbarSeverity('info');
-        setSnackbarOpen(true);
+        // Snackbar message for this part is already set above or will be updated by specific outcomes
 
         try {
           const stopSessionUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/stop`);
@@ -882,76 +887,71 @@ const RecordingControlPanel = ({
             console.error(`[API] Error stopping session ${sessionToStop}:`, response.status, errorText);
             setSnackbarMessage(`Server error finalizing session: ${errorText || response.statusText}`);
             setSnackbarSeverity('error');
-            setSnackbarOpen(true);
+            // No snackbarOpen true here, it's managed by the outer try/finally for isFinalizingTranscript
+            throw new Error(`Server error ${response.status} during session stop`); // Throw to be caught by outer catch
           } else {
             const result = await response.json();
             console.log(`[API] Session ${sessionToStop} stopped successfully on backend:`, result);
-            setSnackbarMessage('Session finalized and saved on server.');
-            setSnackbarSeverity('success');
-            setSnackbarOpen(true);
+            setSnackbarMessage('Session finalized. Fetching final transcript...'); // Update message
+            setSnackbarSeverity('success'); // Can show success for this stage
+            setSnackbarOpen(true); // Show this specific success
             successfullyStoppedOnBackend = true;
             
             dispatch({ type: ACTIONS.MARK_SESSION_SAVED }); 
 
-            if (successfullyStoppedOnBackend && sessionToStop) {
-              console.log(`[API] Fetching final transcript for session ${sessionToStop}`);
-              setSnackbarMessage('Fetching final transcript...');
-              setSnackbarSeverity('info');
-              setSnackbarOpen(true);
+            // Now fetch the final transcript text
+            // The isFinalizingTranscript is already true and will remain true
+            console.log(`[API] Fetching final transcript for session ${sessionToStop}`);
+            // Snackbar message updated above
 
-              try {
-                const transcriptUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/transcription`);
-                const transcriptResponse = await fetch(transcriptUrl, {
-                  method: 'GET',
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
+            try {
+              const transcriptUrl = getGatewayUrl(`/api/transcription/sessions/${sessionToStop}/transcription`);
+              const transcriptResponse = await fetch(transcriptUrl, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
 
-                if (!transcriptResponse.ok) {
-                  const errorText = await transcriptResponse.text();
-                  throw new Error(`Failed to fetch final transcript: ${transcriptResponse.status} ${errorText}`);
-                }
-                const transcriptData = await transcriptResponse.json();
-                dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: transcriptData.full_transcript_text || "" });
-                // Optionally, if you also want to update segments in the context from transcriptData.transcription_segments:
-                // dispatch({ type: 'SET_FINAL_SEGMENTS', payload: transcriptData.transcription_segments || [] });
-                // This would require defining SET_FINAL_SEGMENTS action in TranscriptionContext.
-
-                setSnackbarMessage('Final transcript loaded.');
-                setSnackbarSeverity('success');
-                setSnackbarOpen(true);
-
-              } catch (fetchTranscriptError) {
-                console.error('[API] Error fetching final transcript:', fetchTranscriptError);
-                setSnackbarMessage(`Error fetching final transcript: ${fetchTranscriptError.message}`);
-                setSnackbarSeverity('error');
-                setSnackbarOpen(true);
-                // The transcript in context might be slightly stale if this fails, but session is stopped.
+              if (!transcriptResponse.ok) {
+                const errorText = await transcriptResponse.text();
+                throw new Error(`Failed to fetch final transcript: ${transcriptResponse.status} ${errorText}`);
               }
+              const transcriptData = await transcriptResponse.json();
+              dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: transcriptData.full_transcript_text || "" });
+              
+              setSnackbarMessage('Final transcript loaded.');
+              setSnackbarSeverity('success');
+              // No snackbarOpen true here, outer finally will handle it or it's already open
+            } catch (fetchTranscriptError) {
+              console.error('[API] Error fetching final transcript:', fetchTranscriptError);
+              setSnackbarMessage(`Error fetching final transcript: ${fetchTranscriptError.message}`);
+              setSnackbarSeverity('error');
+              // Let outer catch handle setting isFinalizingTranscript to false
+              throw fetchTranscriptError; // Re-throw to be caught by outer catch
             }
           }
         } catch (apiStopError) {
           console.error(`[API] Network or other error stopping session ${sessionToStop}:`, apiStopError);
-          setSnackbarMessage(`Network error finalizing session: ${apiStopError.message}`);
-          setSnackbarSeverity('error');
-          setSnackbarOpen(true);
+          // Snackbar message will be set by the catch block that re-throws
+          // Let outer catch handle setting isFinalizingTranscript to false
+          throw apiStopError; // Re-throw to be caught by outer catch
         }
       } else {
         console.warn('[API] No session ID or token available to stop session on backend.');
         setSnackbarMessage('No active server session to stop. Local recording only.');
         setSnackbarSeverity('warning');
         setSnackbarOpen(true);
+        // If no server interaction, we are done finalizing locally.
+        // The final transcript won't be fetched from server, so isFinalizing should be false.
+        dispatch({ type: ACTIONS.SET_IS_FINALIZING_TRANSCRIPT, payload: false });
       }
       
+      // Local audio blob processing (backup)
       const completeAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       if (completeAudioBlob.size > 0) {
         try {
-          // Keep recordedAudioBlob if it's used for local display or backup, 
-          // but it's not strictly needed for the new flow if not used elsewhere.
-          // recordedAudioBlob = completeAudioBlob; 
-          
           const downloadUrl = URL.createObjectURL(completeAudioBlob);
           if (waveformRef && waveformRef.current) {
-            waveformRef.current.loadBlob(completeAudioBlob); // For local display if needed
+            waveformRef.current.loadBlob(completeAudioBlob);
           }
           const a = document.createElement('a');
           a.href = downloadUrl;
@@ -961,35 +961,38 @@ const RecordingControlPanel = ({
           document.body.removeChild(a);
           URL.revokeObjectURL(downloadUrl);
           console.log('Audio also saved locally (backup).');
-          
-          // --- Call to retranscribeFinalAudio has been removed from here ---
-          // The backend now handles the final transcript generation comprehensively.
-
         } catch (saveError) {
           console.error('Error processing local audio blob:', saveError);
         }
-      } else {
-        console.warn("No audio data was recorded to save locally.");
       }
 
     } catch (error) { 
-      console.error('Error stopping recording process:', error);
+      console.error('Error during stopRecording process:', error);
       setSnackbarMessage(`Failed to stop recording: ${error.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
       dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to stop recording: ' + error.message });
     } finally {
       setAudioChunks([]);
       setMediaRecorder(null);
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
+      // This will now be the single place that guarantees isFinalizingTranscript is set to false
+      dispatch({ type: ACTIONS.SET_IS_FINALIZING_TRANSCRIPT, payload: false }); 
+      // Ensure snackbar is open if a message was set and not already handled
+      if (snackbarMessage && !snackbarOpen) setSnackbarOpen(true);
     }
-  }, [
+  },
+  [
     loadedSessionId, mediaRecorder, recordingState, token, user,
     audioStream, dispatch, sessionId, 
     audioFilename, 
     audioChunks,
-    uploadAndTranscribeAudio, 
+    // uploadAndTranscribeAudio, // Removed from dependencies as it's not called directly here anymore for this flow
     setSnackbarMessage, setSnackbarSeverity, setSnackbarOpen,
-    retranscribeFinalAudio
-  ]);
+    waveformRef // Added waveformRef if used in this function, though loadBlob is fine
+    // retranscribeFinalAudio, // Removed, backend handles this
+  ]
+);
 
   const checkCanStartRecording = () => {
     if (loadedSessionId) return false;

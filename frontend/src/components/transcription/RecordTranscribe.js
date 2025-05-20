@@ -401,6 +401,7 @@ const RecordTranscribe = () => {
     audioUrl, // Already in context
     playbackTime, // Already in context for dispatch, local for control
     sendWebSocketMessage, // Added for RealtimeTaggingPanel access
+    isFinalizingTranscript, // Destructure new state
   } = state;
 
   const [confirmCloseDialog, setConfirmCloseDialog] = useState(false);
@@ -787,6 +788,14 @@ const RecordTranscribe = () => {
               {loadedSessionId ? `Reviewing: ${audioFilename || 'Session'}` : 'Record & Transcribe Live' }
             </Typography>
         </GradientText>
+        {isFinalizingTranscript && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} color="inherit" />
+            <Typography variant="body2" color="textSecondary">
+              Please wait, final transcript is being created...
+            </Typography>
+          </Box>
+        )}
         <IconButton onClick={handleCloseWindow}>
           <CloseIcon />
         </IconButton>

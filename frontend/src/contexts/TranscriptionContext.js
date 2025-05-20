@@ -31,6 +31,7 @@ export const ACTIONS = {
   SET_WEBSOCKET_SENDER: 'SET_WEBSOCKET_SENDER',
   SET_PLAYBACK_TIME: 'SET_PLAYBACK_TIME',
   SET_IS_PLAYING: 'SET_IS_PLAYING', // Added for wavesurfer playback state
+  SET_IS_FINALIZING_TRANSCRIPT: 'SET_IS_FINALIZING_TRANSCRIPT',
 };
 
 // Define recorder states
@@ -87,6 +88,7 @@ const initialState = {
   sendWebSocketMessage: null,
   playbackTime: 0, // For tracking playback progress
   isPlaying: false, // Added for wavesurfer playback state
+  isFinalizingTranscript: false,
 };
 
 // Reducer function to handle state updates
@@ -349,6 +351,9 @@ const transcriptionReducer = (state, action) => {
 
     case ACTIONS.SET_IS_PLAYING: // Added for wavesurfer playback state
       return { ...state, isPlaying: action.payload };
+
+    case ACTIONS.SET_IS_FINALIZING_TRANSCRIPT:
+      return { ...state, isFinalizingTranscript: action.payload };
 
     default:
       return state;
