@@ -77,7 +77,7 @@ const useStyles = makeStyles((theme) => ({
 const SessionBrowserPanel = ({ onNavigationAttempt }) => {
   const classes = useStyles();
   const { state, dispatch } = useTranscription();
-  const { previousSessions, loadedSessionId } = state;
+  const { previousSessions, loadedSessionId, sessionListVersion } = state;
   const { token } = useContext(AuthContext);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -120,7 +120,7 @@ const SessionBrowserPanel = ({ onNavigationAttempt }) => {
     };
     
     fetchSessions();
-  }, [dispatch, token]);
+  }, [dispatch, token, sessionListVersion]);
 
   const handleSelectSession = async (sessionId) => {
     if (!token) {

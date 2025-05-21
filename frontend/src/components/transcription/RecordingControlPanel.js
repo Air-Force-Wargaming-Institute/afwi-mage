@@ -823,6 +823,7 @@ const RecordingControlPanel = ({
       setSnackbarMessage('Final transcript updated with enhanced accuracy');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
+      dispatch({ type: ACTIONS.REFRESH_SESSION_LIST });
       
     } catch (error) {
       console.error('[FinalTranscription] Error:', error);
@@ -916,6 +917,7 @@ const RecordingControlPanel = ({
               
               setSnackbarMessage('Final transcript loaded.');
               setSnackbarSeverity('success');
+              dispatch({ type: ACTIONS.REFRESH_SESSION_LIST });
             } catch (fetchTranscriptError) {
               console.error('[API] Error fetching final transcript:', fetchTranscriptError);
               setSnackbarMessage(`Error fetching final transcript: ${fetchTranscriptError.message}`);

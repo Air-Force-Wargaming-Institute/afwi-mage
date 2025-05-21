@@ -32,6 +32,7 @@ export const ACTIONS = {
   SET_PLAYBACK_TIME: 'SET_PLAYBACK_TIME',
   SET_IS_PLAYING: 'SET_IS_PLAYING', // Added for wavesurfer playback state
   SET_IS_FINALIZING_TRANSCRIPT: 'SET_IS_FINALIZING_TRANSCRIPT',
+  REFRESH_SESSION_LIST: 'REFRESH_SESSION_LIST', // New action
 };
 
 // Define recorder states
@@ -89,6 +90,7 @@ const initialState = {
   playbackTime: 0, // For tracking playback progress
   isPlaying: false, // Added for wavesurfer playback state
   isFinalizingTranscript: false,
+  sessionListVersion: 0, // New state for triggering session list refresh
 };
 
 // Reducer function to handle state updates
@@ -354,6 +356,9 @@ const transcriptionReducer = (state, action) => {
 
     case ACTIONS.SET_IS_FINALIZING_TRANSCRIPT:
       return { ...state, isFinalizingTranscript: action.payload };
+
+    case ACTIONS.REFRESH_SESSION_LIST: // New reducer case
+      return { ...state, sessionListVersion: state.sessionListVersion + 1 };
 
     default:
       return state;

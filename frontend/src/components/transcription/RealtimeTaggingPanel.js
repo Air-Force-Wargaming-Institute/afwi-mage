@@ -452,7 +452,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
     if (loadedSessionId && transcriptionText) {
       // Regex to find speaker tags like "[HH:MM:SS] SPEAKER_XX:" or "[HH:MM:SS] Actual Name:"
       // It tries to avoid matching lines that look like "(*** MARKER_TYPE ***)"
-      const speakerTagRegex = /\[\d{2}:\d{2}:\d{2}\]\s*(SPEAKER_\d+|(?!(?:\(\*{3}[^*]+\*{3}\)|\s*\(\*{3}))[^:]+?)\s*:/g;
+      const speakerTagRegex = /\[\d{2}:\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2}:\d{2})?\]\s*(?!(?:\(\*{3}[^*]+\*{3}\)|\s*\(\*{3}))([^:]+?)\s*:/gm;
       const matches = [...transcriptionText.matchAll(speakerTagRegex)];
     
       // The speaker tag is in the first captured group from the regex patterns above.
