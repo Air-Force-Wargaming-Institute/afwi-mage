@@ -17,7 +17,7 @@ pyannote.audio==3.3.2 # was >3.1.1
 # Audio processing helper
 pydub==0.25.1 #was >0.25.1
 numpy==2.2.5 #was >1.24.0
-pandas==2.2.3 #Probably can go lower if needed
+pandas==2.2.3 #Probably can go lower if needed; might be a dependency of pydub
 
 # Database Driver (for session storage)
 asyncpg==0.30.0 # was >0.29.0

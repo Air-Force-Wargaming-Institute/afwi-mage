@@ -12,7 +12,7 @@ import {
   CircularProgress
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import { Flag as FlagIcon, Person as PersonIcon, Add as AddIcon, Delete as DeleteIcon } from '@material-ui/icons';
+import { Flag as FlagIcon, Person as PersonIcon, Add as AddIcon, Delete as DeleteIcon, EditAttributesOutlined } from '@material-ui/icons';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
 import { getApiUrl, getGatewayUrl } from '../../config';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -107,6 +107,21 @@ const useStyles = makeStyles((theme) => ({
       }
     }
   },
+  speakerRenameSection: {
+    marginTop: theme.spacing(2),
+    paddingTop: theme.spacing(2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+  },
+  speakerRenameItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(2),
+    marginBottom: theme.spacing(1),
+  },
+  originalSpeakerTag: {
+    minWidth: '120px', // Adjust as needed
+    fontWeight: 'bold',
+  },
 }));
 
 const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) => {
@@ -128,6 +143,7 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
     sendWebSocketMessage,
     playbackTime,
     isPlaying: isContextAudioPlaying,
+    transcriptionText,
   } = state;
 
   const [customMarkerLabel, setCustomMarkerLabel] = useState('');
@@ -142,6 +158,10 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
   const [taggingSpeaker, setTaggingSpeaker] = useState(false);
   const [speakerError, setSpeakerError] = useState(null);
   const [pendingSpeakerId, setPendingSpeakerId] = useState(null);
+
+  const [uniqueSpeakerTags, setUniqueSpeakerTags] = useState([]);
+  const [speakerNameMappings, setSpeakerNameMappings] = useState({});
+  const [isApplyingNames, setIsApplyingNames] = useState(false);
 
   const canAddMarkersDuringPlayback = loadedSessionId && isContextAudioPlaying;
 
@@ -428,6 +448,114 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
     }
   };
 
+  useEffect(() => {
+    if (loadedSessionId && transcriptionText) {
+      // Regex to find speaker tags like "[HH:MM:SS] SPEAKER_XX:" or "[HH:MM:SS] Actual Name:"
+      // It tries to avoid matching lines that look like "(*** MARKER_TYPE ***)"
+      const speakerTagRegex = /\[\d{2}:\d{2}:\d{2}\]\s*(SPEAKER_\d+|(?!(?:\(\*{3}[^*]+\*{3}\)|\s*\(\*{3}))[^:]+?)\s*:/g;
+      const matches = [...transcriptionText.matchAll(speakerTagRegex)];
+    
+      // The speaker tag is in the first captured group from the regex patterns above.
+      const currentTags = new Set(matches.map(match => match[1].trim())); 
+      const sortedTags = Array.from(currentTags).sort();
+      setUniqueSpeakerTags(sortedTags);
+
+      // Initialize mappings: if a tag isn't in mappings, add it with an empty new name
+      setSpeakerNameMappings(prevMappings => {
+        const newMappings = { ...prevMappings };
+        sortedTags.forEach(tag => {
+          if (!(tag in newMappings)) {
+            newMappings[tag] = '';
+          }
+        });
+        // Remove mappings for tags no longer in the transcript
+        Object.keys(newMappings).forEach(tag => {
+            if (!sortedTags.includes(tag)) {
+                delete newMappings[tag];
+            }
+        });
+        return newMappings;
+      });
+    } else {
+      setUniqueSpeakerTags([]);
+      setSpeakerNameMappings({});
+    }
+  }, [transcriptionText, loadedSessionId]);
+
+  const handleMappingNameChange = (originalTag, newName) => {
+    setSpeakerNameMappings(prev => ({ ...prev, [originalTag]: newName }));
+  };
+
+  const handleApplySpeakerNames = () => {
+    if (!loadedSessionId) {
+      setSnackbarMessage('Can only rename speakers in a loaded session.');
+      setSnackbarOpen(true);
+      return;
+    }
+    if (Object.values(speakerNameMappings).every(name => name.trim() === '')) {
+        setSnackbarMessage('Please enter at least one new name for a speaker tag.');
+        setSnackbarOpen(true);
+        return;
+    }
+
+    setIsApplyingNames(true);
+    let updatedText = transcriptionText;
+
+    // --- START DIAGNOSTIC LOG ---
+    console.log("[RENAMER] Before replacements, transcriptionText:", transcriptionText?.substring(0, 300));
+    console.log("[RENAMER] Mappings to apply:", JSON.parse(JSON.stringify(speakerNameMappings)));
+    // --- END DIAGNOSTIC LOG ---
+
+    let textChangedInLoop = false; 
+    // Iterate in a way that doesn't let shorter tags (e.g. SPEAKER_0) replace parts of longer tags (e.g. SPEAKER_01)
+    // Sort tags by length descending to handle this.
+    const sortedOriginalTags = Object.keys(speakerNameMappings).sort((a, b) => b.length - a.length);
+
+    for (const originalTag of sortedOriginalTags) {
+      // console.log(`[RENAMER] Processing tag: '${originalTag}'`);
+      const newName = speakerNameMappings[originalTag]?.trim();
+      // console.log(`[RENAMER] New name (trimmed): '${newName}'`);
+      if (newName) {
+        const escapedOriginalTag = originalTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // console.log(`[RENAMER] Escaped originalTag: '${escapedOriginalTag}'`);
+        
+        const searchRegexString = `\\b${escapedOriginalTag}\\b(\\s*:)`;
+        const searchRegex = new RegExp(searchRegexString, 'g');
+        // console.log(`[RENAMER] Constructed searchRegex: /${searchRegexString}/g`);
+        
+        const textBeforeReplace = updatedText;
+        // console.log(`[RENAMER] Text BEFORE replace for '${originalTag}': "${updatedText?.substring(0, 300)}"`);
+        
+        updatedText = updatedText.replace(searchRegex, `${newName}$1`);
+        // console.log(`[RENAMER] Text AFTER replace for '${originalTag}': "${updatedText?.substring(0, 300)}"`);
+        
+        if (textBeforeReplace !== updatedText) {
+          console.log(`[RENAMER] Modifying text: Successfully replaced instances of "${originalTag}" with "${newName}"`);
+          textChangedInLoop = true;
+        } else {
+          console.log(`[RENAMER] No change for tag '${originalTag}'.`);
+        }
+      }
+    }
+
+    // --- START DIAGNOSTIC LOG ---
+    console.log("[RENAMER] After replacements, updatedText:", updatedText?.substring(0, 300));
+    if (!textChangedInLoop && transcriptionText === updatedText) {
+      console.warn("[RENAMER] Text was NOT modified by ANY replacement logic in the loop.");
+    } else if (textChangedInLoop && transcriptionText !== updatedText) {
+      console.log("[RENAMER] Text was successfully modified by replacement logic.");
+    } else if (textChangedInLoop && transcriptionText === updatedText){
+      console.warn("[RENAMER] Loop indicated changes, but final text is same as initial. This is unexpected. Review logic or mappings.");
+    }
+    // --- END DIAGNOSTIC LOG ---
+
+    dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: updatedText });
+    setIsApplyingNames(false);
+    setSnackbarMessage('Speaker names updated in transcript. Save changes to persist.');
+    setSnackbarOpen(true);
+    // Note: isDirty will be set by the SET_TRANSCRIPTION_TEXT action in the context
+  };
+
   return (
     <Box>
         <Box className={classes.formSection}>
@@ -639,6 +767,43 @@ const RealtimeTaggingPanel = ({ isReadOnly: globalIsReadOnly, isAudioPlaying }) 
             })}
             </Box>
         </Box>
+
+        {/* --- START NEW UI FOR SPEAKER RENAMING --- */}
+        {loadedSessionId && uniqueSpeakerTags.length > 0 && (
+          <Box className={classes.speakerRenameSection}>
+            <Typography variant="h6" className={classes.formTitle}>Rename Speaker Tags</Typography>
+            <Typography variant="body2" color="textSecondary" sx={{mb:1.5}}>
+              Assign actual names to the generic speaker tags found in the transcript.
+              The original transcript will be updated with these names. Click "Save Changes" at the bottom of the page to persist.
+            </Typography>
+            {uniqueSpeakerTags.map(tag => (
+              <Box key={tag} className={classes.speakerRenameItem}>
+                <Typography className={classes.originalSpeakerTag}>{tag}:</Typography>
+                <TextField
+                  label="Enter New Name"
+                  variant="outlined"
+                  size="small"
+                  value={speakerNameMappings[tag] || ''}
+                  onChange={(e) => handleMappingNameChange(tag, e.target.value)}
+                  disabled={isApplyingNames}
+                  sx={{ flexGrow: 1 }}
+                />
+              </Box>
+            ))}
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={handleApplySpeakerNames}
+              disabled={isApplyingNames || Object.values(speakerNameMappings).every(name => name.trim() === '')}
+              startIcon={isApplyingNames ? <CircularProgress size={20} /> : null}
+              sx={{ mt: 1 }}
+            >
+              {isApplyingNames ? 'Applying...' : 'Update Transcript with New Names'}
+            </Button>
+          </Box>
+        )}
+        {/* --- END NEW UI FOR SPEAKER RENAMING --- */}
 
         <Snackbar
             open={snackbarOpen}
