@@ -151,9 +151,9 @@ try {
         Write-Host "Modifying $airgapComposePath for airgapped environment..."
         $composeContent = Get-Content $airgapComposePath -Raw
         
-        # Change include paths
-        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*vLLM/docker-compose.vllm.yml', "include:`r`n  - ./compose_parts/docker-compose.vllm.yml"
-        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*ollama/docker-compose.ollama.yml', "include:`r`n  - ./compose_parts/docker-compose.ollama.yml"
+        # Change include paths - More flexible regex to match any path to the compose files
+        $composeContent = $composeContent -replace 'include:\s*\n\s*-\s*[^#\n]*docker-compose\.vllm\.yml', "include:`r`n  - ./compose_parts/docker-compose.vllm.yml"
+        $composeContent = $composeContent -replace '\n\s*-\s*[^#\n]*docker-compose\.ollama\.yml', "`r`n  - ./compose_parts/docker-compose.ollama.yml"
         
         # Modify build directives to image directives for services listed in $StandardBackendServicesToPackage
         foreach ($service in $StandardBackendServicesToPackage) {

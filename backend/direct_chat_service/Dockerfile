@@ -35,6 +35,9 @@ COPY . /app/
 # Ensure proper permissions
 RUN chmod -R 755 /app
 
+# Set environment variables
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
+
 # Expose port for the service
 EXPOSE 8011
 

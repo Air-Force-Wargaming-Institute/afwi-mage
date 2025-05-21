@@ -49,7 +49,7 @@ RUN touch /.dockerenv
 RUN chmod -R 777 /app/data
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
 ENV HOST=0.0.0.0
 ENV PORT=8020
 ENV DEBUG=1

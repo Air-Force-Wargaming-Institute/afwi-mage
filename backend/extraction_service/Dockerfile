@@ -30,6 +30,7 @@ ENV PATH="/venv/bin:$PATH"
 # Copy NLTK data
 COPY --from=builder /build/nltk_data /app/nltk_data
 
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
 # Copy application code
 COPY . /app/
 

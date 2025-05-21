@@ -29,6 +29,9 @@ RUN mkdir -p /app/data
 # Copy application code
 COPY . /app/
 
+# Set environment variables
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
+
 # Ensure proper permissions
 RUN chmod -R 755 /app
 

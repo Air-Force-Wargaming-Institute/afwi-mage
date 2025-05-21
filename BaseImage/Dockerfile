@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     libreoffice \
     libreoffice-writer \
+    libreoffice-java-common \
     python3-uno \
     tesseract-ocr \
     libtesseract-dev \
@@ -24,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     pandoc \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Update pip

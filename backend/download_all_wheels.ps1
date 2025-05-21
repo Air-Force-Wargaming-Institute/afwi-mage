@@ -17,7 +17,8 @@ $ServiceDirs = @(
     "upload_service",
     "vLLM",               # Skipped (no requirements.txt)
     "wargame_service",    # Skipped (empty requirements.txt)
-    "workbench_service"
+    "workbench_service",
+    "report_builder_service"
 )
 
 # Create the central wheels directory if it doesn't exist

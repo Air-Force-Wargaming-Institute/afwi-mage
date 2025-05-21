@@ -40,6 +40,7 @@ ENV PATH="/venv/bin:$PATH"
 # Copy application code
 COPY . .
 
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
 # Verify pandoc again in the final environment if critical
 # RUN pandoc --version
 

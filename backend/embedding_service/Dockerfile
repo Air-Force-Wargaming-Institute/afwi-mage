@@ -30,7 +30,7 @@ RUN mkdir -p /app/data
 COPY . /app/
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
 
 # Expose port
 EXPOSE 8000

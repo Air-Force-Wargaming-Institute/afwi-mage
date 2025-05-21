@@ -24,6 +24,7 @@ langchain-core>=0.3
 langchain-community>=0.3
 langchain-text-splitters>=0.3
 langchain-openai>=0.1.4
+langchain-ollama==0.3.3 # Added for airgapped deployment
 
 # Embedding models - CPU versions
 # openai>=1.3.0

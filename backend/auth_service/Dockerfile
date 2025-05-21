@@ -23,6 +23,9 @@ WORKDIR /app
 COPY --from=builder /venv /venv
 ENV PATH="/venv/bin:$PATH"
 
+# Set environment variables
+ENV PYTHONPATH=/app:/usr/lib/python3/dist-packages
+
 # Create necessary directories
 RUN mkdir -p /app/data
 
