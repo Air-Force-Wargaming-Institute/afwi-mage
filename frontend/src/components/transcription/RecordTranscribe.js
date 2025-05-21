@@ -475,7 +475,8 @@ const RecordTranscribe = () => {
         setCurrentPlaybackTimeForSlider(0);
         dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
         setIsWaveformReady(true);
-        setIsAudioPlaying(false); // Ensure playing is false on ready
+        setIsAudioPlaying(false); 
+        setApiError(null); // Explicitly clear API error on successful load
       });
       wavesurfer.on('audioprocess', (time) => {
         if (!isSeekingRef.current) {
@@ -494,9 +495,22 @@ const RecordTranscribe = () => {
         dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: newTime });
       });
       wavesurfer.on('error', (err) => {
-        console.error('WaveSurfer error (in RecordTranscribe):', err);
-        setApiError(`WaveSurfer error: ${err.toString()}`);
-        setIsWaveformReady(false);
+        const errorMessage = err.toString();
+        console.error('WaveSurfer error (in RecordTranscribe):', errorMessage);
+        setApiError(`WaveSurfer error: ${errorMessage}`);
+        setIsWaveformReady(false); // Ensure UI reflects that waveform is not ready
+        // Most other state resets are handled by the main loading useEffect or fetchAndLoadAudio catch
+
+        if (errorMessage.includes('AbortError') || errorMessage.includes('The fetching process for the media resource was aborted')) {
+          setTimeout(() => {
+            setApiError((currentError) => {
+              if (currentError && (currentError.includes('AbortError') || currentError.includes('The fetching process for the media resource was aborted'))) {
+                return null; 
+              }
+              return currentError; 
+            });
+          }, 3000); 
+        }
       });
     }
     // Cleanup on component unmount
@@ -513,47 +527,68 @@ const RecordTranscribe = () => {
     };
   }, [theme, dispatch]); // Removed currentObjectUrl from deps, managed internally
 
-  // Effect to load audio when audioUrl changes (Moved and adapted)
+  // Effect to load audio when audioUrl changes
   useEffect(() => {
+    // --- Full Reset Logic (runs every time audioUrl changes) --- 
     if (wavesurferRef.current) {
-      if (currentObjectUrl) { // Revoke previous if any
-        URL.revokeObjectURL(currentObjectUrl);
-        setCurrentObjectUrl(null);
-      }
-      if (loadedSessionId && audioUrl) {
-        setIsWaveformReady(false); // Reset ready state
-        setAudioDuration(0);
-        setCurrentPlaybackTimeForSlider(0);
-        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
-        setIsAudioPlaying(false);
+      wavesurferRef.current.stop();
+      wavesurferRef.current.empty();
+    }
+    setIsWaveformReady(false);
+    setAudioDuration(0);
+    setCurrentPlaybackTimeForSlider(0);
+    setIsAudioPlaying(false);
+    dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+    dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: false });
+    setApiError(null); // Clear any previous error when audioUrl changes
 
+    if (currentObjectUrl) { 
+      URL.revokeObjectURL(currentObjectUrl);
+      setCurrentObjectUrl(null);
+    }
+    // --- End Full Reset Logic ---
+
+    if (wavesurferRef.current && loadedSessionId && audioUrl) {
         const fetchAndLoadAudio = async () => {
           try {
             if (!token) throw new Error("Auth token missing");
             const response = await fetch(audioUrl, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to fetch audio: ${response.status} ${errorText}`);
+            }
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
             setCurrentObjectUrl(objectUrl); 
             wavesurferRef.current.load(objectUrl);
+            // 'ready' event will set isWaveformReady and clear apiError
           } catch (error) {
-            console.error("Error fetching or loading audio:", error);
-            setApiError(error.message);
-            setIsWaveformReady(false);
+            console.error("Error in fetchAndLoadAudio:", error);
+            setApiError(error.message); 
+            setIsWaveformReady(false); 
+            // If fetching or initial load call fails, ensure WaveSurfer is visually cleared and states reset
+            if (wavesurferRef.current) {
+                wavesurferRef.current.stop();
+                wavesurferRef.current.empty();
+            }
+            setAudioDuration(0);
+            setCurrentPlaybackTimeForSlider(0);
+            setIsAudioPlaying(false);
+            dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
+            dispatch({ type: ACTIONS.SET_IS_PLAYING, payload: false });
           }
         };
         fetchAndLoadAudio();
-      } else if (!loadedSessionId) { // If new session or reset
-        wavesurferRef.current.empty();
-        setIsWaveformReady(false);
-        setAudioDuration(0);
-        setCurrentPlaybackTimeForSlider(0);
-        dispatch({ type: ACTIONS.SET_PLAYBACK_TIME, payload: 0 });
-        setIsAudioPlaying(false);
-      }
+    } else if (!loadedSessionId && wavesurferRef.current) {
+        // This handles clearing the waveform if the session is deselected (loadedSessionId is null)
+        // The full reset at the top already covers this, but an explicit log can be useful.
+        console.log("[RecordTranscribe] No session loaded or audioUrl missing, WaveSurfer reset.");
     }
-  }, [loadedSessionId, audioUrl, token, dispatch]);
-  // --- END: WaveSurfer Logic Moved ---
+    // Important: currentObjectUrl should NOT be in the dependency array 
+    // as it's managed entirely within this effect to prevent re-runs when it's set.
+  }, [loadedSessionId, audioUrl, token, dispatch]); 
+
+  // --- END: WaveSurfer Logic ---
 
   // --- START: Playback Handlers (Moved here) ---
   const handlePlayPause = useCallback(() => {
