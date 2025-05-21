@@ -346,7 +346,7 @@ services:
       - COMPUTE_TYPE=float16
       - BATCH_SIZE=16
       - HF_TOKEN=${HF_TOKEN:-}
-      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_VISIBLE_DEVICES=0
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=info
     deploy:

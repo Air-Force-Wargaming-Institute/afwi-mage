@@ -176,10 +176,10 @@ async def process_live_transcription_update_sliding_window(
             try:
                 num_participants = len(session_db_obj.participants) if session_db_obj.participants else 0
                 min_speakers_param = 1 # At least one speaker expected
-                max_speakers_param = num_participants if num_participants > 0 else None # None lets pyannote decide if no participants info
+                max_speakers_param = num_participants if num_participants > 0 else None
                 
                 logger.info(f"[{session_id}] Running diarization. Min Speakers: {min_speakers_param}, Max Speakers: {max_speakers_param}")
-                diarization_pyannote_annotation = diarize_model(audio_for_align_diarize, min_speakers=min_speakers_param, max_speakers=max_speakers_param)
+                diarization_pyannote_annotation = diarize_model(audio_for_align_diarize, min_speakers=min_speakers_param, max_speakers=max_speakers_param) # Set to None to let pyannote grow speakers as needed
                 
                 # CORRECTED LOGIC FOR HANDLING PYANNOTE OUTPUT AND INITIALIZING DATAFRAME
                 if diarization_pyannote_annotation is not None and not isinstance(diarization_pyannote_annotation, pd.DataFrame):

@@ -15,6 +15,7 @@ import subprocess # For running ffmpeg
 import shutil # For cleaning up chunk directory
 import asyncio # Added for asyncio.sleep
 import math # Add math for floor operation
+import pandas as pd
 
 # Import config constants directly using relative path
 from config import DEVICE, BATCH_SIZE, ARTIFACT_STORAGE_BASE_PATH # Import new config
@@ -101,6 +102,131 @@ def generate_transcript_with_markers(segments: List[dict], markers: List[dict]) 
 
     return '\n'.join(transcript_lines)
 # --- END NEW HELPER FUNCTION ---
+
+# --- START NEW FULL AUDIO PROCESSING FUNCTION ---
+async def process_entire_audio_for_final_transcript(
+    audio_path: str,
+    language_code: Optional[str] = "en",
+    num_participants: Optional[int] = None
+) -> List[dict]:
+    logger.info(f"Starting full audio processing for final transcript: {audio_path}")
+    if not os.path.exists(audio_path):
+        logger.error(f"Audio file not found for final processing: {audio_path}")
+        return []
+
+    try:
+        # Ensure latest models are fetched, especially if language might change
+        whisper_model, diarize_model, align_model_tuple = get_models(language_code=language_code)
+
+        if not whisper_model:
+            logger.error("Whisper model not loaded. Cannot perform final transcription.")
+            return []
+
+        audio = whisperx.load_audio(audio_path)
+
+        logger.info(f"Final Transcribe: Transcribing entire audio...")
+        transcription_result = whisper_model.transcribe(audio, batch_size=BATCH_SIZE)
+        detected_language = transcription_result.get("language", language_code or "en")
+        logger.info(f"Final Transcribe: Detected language: {detected_language}")
+
+        current_segments = transcription_result.get("segments", [])
+        if not current_segments:
+            logger.warning(f"Final Transcribe: No segments produced by Whisper for {audio_path}.")
+            return []
+
+        # Reload align model if language changed or initial one was for a different language
+        if detected_language != language_code or align_model_tuple is None:
+            logger.info(f"Final Transcribe: Updating alignment model for language: {detected_language}")
+            _ , _, align_model_tuple = get_models(language_code=detected_language)
+
+        aligned_segments_data = {"segments": current_segments, "word_segments": []}
+        if align_model_tuple:
+            model_a, metadata = align_model_tuple
+            logger.info(f"Final Transcribe: Aligning transcription...")
+            aligned_segments_data = whisperx.align(
+                current_segments, model_a, metadata, audio, DEVICE, return_char_alignments=False
+            )
+        else:
+            logger.warning(f"Final Transcribe: Alignment model for '{detected_language}' not available. Using unaligned segments for structure.")
+            # Ensure word_segments structure for assign_word_speakers if using raw segments
+            word_segments_from_raw = []
+            for seg_raw in current_segments:
+                if 'words' in seg_raw and isinstance(seg_raw['words'], list):
+                    word_segments_from_raw.extend(seg_raw['words'])
+            aligned_segments_data['word_segments'] = word_segments_from_raw
+        
+        final_segments_with_speaker = aligned_segments_data.get("segments", [])
+
+        if diarize_model:
+            logger.info(f"Final Transcribe: Performing diarization on entire audio...")
+            min_speakers_param = 1
+            max_speakers_param = num_participants if num_participants and num_participants > 0 else None
+            
+            try:
+                # PyAnnote's DiarizationPipeline can take the audio file path directly
+                diarization_annotation = diarize_model(audio_path, min_speakers=min_speakers_param, max_speakers=max_speakers_param)
+
+                if diarization_annotation is not None and not isinstance(diarization_annotation, pd.DataFrame):
+                    if not diarization_annotation.labels():
+                        diarize_segments_df = pd.DataFrame(columns=['speaker', 'start', 'end'])
+                    else:
+                        turns = []
+                        for turn, _, speaker_label in diarization_annotation.itertracks(yield_label=True):
+                            turns.append({'start': turn.start, 'end': turn.end, 'speaker': speaker_label})
+                        diarize_segments_df = pd.DataFrame(turns) if turns else pd.DataFrame(columns=['speaker', 'start', 'end'])
+                elif isinstance(diarization_annotation, pd.DataFrame):
+                    diarize_segments_df = diarization_annotation
+                else:
+                    diarize_segments_df = pd.DataFrame(columns=['speaker', 'start', 'end'])
+
+                if not diarize_segments_df.empty:
+                    logger.info(f"Final Transcribe: Assigning word speakers...")
+                    # Ensure aligned_segments_data has 'word_segments' if not produced by whisperx.align
+                    if 'word_segments' not in aligned_segments_data or not aligned_segments_data['word_segments']:
+                        if aligned_segments_data.get('segments'): # if segments exist, try to create word_segments from them
+                            word_segments_from_segments_reprocess = []
+                            for seg_reprocess in aligned_segments_data['segments']:
+                                if 'words' in seg_reprocess and isinstance(seg_reprocess['words'], list):
+                                    word_segments_from_segments_reprocess.extend(seg_reprocess['words'])
+                            aligned_segments_data['word_segments'] = word_segments_from_segments_reprocess
+                        else: # No segments means no words
+                            aligned_segments_data['word_segments'] = []
+                    result_with_speakers = whisperx.assign_word_speakers(diarize_segments_df, aligned_segments_data)
+                    final_segments_with_speaker = result_with_speakers.get("segments", [])
+                else:
+                    logger.warning("Final Transcribe: Diarization produced no speaker segments. Speaker labels will be UNKNOWN.")
+                    for seg in final_segments_with_speaker: seg.setdefault('speaker', 'UNKNOWN')
+            except Exception as e_diarize:
+                logger.error(f"Final Transcribe: Error during diarization or speaker assignment: {e_diarize}", exc_info=True)
+                for seg in final_segments_with_speaker: seg.setdefault('speaker', 'UNKNOWN')
+        else:
+            logger.warning("Final Transcribe: Diarization model not available. Speaker labels will be UNKNOWN.")
+            for seg in final_segments_with_speaker: seg.setdefault('speaker', 'UNKNOWN')
+        
+        output_segments = []
+        for seg_data in final_segments_with_speaker:
+            segment_words = seg_data.get('words', [])
+            word_confidences = []
+            if isinstance(segment_words, list):
+                for w_seg in segment_words:
+                    if isinstance(w_seg, dict) and 'score' in w_seg and w_seg['score'] is not None:
+                        word_confidences.append(w_seg['score'])
+            segment_confidence = sum(word_confidences) / len(word_confidences) if word_confidences else None
+            output_segments.append({
+                "speaker": seg_data.get("speaker", "UNKNOWN"),
+                "text": seg_data.get("text", "").strip(),
+                "start": seg_data.get("start"),
+                "end": seg_data.get("end"),
+                "confidence": segment_confidence
+            })
+
+        logger.info(f"Final Transcribe: Processing complete. Generated {len(output_segments)} segments.")
+        return output_segments
+
+    except Exception as e:
+        logger.error(f"Error during final audio processing for {audio_path}: {e}", exc_info=True)
+        return []
+# --- END NEW FULL AUDIO PROCESSING FUNCTION ---
 
 # --- START EDIT ---
 # Dependency to get authenticated user ID from header
@@ -259,10 +385,32 @@ async def stop_session(
     # This route now finalizes any remaining metadata or text formatting if necessary.
 
     final_audio_path_str = session.audio_storage_path
-    refined_segments = session.transcription_segments or []
+    reprocessed_segments = [] # Initialize reprocessed_segments
+
+    if final_audio_path_str and os.path.exists(final_audio_path_str):
+        logger.info(f"[{session_id}] Starting full reprocessing of audio file: {final_audio_path_str}")
+        num_participants = len(session.participants) if session.participants else 0
+        language_for_reprocessing = session.detected_language or "en"
+        
+        reprocessed_segments = await process_entire_audio_for_final_transcript(
+            final_audio_path_str,
+            language_code=language_for_reprocessing,
+            num_participants=num_participants
+        )
+        if reprocessed_segments:
+            logger.info(f"[{session_id}] Full reprocessing generated {len(reprocessed_segments)} segments.")
+            # Overwrite segments from live processing with these more accurate ones
+            refined_segments = reprocessed_segments # Use this for generating full text
+        else:
+            logger.warning(f"[{session_id}] Full reprocessing did not generate new segments. Using existing segments if any.")
+            refined_segments = session.transcription_segments or [] 
+    else:
+        logger.warning(f"[{session_id}] No final audio path or file does not exist. Skipping full reprocessing. Path: {final_audio_path_str}")
+        refined_segments = session.transcription_segments or []
+    
     markers_from_db = session.markers or []
     
-    logger.info(f"[{session_id}] Using {len(refined_segments)} segments (from WebSocket processing) and {len(markers_from_db)} markers for final transcript generation.")
+    logger.info(f"[{session_id}] Using {len(refined_segments)} segments (after potential reprocessing) and {len(markers_from_db)} markers for final transcript generation.")
     
     # Generate an intermediate full_transcript_text from live segments (can include timestamps)
     # This version is saved to the DB and might be overwritten by the frontend's retranscribe.
