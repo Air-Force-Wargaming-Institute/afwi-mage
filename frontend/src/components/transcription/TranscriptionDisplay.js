@@ -135,6 +135,11 @@ const TranscriptionDisplay = () => {
     loadedSessionId,
     recordingState,
     audioFilename,
+    eventMetadata,
+    selectedClassification,
+    caveatType,
+    customCaveat,
+    participants,
   } = state;
   
   const transcriptionPanelRef = useRef(null);
@@ -226,13 +231,53 @@ const TranscriptionDisplay = () => {
   };
 
   const handleDownloadTranscript = () => {
-    if (!transcriptionText) {
-      console.warn("No transcription text to download.");
+    if (!transcriptionText && !loadedSessionId) {
+      console.warn("No transcription text or loaded session to download.");
       return;
     }
 
+    let metadataHeader = "";
+    if (loadedSessionId) {
+      const sessionName = audioFilename || state.initialLoadedData?.audioFilename || "N/A";
+      
+      const rawFullClassification = eventMetadata?.classification;
+      let formattedClassificationForHeader = 'N/A';
+
+      if (rawFullClassification && rawFullClassification !== 'SELECT A SECURITY CLASSIFICATION') {
+        const parts = rawFullClassification.split('//');
+        const baseClassification = parts[0].toUpperCase();
+        if (parts.length > 1 && parts[1].trim() !== '') {
+          const caveats = parts.slice(1).join('//').toUpperCase(); // Join back if there were multiple '//' in caveat part, then uppercase
+          formattedClassificationForHeader = `${baseClassification}//${caveats}`;
+        } else {
+          formattedClassificationForHeader = baseClassification;
+        }
+      }
+
+      metadataHeader += `Session Name: ${sessionName}\n`;
+      metadataHeader += `Classification: ${formattedClassificationForHeader}\n`;
+      metadataHeader += "Event Information:\n";
+      metadataHeader += `  Wargame Name: ${eventMetadata?.wargame_name || 'N/A'}\n`;
+      metadataHeader += `  Scenario: ${eventMetadata?.scenario || 'N/A'}\n`;
+      metadataHeader += `  Phase: ${eventMetadata?.phase || 'N/A'}\n`;
+      metadataHeader += `  Location: ${eventMetadata?.location || 'N/A'}\n`;
+      metadataHeader += `  Organization: ${eventMetadata?.organization || 'N/A'}\n`;
+      
+      if (participants && participants.length > 0) {
+        metadataHeader += "Participants:\n";
+        participants.forEach(p => {
+          metadataHeader += `  - ${p.name || 'Unknown'} (${p.role || 'N/A'})\n`;
+        });
+      } else {
+        metadataHeader += "Participants: N/A\n";
+      }
+      metadataHeader += "--------------------------------------------------------------------------------\n\n"; // Separator
+    }
+
+    const combinedText = metadataHeader + (transcriptionText || "No transcription content available.");
+
     const filenameToUse = audioFilename ? `${audioFilename.split('.')[0]}.txt` : "transcript.txt";
-    const blob = new Blob([transcriptionText], { type: 'text/plain;charset=utf-8;' });
+    const blob = new Blob([combinedText], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement("a");
 
     if (link.download !== undefined) {

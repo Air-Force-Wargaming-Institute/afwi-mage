@@ -239,6 +239,7 @@ const transcriptionReducer = (state, action) => {
             phase: loadedData.event_metadata.phase || '',
             location: loadedData.event_metadata.location || '',
             organization: loadedData.event_metadata.organization || '',
+            classification: initialClassification || 'SELECT A SECURITY CLASSIFICATION'
         } : initialState.eventMetadata,
         classification: initialClassification.split('//')[0],
         caveatType: initialCaveatType,
@@ -259,6 +260,7 @@ const transcriptionReducer = (state, action) => {
                 phase: loadedData.event_metadata.phase || '',
                 location: loadedData.event_metadata.location || '',
                 organization: loadedData.event_metadata.organization || '',
+                classification: initialClassification || 'SELECT A SECURITY CLASSIFICATION'
             } : initialState.eventMetadata,
             classification: initialClassification.split('//')[0],
             caveatType: initialCaveatType,
