@@ -5,10 +5,14 @@ import {
   CircularProgress,
   Button,
   TextField,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@material-ui/core';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
-import { Refresh as RefreshIcon, GetApp as DownloadIcon } from '@material-ui/icons';
+import { Refresh as RefreshIcon, GetApp as DownloadIcon, Edit as EditIcon } from '@material-ui/icons';
 import { useTranscription, RECORDING_STATES, ACTIONS } from '../../contexts/TranscriptionContext';
 import { AnimatedGradientPaper } from '../../styles/StyledComponents';
 import { getApiUrl, getGatewayUrl } from '../../config';
@@ -93,6 +97,32 @@ const useStyles = makeStyles((theme) => ({
     alignItems: 'center',
     marginBottom: theme.spacing(1),
   },
+  editModal: {
+    '& .MuiDialog-paper': {
+      width: '80%',
+      maxWidth: '1200px',
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+    },
+  },
+  editModalContent: {
+    flexGrow: 1,
+    padding: theme.spacing(2),
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  editModalTextField: {
+    flexGrow: 1,
+    '& .MuiOutlinedInput-root': {
+      height: '100%',
+      alignItems: 'flex-start',
+    },
+    '& .MuiOutlinedInput-input': {
+      height: '100% !important',
+      overflowY: 'auto',
+    },
+  },
 }));
 
 const TranscriptionDisplay = () => {
@@ -110,6 +140,8 @@ const TranscriptionDisplay = () => {
   const transcriptionPanelRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [modalText, setModalText] = useState('');
   
   const isEditable = loadedSessionId && 
                      recordingState !== RECORDING_STATES.RECORDING && 
@@ -257,9 +289,21 @@ const TranscriptionDisplay = () => {
           <>
             <Box className={classes.headerBox}>
               <Typography variant="h6">Editable Transcript</Typography>
-              <IconButton onClick={handleDownloadTranscript} size="small" title="Download Transcript">
-                <DownloadIcon />
-              </IconButton>
+              <Box>
+                <IconButton 
+                  onClick={() => {
+                    setModalText(transcriptionText || '');
+                    setEditModalOpen(true);
+                  }} 
+                  size="small" 
+                  title="Edit in Full View"
+                >
+                  <EditIcon />
+                </IconButton>
+                <IconButton onClick={handleDownloadTranscript} size="small" title="Download Transcript">
+                  <DownloadIcon />
+                </IconButton>
+              </Box>
             </Box>
             <TextField
               multiline
@@ -302,6 +346,44 @@ const TranscriptionDisplay = () => {
           </Box>
         )
       )}
+
+      {/* Edit Transcription Modal */}
+      <Dialog
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        aria-labelledby="edit-transcription-dialog-title"
+        className={classes.editModal}
+        fullWidth
+        maxWidth={false}
+      >
+        <DialogTitle id="edit-transcription-dialog-title">Edit Transcription</DialogTitle>
+        <DialogContent className={classes.editModalContent}>
+          <TextField
+            multiline
+            fullWidth
+            variant="outlined"
+            value={modalText}
+            onChange={(e) => setModalText(e.target.value)}
+            className={classes.editModalTextField}
+            placeholder="Edit transcription..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditModalOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: modalText });
+              setEditModalOpen(false);
+            }} 
+            color="primary" 
+            variant="contained"
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AnimatedGradientPaper>
   );
 };
