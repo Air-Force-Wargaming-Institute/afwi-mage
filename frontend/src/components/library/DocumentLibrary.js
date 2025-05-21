@@ -1142,7 +1142,7 @@ function DocumentLibrary() {
                   onClick={() => {
                     // Open the standalone window directly
                     const url = '/record-transcribe-standalone'; // Use the new dedicated route
-                    const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+                    const windowFeatures = 'menubar=no,toolbar=no,location=no,status=no'; // Removed width and height
                     const recordTranscribeWindow = window.open(url, 'RecordTranscribeWindow', windowFeatures);
                     
                     if (recordTranscribeWindow) {
