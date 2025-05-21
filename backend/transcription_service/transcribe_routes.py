@@ -56,51 +56,104 @@ def format_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 # --- NEW HELPER FUNCTION ---
-def generate_transcript_with_markers(segments: List[dict], markers: List[dict]) -> str:
+def generate_transcript_with_speaker_paragraphs(segments: List[dict], markers: List[dict]) -> str:
     """
     Generates a single transcript string by interleaving transcription segments
-    and timeline markers chronologically.
+    (grouped into paragraphs by speaker) and timeline markers chronologically.
+    Paragraphs are formatted as SPEAKER_LABEL [START_TIME - END_TIME]: Text.
     """
     processed_items = []
+    if segments:
+        for seg in segments:
+            # Ensure segments have 'start' and 'text' for processing
+            if seg.get("start") is not None and seg.get("text") is not None:
+                processed_items.append({
+                    "time": seg.get("start"),
+                    "type": "segment",
+                    "text": seg.get("text", "").strip(),
+                    "speaker": seg.get("speaker", "UNKNOWN"),
+                    "end": seg.get("end") # Crucial for paragraph end time
+                })
+            else:
+                logger.warning(f"Skipping segment due to missing 'start' or 'text': {seg}")
 
-    for seg in segments:
-        processed_items.append({
-            "time": seg.get("start"),
-            "type": "segment",
-            "text": seg.get("text", "").strip(),
-            "speaker": seg.get("speaker", "UNKNOWN")
-        })
 
-    for marker in markers:
-        processed_items.append({
-            "time": marker.get("timestamp"),
-            "type": "marker",
-            "marker_type": marker.get("marker_type", "generic_marker"),
-            "speaker_name": marker.get("speaker_name"),
-            "speaker_role": marker.get("speaker_role")
-        })
+    if markers:
+        for marker in markers:
+            if marker.get("timestamp") is not None:
+                processed_items.append({
+                    "time": marker.get("timestamp"),
+                    "type": "marker",
+                    "marker_type": marker.get("marker_type", "generic_marker"),
+                    "description": marker.get("description"), # For custom markers
+                    "speaker_name": marker.get("speaker_name"), # For speaker_tag_event
+                    "speaker_role": marker.get("speaker_role")  # For speaker_tag_event
+                })
+            else:
+                logger.warning(f"Skipping marker due to missing 'timestamp': {marker}")
 
-    # Filter out items with no time for sorting
-    processed_items = [item for item in processed_items if item["time"] is not None]
-    # Sort by time
+    # Filter out items with no time for sorting (should be rare after checks)
+    processed_items = [item for item in processed_items if item.get("time") is not None]
     processed_items.sort(key=lambda x: x["time"])
 
-    transcript_lines = []
+    output_lines = []
+    current_speaker_segments = []
+    current_speaker_label = None
+    paragraph_start_time = None
+    paragraph_end_time = None
+
+    def finalize_paragraph():
+        nonlocal output_lines, current_speaker_segments, current_speaker_label, paragraph_start_time, paragraph_end_time
+        if current_speaker_segments:
+            full_paragraph_text = " ".join(current_speaker_segments)
+            formatted_start = format_time(paragraph_start_time)
+            formatted_end = format_time(paragraph_end_time if paragraph_end_time is not None else paragraph_start_time) # Handle if end time is None
+            output_lines.append(f"[{formatted_start} - {formatted_end}] {current_speaker_label}: {full_paragraph_text}")
+        current_speaker_segments = []
+        current_speaker_label = None
+        paragraph_start_time = None
+        paragraph_end_time = None
+
     for item in processed_items:
-        formatted_timestamp = format_time(item["time"])
         if item["type"] == "segment":
-            if item["text"]: # Only add segment if there's text
-                transcript_lines.append(f"[{formatted_timestamp}] {item['speaker']}: {item['text']}")
+            segment_text = item["text"]
+            if not segment_text: # Skip empty text segments
+                if item.get("end") is not None and paragraph_start_time is not None and item["speaker"] == current_speaker_label:
+                    # If an empty segment from the current speaker still has a valid end time, update paragraph_end_time
+                    paragraph_end_time = max(paragraph_end_time or item["end"], item["end"])
+                continue
+
+            if item["speaker"] == current_speaker_label:
+                current_speaker_segments.append(segment_text)
+                if item.get("end") is not None:
+                    paragraph_end_time = max(paragraph_end_time or item["end"], item["end"])
+            else:
+                finalize_paragraph()
+                current_speaker_label = item["speaker"]
+                current_speaker_segments.append(segment_text)
+                paragraph_start_time = item["time"]
+                paragraph_end_time = item.get("end", item["time"])
+        
         elif item["type"] == "marker":
+            finalize_paragraph() # Finalize any pending speaker paragraph before a marker
+            formatted_timestamp = format_time(item["time"])
             marker_display_type = item['marker_type'].upper()
+            
             if item['marker_type'] == "speaker_tag_event":
                 speaker_name_display = item.get('speaker_name', 'Unknown Speaker')
                 speaker_role_display = f" ({item.get('speaker_role', 'N/A')})" if item.get('speaker_role') else ""
-                transcript_lines.append(f"[{formatted_timestamp}]        (*** SPEAKER: {speaker_name_display}{speaker_role_display} ***)")
-            else:
-                transcript_lines.append(f"[{formatted_timestamp}]        (***{marker_display_type}***)")
+                output_lines.append(f"[{formatted_timestamp}]        (*** SPEAKER: {speaker_name_display}{speaker_role_display} ***)")
+            else: # Generic markers or custom ones
+                description = item.get('description')
+                if description and description.startswith(f"{marker_display_type} at"): # Avoid redundant "at TIME" if description already has it.
+                    output_lines.append(f"[{formatted_timestamp}]        (*** {description} ***)")
+                else:
+                    output_lines.append(f"[{formatted_timestamp}]        (*** {marker_display_type}{f': {description}' if description else ''} ***)")
 
-    return '\n'.join(transcript_lines)
+
+    finalize_paragraph() # Finalize any remaining paragraph after the loop
+
+    return '\n\n'.join(output_lines)
 # --- END NEW HELPER FUNCTION ---
 
 # --- START NEW FULL AUDIO PROCESSING FUNCTION ---
@@ -415,7 +468,7 @@ async def stop_session(
     # Generate an intermediate full_transcript_text from live segments (can include timestamps)
     # This version is saved to the DB and might be overwritten by the frontend's retranscribe.
     if refined_segments or markers_from_db:
-        intermediate_full_transcript_text = generate_transcript_with_markers(refined_segments, markers_from_db)
+        intermediate_full_transcript_text = generate_transcript_with_speaker_paragraphs(refined_segments, markers_from_db)
         logger.info(f"Generated final transcript text with markers for DB for session {session_id}.")
     else:
         intermediate_full_transcript_text = ""
@@ -682,7 +735,7 @@ async def update_session_details(
         current_segments = session_after_update.transcription_segments or []
         current_markers = session_after_update.markers or []
         
-        text_to_write_to_file = generate_transcript_with_markers(current_segments, current_markers)
+        text_to_write_to_file = generate_transcript_with_speaker_paragraphs(current_segments, current_markers)
         
         session_after_update.full_transcript_text = text_to_write_to_file
         session_after_update.last_update = datetime.utcnow()
