@@ -18,7 +18,8 @@ import {
   PlayArrow as PlayIcon,
   PlayCircleFilled as PlayCircleFilledIcon,
   PauseCircleFilled as PauseCircleFilledIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  GetApp as DownloadIcon
 } from '@material-ui/icons';
 import { useTranscription, ACTIONS, RECORDING_STATES } from '../../contexts/TranscriptionContext';
 import { getApiUrl, getGatewayUrl } from '../../config';
@@ -1008,6 +1009,64 @@ const RecordingControlPanel = ({
     if (missing.length > 0) startButtonTooltip = `Please provide: ${missing.join(', ')}`;
   }
 
+  const handleDownloadAudio = async () => {
+    if (!loadedSessionId || !audioUrl || !token) {
+      setSnackbarMessage('Audio not available for download or not authenticated.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setSnackbarMessage('Preparing audio for download...');
+    setSnackbarSeverity('info');
+    setSnackbarOpen(true);
+
+    try {
+      const response = await fetch(audioUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch audio: ${response.status} ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      let filename = 'downloaded_audio';
+      if (audioFilename) {
+        filename = audioFilename.includes('.') ? audioFilename : `${audioFilename}.webm`;
+      } else if (audioUrl) {
+        try {
+            const urlPath = new URL(audioUrl).pathname;
+            const lastSegment = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+            if (lastSegment) filename = lastSegment;
+        } catch (e) { /* ignore_error */ }
+      }
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+
+      setSnackbarMessage('Audio download started.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+
+    } catch (error) {
+      console.error('Error downloading audio:', error);
+      setSnackbarMessage(`Failed to download audio: ${error.message}`);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+
   useEffect(() => {
     return () => {
       dispatch({ type: ACTIONS.SET_WEBSOCKET_SENDER, payload: null });
@@ -1150,6 +1209,20 @@ const RecordingControlPanel = ({
                   size="large"
                 >
                   Stop
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Download Audio File" arrow>
+              <span>
+                <Button
+                  variant="outlined" 
+                  color="default"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadAudio}
+                  disabled={!parentIsWaveformReady || !audioUrl || !loadedSessionId}
+                  size="large"
+                >
+                  Download Audio
                 </Button>
               </span>
             </Tooltip>

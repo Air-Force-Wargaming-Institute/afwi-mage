@@ -4,10 +4,11 @@ import {
   Typography,
   CircularProgress,
   Button,
-  TextField
+  TextField,
+  IconButton
 } from '@material-ui/core';
-import { makeStyles } from '@material-ui/core/styles';
-import { Refresh as RefreshIcon } from '@material-ui/icons';
+import { makeStyles, useTheme } from '@material-ui/core/styles';
+import { Refresh as RefreshIcon, GetApp as DownloadIcon } from '@material-ui/icons';
 import { useTranscription, RECORDING_STATES, ACTIONS } from '../../contexts/TranscriptionContext';
 import { AnimatedGradientPaper } from '../../styles/StyledComponents';
 import { getApiUrl, getGatewayUrl } from '../../config';
@@ -86,16 +87,24 @@ const useStyles = makeStyles((theme) => ({
         lineHeight: 1.8,
     },
   },
+  headerBox: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing(1),
+  },
 }));
 
 const TranscriptionDisplay = () => {
   const classes = useStyles();
+  const theme = useTheme();
   const { state, dispatch } = useTranscription();
   const { token } = useContext(AuthContext);
   const { 
     transcriptionText,
     loadedSessionId,
     recordingState,
+    audioFilename,
   } = state;
   
   const transcriptionPanelRef = useRef(null);
@@ -184,6 +193,30 @@ const TranscriptionDisplay = () => {
     dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: event.target.value });
   };
 
+  const handleDownloadTranscript = () => {
+    if (!transcriptionText) {
+      console.warn("No transcription text to download.");
+      return;
+    }
+
+    const filenameToUse = audioFilename ? `${audioFilename.split('.')[0]}.txt` : "transcript.txt";
+    const blob = new Blob([transcriptionText], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement("a");
+
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filenameToUse);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      window.open(URL.createObjectURL(blob));
+    }
+  };
+
   return (
     <AnimatedGradientPaper 
         className={classes.transcriptionPanel} 
@@ -221,25 +254,50 @@ const TranscriptionDisplay = () => {
       
       {!isLoading && !error && (
         isEditable ? (
-          <TextField
-            multiline
-            fullWidth
-            variant="outlined"
-            value={transcriptionText || ''} 
-            onChange={handleTranscriptChange}
-            placeholder="Edit transcription..."
-            className={classes.editableTranscript}
-            rows={10} 
-            sx={{ flexGrow: 1, '& .MuiInputBase-root': { height: '100%' } }}
-          />
+          <>
+            <Box className={classes.headerBox}>
+              <Typography variant="h6">Editable Transcript</Typography>
+              <IconButton onClick={handleDownloadTranscript} size="small" title="Download Transcript">
+                <DownloadIcon />
+              </IconButton>
+            </Box>
+            <TextField
+              multiline
+              fullWidth
+              variant="outlined"
+              value={transcriptionText || ''} 
+              onChange={handleTranscriptChange}
+              placeholder="Edit transcription..."
+              className={classes.editableTranscript}
+              rows={10} 
+              sx={{ flexGrow: 1, '& .MuiInputBase-root': { height: '100%' } }}
+            />
+          </>
         ) : transcriptionText ? (
-          <Typography variant="body1" className={classes.transcriptionText}>
-            {transcriptionText}
-          </Typography>
+          <>
+            <Box className={classes.headerBox}>
+              <Typography variant="h6">Transcript</Typography>
+              <IconButton onClick={handleDownloadTranscript} size="small" title="Download Transcript">
+                <DownloadIcon />
+              </IconButton>
+            </Box>
+            <Typography variant="body1" className={classes.transcriptionText}>
+              {transcriptionText}
+            </Typography>
+          </>
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Typography variant="body2" color="textSecondary">
-              {loadedSessionId ? 'No transcript available for this session or an error occurred.' : 'Transcription will appear here...'}
+              {loadedSessionId ? 'No transcript available for this session or an error occurred.' : 
+              <>
+                Transcription will appear here...
+                <Box className={classes.headerBox} style={{ justifyContent: 'flex-end', marginTop: theme.spacing(-4) }}>
+                  <IconButton onClick={handleDownloadTranscript} size="small" title="Download Transcript" disabled>
+                    <DownloadIcon />
+                  </IconButton>
+                </Box>
+              </>
+              }
             </Typography>
           </Box>
         )
