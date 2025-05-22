@@ -708,19 +708,20 @@ const RecordTranscribe = () => {
     }
   };
   
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (forceSave = false, explicitText = null) => {
       if (!loadedSessionId || !token) {
           setSnackbarMessage("Cannot save: No session loaded or not authenticated.");
           setSnackbarOpen(true);
           return;
       }
-      if (!isDirty) {
+      if (!isDirty && !forceSave) {
           setSnackbarMessage("No changes to save.");
           setSnackbarOpen(true);
           return;
       }
 
       const fullClassificationToSave = constructClassificationString(selectedClassification, caveatType, customCaveat);
+      const textForPayload = explicitText !== null ? explicitText : transcriptionText;
 
       const finalPayload = {
         session_name: audioFilename,
@@ -729,7 +730,7 @@ const RecordTranscribe = () => {
             classification: fullClassificationToSave || null, 
         },
         participants: participants,
-        full_transcript_text: transcriptionText,
+        full_transcript_text: textForPayload,
         markers: markers.map(marker => { // Ensure markers are in the format expected by backend
             const { id, ...restOfMarker } = marker; // Assuming frontend uses 'id'
             return {
@@ -911,7 +912,7 @@ const RecordTranscribe = () => {
                     <Typography variant="h5" align="center" gutterBottom sx={{ pt: 1.5, pb: 1 }}>
                        {loadedSessionId ? 'Session Transcript (editable)' : 'Live Transcription'}
                     </Typography>
-                    <TranscriptionDisplay />
+                    <TranscriptionDisplay onSaveChanges={handleSaveChanges} />
                   </Box>
                 </GradientBorderPaper>
               </Grid>

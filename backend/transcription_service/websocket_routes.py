@@ -11,7 +11,7 @@ from datetime import datetime
 import os # Import os
 import pathlib # Import pathlib
 from typing import Optional, Tuple, List, Dict # Updated typing
-from sqlalchemy.orm.attributes import flag_modified # <-- ADD THIS IMPORT
+from sqlalchemy.orm.attributes import flag_modified
 
 # START EDIT: Add tempfile and pandas imports
 import tempfile 
@@ -22,7 +22,7 @@ from websocket_manager import manager # Import the manager instance
 from model_loader import get_models, are_models_loaded # Import model loading utilities
 from config import (
     DEVICE, BATCH_SIZE, HF_TOKEN, 
-    WEBSOCKET_BUFFER_SECONDS, # DIARIZATION_MIN_CHUNK_MS, # No longer used here
+    WEBSOCKET_BUFFER_SECONDS, # DIARIZATION_MIN_CHUNK_MS,
     ARTIFACT_STORAGE_BASE_PATH, AUDIO_FORMAT, TARGET_SAMPLE_RATE
 )
 from session_manager import session_manager # Import Session Manager
@@ -35,14 +35,6 @@ logger = logging.getLogger(__name__)
 # In-memory store for session-specific transcription progress
 # { "session_id": {"last_processed_duration_seconds": 0.0, "all_segments": []} }
 session_transcription_progress: Dict[str, Dict] = {}
-
-
-# Placeholder function for token validation (replace with actual logic) - REMOVED as it was commented out
-
-# Constants
-# TARGET_SAMPLE_RATE = 16000 # Defined in config
-# AUDIO_FORMAT = "webm" # Defined in config
-
 
 # Function to save the final accumulated audio
 async def save_final_accumulated_audio(session_id_str: str, audio_data: bytes, db_session: AsyncSession, base_path_str: str) -> Optional[str]:
@@ -80,9 +72,6 @@ async def save_final_accumulated_audio(session_id_str: str, audio_data: bytes, d
         logger.error(f"[{session_id_str}] Unexpected error saving final audio: {e}", exc_info=True)
         if db_session: await db_session.rollback()
         return None
-
-# REMOVED save_audio_chunk function as it's no longer needed for final file assembly.
-# Individual chunk saving logic is removed.
 
 # Replaced process_audio_buffer with process_live_transcription_update_sliding_window
 async def process_live_transcription_update_sliding_window(

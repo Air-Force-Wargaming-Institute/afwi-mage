@@ -54,11 +54,3 @@ app.include_router(websocket_router, tags=["Transcription (WebSocket)"])
 @app.get("/")
 async def root():
     return {"message": f"Welcome to the {SERVICE_NAME} API"}
-
-# --- REMOVED ---
-# if __name__ == "__main__":
-#     # Note: Model loading is now handled by the lifespan manager
-#     logger.info(f"Starting {SERVICE_NAME} on port {SERVICE_PORT}")
-#     # Set reload=False when running in production or relying solely on lifespan for loading
-#     uvicorn.run("app:app", host="0.0.0.0", port=SERVICE_PORT, log_level=LOG_LEVEL.lower(), reload=True)
-# --- END REMOVED --- 

@@ -56,7 +56,6 @@ def format_time(seconds: float) -> str:
     s = math.floor(seconds % 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-# --- NEW HELPER FUNCTION ---
 def generate_transcript_with_speaker_paragraphs(segments: List[dict], markers: List[dict]) -> str:
     """
     Generates a single transcript string by interleaving transcription segments
@@ -155,9 +154,7 @@ def generate_transcript_with_speaker_paragraphs(segments: List[dict], markers: L
     finalize_paragraph() # Finalize any remaining paragraph after the loop
 
     return '\n\n'.join(output_lines)
-# --- END NEW HELPER FUNCTION ---
 
-# --- START NEW FULL AUDIO PROCESSING FUNCTION ---
 async def process_entire_audio_for_final_transcript(
     audio_path: str,
     language_code: Optional[str] = "en",
@@ -280,9 +277,7 @@ async def process_entire_audio_for_final_transcript(
     except Exception as e:
         logger.error(f"Error during final audio processing for {audio_path}: {e}", exc_info=True)
         return []
-# --- END NEW FULL AUDIO PROCESSING FUNCTION ---
 
-# --- START EDIT ---
 # Dependency to get authenticated user ID from header
 async def get_current_user_id(request: Request) -> str:
     user_id = request.headers.get("X-User-ID")
@@ -295,7 +290,6 @@ async def get_current_user_id(request: Request) -> str:
         )
     logger.debug(f"Authenticated User ID: {user_id}")
     return user_id
-# --- END EDIT ---
 
 # --- Remove Model Loading Logic --- 
 # # NOTE: Models are loaded lazily by whisperx on first use or explicitly.
@@ -329,17 +323,6 @@ async def start_session(
     Initializes a new recording session in the database.
     Generates a unique session ID and stores initial metadata.
     """
-    # Use the injected user ID
-    # TODO: Get user_id from auth middleware instead of request body
-    # user_id = session_data.user_id # Assuming from body for now
-    # if not user_id:
-    #      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ID not provided.")
-         
-    # session_data.user_id = user_id 
-    # We need to pass the user ID to the session manager
-    # Create a dict from the Pydantic model and add the user_id
-    # session_data_dict = session_data.dict()
-    # session_data_dict['user_id'] = current_user_id
 
     # Pass db session and augmented data to session_manager method
     session_id = await session_manager.create_session(db, session_data, current_user_id)
@@ -396,7 +379,6 @@ async def stop_session(
     logger.info(f"Setting session {session_id} status to 'stopped' to signal WebSocket handler.")
     await session_manager.update_session_status(db, str(session_id), "stopped")
 
-    # --- MODIFIED: Polling for WebSocket finalization ---
     max_wait_seconds = 20  # Max time to wait for WebSocket to finalize
     poll_interval_seconds = 0.75 # How often to check DB
     waited_seconds = 0
@@ -428,7 +410,6 @@ async def stop_session(
 
     if not ws_processing_assumed_complete:
         logger.warning(f"[{session_id}] Timed out waiting for WebSocket handler to fully signal completion after {max_wait_seconds}s. Proceeding with available data.")
-    # --- END MODIFICATION ---
 
     # Re-fetch the session to get updated info (like audio_storage_path and final segments)
     # that should have been populated by the WebSocket handler.
@@ -595,7 +576,6 @@ async def cancel_session(
     if not success:
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update session status to cancelled.")
 
-    # TODO: Trigger cleanup?
     # - Signal WebSocket handler (happens automatically based on status check)
     # - Delete temporary files (if any were created outside WS handler)
     logger.info(f"Cancelling session {session_id}. No data deletion implemented, status set to cancelled.")
@@ -604,8 +584,6 @@ async def cancel_session(
     # session_manager.remove_session(db, str(session_id))
 
     return {"session_id": str(session_id), "status": "cancelled", "timestamp": cancel_time}
-
-# --- NEW Endpoints for Session Listing and Retrieval --- 
 
 # Define response model for list item
 class SessionListItem(BaseModel):
@@ -630,7 +608,6 @@ async def list_sessions(
 ):
     """Retrieves a list of past recording sessions for the authenticated user."""
     # Use the injected user ID
-    # TODO: Get user_id from authenticated request (e.g., request.state.user_id)
     # user_id = "current-user" # Placeholder
     user_id = current_user_id
     
@@ -720,7 +697,6 @@ async def update_session_details(
 
     # If update was successful AND client_provided_full_transcript_text is not None
     # (meaning it was explicitly sent, even if empty string), write the .txt file.
-    # --- MODIFICATION START for update_session_details ---
     session_after_update = await session_manager.get_session(db, str(session_id)) # Re-fetch to get all current data
     if not session_after_update:
         logger.error(f"Session {session_id} not found after presumed successful update. Cannot proceed with transcript file writing.")
@@ -750,7 +726,6 @@ async def update_session_details(
     else:
         text_to_write_to_file = session_after_update.full_transcript_text or ""
         logger.info(f"Using existing full_transcript_text from DB for session {session_id} for file writing.")
-    # --- MODIFICATION END for update_session_details ---
     
     # Write the determined transcript text to file
     # if client_provided_full_transcript_text is not None: # This condition is now handled by text_to_write_to_file logic
@@ -779,8 +754,6 @@ async def update_session_details(
         logger.error(f"Failed to save transcript text file to {transcript_txt_full_path} (via update_session_details): {e_io}")
 
     return SchemaUpdateSessionResponse(session_id=session_id, updated_at=datetime.utcnow())
-
-# --- Marker Endpoint --- 
 
 @router.post("/api/transcription/sessions/{session_id}/markers",
             response_model=AddMarkerResponse,
@@ -813,7 +786,6 @@ async def add_marker(
     marker_dict = marker_request.dict()
     marker_dict['user_id'] = user_id
     
-    # ADD THIS LOG:
     logger.info(f"BACKEND_LIVE_MARKER_DICT_TO_SAVE: marker_dict before calling add_marker_to_session: {marker_dict}")
     
     marker_id = await session_manager.add_marker_to_session(db, str(session_id), marker_dict)
@@ -855,7 +827,6 @@ async def get_transcription(
         last_update=session.last_update
     )
 
-# --- START EDIT ---
 @router.delete("/api/transcription/sessions/{session_id}",
                status_code=status.HTTP_204_NO_CONTENT,
                summary="Delete a specific session")
@@ -894,9 +865,6 @@ async def delete_session_endpoint(
     # If successful, FastAPI will automatically return a 204 No Content response.
     # No need to return anything explicitly.
     return
-# --- END EDIT ---
-
-# --- Existing File Upload Endpoint (Renamed for Clarity) ---
 
 @router.post("/api/transcription/transcribe-file", 
              summary="(Util) Transcribe a single audio file (NO DIARIZATION)",
@@ -982,18 +950,6 @@ async def transcribe_audio_diarized_util(
         align_time = time.time()
         logger.info(f"Alignment finished in {align_time - transcribe_time:.2f}s.")
 
-        # Diarization SKIPPED
-        logger.info("Diarization and speaker assignment (SKIPPED)...")
-        # diarize_model will be None from get_models()
-        # if not diarize_model:
-             # logger.warning("Diarization model not available. Skipping diarization.")
-        # else:
-            # diarize_segments = diarize_model(audio)
-            # result = whisperx.assign_word_speakers(diarize_segments, result)
-            # diarize_assign_time = time.time()
-            # logger.info(f"Diarization and speaker assignment finished in {diarize_assign_time - align_time:.2f}s.")
-        logger.warning("Diarization and speaker assignment have been SKIPPED.")
-
         output_segments = []
         segments_to_process = result.get("segments", []) if isinstance(result, dict) else result if isinstance(result, list) else []
         for segment in segments_to_process:
@@ -1001,11 +957,10 @@ async def transcribe_audio_diarized_util(
                 "start": segment.get("start"),
                 "end": segment.get("end"),
                 "text": segment.get("text", "").strip(),
-                "speaker": "UNKNOWN" # Speaker is UNKNOWN as diarization is skipped
+                "speaker": "UNKNOWN" 
             })
 
         total_time = time.time() - start_time
-        logger.info(f"Processing completed for {file.filename} in {total_time:.2f}s (Diarization SKIPPED).")
 
     except Exception as e:
         logger.error(f"Error during processing for {file.filename}: {e}", exc_info=True)
@@ -1053,11 +1008,6 @@ async def get_session_audio(
         logger.error(f"Audio request failed: Audio file not found at stored path: {audio_path}")
         # Maybe update DB state here if file is missing?
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing or inaccessible.")
-        
-    # TODO: Add permission check - does the requesting user own this session?
-    # user_id_from_auth = request.state.user_id # Assuming auth middleware sets this
-    # if session.user_id != user_id_from_auth:
-    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
 
     # Determine filename for download
     # Use session name if available, fallback to session_id
@@ -1237,12 +1187,6 @@ async def upload_audio_with_metadata(
         if file: # Ensure file is closed
             await file.close()
 
-# (Other existing routes)
-# ...
-# --- END EDIT ---
-
-# --- Existing File Upload Endpoint (Renamed for Clarity) ---
-
 @router.post("/api/transcription/transcribe-file", 
              summary="(Util) Transcribe a single audio file (NO DIARIZATION)",
              tags=["Utility"]) 
@@ -1327,18 +1271,6 @@ async def transcribe_audio_diarized_util(
         align_time = time.time()
         logger.info(f"Alignment finished in {align_time - transcribe_time:.2f}s.")
 
-        # Diarization SKIPPED
-        logger.info("Diarization and speaker assignment (SKIPPED)...")
-        # diarize_model will be None from get_models()
-        # if not diarize_model:
-             # logger.warning("Diarization model not available. Skipping diarization.")
-        # else:
-            # diarize_segments = diarize_model(audio)
-            # result = whisperx.assign_word_speakers(diarize_segments, result)
-            # diarize_assign_time = time.time()
-            # logger.info(f"Diarization and speaker assignment finished in {diarize_assign_time - align_time:.2f}s.")
-        logger.warning("Diarization and speaker assignment have been SKIPPED.")
-
         output_segments = []
         segments_to_process = result.get("segments", []) if isinstance(result, dict) else result if isinstance(result, list) else []
         for segment in segments_to_process:
@@ -1346,11 +1278,10 @@ async def transcribe_audio_diarized_util(
                 "start": segment.get("start"),
                 "end": segment.get("end"),
                 "text": segment.get("text", "").strip(),
-                "speaker": "UNKNOWN" # Speaker is UNKNOWN as diarization is skipped
+                "speaker": "UNKNOWN" 
             })
 
         total_time = time.time() - start_time
-        logger.info(f"Processing completed for {file.filename} in {total_time:.2f}s (Diarization SKIPPED).")
 
     except Exception as e:
         logger.error(f"Error during processing for {file.filename}: {e}", exc_info=True)
@@ -1398,11 +1329,6 @@ async def get_session_audio(
         logger.error(f"Audio request failed: Audio file not found at stored path: {audio_path}")
         # Maybe update DB state here if file is missing?
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing or inaccessible.")
-        
-    # TODO: Add permission check - does the requesting user own this session?
-    # user_id_from_auth = request.state.user_id # Assuming auth middleware sets this
-    # if session.user_id != user_id_from_auth:
-    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
 
     # Determine filename for download
     # Use session name if available, fallback to session_id

@@ -125,7 +125,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const TranscriptionDisplay = () => {
+const TranscriptionDisplay = ({ onSaveChanges }) => {
   const classes = useStyles();
   const theme = useTheme();
   const { state, dispatch } = useTranscription();
@@ -420,6 +420,9 @@ const TranscriptionDisplay = () => {
           <Button 
             onClick={() => {
               dispatch({ type: ACTIONS.SET_TRANSCRIPTION_TEXT, payload: modalText });
+              if (onSaveChanges) {
+                onSaveChanges(true, modalText);
+              }
               setEditModalOpen(false);
             }} 
             color="primary" 

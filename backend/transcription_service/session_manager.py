@@ -2,8 +2,6 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Dict, Optional, List, Any
-# Remove io if no longer needed centrally
-# import io 
 
 # Use SQLAlchemy for DB operations
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,16 +14,11 @@ from schemas import StartSessionRequest, ParticipantSchema, EventMetadataSchema,
 # Import the DB model and session getter
 from database import TranscriptionSession, get_db_session 
 
-# --- START EDIT ---
 import pathlib
 import shutil
 from config import ARTIFACT_STORAGE_BASE_PATH # Import base path
-# --- END EDIT ---
 
 logger = logging.getLogger(__name__)
-
-# Remove in-memory store
-# active_sessions: Dict[str, dict] = {}
 
 class SessionManager:
     """Manages transcription sessions in the database."""
@@ -161,7 +154,6 @@ class SessionManager:
                 marker_data["marker_id"] = marker_id
                 marker_data["added_at"] = datetime.utcnow().isoformat() # Record when added, as ISO string
 
-                # ADD THIS LOG:
                 logger.info(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Raw marker_data being processed: {marker_data}")
 
                 # Ensure markers field is initialized as a list
@@ -177,14 +169,12 @@ class SessionManager:
 
                 session.last_update = datetime.utcnow()
 
-                # ADD THIS LOG (right before commit):
                 logger.info(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Content of session.markers before commit: {session.markers}")
 
                 await db.commit()
                 logger.info(f"Added marker {marker_id} to session {session_id} in DB.")
                 return marker_id
             except Exception as e:
-                # ADD THIS LOG for errors:
                 logger.error(f"SESSION_MANAGER_LIVE_MARKER_SAVE: Error during save: {e}, marker_data was: {marker_data}", exc_info=True)
                 await db.rollback()
                 logger.error(f"Failed to add marker to session {session_id} in DB: {e}", exc_info=True)
@@ -318,7 +308,6 @@ class SessionManager:
     async def delete_session(self, db: AsyncSession, session_id: str) -> bool:
         """Deletes a session from the database by ID and its associated artifact folder."""
         session_uuid = uuid.UUID(session_id)
-        # --- START EDIT ---
         # It's better to fetch the session first to get its path, then delete files, then DB record
         session_to_delete = await self.get_session(db, session_id)
 
@@ -329,10 +318,8 @@ class SessionManager:
         # Construct the session artifact path
         # This assumes session_id is the folder name directly under ARTIFACT_STORAGE_BASE_PATH
         session_artifact_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / session_id
-        # --- END EDIT ---
 
         try:
-            # --- START EDIT ---
             # Delete the session artifact folder from the filesystem
             if session_artifact_path.exists():
                 if session_artifact_path.is_dir():
@@ -344,7 +331,6 @@ class SessionManager:
                     logger.info(f"Successfully deleted artifact file: {session_artifact_path}") # Log if it was a file
             else:
                 logger.info(f"Artifact directory not found, skipping file deletion: {session_artifact_path}")
-            # --- END EDIT ---
 
             stmt = delete(TranscriptionSession).where(TranscriptionSession.session_id == session_uuid)
             await db.execute(stmt)
