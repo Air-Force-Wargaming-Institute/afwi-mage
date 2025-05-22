@@ -40,7 +40,19 @@ const getDefaultReport = () => ({
   title: 'New Report',
   description: '',
   vectorStoreId: '',
-  elements: []
+  items: []
+});
+
+// Helper to create a new default element
+const createDefaultElement = (parentId) => ({
+  id: uuidv4(),
+  type: 'explicit', // Or your application's default element type
+  title: 'New Element', // Default title
+  content: '',          // Default content
+  format: 'paragraph',  // Default format
+  parentUUID: parentId, // Link to parent section ID
+  // Add any other default properties your elements usually have
+  // e.g., ai_generated_content: null, generation_error: null, generation_status: 'idle' for generative elements
 });
 
 const useStyles = makeStyles((theme) => ({
@@ -193,7 +205,7 @@ function ReportDesignerPage() {
           id: null,
           title: 'New Template',
           description: '',
-          elements: [],
+          items: [], 
           isTemplate: true
         });
         setHasUnsavedChanges(true);
@@ -214,37 +226,45 @@ function ReportDesignerPage() {
             const templateData = JSON.parse(sessionStorage.getItem('selectedTemplate'));
             
             if (templateData) {
-              // Extract elements from the template content
-              const elements = templateData.content?.elements || [];
-              
-              // Transform elements to add required properties and IDs
-              const transformedElements = elements.map((element, index) => {
-                const baseElementWithId = {
-                  ...element,
-                  id: element.id || `element-new-${index}-${Date.now()}`,
-                  // Ensure format is set
-                  format: element.format || 'paragraph'
+              // Templates might have `content.items` or `content.elements` and `parent_uuid`
+              const rawItems = templateData.content?.items || templateData.content?.elements || [];
+              const transformedItems = rawItems.map((item, index) => {
+                const newItemId = item.id || `item-template-new-${index}-${Date.now()}`;
+                const baseItemData = {
+                  ...item,
+                  id: newItemId,
+                  type: item.item_type === 'section' ? 'section' : item.type || (Array.isArray(item.elements) ? 'section' : 'explicit'),
+                  format: item.format || (item.item_type === 'section' || (Array.isArray(item.elements) && item.type !== 'explicit' && item.type !== 'generative') ? undefined : 'paragraph'),
+                  parentUUID: item.parent_uuid || item.parentUUID || null // Map from parent_uuid or keep parentUUID, then remove parent_uuid
                 };
+                delete baseItemData.parent_uuid; // Remove backend key after mapping
+                delete baseItemData.item_type;   // Remove backend key after mapping type
                 
-                // Handle nested elements like sections if they exist
-                if (element.type === 'section' && element.elements) { 
-                  const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
-                    ...subElement,
-                    id: subElement.id || `subElement-new-${index}-${subIndex}-${Date.now()}`,
-                    format: subElement.format || 'paragraph'
-                  }));
-                  return { ...baseElementWithId, elements: subElementsWithIds };
+                if (baseItemData.type === 'section' && Array.isArray(item.elements)) { 
+                  baseItemData.elements = item.elements.map((subElement, subIndex) => {
+                    const newSubId = subElement.id || `subElement-template-new-${index}-${subIndex}-${Date.now()}`;
+                    const subBase = {
+                      ...subElement,
+                      id: newSubId,
+                      format: subElement.format || 'paragraph',
+                      parentUUID: newItemId, // Child's parentUUID is this section's ID
+                      type: subElement.item_type === 'element' ? subElement.type : subElement.type // Ensure type is preferred over item_type
+                    };
+                    delete subBase.parent_uuid;
+                    delete subBase.item_type;
+                    return subBase;
+                  });
+                } else if (baseItemData.type !== 'section') {
+                  delete baseItemData.elements; 
                 }
-                
-                return baseElementWithId;
+                return baseItemData;
               });
               
-              // Create a new report definition based on the template
               setCurrentDefinition({
                 id: uuidv4(),
                 title: templateData.name,
                 description: templateData.description || '',
-                elements: transformedElements,
+                items: transformedItems, 
                 templateId: templateData.id,
                 type: 'Template-based',
                 isTemplate: false
@@ -313,37 +333,48 @@ function ReportDesignerPage() {
             } else {
               setPageTitlePrefix('Prior Report: ');
             }
-            // Transform the API response to the format expected by ReportConfigPanel
-            const elements = data.content?.elements || [];
+            // Transform the API response to the format expected by our state
+            // API response has data.content.items (or data.content.elements for older compatibility if needed)
+            const rawItems = data.content?.items || data.content?.elements || [];
             
-            // Transform elements to add required properties and IDs
-            const transformedElements = elements.map((element, index) => {
-              const baseElementWithId = {
-                ...element,
-                id: element.id || `element-${reportId}-${index}-${Date.now()}`,
-                // Ensure format is set
-                format: element.format || 'paragraph'
+            const transformedItems = rawItems.map((item, index) => {
+              const newItemId = item.id || `item-api-${reportId}-${index}-${Date.now()}`;
+              const baseItemData = {
+                ...item, 
+                id: newItemId,
+                type: item.item_type === 'section' ? 'section' : item.type, // Prefer item.type, fallback to item_type for section type detection
+                format: item.format || (item.item_type === 'section' ? undefined : 'paragraph'),
+                parentUUID: item.parent_uuid || item.parentUUID || null // Map from parent_uuid, then remove it
               };
+              delete baseItemData.parent_uuid;
+              delete baseItemData.item_type;
               
-              // Handle nested elements like sections if they exist
-              if (element.type === 'section' && element.elements) { 
-                const subElementsWithIds = element.elements.map((subElement, subIndex) => ({
-                  ...subElement,
-                  id: subElement.id || `subElement-${reportId}-${index}-${subIndex}-${Date.now()}`,
-                  format: subElement.format || 'paragraph'
-                }));
-                return { ...baseElementWithId, elements: subElementsWithIds };
+              if (baseItemData.type === 'section' && Array.isArray(item.elements)) { 
+                baseItemData.elements = item.elements.map((subElement, subIndex) => {
+                  const newSubId = subElement.id || `subElement-api-${reportId}-${index}-${subIndex}-${Date.now()}`;
+                  const subBase = {
+                    ...subElement,
+                    id: newSubId,
+                    format: subElement.format || 'paragraph',
+                    parentUUID: newItemId,
+                    type: subElement.item_type === 'element' ? subElement.type : subElement.type
+                  };
+                  delete subBase.parent_uuid;
+                  delete subBase.item_type;
+                  return subBase;
+                });
+              } else if (baseItemData.type !== 'section') {
+                 delete baseItemData.elements;
               }
-              
-              return baseElementWithId;
+              return baseItemData;
             });
 
             // Set the definition with proper mapping of API data
             setCurrentDefinition({
               id: data.id,
-              title: data.name, // Use data.name for both templates and reports as the editable title
+              title: data.name, 
               description: data.description,
-              elements: transformedElements,
+              items: transformedItems, 
               vectorStoreId: data.vectorStoreId || '',
               status: data.status || 'draft',
               isTemplate: data.isTemplate || effectiveIsTemplate, // Prioritize actual data flag
@@ -359,10 +390,10 @@ function ReportDesignerPage() {
              // Fallback logic if data is unexpectedly null/undefined
             if (effectiveIsTemplate) {
               setPageTitlePrefix('Template: ');
-              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Template Error', isTemplate: true });
+              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Template Error', items: [], isTemplate: true });
             } else {
               setPageTitlePrefix('Prior Report: ');
-              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Report Error', isTemplate: false });
+              setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Report Error', items: [], isTemplate: false });
             }
             setHasUnsavedChanges(false);
           }
@@ -374,10 +405,10 @@ function ReportDesignerPage() {
           // Fallback for error
           if (effectiveIsTemplate) {
             setPageTitlePrefix('Template: '); // Or "Error: Template"
-            setCurrentDefinition({ id: reportId, title: 'Error Loading', description: '', elements: [], isTemplate: true });
+            setCurrentDefinition({ id: reportId, title: 'Error Loading', description: '', items: [], isTemplate: true });
           } else {
             setPageTitlePrefix('Prior Report: '); // Or "Error: Report"
-            setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Error Loading', isTemplate: false });
+            setCurrentDefinition({ ...getDefaultReport(), id: reportId, title: 'Error Loading', items: [], isTemplate: false });
           }
         })
         .finally(() => {
@@ -500,17 +531,15 @@ function ReportDesignerPage() {
           ...prevDef,
           [field]: value,
         };
-        // Ensure isTemplate is correctly maintained based on URL and definition type
         updatedDef.isTemplate = isTemplateFromUrl || prevDef.isTemplate; 
         return updatedDef;
       });
-    } else { // Assume it's the full newDefinition object (e.g., from element changes)
+    } else { 
       const newDefinition = newDefinitionOrAction;
       setCurrentDefinition(prevDef => { 
         const updatedDef = {
           ...newDefinition, 
         };
-        // Ensure isTemplate is correctly maintained using the incoming newDefinition's isTemplate flag
         updatedDef.isTemplate = isTemplateFromUrl || newDefinition.isTemplate;
         return updatedDef;
       });
@@ -542,11 +571,68 @@ function ReportDesignerPage() {
           type: currentDefinition.type || 'Custom',
           ...(currentDefinition.templateId && { templateId: currentDefinition.templateId })
         }),
-        // Transform elements to API format
+        // Transform items back to API format (content.items)
         content: {
-          elements: currentDefinition.elements
+          // API expects 'items' list containing sections and elements.
+          // Each element that is a child of a section needs 'parent_uuid' set to section's id.
+          items: currentDefinition.items.map((item, index) => {
+            // --- START CONSOLE LOGGING ---
+            if (index === 0) { // Log only for the first item for now, as per the error
+              console.log('[handleSave] Processing item at index 0:', JSON.parse(JSON.stringify(item)));
+              console.log('[handleSave] item[0].type is:', item.type);
+              console.log('[handleSave] item[0].item_type is:', item.item_type);
+            }
+            // --- END CONSOLE LOGGING ---
+            const apiItem = { ...item }; // Work on a copy
+            
+            // Set item_type for backend (more robustly)
+            if (apiItem.type === 'section') {
+              apiItem.item_type = 'section';
+            } else if (apiItem.item_type === 'section') { // Trust item_type if type is missing/wrong
+              apiItem.item_type = 'section';
+              apiItem.type = 'section'; // Correct apiItem.type for subsequent logic in this map function
+            } else {
+              apiItem.item_type = 'element';
+              // Ensure elements have their specific type (explicit/generative)
+              // If apiItem.type is not 'explicit' or 'generative' here, backend will catch it.
+            }
+
+            // Convert parentUUID to parent_uuid for elements not sections
+            if (apiItem.type !== 'section' && apiItem.parentUUID) {
+              apiItem.parent_uuid = apiItem.parentUUID;
+            }
+            delete apiItem.parentUUID; // Always remove frontend parentUUID from API payload
+
+            if (apiItem.type === 'section') {
+              apiItem.elements = (apiItem.elements || []).map(childEl => {
+                const apiChildEl = {
+                  ...childEl,
+                  item_type: 'element', // Children are always elements
+                  parent_uuid: apiItem.id // Link child to this section using backend key
+                };
+                delete apiChildEl.parentUUID; // Remove frontend key from child
+                return apiChildEl;
+              });
+              // Sections themselves do not have parent_uuid in the backend schema
+              delete apiItem.parent_uuid; 
+              // Sections themselves also do not have a 'type' field in the backend schema, only 'item_type'
+              delete apiItem.type;
+            }
+            return apiItem; 
+          })
         }
       };
+      // Ensure content.items is the key, remove elements if it was a leftover from old logic
+      if (apiData.content.elements && apiData.content.items) {
+        delete apiData.content.elements;
+      } else if (apiData.content.elements && !apiData.content.items) {
+        apiData.content.items = apiData.content.elements;
+        delete apiData.content.elements;
+      }
+
+      // --- ADD CONSOLE LOG FOR SENT DATA ---
+      console.log('[handleSave] Data being sent to API (apiData.content.items):', JSON.parse(JSON.stringify(apiData.content.items)));
+      // --- END CONSOLE LOG ---
 
       let response;
       
@@ -570,8 +656,18 @@ function ReportDesignerPage() {
           id: response.data.id,
           title: response.data.name || response.data.title, // API uses 'name'
           description: response.data.description,
-          elements: response.data.content?.elements || prev.elements,
-          isTemplate: true, // This is a new template
+          items: (response.data.content?.items || []).map(item => { 
+            const newItemId = item.id; 
+            const baseItem = { ...item, parent_uuid: item.parent_uuid || null }; 
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              baseItem.elements = item.elements.map(subEl => ({ 
+                ...subEl, 
+                parent_uuid: newItemId 
+              }));
+            }
+            return baseItem;
+          }),
+          isTemplate: true, 
           category: response.data.category || 'Custom',
           updatedAt: response.data.updatedAt,
           createdAt: response.data.createdAt
@@ -607,7 +703,17 @@ function ReportDesignerPage() {
           id: response.data.id,
           title: response.data.name || response.data.title, // API uses 'name'
           description: response.data.description,
-          elements: response.data.content?.elements || prev.elements,
+          items: (response.data.content?.items || []).map(item => { 
+            const newItemId = item.id;
+            const baseItem = { ...item, parent_uuid: item.parent_uuid || null }; 
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              baseItem.elements = item.elements.map(subEl => ({ 
+                ...subEl, 
+                parent_uuid: newItemId 
+              }));
+            }
+            return baseItem;
+          }),
           vectorStoreId: response.data.vectorStoreId,
           status: response.data.status || 'draft',
           type: response.data.type || 'Custom',
@@ -648,13 +754,28 @@ function ReportDesignerPage() {
       }
       
       // Update the current definition with the response from the server
+      // --- ADD CONSOLE LOG FOR RECEIVED DATA AFTER SAVE ---
+      if (response && response.data && response.data.content && response.data.content.items) {
+        console.log('[handleSave] Data received from API after save (response.data.content.items):', JSON.parse(JSON.stringify(response.data.content.items)));
+      }
+      // --- END CONSOLE LOG ---
       setCurrentDefinition(prev => ({
         ...prev,
         id: response.data.id || prev.id,
         title: response.data.name || response.data.title, // API might use 'name' for title
         description: response.data.description,
         vectorStoreId: !isTemplate ? response.data.vectorStoreId : prev.vectorStoreId,
-        elements: response.data.content?.elements || prev.elements,
+        items: (response.data.content?.items || prev.items || []).map(item => { 
+            const newItemId = item.id;
+            const baseItem = { ...item, parent_uuid: item.parent_uuid || null };
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              baseItem.elements = item.elements.map(subEl => ({ 
+                ...subEl, 
+                parent_uuid: newItemId
+              }));
+            }
+            return baseItem;
+          }),
         isTemplate: isTemplate, // Ensure this is correctly maintained
         type: !isTemplate ? (response.data.type || prev.type) : prev.type,
         status: !isTemplate ? (response.data.status || prev.status) : prev.status,
@@ -1023,7 +1144,7 @@ function ReportDesignerPage() {
         description: templateDescription || "",
         category: "Custom",
         content: {
-          elements: currentDefinition.elements || []
+          items: currentDefinition.items || []
         }
       };
       
@@ -1073,13 +1194,27 @@ function ReportDesignerPage() {
         name: reportName,
         description: currentDefinition.description || '',
         content: {
-          elements: currentDefinition.elements.map(el => ({ ...el, id: undefined })) // Ensure elements get new IDs if necessary by backend
+          items: currentDefinition.items.map(item => {
+            const newItem = { ...item, id: undefined };
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              const newSectionId = uuidv4();
+              newItem.id = newSectionId;
+              newItem.elements = item.elements.map(el => ({ 
+                ...el, 
+                id: undefined,
+                parentUUID: newSectionId
+              }));
+            } else {
+              newItem.parentUUID = null;
+            }
+            return newItem;
+          })
         },
-        isTemplate: false, // Explicitly set as not a template
-        templateId: currentDefinition.id, // Link to the original template
-        vectorStoreId: '', // Or some default, or prompt user if needed
+        isTemplate: false, 
+        templateId: currentDefinition.id, 
+        vectorStoreId: '',
         status: 'draft',
-        type: 'Template-based' // Indicate it was derived from a template
+        type: 'Template-based'
       };
 
       const response = await axios.post(
@@ -1097,12 +1232,12 @@ function ReportDesignerPage() {
 
       // Update application state to reflect the new report
       setCurrentDefinition({
-        ...savedReport, // Assuming backend returns the full new report object including new ID
-        title: savedReport.name, // Ensure title is mapped from name
-        isTemplate: false // Ensure this is set correctly in the state
+        ...savedReport,
+        title: savedReport.name,
+        isTemplate: false
       });
-      setIsNewReport(false); // It's now an existing report
-      setHasUnsavedChanges(false); // Freshly saved
+      setIsNewReport(false);
+      setHasUnsavedChanges(false);
 
       // Update the URL to the new report's designer page
       history.push(`/report-designer/${savedReport.id}`);
@@ -1128,37 +1263,41 @@ function ReportDesignerPage() {
   };
 
   const getReportText = () => {
-    if (!currentDefinition || !currentDefinition.elements) return '';
+    if (!currentDefinition || !currentDefinition.items) return '';
 
-    return currentDefinition.elements.map(element => {
+    // Renamed for clarity to avoid conflict with a potential outer 'item' variable in calling scopes
+    const processItemNodeForText = (itemNode) => {
       let content = '';
-      if (element.type === 'explicit') {
-        content = element.content || '';
-      } else if (element.type === 'generative') {
-        // Use ai_generated_content for generative sections
-        // Fallback to a placeholder if content is not yet generated or if there was an error
-        content = element.ai_generated_content || `[Content for '${element.title || 'generative section'}' not generated or error occurred]`;
+      if (itemNode.type === 'section') {
+        // As per plan: Flatten for TXT/MD. Sections themselves are not directly in text output.
+        return (itemNode.elements || []).map(processItemNodeForText).join('\n\n');
+      }
+      
+      // Element processing logic (remains largely the same)
+      if (itemNode.type === 'explicit') {
+        content = itemNode.content || '';
+      } else if (itemNode.type === 'generative') {
+        content = itemNode.ai_generated_content || `[Content for '${itemNode.title || 'generative section'}' not generated or error occurred]`;
       }
 
-      // Filter out <think> and <thinking> tags and their content
       if (content && typeof content === 'string') {
-        // Remove <thinking>...</thinking> tags
         content = content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
-        // Remove <think>...</think> tags
         content = content.replace(/<think>[\s\S]*?<\/think>/g, '');
       }
 
-      if (element.format && element.format.startsWith('h')) {
-        const level = parseInt(element.format.substring(1), 10) || 1;
+      if (itemNode.format && itemNode.format.startsWith('h')) {
+        const level = parseInt(itemNode.format.substring(1), 10) || 1;
         const prefix = '#'.repeat(level) + ' ';
         return prefix + content;
-      } else if (element.format === 'bulletList') {
+      } else if (itemNode.format === 'bulletList') {
         return content.split('\n').map(line => `- ${line}`).join('\n');
-      } else if (element.format === 'numberedList') {
+      } else if (itemNode.format === 'numberedList') {
         return content.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
       }
       return content;
-    }).filter(Boolean).join('\n\n');
+    };
+
+    return (currentDefinition.items || []).map(processItemNodeForText).filter(Boolean).join('\n\n');
   };
 
   const handleGenerateReport = async () => {
@@ -1174,16 +1313,7 @@ function ReportDesignerPage() {
     // Save the current state of the report before generating
     try {
       await handleSave(); 
-      // If handleSave throws an error, it will be caught by its own try/catch, 
-      // and a snackbar will be shown. We might want to prevent generation here
-      // if save failed, but handleSave doesn't explicitly return success/failure.
-      // For now, assume if it doesn't throw and stop execution, it was "successful enough"
-      // or the user was notified of an issue.
     } catch (saveError) {
-      // This catch block might not be strictly necessary if handleSave handles its own errors
-      // and doesn't re-throw them in a way that should stop this function.
-      // However, if handleSave could throw an error that isn't caught internally and
-      // we want to stop generation, this would be the place.
       console.error("Failed to save report before generation:", saveError);
       setSnackbar({
         open: true,
@@ -1193,7 +1323,25 @@ function ReportDesignerPage() {
       return; // Stop generation if save fails
     }
 
-    const generativeElements = currentDefinition.elements.filter(el => el.type === 'generative');
+    // Recursive helper to find all generative elements, whether top-level or nested in sections.
+    const findGenerativeElementsRecursive = (itemList) => {
+      let generative = [];
+      if (!Array.isArray(itemList)) return generative;
+
+      for (const item of itemList) {
+        if (item.type === 'section' && Array.isArray(item.elements)) {
+          // If it's a section, recurse into its elements
+          generative = generative.concat(findGenerativeElementsRecursive(item.elements));
+        } else if (item.type === 'generative') {
+          // If it's a generative element, add it to the list
+          // The element object itself (item) is pushed. It will retain its parentUUID if it has one.
+          generative.push(item);
+        }
+      }
+      return generative;
+    };
+    const generativeElements = findGenerativeElementsRecursive(currentDefinition.items || []);
+
     if (generativeElements.length === 0) {
       setSnackbar({
         open: true,
@@ -1223,27 +1371,8 @@ function ReportDesignerPage() {
     // Sequentially generate content for each generative element
     // We will use a mutable copy of currentDefinition to update it step-by-step
     let currentReportState = JSON.parse(JSON.stringify(currentDefinition));
-    // The original line for completedCount is removed as we set it to 0 above for full regeneration.
-    // let completedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
     
-    // Update progress based on already completed elements -- This is now handled by initializing completedCount to 0.
-    // setGenerationProgress({ current: completedCount, total: generativeElements.length });
-
-    for (const elementToProcess of generativeElements) {
-      // The check for existing/completed content is removed to force regeneration.
-      // const existingElementData = currentReportState.elements.find(e => e.id === elementToProcess.id);
-      // if (existingElementData && existingElementData.ai_generated_content && existingElementData.generation_status === 'completed') {
-      //   setGeneratingElements(prev => ({
-      //     ...prev,
-      //     [elementToProcess.id]: {
-      //       status: 'completed',
-      //       content: existingElementData.ai_generated_content,
-      //       error: null
-      //     }
-      //   }));
-      //   continue;
-      // }
-
+    for (const elementToProcess of generativeElements) { // elementToProcess is a direct reference to a generative element
       // Mark current element as 'generating' in the UI
       setGeneratingElements(prev => ({
         ...prev,
@@ -1262,8 +1391,8 @@ function ReportDesignerPage() {
           type: currentReportState.type || 'Custom', // Ensure type is present
           templateId: currentReportState.templateId,
           status: currentReportState.status || 'draft', // Ensure status is present
-          content: { // Nest elements under content
-            elements: currentReportState.elements
+          content: { 
+            items: currentReportState.items
           },
           createdAt: currentReportState.createdAt, 
           updatedAt: currentReportState.updatedAt 
@@ -1271,11 +1400,11 @@ function ReportDesignerPage() {
 
         // Remove undefined fields to avoid sending them if not set
         Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-        if (payload.content?.elements === undefined) { // Check if content or content.elements is undefined
-            if (payload.content) delete payload.content.elements;
-            else payload.content = { elements: [] }; // Ensure content.elements exists if content itself was undefined
-        } else if (payload.content.elements === null) {
-            payload.content.elements = []; // Ensure elements is an array if it's null
+        if (payload.content?.items === undefined) { 
+            if (payload.content) delete payload.content.items;
+            else payload.content = { items: [] }; 
+        } else if (payload.content.items === null) {
+            payload.content.items = []; 
         }
         
         // Call the backend API to regenerate the specific section
@@ -1292,20 +1421,39 @@ function ReportDesignerPage() {
 
         const apiResponseData = response.data; // Store the raw API response
 
-        if (apiResponseData && apiResponseData.content && apiResponseData.content.elements) {
+        if (apiResponseData && apiResponseData.content && apiResponseData.content.items) {
           // Create a new "flat" definition for the React state
           const newFlatDefinition = {
-            ...apiResponseData, // Spread top-level properties like id, name, status, etc.
-            title: apiResponseData.name || apiResponseData.title, // Ensure title is correctly mapped from API's name or title
-            elements: apiResponseData.content.elements, // Hoist elements
+            ...apiResponseData, 
+            title: apiResponseData.name || apiResponseData.title, 
+            items: apiResponseData.content.items.map(item => {
+                const baseItem = { ...item, parent_uuid: item.parent_uuid || null };
+                if (item.type === 'section' && Array.isArray(item.elements)) {
+                  baseItem.elements = item.elements.map(subEl => ({ ...subEl, parent_uuid: item.id }));
+                }
+                return baseItem;
+              }), 
           };
-          delete newFlatDefinition.content; // Remove the nested 'content' property
+          delete newFlatDefinition.content; 
 
-          setCurrentDefinition(newFlatDefinition); // Update the main state with the flat structure
-          currentReportState = newFlatDefinition; // Update local variable for consistency
+          setCurrentDefinition(newFlatDefinition); 
+          currentReportState = newFlatDefinition; 
 
-          // Find the regenerated element in the original API response's structure for UI updates
-          const regeneratedElement = apiResponseData.content.elements.find(el => el.id === elementToProcess.id);
+          // Find the regenerated element. It might be top-level or nested.
+          let regeneratedElement = null;
+          const findElementByIdRecursive = (id, itemListToSearch) => {
+            if (!Array.isArray(itemListToSearch)) return null;
+            for (const item of itemListToSearch) {
+              if (item.id === id) return item;
+              if (item.type === 'section' && Array.isArray(item.elements)) {
+                const found = findElementByIdRecursive(id, item.elements);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          // elementToProcess.id is the ID of the generative element we sent for processing.
+          regeneratedElement = findElementByIdRecursive(elementToProcess.id, newFlatDefinition.items);
           
           if (regeneratedElement) {
             setGeneratingElements(prev => ({
@@ -1358,11 +1506,20 @@ function ReportDesignerPage() {
 
     setIsGenerating(false);
     if (!error) { // If loop completed without setting a general error state
-        const finalCompletedCount = currentReportState.elements.filter(el => el.type === 'generative' && el.generation_status === 'completed').length;
-        if (finalCompletedCount === generativeElements.length) {
+        const finalGenerativeElements = findGenerativeElementsRecursive(currentReportState.items || []);
+        const finalCompletedCount = finalGenerativeElements.filter(el => el.generation_status === 'completed' && el.ai_generated_content).length;
+        
+        if (finalCompletedCount === finalGenerativeElements.length && finalGenerativeElements.length > 0) {
             setSnackbar({ open: true, message: 'All report sections generated successfully!', severity: 'success' });
-        } else {
-             setSnackbar({ open: true, message: 'Report generation finished, but some sections may have errors.', severity: 'warning' });
+        } else if (finalGenerativeElements.length === 0) {
+            // This case should be caught earlier, but as a fallback
+            setSnackbar({ open: true, message: 'No generative sections found in the report.', severity: 'info' });
+        } else if (finalCompletedCount > 0 && finalCompletedCount < finalGenerativeElements.length) {
+             setSnackbar({ open: true, message: 'Report generation finished, but some sections may have errors or no content.', severity: 'warning' });
+        } else if (finalCompletedCount === 0 && finalGenerativeElements.length > 0) {
+            setSnackbar({ open: true, message: 'Report generation completed, but no content was generated for any section.', severity: 'error' });
+        } else { // Default fallback, should ideally not be hit if logic above is sound
+            setSnackbar({ open: true, message: 'Report generation process completed.', severity: 'info' });
         }
     } else {
         setSnackbar({ open: true, message: `Report generation completed with errors. Check individual sections.`, severity: 'error' });
@@ -1404,10 +1561,30 @@ function ReportDesignerPage() {
       }
 
       // Find the element to regenerate
-      const element = currentDefinition.elements.find(el => el.id === elementId);
+      let element = null;
+      let parentSection = null; // Keep track of parent if element is nested
+
+      const findElementRecursive = (itemsList, targetId) => {
+        for (const item of itemsList) {
+          if (item.id === targetId) {
+            return item;
+          }
+          if (item.type === 'section' && Array.isArray(item.elements)) {
+            const foundInChildren = findElementRecursive(item.elements, targetId);
+            if (foundInChildren) {
+              // If found in children, we don't set parentSection here,
+              // as 'element' itself will be the child.
+              // The context for regeneration, however, is the whole report.
+              return foundInChildren;
+            }
+          }
+        }
+        return null;
+      };
+      element = findElementRecursive(currentDefinition.items || [], elementId);
       
       if (!element) {
-        throw new Error('Section not found');
+        throw new Error('Section not found for regeneration');
       }
       
       // Get the section title for display
@@ -1434,19 +1611,17 @@ function ReportDesignerPage() {
         type: currentDefinition.type || 'Custom', // Ensure type is present
         templateId: currentDefinition.templateId,
         status: currentDefinition.status || 'draft', // Ensure status is present
-        content: { // Nest elements under content
-          elements: currentDefinition.elements
+        content: { 
+          items: currentDefinition.items
         },
-        // createdAt and updatedAt should ideally be present in currentDefinition if it's a saved report
-        // If they might be missing, the backend would need to handle it or we need to ensure they are always there.
-        // For now, assume they are passed if they exist on currentDefinition.
         createdAt: currentDefinition.createdAt, 
         updatedAt: currentDefinition.updatedAt 
       };
 
       // Remove undefined fields to avoid sending them if not set
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-      if (payload.content.elements === undefined) delete payload.content.elements; // Should not happen if currentDefinition.elements exists
+      if (payload.content.items === undefined) delete payload.content.items; 
+      else if (payload.content.items === null) payload.content.items = [];
 
       // Call the backend API to regenerate the specific section
       // Send the entire currentDefinition as the request body
@@ -1469,19 +1644,35 @@ function ReportDesignerPage() {
       // If successful, the response.data is the updated Report object
       const apiResponseData = response.data; // Use a clear variable name
 
-      if (apiResponseData && apiResponseData.content && apiResponseData.content.elements) {
+      if (apiResponseData && apiResponseData.content && apiResponseData.content.items) {
         // Create a new "flat" definition for the React state
         const newFlatDefinition = {
-          ...apiResponseData, // Spread top-level properties like id, name, status, etc.
-          title: apiResponseData.name || apiResponseData.title, // Ensure title is correctly mapped from API's name or title
-          elements: apiResponseData.content.elements, // Hoist elements
+          ...apiResponseData, 
+          title: apiResponseData.name || apiResponseData.title, 
+          items: apiResponseData.content.items.map(item => {
+            const baseItem = { ...item, parent_uuid: item.parent_uuid || null };
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              baseItem.elements = item.elements.map(subEl => ({ ...subEl, parent_uuid: item.id }));
+            }
+            return baseItem;
+          }),
         };
-        delete newFlatDefinition.content; // Remove the nested 'content' property
+        delete newFlatDefinition.content; 
 
-        setCurrentDefinition(newFlatDefinition); // Update the main state with the flat structure
+        setCurrentDefinition(newFlatDefinition); 
 
-        // Find the regenerated element in the original API response's structure (which is nested)
-        const regeneratedElement = apiResponseData.content.elements.find(el => el.id === elementId);
+        let regeneratedElement = null;
+        const findElementById_regen = (id, itemList) => {
+          for (const item of itemList) {
+            if (item.id === id) return item;
+            if (item.type === 'section' && Array.isArray(item.elements)) {
+              const found = findElementById_regen(id, item.elements);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        regeneratedElement = findElementById_regen(elementId, newFlatDefinition.items);
 
         if (regeneratedElement) {
             setGeneratingElements(prev => ({
@@ -1546,6 +1737,195 @@ function ReportDesignerPage() {
 
   const handleCloseErrorDialog = () => {
     setErrorDialogOpen(false);
+  };
+
+  const updateElement = (updatedElementData) => {
+    setCurrentDefinition(prevDefinition => {
+      const newItems = (prevDefinition.items || []).map(item => {
+        // If this top-level item is the one being updated
+        if (item.id === updatedElementData.id) {
+          return { ...item, ...updatedElementData, parentUUID: item.parentUUID };
+        }
+        // If this top-level item is a section, check its children
+        if (item.type === 'section' && Array.isArray(item.elements)) {
+          let childElementUpdated = false;
+          const updatedChildElements = item.elements.map(childEl => {
+            if (childEl.id === updatedElementData.id) {
+              childElementUpdated = true;
+              // When updating a child, ensure its parentUUID remains linked to this section
+              return { ...childEl, ...updatedElementData, parent_uuid: item.id };
+            }
+            return childEl;
+          });
+          if (childElementUpdated) {
+            return { ...item, elements: updatedChildElements };
+          }
+        }
+        return item;
+      });
+      return { ...prevDefinition, items: newItems };
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  // Adds a new item (element or section) to the report definition.
+  // For adding an element: newElementData is the element, parentSectionId is the ID of the section it belongs to (or null for top-level).
+  // For adding a section: newElementData is the section data (should have type: 'section'), parentSectionId is ignored (or should be null).
+  const addItem = (itemData, parentSectionId = null) => {
+    setCurrentDefinition(prevDefinition => {
+      const newItems = [...(prevDefinition.items || [])];
+      const itemToAdd = { ...itemData, id: itemData.id || uuidv4() };
+
+      if (itemToAdd.type === 'section') {
+        // Adding a new section to the top-level items list
+        itemToAdd.parentUUID = null; // Sections are always top-level conceptually
+        if (!Array.isArray(itemToAdd.elements)) {
+           itemToAdd.elements = []; // Ensure sections have an elements array
+        }
+        // As per plan: "When a new Section is created... automatically insert a new Element within that Section."
+        if (itemToAdd.elements.length === 0) {
+            itemToAdd.elements.push(createDefaultElement(itemToAdd.id));
+        }
+        newItems.push(itemToAdd);
+      } else { 
+        // Adding a new element (not a section)
+        if (parentSectionId) {
+          const parentSectionIndex = newItems.findIndex(item => item.id === parentSectionId && item.type === 'section');
+          if (parentSectionIndex !== -1) {
+            const parentSection = { ...newItems[parentSectionIndex] }; // shallow copy section
+            parentSection.elements = [...(parentSection.elements || [])]; // shallow copy elements array
+            parentSection.elements.push({ ...itemToAdd, parentUUID: parentSectionId });
+            newItems[parentSectionIndex] = parentSection;
+          } else {
+            console.warn(`Parent section with ID ${parentSectionId} not found. Adding element to top level.`);
+            newItems.push({ ...itemToAdd, parentUUID: null });
+          }
+        } else {
+          // Adding a top-level element
+          newItems.push({ ...itemToAdd, parentUUID: null });
+        }
+      }
+      return { ...prevDefinition, items: newItems };
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  // Deletes an item: either a top-level section, a top-level element, or an element from within a section.
+  const deleteItem = (itemIdToDelete, parentSectionIdIfChild = null) => {
+    setCurrentDefinition(prevDefinition => {
+      let newItems = [...(prevDefinition.items || [])];
+
+      if (parentSectionIdIfChild) {
+        // Deleting an element from within a section
+        const parentSectionIndex = newItems.findIndex(item => item.id === parentSectionIdIfChild && item.type === 'section');
+        if (parentSectionIndex !== -1) {
+          const parentSection = { ...newItems[parentSectionIndex] }; // shallow copy
+          let updatedChildElements = (parentSection.elements || []).filter(el => el.id !== itemIdToDelete);
+          
+          if (updatedChildElements.length === 0 && parentSection.type === 'section') {
+            // Plan: "If the last Element of a Section is deleted, automatically insert a new Element"
+            updatedChildElements.push(createDefaultElement(parentSectionIdIfChild)); 
+          }
+          parentSection.elements = updatedChildElements;
+          newItems[parentSectionIndex] = parentSection;
+        }
+        // If parent section not found, the item effectively doesn't exist in that context, so no change.
+      } else {
+        // Deleting a top-level item (could be a section or an element)
+        const itemToDelete = newItems.find(item => item.id === itemIdToDelete);
+        if (itemToDelete && itemToDelete.type === 'section') {
+          // Plan: "When a parent Section is deleted, all its child Elements will have their parentUUID set to null
+          // and become unparented, remaining in the report structure..."
+          const childElementsOfDeletedSection = (itemToDelete.elements || []).map(child => ({
+            ...child,
+            parentUUID: null // Unparent them
+          }));
+          // Find index of section to delete
+          const sectionIndex = newItems.findIndex(item => item.id === itemIdToDelete);
+          if (sectionIndex !== -1) {
+            // Remove the section and insert its children in its place
+            newItems.splice(sectionIndex, 1, ...childElementsOfDeletedSection);
+          }
+        } else {
+          // Deleting a top-level element (not a section)
+          newItems = newItems.filter(item => item.id !== itemIdToDelete);
+        }
+      }
+      return { ...prevDefinition, items: newItems };
+    });
+    setHasUnsavedChanges(true);
+  };
+  
+  // Renamed from reorderElements to reorderItems, and signature matches react-beautiful-dnd or similar
+  const reorderItems = (result) => {
+    const { source, destination, draggableId } = result;
+
+    if (!destination) return; // Dropped outside a valid droppable
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return; // Dropped in the same place
+    }
+
+    setCurrentDefinition(prevDefinition => {
+      let newItemsState = [...(prevDefinition.items || [])]; // Operate on a mutable copy
+
+      let movedItemGlobal; // Store the item being moved
+
+      // --- REMOVE FROM SOURCE --- 
+      if (source.droppableId === 'report-items-droppable') { // Source is top-level
+        // Find and remove from top-level, store the moved item
+        const [removed] = newItemsState.splice(source.index, 1);
+        movedItemGlobal = removed;
+      } else { // Source is a section (droppableId is section.id)
+        const sourceSectionIndex = newItemsState.findIndex(s => s.id === source.droppableId && s.type === 'section');
+        if (sourceSectionIndex !== -1) {
+          const sourceSection = { ...newItemsState[sourceSectionIndex] }; // shallow copy section
+          sourceSection.elements = [...(sourceSection.elements || [])]; // shallow copy elements array
+          const [removed] = sourceSection.elements.splice(source.index, 1);
+          movedItemGlobal = removed;
+          newItemsState[sourceSectionIndex] = sourceSection; // Update the section in the main list
+
+          // If source section became empty, add default element
+          if (sourceSection.elements.length === 0) {
+            sourceSection.elements.push(createDefaultElement(sourceSection.id));
+            newItemsState[sourceSectionIndex] = { ...sourceSection }; // Ensure re-assignment for state update
+          }
+        } else {
+          console.error("Source section not found for reorder");
+          return prevDefinition; // No change if source section is invalid
+        }
+      }
+
+      if (!movedItemGlobal) {
+        console.error("Could not find item to move");
+        return prevDefinition; // Should not happen
+      }
+
+      // --- ADD TO DESTINATION --- 
+      if (destination.droppableId === 'report-items-droppable') { // Destination is top-level
+        movedItemGlobal.parentUUID = null; // Item is now top-level
+        newItemsState.splice(destination.index, 0, movedItemGlobal);
+      } else { // Destination is a section (droppableId is section.id)
+        const destSectionIndex = newItemsState.findIndex(s => s.id === destination.droppableId && s.type === 'section');
+        if (destSectionIndex !== -1) {
+          const destSection = { ...newItemsState[destSectionIndex] }; // shallow copy section
+          destSection.elements = [...(destSection.elements || [])]; // shallow copy elements array
+          
+          movedItemGlobal.parentUUID = destSection.id; // Update parentUUID to the new section
+          destSection.elements.splice(destination.index, 0, movedItemGlobal);
+          newItemsState[destSectionIndex] = destSection; // Update the section in the main list
+        } else {
+          console.error("Destination section not found for reorder. Item not moved.");
+          // Revert: Add back to source (this is complex, for now, just log error)
+          // A more robust solution would put it back exactly where it was.
+          // For simplicity, current state might be slightly off if this rare error occurs.
+          // The primary goal is to prevent crashes.
+          return prevDefinition; 
+        }
+      }
+
+      return { ...prevDefinition, items: newItemsState };
+    });
+    setHasUnsavedChanges(true);
   };
 
   if (isLoading) {
@@ -1695,17 +2075,22 @@ function ReportDesignerPage() {
             isGenerating={isGenerating}
             generatingElements={generatingElements}
             isNewReport={isNewReport}
+            onGenerateReport={handleGenerateReport}
+            setGeneratingElements={setGeneratingElements}
+            setScrollToElementId={setScrollToElementId}
+            setHighlightElementId={setHighlightElementId}
+            updateElement={updateElement}
+            addItem={addItem} // Renamed from addElement
+            deleteItem={deleteItem} // Renamed from deleteElement
+            reorderItems={reorderItems} 
           />
         </Box>
         <Box className={classes.rightPanel}>
-          <ReportPreviewPanel
-            definition={currentDefinition}
-            onContentChange={handleDefinitionChange}
-            isGenerating={isGenerating}
-            generatingElements={generatingElements}
+          <ReportPreviewPanel 
+            items={(currentDefinition.items || []).flatMap(item => item.type === 'section' ? (item.elements || []) : item)} // Flatten for preview
             scrollToElementId={scrollToElementId}
-            setScrollToElementId={setScrollToElementId}
             highlightElementId={highlightElementId}
+            setScrollToElementId={setScrollToElementId}
             setHighlightElementId={setHighlightElementId}
           />
         </Box>

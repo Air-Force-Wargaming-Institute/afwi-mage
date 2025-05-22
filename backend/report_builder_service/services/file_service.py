@@ -45,7 +45,7 @@ def load_template_from_file(file_path: Path) -> Optional[Template]:
 def save_template_to_file(template: Template):
     file_path = TEMPLATES_DIR / f"{template.id}.json"
     with open(file_path, "w") as f:
-        json.dump(template.dict(), f, indent=4)
+        f.write(template.model_dump_json(indent=4))
 
 def load_all_templates() -> List[Template]:
     templates = []

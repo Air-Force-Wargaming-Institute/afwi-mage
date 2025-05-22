@@ -54,20 +54,20 @@ To enhance the Report Builder with improved content handling for AI-generated "t
 *User Stories & Tasks:*
 
 *   **As a user, I want an option to export my final report as a PDF document, in addition to existing export formats.**
-    *   [ ] **Library Selection (`report_builder_service`):** Research and choose a suitable Python library for converting HTML or Markdown to PDF (e.g., WeasyPrint, ReportLab, or using Pandoc if it provides good results from Markdown/HTML).
+    *   [x] **Library Selection (`report_builder_service`):** Research and choose a suitable Python library for converting HTML or Markdown to PDF (e.g., WeasyPrint, ReportLab, or using Pandoc if it provides good results from Markdown/HTML).
         *   Consider dependencies, licensing, and ease of installation in the Docker container.
-    *   [ ] **New API Endpoint (`report_builder_service`):** Create a new API endpoint (e.g., `/reports/{report_id}/export/pdf`).
-    *   [ ] **Content Preparation (`report_builder_service`):** Reuse or adapt the `generate_export_markdown` logic to get the clean report content (without thinking tags).
-    *   [ ] **Conversion Logic (`report_builder_service`):** Implement the conversion from Markdown/HTML to PDF using the chosen library.
-    *   [ ] **Response Handling (`report_builder_service`):** Ensure the API endpoint returns the PDF file with appropriate `Content-Type` headers (e.g., `application/pdf`).
-    *   [ ] **UI Element (`ReportDesignerPage.js` / `ReportPreviewPanel.js`):** Add a "Export to PDF" button/menu item to the export options.
-    *   [ ] **API Call (Frontend):** Implement the frontend logic to call the new PDF export API endpoint.
-    *   [ ] **File Download (Frontend):** Handle the API response to trigger a file download for the user.
-    *   [ ] **Dockerfile/Dependencies:** Update `requirements.txt` with the new Python PDF library.
-    *   [ ] **Dockerfile/Dependencies:** Update `Dockerfile` if the chosen library has system-level dependencies (e.g., for WeasyPrint).
-    *   [ ] **Dockerfile/Dependencies:** Update `download_wheels.ps1` and `downloaded_wheels_list.txt` if necessary.
-    *   [ ] **Testing:** Test PDF export with various report structures and content types.
-    *   [ ] **Testing:** Verify PDF formatting, readability, and inclusion of all relevant content.
+    *   [x] **New API Endpoint (`report_builder_service`):** Create a new API endpoint (e.g., `/reports/{report_id}/export/pdf`).
+    *   [x] **Content Preparation (`report_builder_service`):** Reuse or adapt the `generate_export_markdown` logic to get the clean report content (without thinking tags).
+    *   [x] **Conversion Logic (`report_builder_service`):** Implement the conversion from Markdown/HTML to PDF using the chosen library.
+    *   [x] **Response Handling (`report_builder_service`):** Ensure the API endpoint returns the PDF file with appropriate `Content-Type` headers (e.g., `application/pdf`).
+    *   [x] **UI Element (`ReportDesignerPage.js` / `ReportPreviewPanel.js`):** Add a "Export to PDF" button/menu item to the export options.
+    *   [x] **API Call (Frontend):** Implement the frontend logic to call the new PDF export API endpoint.
+    *   [x] **File Download (Frontend):** Handle the API response to trigger a file download for the user.
+    *   [x] **Dockerfile/Dependencies:** Update `requirements.txt` with the new Python PDF library.
+    *   [x] **Dockerfile/Dependencies:** Update `Dockerfile` if the chosen library has system-level dependencies (e.g., for WeasyPrint).
+    *   [x] **Dockerfile/Dependencies:** Update `download_wheels.ps1` and `downloaded_wheels_list.txt` if necessary.
+    *   [x] **Testing:** Test PDF export with various report structures and content types.
+    *   [x] **Testing:** Verify PDF formatting, readability, and inclusion of all relevant content.
 
 ## 5. Open Questions & Discussion Points
 

@@ -1,6 +1,6 @@
 import httpx
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 import json
 from datetime import datetime
 import re
@@ -11,7 +11,7 @@ from config import (
     REPORT_SECTION_SYSTEM_PROMPT, TOKEN_LIMIT, REGENERATION_TOKEN_LIMIT,
     VLLM_API_KEY
 )
-from models.schemas import ReportElement, Report
+from models.schemas import ReportElement, Report, Section
 from services.file_service import save_report_to_file
 
 async def generate_element_content(element: ReportElement, vector_store_id: Optional[str], previous_content: str = "") -> str:
@@ -318,7 +318,8 @@ def get_context_within_limit(contents: List[str], token_limit: int) -> str:
 async def generate_export_markdown(report: Report) -> str:
     """
     Generate clean markdown content for export purposes.
-    This version only includes AI-generated content for generative sections, not instructions.
+    This version includes AI-generated content for generative sections, explicit content,
+    and section titles.
     
     Args:
         report: The report definition to use
@@ -327,67 +328,178 @@ async def generate_export_markdown(report: Report) -> str:
         str: Clean markdown content for export
     """
     logger.info(f"Generating export-ready markdown for report: {report.id}")
-    markdown_parts = []  # Initialize a list to hold parts of the markdown
-    
-    # Add report title and description
+    markdown_parts = []
+
     markdown_parts.append(f"# {report.name}\n")
     
     if report.description:
-        markdown_parts.append(f"{report.description}\n\n")  # Add extra newline for spacing after description
+        markdown_parts.append(f"{report.description}\n\n")
 
-    # Process each element in the report
-    logger.info(f"Processing {len(report.content.elements)} elements for export")
     has_missing_content = False
-    for element_index, element in enumerate(report.content.elements):
-        element_content_parts = [] # For collecting parts of the current element's content
 
-        # Skip elements with no content unless they are headings (which might just use their title)
+    def process_element_for_markdown(element: ReportElement, is_nested: bool = False):
+        nonlocal has_missing_content
+        element_content_parts = []
         is_heading = element.format and element.format.startswith('h')
-        # Determine actual content to use
         actual_content = None
+
         if element.type == 'explicit':
             actual_content = element.content if element.content is not None else (element.title if is_heading and element.title is not None else '')
         elif element.type == 'generative':
             actual_content = element.ai_generated_content if element.ai_generated_content is not None else ''
-            if not actual_content: # Check if AI content is missing for a generative section
+            if not actual_content:
                 logger.warning(f"Element {element.id} (generative) has no ai_generated_content for export.")
                 has_missing_content = True
         
-        if actual_content is None: # Should not happen if logic above is correct
+        if actual_content is None:
              actual_content = ""
 
-        # Filter thinking tags from the content
         actual_content = _filter_thinking_tags(actual_content)
 
-        if not actual_content.strip(): # Skip if content is empty or just whitespace
-            markdown_parts.append("\n") # Add spacing even if skipped
-            continue
+        if not actual_content.strip() and not is_heading:
+            return ""
 
-        # Apply formatting based on element.format
         if element.format and element.format.startswith('h'):
             try:
                 level = int(element.format[1:])
                 if 1 <= level <= 6:
                     element_content_parts.append(f"{'#' * level} {actual_content}\n")
-                else: # Default to paragraph if level is invalid
+                else:
                     element_content_parts.append(f"{actual_content}\n")
-            except ValueError: # Default to paragraph if format is like 'hX' but X is not a number
+            except ValueError:
                 element_content_parts.append(f"{actual_content}\n")
         elif element.format == 'bulletList':
             lines = actual_content.split('\n')
             for line in lines:
-                element_content_parts.append(f"- {line}\n")
+                if line.strip():
+                    element_content_parts.append(f"- {line}\n")
         elif element.format == 'numberedList':
             lines = actual_content.split('\n')
             for i, line in enumerate(lines):
-                element_content_parts.append(f"{i + 1}. {line}\n")
-        else: # Default to paragraph
+                if line.strip():
+                    element_content_parts.append(f"{i + 1}. {line}\n")
+        else: 
             element_content_parts.append(f"{actual_content}\n")
         
-        markdown_parts.append("".join(element_content_parts))
-        markdown_parts.append("\n")  # Add spacing after the element's content
-    
+        return "".join(element_content_parts)
+
+    logger.info(f"Processing {len(report.content.items)} items for export")
+    for item_index, item in enumerate(report.content.items):
+        if item.item_type == 'section':
+            section = item 
+            markdown_parts.append(f"\n## {section.title}\n\n")
+            if section.elements:
+                for element_index, element in enumerate(section.elements):
+                    element_markdown = process_element_for_markdown(element, is_nested=True)
+                    if element_markdown:
+                        markdown_parts.append(element_markdown)
+                        markdown_parts.append("\n")
+            else:
+                markdown_parts.append("_This section is empty._\n\n")
+
+        elif item.item_type == 'element':
+            element = item 
+            element_markdown = process_element_for_markdown(element, is_nested=False)
+            if element_markdown:
+                markdown_parts.append(element_markdown)
+                markdown_parts.append("\n")
+        else:
+            logger.warning(f"Unknown item type encountered in report content: {getattr(item, 'item_type', 'N/A')}")
+
     if has_missing_content:
-        logger.warning(f"Report {report.id} has sections with missing AI-generated content")
+        logger.warning(f"Report {report.id} has elements with missing AI-generated content")
         
-    return "".join(markdown_parts)  # Join all parts together 
+    return "".join(markdown_parts).strip() + "\n"
+
+async def generate_flattened_export_markdown(report: Report) -> str:
+    """
+    Generate clean markdown content for export purposes with a flattened structure.
+    This version processes all elements, including those within sections, as a single list
+    and does not include section titles.
+    
+    Args:
+        report: The report definition to use
+        
+    Returns:
+        str: Clean markdown content for export, flattened.
+    """
+    logger.info(f"Generating flattened export-ready markdown for report: {report.id}")
+    markdown_parts = []
+    has_missing_content = False # Keep this local to this function or pass as arg if helper is outside
+
+    # Inner helper function (copied and adapted from generate_export_markdown)
+    # If this helper grows complex or is identical, consider moving it to a shared scope.
+    def process_element_for_flat_markdown(element: ReportElement):
+        nonlocal has_missing_content
+        element_content_parts = []
+        is_heading = element.format and element.format.startswith('h')
+        actual_content = None
+
+        if element.type == 'explicit':
+            actual_content = element.content if element.content is not None else (element.title if is_heading and element.title is not None else '')
+        elif element.type == 'generative':
+            actual_content = element.ai_generated_content if element.ai_generated_content is not None else ''
+            if not actual_content:
+                logger.warning(f"Element {element.id} (generative) has no ai_generated_content for flat export.")
+                has_missing_content = True
+        
+        if actual_content is None:
+             actual_content = ""
+
+        actual_content = _filter_thinking_tags(actual_content)
+
+        if not actual_content.strip() and not is_heading:
+            return ""
+
+        if element.format and element.format.startswith('h'):
+            try:
+                level = int(element.format[1:])
+                if 1 <= level <= 6:
+                    element_content_parts.append(f"{'#' * level} {actual_content}\n")
+                else:
+                    element_content_parts.append(f"{actual_content}\n")
+            except ValueError:
+                element_content_parts.append(f"{actual_content}\n")
+        elif element.format == 'bulletList':
+            lines = actual_content.split('\n')
+            for line in lines:
+                if line.strip():
+                    element_content_parts.append(f"- {line}\n")
+        elif element.format == 'numberedList':
+            lines = actual_content.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip():
+                    element_content_parts.append(f"{i + 1}. {line}\n")
+        else: 
+            element_content_parts.append(f"{actual_content}\n")
+        
+        return "".join(element_content_parts)
+
+    # Add report title and description only once at the beginning
+    markdown_parts.append(f"# {report.name}\n")
+    if report.description:
+        markdown_parts.append(f"{report.description}\n\n")
+
+    logger.info(f"Processing {len(report.content.items)} items for flattened export")
+    for item in report.content.items:
+        if item.item_type == 'section':
+            section = item # item is a Section
+            if section.elements:
+                for element in section.elements:
+                    element_markdown = process_element_for_flat_markdown(element)
+                    if element_markdown:
+                        markdown_parts.append(element_markdown)
+                        markdown_parts.append("\n") # Add spacing after the element's content
+        elif item.item_type == 'element':
+            element = item # item is a ReportElement
+            element_markdown = process_element_for_flat_markdown(element)
+            if element_markdown:
+                markdown_parts.append(element_markdown)
+                markdown_parts.append("\n") # Add spacing after the element's content
+        else:
+            logger.warning(f"Unknown item type encountered in report content: {getattr(item, 'item_type', 'N/A')}")
+
+    if has_missing_content:
+        logger.warning(f"Report {report.id} has elements with missing AI-generated content during flattened export")
+        
+    return "".join(markdown_parts).strip() + "\n" 

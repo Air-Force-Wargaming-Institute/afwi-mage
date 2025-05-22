@@ -12,7 +12,7 @@ from models.schemas import GeneratedReportMarkdown, ErrorResponse, ErrorCodes, W
 from services.file_service import load_report_from_file, save_report_to_file
 from services.generation_service import (
     generate_element_content, get_preceding_content, get_context_within_limit, 
-    generate_export_markdown, estimate_tokens
+    generate_export_markdown, estimate_tokens, generate_flattened_export_markdown
 )
 from services.export_service import export_report_to_pdf_service
 from utils.errors import create_error_response, get_status_code_for_error, ServiceError
@@ -369,8 +369,8 @@ async def export_report_to_word(report_id: str, options: WordExportOptions = Non
                 with open(report_content_path, "r", encoding="utf-8") as f:
                     markdown_content = f.read()
             else:
-                # Generate clean markdown from the report
-                markdown_content = await generate_export_markdown(report)
+                # Generate clean FLATTENED markdown from the report for Word export
+                markdown_content = await generate_flattened_export_markdown(report)
                 
                 # If we have no content, return an error
                 if not markdown_content:
