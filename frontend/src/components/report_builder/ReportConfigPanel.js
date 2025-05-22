@@ -28,6 +28,8 @@ import FormatListNumberedIcon from '@material-ui/icons/FormatListNumbered';
 import AutorenewIcon from '@material-ui/icons/Autorenew';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import InfoIcon from '@material-ui/icons/Info';
+import ExitToAppIcon from '@material-ui/icons/ExitToApp';
+import CallReceivedIcon from '@material-ui/icons/CallReceived';
 import { GradientText, SubtleGlowPaper } from '../../styles/StyledComponents';
 import { getGatewayUrl } from '../../config';
 import axios from 'axios';
@@ -112,6 +114,8 @@ const useStyles = makeStyles((theme) => ({
   insertButtonContainer: {
     display: 'flex',
     justifyContent: 'center',
+    gap: theme.spacing(1),
+    flexWrap: 'wrap',
   },
   bulletList: {
     listStyleType: 'disc',
@@ -302,34 +306,194 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
     const urlParams = new URLSearchParams(window.location.search);
     const templateKey = urlParams.get('templateKey');
 
-    if (templateKey && currentReportId && (!definition || !definition.elements || definition.elements.length === 0)) {
+    if (templateKey && currentReportId && (!definition || !definition.items || definition.items.length === 0)) {
       try {
         const templateDataString = sessionStorage.getItem(templateKey);
         if (templateDataString) {
           const template = JSON.parse(templateDataString); // template is already in the new format
           
-          // Simplified processing: template.prebuiltElements are now in the correct format.
-          // We just need to ensure unique IDs for elements within this new report instance.
-          const processedElements = (template.prebuiltElements || []).map((element, index) => ({
-            ...element, // Spread the element, which already has `format` and correct `content` structure
-            id: `${template.id || 'template'}-${element.title ? element.title.replace(/\s+/g, '-').toLowerCase() : 'element'}-${index}-${Date.now()}`,
-            // No need for derivedFormat or content processing logic here anymore.
-          }));
+          // Process template items (now using items instead of prebuiltElements)
+          const processedItems = (template.items || template.prebuiltElements || []).map((item, index) => {
+            if (item.item_type === 'section') {
+              // Process section and its child elements
+              const processedElements = (item.elements || []).map((element, elemIndex) => ({
+                ...element,
+                id: `${template.id || 'template'}-${item.title || 'section'}-elem-${elemIndex}-${Date.now()}`,
+              }));
+              return {
+                ...item,
+                id: `${template.id || 'template'}-section-${index}-${Date.now()}`,
+                elements: processedElements
+              };
+            } else {
+              // Standalone element
+              return {
+                ...item,
+                id: `${template.id || 'template'}-${item.title ? item.title.replace(/\s+/g, '-').toLowerCase() : 'element'}-${index}-${Date.now()}`,
+              };
+            }
+          });
 
           onChange({
             id: currentReportId,
             title: template.name || 'New Report from Template',
             description: template.description || '',
-            elements: processedElements,
+            items: processedItems,
             vectorStoreId: template.vectorStoreId || ''
           });
-          // sessionStorage.removeItem(templateKey); // Optional: Clear sessionStorage after use
         }
       } catch (error) {
         console.error('Error processing template data from sessionStorage:', error);
       }
     }
   }, [definition, onChange, currentReportId]);
+
+  // Helper functions for managing items structure
+  const getAllElements = (items) => {
+    const allElements = [];
+    items.forEach(item => {
+      if (item.item_type === 'element') {
+        allElements.push(item);
+      } else if (item.item_type === 'section' && item.elements) {
+        allElements.push(...item.elements);
+      }
+    });
+    return allElements;
+  };
+
+  const findElementInItems = (items, elementId) => {
+    for (const item of items) {
+      if (item.item_type === 'element' && item.id === elementId) {
+        return { element: item, parent: null, parentIndex: null, elementIndex: items.indexOf(item) };
+      } else if (item.item_type === 'section' && item.elements) {
+        for (let i = 0; i < item.elements.length; i++) {
+          if (item.elements[i].id === elementId) {
+            return { element: item.elements[i], parent: item, parentIndex: items.indexOf(item), elementIndex: i };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const updateElementInItems = (items, elementId, field, value) => {
+    return items.map(item => {
+      if (item.item_type === 'element' && item.id === elementId) {
+        return { ...item, [field]: value };
+      } else if (item.item_type === 'section' && item.elements) {
+        const updatedElements = item.elements.map(element => 
+          element.id === elementId ? { ...element, [field]: value } : element
+        );
+        return { ...item, elements: updatedElements };
+      }
+      return item;
+    });
+  };
+
+  const deleteElementFromItems = (items, elementId) => {
+    return items.map(item => {
+      if (item.item_type === 'section' && item.elements) {
+        const updatedElements = item.elements.filter(element => element.id !== elementId);
+        // If section becomes empty, auto-add a new element
+        if (updatedElements.length === 0) {
+          updatedElements.push(createNewElement());
+        }
+        return { ...item, elements: updatedElements };
+      }
+      return item;
+    }).filter(item => !(item.item_type === 'element' && item.id === elementId));
+  };
+
+  const handleDeleteSection = (sectionId) => {
+    const sectionToDelete = (definition?.items || []).find(item => item.item_type === 'section' && item.id === sectionId);
+    if (!sectionToDelete) return;
+
+    const updatedItems = [];
+    const sectionIndex = (definition?.items || []).findIndex(item => item.id === sectionId);
+    
+    // Add all items before the section
+    updatedItems.push(...(definition?.items || []).slice(0, sectionIndex));
+    
+    // Add the child elements of the deleted section as standalone elements
+    if (sectionToDelete.elements) {
+      sectionToDelete.elements.forEach(element => {
+        updatedItems.push({
+          ...element,
+          item_type: 'element',
+          parent_uuid: null // Make them unparented
+        });
+      });
+    }
+    
+    // Add all items after the section
+    updatedItems.push(...(definition?.items || []).slice(sectionIndex + 1));
+    
+    onChange({ ...definition, items: updatedItems });
+  };
+
+  const handleRemoveElementFromSection = (elementId) => {
+    const found = findElementInItems(definition?.items || [], elementId);
+    if (!found || !found.parent) return; // Element is not in a section
+    
+    const updatedItems = [];
+    
+    (definition?.items || []).forEach((item, index) => {
+      if (item.item_type === 'section' && item.id === found.parent.id) {
+        // Remove element from this section
+        const updatedElements = item.elements.filter(el => el.id !== elementId);
+        
+        // If section becomes empty, add a new element
+        if (updatedElements.length === 0) {
+          updatedElements.push(createNewElement());
+        }
+        
+        updatedItems.push({ ...item, elements: updatedElements });
+        
+        // Add the removed element as a standalone element right after the section
+        updatedItems.push({
+          ...found.element,
+          item_type: 'element',
+          parent_uuid: null
+        });
+      } else {
+        updatedItems.push(item);
+      }
+    });
+    
+    onChange({ ...definition, items: updatedItems });
+  };
+
+  const handleAddElementToSectionAbove = (elementId) => {
+    const elementIndex = (definition?.items || []).findIndex(item => item.item_type === 'element' && item.id === elementId);
+    if (elementIndex <= 0) return; // No element found or no section above
+    
+    // Find the section directly above this element
+    let sectionAbove = null;
+    for (let i = elementIndex - 1; i >= 0; i--) {
+      if ((definition?.items || [])[i].item_type === 'section') {
+        sectionAbove = (definition?.items || [])[i];
+        break;
+      }
+    }
+    
+    if (!sectionAbove) return; // No section found above
+    
+    const elementToMove = (definition?.items || []).find(item => item.id === elementId);
+    if (!elementToMove) return;
+    
+    const updatedItems = (definition?.items || []).map(item => {
+      if (item.item_type === 'section' && item.id === sectionAbove.id) {
+        // Add element to this section
+        return {
+          ...item,
+          elements: [...item.elements, { ...elementToMove, parent_uuid: item.id }]
+        };
+      }
+      return item;
+    }).filter(item => !(item.item_type === 'element' && item.id === elementId)); // Remove from root level
+    
+    onChange({ ...definition, items: updatedItems });
+  };
 
   // New generic handler for simple field changes
   const handleFieldChange = (e) => {
@@ -339,36 +503,78 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
 
   const createNewElement = () => ({
     id: `element-${Date.now()}`,
+    item_type: 'element',
     type: 'explicit',
     format: 'paragraph',
     content: '',
     instructions: '',
-    ai_generated_content: null
+    ai_generated_content: null,
+    parent_uuid: null
+  });
+
+  const createNewSection = () => ({
+    id: `section-${Date.now()}`,
+    item_type: 'section',
+    title: 'New Section',
+    elements: [createNewElement()]
   });
 
   const handleAddElement = () => {
     const newElement = createNewElement();
-    const newElements = [...(definition?.elements || []), newElement];
-    onChange({ ...definition, elements: newElements });
+    const newItems = [...(definition?.items || []), newElement];
+    onChange({ ...definition, items: newItems });
+  };
+
+  const handleAddSection = () => {
+    const newSection = createNewSection();
+    const newItems = [...(definition?.items || []), newSection];
+    onChange({ ...definition, items: newItems });
   };
 
   const handleInsertElementBelow = (index) => {
     const newElement = createNewElement();
-    const newElements = [...(definition?.elements || [])];
-    newElements.splice(index + 1, 0, newElement);
-    onChange({ ...definition, elements: newElements });
+    const newItems = [...(definition?.items || [])];
+    newItems.splice(index + 1, 0, newElement);
+    onChange({ ...definition, items: newItems });
+  };
+
+  const handleInsertSectionBelow = (index) => {
+    const newSection = createNewSection();
+    const newItems = [...(definition?.items || [])];
+    newItems.splice(index + 1, 0, newSection);
+    onChange({ ...definition, items: newItems });
+  };
+
+  const handleInsertElementBelowSection = (index) => {
+    const newElement = createNewElement();
+    const newItems = [...(definition?.items || [])];
+    newItems.splice(index + 1, 0, newElement);
+    onChange({ ...definition, items: newItems });
+  };
+
+  const handleInsertElementInSection = (sectionId, elementIndex) => {
+    const newElement = createNewElement();
+    const updatedItems = (definition?.items || []).map(item => {
+      if (item.item_type === 'section' && item.id === sectionId) {
+        const updatedElements = [...item.elements];
+        updatedElements.splice(elementIndex + 1, 0, newElement);
+        return { ...item, elements: updatedElements };
+      }
+      return item;
+    });
+    onChange({ ...definition, items: updatedItems });
   };
 
   const handleElementChange = (elementId, field, value) => {
-    const newElements = (definition?.elements || []).map(el => {
-      if (el.id === elementId) {
-        const updatedElement = { ...el, [field]: value };
-        
-        // Special handling when switching between element types
-        if (field === 'type') {
+    const updatedItems = updateElementInItems(definition?.items || [], elementId, field, value);
+    
+    // Special handling when switching between element types
+    if (field === 'type') {
+      const updatedItemsWithTypeSwitch = updatedItems.map(item => {
+        if (item.item_type === 'element' && item.id === elementId) {
+          const updatedElement = { ...item };
           if (value === 'explicit') {
-            // Don't clear any fields when switching to explicit
-            // Just ensure the required fields exist
+            // Ensure required fields exist for explicit elements
             if (updatedElement.ai_generated_content === undefined) {
               updatedElement.ai_generated_content = null;
             }
@@ -376,8 +582,7 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
               updatedElement.instructions = '';
             }
           } else if (value === 'generative') {
-            // Don't clear any fields when switching to generative
-            // Just ensure the required fields exist
+            // Ensure required fields exist for generative elements
             if (updatedElement.content === undefined) {
               updatedElement.content = '';
             }
@@ -388,29 +593,58 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
               updatedElement.ai_generated_content = null;
             }
           }
+          return updatedElement;
+        } else if (item.item_type === 'section' && item.elements) {
+          const updatedElements = item.elements.map(element => {
+            if (element.id === elementId) {
+              const updatedElement = { ...element };
+              if (value === 'explicit') {
+                if (updatedElement.ai_generated_content === undefined) {
+                  updatedElement.ai_generated_content = null;
+                }
+                if (updatedElement.instructions === undefined) {
+                  updatedElement.instructions = '';
+                }
+              } else if (value === 'generative') {
+                if (updatedElement.content === undefined) {
+                  updatedElement.content = '';
+                }
+                if (updatedElement.instructions === undefined) {
+                  updatedElement.instructions = '';
+                }
+                if (updatedElement.ai_generated_content === undefined) {
+                  updatedElement.ai_generated_content = null;
+                }
+              }
+              return updatedElement;
+            }
+            return element;
+          });
+          return { ...item, elements: updatedElements };
         }
-        
-        return updatedElement;
-      }
-      return el;
-    });
-    
-    onChange({ ...definition, elements: newElements });
+        return item;
+      });
+      onChange({ ...definition, items: updatedItemsWithTypeSwitch });
+    } else {
+      onChange({ ...definition, items: updatedItems });
+    }
   };
 
   const handleDeleteElement = (elementId) => {
-    const newElements = (definition?.elements || []).filter(el => el.id !== elementId);
-    onChange({ ...definition, elements: newElements });
+    const updatedItems = deleteElementFromItems(definition?.items || [], elementId);
+    onChange({ ...definition, items: updatedItems });
   };
 
   const handleMoveElement = (index, direction) => {
-    const newElements = [...(definition?.elements || [])];
-    if (index < 0 || index >= newElements.length) return;
-    const item = newElements.splice(index, 1)[0];
+    // For now, this only handles root-level items movement
+    // TODO: Add logic for moving elements within sections
+    const newItems = [...(definition?.items || [])];
+    if (index < 0 || index >= newItems.length) return;
+    const item = newItems.splice(index, 1)[0];
     const newIndex = index + direction;
-    const clampedIndex = Math.max(0, Math.min(newIndex, newElements.length));
-    newElements.splice(clampedIndex, 0, item);
-    onChange({ ...definition, elements: newElements });
+    const clampedIndex = Math.max(0, Math.min(newIndex, newItems.length));
+    newItems.splice(clampedIndex, 0, item);
+    onChange({ ...definition, items: newItems });
   };
 
   const isBulletFormat = (element) => {
@@ -446,9 +680,22 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   const handleTitleClick = (elementId, e) => {
     e.stopPropagation();
     setEditingTitle(elementId);
-    // Set the initial editing value to the current title (or empty string if null)
-    const element = definition?.elements?.find(el => el.id === elementId);
-    setEditingTitleValue(element?.title || '');
+    
+    // Find the item (could be section or element) using the helper function
+    const found = findElementInItems(definition?.items || [], elementId);
+    let currentTitle = '';
+    
+    if (found) {
+      currentTitle = found.element.title || '';
+    } else {
+      // Check if it's a section
+      const section = (definition?.items || []).find(item => item.item_type === 'section' && item.id === elementId);
+      if (section) {
+        currentTitle = section.title || '';
+      }
+    }
+    
+    setEditingTitleValue(currentTitle);
 
     // If the element is currently collapsed, expand it when its title is clicked for editing.
     if (collapsedElements[elementId]) {
@@ -461,7 +708,20 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
   };
 
   const saveTitleChange = (elementId) => {
-    handleElementChange(elementId, 'title', editingTitleValue);
+    // Check if it's a section first
+    const isSection = (definition?.items || []).find(item => item.item_type === 'section' && item.id === elementId);
+    
+    if (isSection) {
+      // Handle section title change
+      const updatedItems = (definition?.items || []).map(item => 
+        item.id === elementId ? { ...item, title: editingTitleValue } : item
+      );
+      onChange({ ...definition, items: updatedItems });
+    } else {
+      // Handle element title change
+      handleElementChange(elementId, 'title', editingTitleValue);
+    }
+    
     setEditingTitle(null);
   };
 
@@ -474,14 +734,27 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
 
   const toggleAllElements = (collapse) => {
     const newCollapsedState = {};
-    (definition?.elements || []).forEach(element => {
-      newCollapsedState[element.id] = collapse;
+    (definition?.items || []).forEach(item => {
+      if (item.item_type === 'element') {
+        newCollapsedState[item.id] = collapse;
+      } else if (item.item_type === 'section' && item.elements) {
+        item.elements.forEach(element => {
+          newCollapsedState[element.id] = collapse;
+        });
+      }
     });
     setCollapsedElements(newCollapsedState);
   };
 
   const areAllCollapsed = () => {
-    return (definition?.elements || []).every(element => collapsedElements[element.id]);
+    return (definition?.items || []).every(item => {
+      if (item.item_type === 'element') {
+        return collapsedElements[item.id];
+      } else if (item.item_type === 'section' && item.elements) {
+        return item.elements.every(element => collapsedElements[element.id]);
+      }
+      return false;
+    });
   };
 
   // Helper functions for the ReportTextEditorModal
@@ -506,6 +779,24 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
       handleElementChange(elementId, field, newValue);
     }
     handleCloseReportTextEditor();
+  };
+
+  const handleMoveElementInSection = (sectionId, elementIndex, direction) => {
+    const updatedItems = (definition?.items || []).map(item => {
+      if (item.item_type === 'section' && item.id === sectionId) {
+        const elements = [...item.elements];
+        if (elementIndex < 0 || elementIndex >= elements.length) return item;
+        
+        const element = elements.splice(elementIndex, 1)[0];
+        const newIndex = elementIndex + direction;
+        const clampedIndex = Math.max(0, Math.min(newIndex, elements.length));
+        elements.splice(clampedIndex, 0, element);
+        
+        return { ...item, elements };
+      }
+      return item;
+    });
+    onChange({ ...definition, items: updatedItems });
   };
 
   return (
@@ -588,269 +879,646 @@ function ReportConfigPanel({ definition, onChange, currentReportId, onRegenerate
       </Box>
 
       <Box className={classes.elementsContainer}>
-        {(definition?.elements || []).map((element, index) => (
-          <SubtleGlowPaper 
-            key={element.id || index} 
-            className={classes.elementItem} 
-            elevation={2}
-            onClick={() => toggleElement(element.id)}
-          >
-            <Box 
-              className={classes.elementHeader}
-            >
-              <Box style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <IconButton 
-                  size="small" 
-                  className={classes.collapseButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleElement(element.id);
-                  }}
-                >
-                  {collapsedElements[element.id] ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-                </IconButton>
-                {editingTitle === element.id ? (
-                  <TextField
-                    className={classes.elementTitleInput}
-                    value={editingTitleValue}
-                    onChange={handleTitleChange}
-                    onBlur={() => saveTitleChange(element.id)}
-                    onKeyPress={(e) => handleTitleKeyPress(e, element.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                    size="small"
-                    variant="standard"
-                  />
-                ) : (
-                  <Typography 
-                    className={classes.elementTitle}
-                    onClick={(e) => handleTitleClick(element.id, e)}
-                  >
-                    {element.title || `Element ${index + 1}`}
-                  </Typography>
-                )}
-              </Box>
-              <Box className={classes.elementActions}>
-                <IconButton size="small" onClick={(e) => {
-                  e.stopPropagation();
-                  handleMoveElement(index, -1);
-                }} disabled={index === 0} title="Move Up">
-                  <ArrowUpwardIcon fontSize="inherit"/>
-                </IconButton>
-                <IconButton size="small" onClick={(e) => {
-                  e.stopPropagation();
-                  handleMoveElement(index, 1);
-                }} disabled={index === (definition?.elements?.length || 0) - 1} title="Move Down">
-                  <ArrowDownwardIcon fontSize="inherit"/>
-                </IconButton>
-                <IconButton size="small" onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteElement(element.id);
-                }} color="secondary" title="Delete Element">
-                  <DeleteIcon fontSize="inherit"/>
-                </IconButton>
-              </Box>
-            </Box>
-
-            <Collapse in={!collapsedElements[element.id]}>
-              <Box className={classes.elementContent} onClick={(e) => e.stopPropagation()}>
-                <Box className={classes.elementControls}>
-                  <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
-                    <Button
-                      className={classes.typeToggleButton}
-                      variant={element.type === 'explicit' ? 'contained' : 'outlined'}
-                      color={element.type === 'explicit' ? 'primary' : 'default'}
-                      onClick={() => handleElementChange(element.id || index, 'type', 'explicit')}
+        {(definition?.items || []).map((item, index) => {
+          if (item.item_type === 'section') {
+            // Render Section with its child elements
+            return (
+              <SubtleGlowPaper 
+                key={item.id || index} 
+                className={classes.elementItem} 
+                elevation={2}
+              >
+                <Box className={classes.sectionHeader}>
+                  <Box className={classes.sectionTitle}>
+                    <IconButton 
+                      size="small" 
+                      className={classes.collapseButton}
+                      onClick={() => toggleElement(item.id)}
                     >
-                      Explicit
-                    </Button>
-                    <Button
-                      className={classes.typeToggleButton}
-                      variant={element.type === 'generative' ? 'contained' : 'outlined'}
-                      color={element.type === 'generative' ? 'primary' : 'default'}
-                      onClick={() => handleElementChange(element.id || index, 'type', 'generative')}
-                    >
-                      AI Gen
-                    </Button>
-                  </ButtonGroup>
+                      {collapsedElements[item.id] ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                    </IconButton>
+                    {editingTitle === item.id ? (
+                      <TextField
+                        className={classes.elementTitleInput}
+                        value={editingTitleValue}
+                        onChange={handleTitleChange}
+                        onBlur={() => saveTitleChange(item.id)}
+                        onKeyPress={(e) => handleTitleKeyPress(e, item.id)}
+                        autoFocus
+                        size="small"
+                        variant="standard"
+                      />
+                    ) : (
+                      <Typography 
+                        className={classes.elementTitle}
+                        onClick={(e) => handleTitleClick(item.id, e)}
+                      >
+                        📁 {item.title || `Section ${index + 1}`}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box className={classes.elementActions}>
+                    <IconButton size="small" onClick={() => handleMoveElement(index, -1)} disabled={index === 0} title="Move Section Up">
+                      <ArrowUpwardIcon fontSize="inherit"/>
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleMoveElement(index, 1)} disabled={index === (definition?.items?.length || 0) - 1} title="Move Section Down">
+                      <ArrowDownwardIcon fontSize="inherit"/>
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDeleteSection(item.id)} color="secondary" title="Delete Section">
+                      <DeleteIcon fontSize="inherit"/>
+                    </IconButton>
+                  </Box>
+                </Box>
 
-                  {element.type === 'explicit' && (
-                    <ButtonGroup className={classes.formatButtonGroup} size="small" aria-label="format options">
-                      {formatOptions.map(opt => {
-                        const isSelected = element.format === opt.value;
-                        const FormatIcon = opt.icon;
-                        return (
-                          FormatIcon ? (
-                            <Tooltip title={opt.label} key={opt.value}>
-                              <IconButton
-                                className={classes.formatIconButton}
+                <Collapse in={!collapsedElements[item.id]}>
+                  <Box className={classes.sectionContent}>
+                    {/* Render child elements */}
+                    {(item.elements || []).map((element, elemIndex) => (
+                      <SubtleGlowPaper 
+                        key={element.id || elemIndex} 
+                        className={classes.elementItem} 
+                        elevation={1}
+                        onClick={() => toggleElement(element.id)}
+                      >
+                        <Box className={classes.elementHeader}>
+                          <Box style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                            <IconButton 
+                              size="small" 
+                              className={classes.collapseButton}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleElement(element.id);
+                              }}
+                            >
+                              {collapsedElements[element.id] ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                            </IconButton>
+                            {editingTitle === element.id ? (
+                              <TextField
+                                className={classes.elementTitleInput}
+                                value={editingTitleValue}
+                                onChange={handleTitleChange}
+                                onBlur={() => saveTitleChange(element.id)}
+                                onKeyPress={(e) => handleTitleKeyPress(e, element.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
                                 size="small"
-                                color={'primary'} 
-                                onClick={() => handleElementChange(element.id || index, 'format', opt.value)}
-                                style={{
-                                  border: `1px solid ${theme.palette.primary.main}`, // Always use primary color for border
-                                  borderRadius: '4px',
-                                  color: isSelected ? theme.palette.primary.contrastText : theme.palette.primary.main,
-                                  backgroundColor: isSelected ? theme.palette.primary.main : 'transparent',
-                                }}
+                                variant="standard"
+                              />
+                            ) : (
+                              <Typography 
+                                className={classes.elementTitle}
+                                onClick={(e) => handleTitleClick(element.id, e)}
                               >
-                                <FormatIcon fontSize="small" />
+                                📄 {element.title || `Element ${elemIndex + 1}`}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Box className={classes.elementActions}>
+                            <IconButton size="small" onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveElementInSection(item.id, elemIndex, -1);
+                            }} disabled={elemIndex === 0} title="Move Element Up">
+                              <ArrowUpwardIcon fontSize="inherit"/>
+                            </IconButton>
+                            <IconButton size="small" onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveElementInSection(item.id, elemIndex, 1);
+                            }} disabled={elemIndex === (item.elements?.length || 0) - 1} title="Move Element Down">
+                              <ArrowDownwardIcon fontSize="inherit"/>
+                            </IconButton>
+                            <IconButton size="small" onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteElement(element.id);
+                            }} color="secondary" title="Delete Element">
+                              <DeleteIcon fontSize="inherit"/>
+                            </IconButton>
+                            <Tooltip title="Remove from Section (make standalone)">
+                              <IconButton size="small" onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveElementFromSection(element.id);
+                              }} color="primary" title="Remove from Section">
+                                <ExitToAppIcon fontSize="inherit"/>
                               </IconButton>
                             </Tooltip>
-                          ) : (
-                            <Button 
-                              key={opt.value}
-                              className={classes.formatButton}
-                              variant={isSelected ? 'contained' : 'outlined'}
-                              color={isSelected ? 'primary' : 'default'}
-                              onClick={() => handleElementChange(element.id || index, 'format', opt.value)}
-                            >
-                              {opt.label}
-                            </Button>
-                          )
-                        );
-                      })}
-                    </ButtonGroup>
-                  )}
+                          </Box>
+                        </Box>
 
-                  {element.type === 'generative' && onRegenerateSection && (
-                    <Tooltip 
-                      title={
-                        isNewReport ? "Please save the document before AI generation." :
-                        !definition?.id ? "Please save the document before AI generation." : (
-                          <Typography variant="body2">
-                            {element.ai_generated_content ? 
-                              "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
-                              "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
-                          </Typography>
-                        )
-                      }
-                      classes={{ tooltip: classes.regenerateTooltip }}
-                      placement="top"
-                    >
-                      <span>
-                        <Button
-                          variant="contained"
-                          disabled={isGenerating || isNewReport || !definition?.id}
-                          className={classes.regenerateButton}
-                          size="small"
-                          onClick={() => onRegenerateSection(element.id)}
-                          startIcon={generatingElements[element.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
-                        >
-                          {element.ai_generated_content ? 'Regenerate' : 'Generate'}
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  )}
+                        <Collapse in={!collapsedElements[element.id]}>
+                          <Box className={classes.elementContent} onClick={(e) => e.stopPropagation()}>
+                            <Box className={classes.elementControls}>
+                              <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
+                                <Button
+                                  className={classes.typeToggleButton}
+                                  variant={element.type === 'explicit' ? 'contained' : 'outlined'}
+                                  color={element.type === 'explicit' ? 'primary' : 'default'}
+                                  onClick={() => handleElementChange(element.id, 'type', 'explicit')}
+                                >
+                                  Explicit
+                                </Button>
+                                <Button
+                                  className={classes.typeToggleButton}
+                                  variant={element.type === 'generative' ? 'contained' : 'outlined'}
+                                  color={element.type === 'generative' ? 'primary' : 'default'}
+                                  onClick={() => handleElementChange(element.id, 'type', 'generative')}
+                                >
+                                  AI Gen
+                                </Button>
+                              </ButtonGroup>
+
+                              {element.type === 'explicit' && (
+                                <ButtonGroup className={classes.formatButtonGroup} size="small" aria-label="format options">
+                                  {formatOptions.map(opt => {
+                                    const isSelected = element.format === opt.value;
+                                    const FormatIcon = opt.icon;
+                                    return (
+                                      FormatIcon ? (
+                                        <Tooltip title={opt.label} key={opt.value}>
+                                          <IconButton
+                                            className={classes.formatIconButton}
+                                            size="small"
+                                            color={'primary'} 
+                                            onClick={() => handleElementChange(element.id, 'format', opt.value)}
+                                            style={{
+                                              border: `1px solid ${theme.palette.primary.main}`,
+                                              borderRadius: '4px',
+                                              color: isSelected ? theme.palette.primary.contrastText : theme.palette.primary.main,
+                                              backgroundColor: isSelected ? theme.palette.primary.main : 'transparent',
+                                            }}
+                                          >
+                                            <FormatIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      ) : (
+                                        <Button 
+                                          key={opt.value}
+                                          className={classes.formatButton}
+                                          variant={isSelected ? 'contained' : 'outlined'}
+                                          color={isSelected ? 'primary' : 'default'}
+                                          onClick={() => handleElementChange(element.id, 'format', opt.value)}
+                                        >
+                                          {opt.label}
+                                        </Button>
+                                      )
+                                    );
+                                  })}
+                                </ButtonGroup>
+                              )}
+
+                              {element.type === 'generative' && onRegenerateSection && (
+                                <Tooltip 
+                                  title={
+                                    isNewReport ? "Please save the document before AI generation." :
+                                    !definition?.id ? "Please save the document before AI generation." : (
+                                      <Typography variant="body2">
+                                        {element.ai_generated_content ? 
+                                          "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
+                                          "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
+                                      </Typography>
+                                    )
+                                  }
+                                  classes={{ tooltip: classes.regenerateTooltip }}
+                                  placement="top"
+                                >
+                                  <span>
+                                    <Button
+                                      variant="contained"
+                                      disabled={isGenerating || isNewReport || !definition?.id}
+                                      className={classes.regenerateButton}
+                                      size="small"
+                                      onClick={() => onRegenerateSection(element.id)}
+                                      startIcon={generatingElements[element.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
+                                    >
+                                      {element.ai_generated_content ? 'Regenerate' : 'Generate'}
+                                    </Button>
+                                  </span>
+                                </Tooltip>
+                              )}
+                            </Box>
+                            
+                            {element.type === 'explicit' ? (
+                              <Box className={classes.textFieldContainer}>
+                                <TextField
+                                  multiline
+                                  rows={2}
+                                  fullWidth
+                                  variant="outlined"
+                                  margin="dense"
+                                  size="small"
+                                  value={isBulletFormat(element) ? getBulletItems(element).join('\n') : element.content || ''}
+                                  onChange={(e) => {
+                                    if (isBulletFormat(element)) {
+                                      handleBulletChange(element.id, e.target.value, element);
+                                    } else {
+                                      handleElementChange(element.id, 'content', e.target.value);
+                                    }
+                                  }}
+                                  label={
+                                    isBulletFormat(element) ? 
+                                    'Content: Use line breaks for new items.' : 
+                                    element.format === 'numberedList' ? 
+                                    'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
+                                    element.format === 'paragraph' ? 
+                                    'Content: Line breaks will be preserved.' : 
+                                    'Content: Formatting is controlled by the buttons above.'
+                                  }
+                                />
+                                <Tooltip title="Open Fullscreen Editor">
+                                  <IconButton
+                                    size="small"
+                                    className={classes.expandButton}
+                                    onClick={() => handleOpenReportTextEditor(
+                                      element.id,
+                                      'content',
+                                      element.content || '',
+                                      `Edit Content for ${element.title || 'Element ' + (elemIndex + 1)}`,
+                                      isBulletFormat(element) ? 'Enter bullet items (one item per line)...': 'Enter element content...'
+                                    )}
+                                  >
+                                    <FullscreenIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            ) : (
+                              <Box className={classes.textFieldContainer}>
+                                <TextField
+                                  label="AI Prompt - Provide instructions for MAGE to generate this element."
+                                  multiline
+                                  rows={2}
+                                  fullWidth
+                                  variant="outlined"
+                                  margin="dense"
+                                  size="small"
+                                  value={element.instructions || ''}
+                                  onChange={(e) => handleElementChange(element.id, 'instructions', e.target.value)}
+                                />
+                                <Tooltip title="Open Fullscreen Editor">
+                                  <IconButton
+                                    size="small"
+                                    className={classes.expandButton}
+                                    onClick={() => handleOpenReportTextEditor(
+                                      element.id,
+                                      'instructions',
+                                      element.instructions || '',
+                                      `Edit AI Prompt for ${element.title || 'Element ' + (elemIndex + 1)}`,
+                                      'Enter AI prompt instructions...'
+                                    )}
+                                  >
+                                    <FullscreenIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            )}
+                          </Box>
+                        </Collapse>
+
+                        <Box className={classes.insertButtonContainer}>
+                          <Button 
+                            size="small"
+                            variant="text"
+                            color="primary" 
+                            startIcon={<AddIcon />} 
+                            onClick={(e) => { 
+                              e.stopPropagation();
+                              handleInsertElementInSection(item.id, elemIndex);
+                            }}
+                          >
+                            Insert Element Below
+                          </Button>
+                        </Box>
+                      </SubtleGlowPaper>
+                    ))}
+                  </Box>
+                </Collapse>
+
+                <Box className={classes.insertButtonContainer}>
+                  <Button 
+                    size="small"
+                    variant="text"
+                    color="primary" 
+                    startIcon={<AddIcon />} 
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      handleInsertElementBelowSection(index);
+                    }}
+                  >
+                    Insert Element Below
+                  </Button>
+                  <Button 
+                    size="small"
+                    variant="text"
+                    color="secondary" 
+                    startIcon={<AddIcon />} 
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      handleInsertSectionBelow(index);
+                    }}
+                  >
+                    Insert Section Below
+                  </Button>
                 </Box>
-                
-                {element.type === 'explicit' ? (
-                  <Box className={classes.textFieldContainer}>
-                    <TextField
-                      multiline
-                      rows={2}
-                      fullWidth
-                      variant="outlined"
-                      margin="dense"
-                      size="small"
-                      value={isBulletFormat(element) ? getBulletItems(element).join('\n') : element.content || ''}
-                      onChange={(e) => {
-                        if (isBulletFormat(element)) {
-                          handleBulletChange(element.id || index, e.target.value, element);
-                        } else {
-                          handleElementChange(element.id || index, 'content', e.target.value);
-                        }
-                      }}
-                      label={
-                        isBulletFormat(element) ? 
-                        'Content: Use line breaks for new items.' : 
-                        element.format === 'numberedList' ? 
-                        'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
-                        element.format === 'paragraph' ? 
-                        'Content: Line breaks will be preserved.' : 
-                        'Content: Formatting is controlled by the buttons above.'
-                      }
-                    />
-                    <Tooltip title="Open Fullscreen Editor">
-                      <IconButton
-                        size="small"
-                        className={classes.expandButton}
-                        onClick={() => handleOpenReportTextEditor(
-                          element.id || index,
-                          'content',
-                          element.content || '',
-                          `Edit Content for ${element.title || 'Element ' + (index + 1)}`,
-                          isBulletFormat(element) ? 'Enter bullet items (one item per line)...': 'Enter element content...'
-                        )}
-                      >
-                        <FullscreenIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                ) : (
-                  <Box className={classes.textFieldContainer}>
-                    <TextField
-                      label="AI Prompt - Provide instructions for MAGE to generate this element."
-                      multiline
-                      rows={2}
-                      fullWidth
-                      variant="outlined"
-                      margin="dense"
-                      size="small"
-                      value={element.instructions || ''}
-                      onChange={(e) => handleElementChange(element.id || index, 'instructions', e.target.value)}
-                    />
-                    <Tooltip title="Open Fullscreen Editor">
-                      <IconButton
-                        size="small"
-                        className={classes.expandButton}
-                        onClick={() => handleOpenReportTextEditor(
-                          element.id || index,
-                          'instructions',
-                          element.instructions || '',
-                          `Edit AI Prompt for ${element.title || 'Element ' + (index + 1)}`,
-                          'Enter AI prompt instructions...'
-                        )}
-                      >
-                        <FullscreenIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                )}
-              </Box>
-            </Collapse>
-
-            <Box className={classes.insertButtonContainer} >
-              <Button 
-                size="small"
-                variant="text"
-                color="primary" 
-                startIcon={<AddIcon />} 
-                onClick={(e) => { 
-                  e.stopPropagation();
-                  handleInsertElementBelow(index);
-                }}
+              </SubtleGlowPaper>
+            );
+          } else {
+            // Render standalone Element
+            return (
+              <SubtleGlowPaper 
+                key={item.id || index} 
+                className={classes.elementItem} 
+                elevation={2}
+                onClick={() => toggleElement(item.id)}
               >
-                Insert Element Below
-              </Button>
-            </Box>
-          </SubtleGlowPaper>
-        ))}
-        {(definition?.elements || []).length === 0 && (
+                <Box className={classes.elementHeader}>
+                  <Box style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <IconButton 
+                      size="small" 
+                      className={classes.collapseButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleElement(item.id);
+                      }}
+                    >
+                      {collapsedElements[item.id] ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                    </IconButton>
+                    {editingTitle === item.id ? (
+                      <TextField
+                        className={classes.elementTitleInput}
+                        value={editingTitleValue}
+                        onChange={handleTitleChange}
+                        onBlur={() => saveTitleChange(item.id)}
+                        onKeyPress={(e) => handleTitleKeyPress(e, item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        size="small"
+                        variant="standard"
+                      />
+                    ) : (
+                      <Typography 
+                        className={classes.elementTitle}
+                        onClick={(e) => handleTitleClick(item.id, e)}
+                      >
+                        📄 {item.title || `Element ${index + 1}`}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box className={classes.elementActions}>
+                    <IconButton size="small" onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveElement(index, -1);
+                    }} disabled={index === 0} title="Move Element Up">
+                      <ArrowUpwardIcon fontSize="inherit"/>
+                    </IconButton>
+                    <IconButton size="small" onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveElement(index, 1);
+                    }} disabled={index === (definition?.items?.length || 0) - 1} title="Move Element Down">
+                      <ArrowDownwardIcon fontSize="inherit"/>
+                    </IconButton>
+                    <IconButton size="small" onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteElement(item.id);
+                    }} color="secondary" title="Delete Element">
+                      <DeleteIcon fontSize="inherit"/>
+                    </IconButton>
+                    {/* Check if there's a section above this element */}
+                    {(() => {
+                      const elementIndex = (definition?.items || []).findIndex(it => it.id === item.id);
+                      const hasSectionAbove = elementIndex > 0 && (definition?.items || []).slice(0, elementIndex).some(it => it.item_type === 'section');
+                      return hasSectionAbove ? (
+                        <Tooltip title="Add to Section Above">
+                          <IconButton size="small" onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddElementToSectionAbove(item.id);
+                          }} color="primary" title="Add to Section Above">
+                            <CallReceivedIcon fontSize="inherit"/>
+                          </IconButton>
+                        </Tooltip>
+                      ) : null;
+                    })()}
+                  </Box>
+                </Box>
+
+                <Collapse in={!collapsedElements[item.id]}>
+                  <Box className={classes.elementContent} onClick={(e) => e.stopPropagation()}>
+                    <Box className={classes.elementControls}>
+                      <ButtonGroup className={classes.typeToggleButtonGroup} size="small" aria-label="element type toggle">
+                        <Button
+                          className={classes.typeToggleButton}
+                          variant={item.type === 'explicit' ? 'contained' : 'outlined'}
+                          color={item.type === 'explicit' ? 'primary' : 'default'}
+                          onClick={() => handleElementChange(item.id || index, 'type', 'explicit')}
+                        >
+                          Explicit
+                        </Button>
+                        <Button
+                          className={classes.typeToggleButton}
+                          variant={item.type === 'generative' ? 'contained' : 'outlined'}
+                          color={item.type === 'generative' ? 'primary' : 'default'}
+                          onClick={() => handleElementChange(item.id || index, 'type', 'generative')}
+                        >
+                          AI Gen
+                        </Button>
+                      </ButtonGroup>
+
+                      {item.type === 'explicit' && (
+                        <ButtonGroup className={classes.formatButtonGroup} size="small" aria-label="format options">
+                          {formatOptions.map(opt => {
+                            const isSelected = item.format === opt.value;
+                            const FormatIcon = opt.icon;
+                            return (
+                              FormatIcon ? (
+                                <Tooltip title={opt.label} key={opt.value}>
+                                  <IconButton
+                                    className={classes.formatIconButton}
+                                    size="small"
+                                    color={'primary'} 
+                                    onClick={() => handleElementChange(item.id || index, 'format', opt.value)}
+                                    style={{
+                                      border: `1px solid ${theme.palette.primary.main}`,
+                                      borderRadius: '4px',
+                                      color: isSelected ? theme.palette.primary.contrastText : theme.palette.primary.main,
+                                      backgroundColor: isSelected ? theme.palette.primary.main : 'transparent',
+                                    }}
+                                  >
+                                    <FormatIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                <Button 
+                                  key={opt.value}
+                                  className={classes.formatButton}
+                                  variant={isSelected ? 'contained' : 'outlined'}
+                                  color={isSelected ? 'primary' : 'default'}
+                                  onClick={() => handleElementChange(item.id || index, 'format', opt.value)}
+                                >
+                                  {opt.label}
+                                </Button>
+                              )
+                            );
+                          })}
+                        </ButtonGroup>
+                      )}
+
+                      {item.type === 'generative' && onRegenerateSection && (
+                        <Tooltip 
+                          title={
+                            isNewReport ? "Please save the document before AI generation." :
+                            !definition?.id ? "Please save the document before AI generation." : (
+                              <Typography variant="body2">
+                                {item.ai_generated_content ? 
+                                  "Regenerate this section's content. The AI will analyze the full report context to ensure the new content maintains consistency with all other sections." :
+                                  "Generate this section's content. The AI will analyze the full report context to ensure content is consistent with all other sections."}
+                              </Typography>
+                            )
+                          }
+                          classes={{ tooltip: classes.regenerateTooltip }}
+                          placement="top"
+                        >
+                          <span>
+                            <Button
+                              variant="contained"
+                              disabled={isGenerating || isNewReport || !definition?.id}
+                              className={classes.regenerateButton}
+                              size="small"
+                              onClick={() => onRegenerateSection(item.id)}
+                              startIcon={generatingElements[item.id]?.status === 'generating' ? <CircularProgress size={16} color="inherit" /> : null}
+                            >
+                              {item.ai_generated_content ? 'Regenerate' : 'Generate'}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </Box>
+                    
+                    {item.type === 'explicit' ? (
+                      <Box className={classes.textFieldContainer}>
+                        <TextField
+                          multiline
+                          rows={2}
+                          fullWidth
+                          variant="outlined"
+                          margin="dense"
+                          size="small"
+                          value={isBulletFormat(item) ? getBulletItems(item).join('\n') : item.content || ''}
+                          onChange={(e) => {
+                            if (isBulletFormat(item)) {
+                              handleBulletChange(item.id || index, e.target.value, item);
+                            } else {
+                              handleElementChange(item.id || index, 'content', e.target.value);
+                            }
+                          }}
+                          label={
+                            isBulletFormat(item) ? 
+                            'Content: Use line breaks for new items.' : 
+                            item.format === 'numberedList' ? 
+                            'Content: Use line breaks for new numbered items. Indent with spaces for sub-lists.' : 
+                            item.format === 'paragraph' ? 
+                            'Content: Line breaks will be preserved.' : 
+                            'Content: Formatting is controlled by the buttons above.'
+                          }
+                        />
+                        <Tooltip title="Open Fullscreen Editor">
+                          <IconButton
+                            size="small"
+                            className={classes.expandButton}
+                            onClick={() => handleOpenReportTextEditor(
+                              item.id || index,
+                              'content',
+                              item.content || '',
+                              `Edit Content for ${item.title || 'Element ' + (index + 1)}`,
+                              isBulletFormat(item) ? 'Enter bullet items (one item per line)...': 'Enter element content...'
+                            )}
+                          >
+                            <FullscreenIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    ) : (
+                      <Box className={classes.textFieldContainer}>
+                        <TextField
+                          label="AI Prompt - Provide instructions for MAGE to generate this element."
+                          multiline
+                          rows={2}
+                          fullWidth
+                          variant="outlined"
+                          margin="dense"
+                          size="small"
+                          value={item.instructions || ''}
+                          onChange={(e) => handleElementChange(item.id || index, 'instructions', e.target.value)}
+                        />
+                        <Tooltip title="Open Fullscreen Editor">
+                          <IconButton
+                            size="small"
+                            className={classes.expandButton}
+                            onClick={() => handleOpenReportTextEditor(
+                              item.id || index,
+                              'instructions',
+                              item.instructions || '',
+                              `Edit AI Prompt for ${item.title || 'Element ' + (index + 1)}`,
+                              'Enter AI prompt instructions...'
+                            )}
+                          >
+                            <FullscreenIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
+                  </Box>
+                </Collapse>
+
+                <Box className={classes.insertButtonContainer}>
+                  <Button 
+                    size="small"
+                    variant="text"
+                    color="primary" 
+                    startIcon={<AddIcon />} 
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      handleInsertElementBelow(index);
+                    }}
+                  >
+                    Insert Element Below
+                  </Button>
+                  <Button 
+                    size="small"
+                    variant="text"
+                    color="secondary" 
+                    startIcon={<AddIcon />} 
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      handleInsertSectionBelow(index);
+                    }}
+                  >
+                    Insert Section Below
+                  </Button>
+                </Box>
+              </SubtleGlowPaper>
+            );
+          }
+        })}
+        {(definition?.items || []).length === 0 && (
           <Typography align="center" color="textSecondary" style={{ padding: '16px' }}>
-            No elements added yet. Use the button below to add the first element.
+            No items added yet. Use the buttons below to add the first element or section.
           </Typography>
         )}
       </Box>
-      <Button 
-        variant="contained"
-        color="primary" 
-        startIcon={<AddIcon />} 
-        onClick={handleAddElement}
-        style={{ marginTop: '16px', alignSelf: 'center' }}
-      >
-        Add Element to End
-      </Button>
+      <Box style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+        <Button 
+          variant="contained"
+          color="primary" 
+          startIcon={<AddIcon />} 
+          onClick={handleAddElement}
+        >
+          Add Element
+        </Button>
+        <Button 
+          variant="outlined"
+          color="primary" 
+          startIcon={<AddIcon />} 
+          onClick={handleAddSection}
+        >
+          Add Section
+        </Button>
+      </Box>
 
       <ReportTextEditorModal
         open={isReportTextEditorOpen}

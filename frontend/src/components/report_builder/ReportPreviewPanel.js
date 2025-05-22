@@ -408,6 +408,27 @@ const parseReportContent = (content, elementId) => {
   }
 };
 
+// Helper function to flatten sections to only their child elements (sections not shown in preview)
+const flattenItemsToElements = (items) => {
+  if (!items || !Array.isArray(items)) return [];
+  
+  const flattenedElements = [];
+  
+  for (const item of items) {
+    if (item.item_type === 'element') {
+      // Standalone element - add directly
+      flattenedElements.push(item);
+    } else if (item.item_type === 'section') {
+      // Section - add only its child elements (skip the section itself)
+      if (item.elements && Array.isArray(item.elements)) {
+        flattenedElements.push(...item.elements);
+      }
+    }
+  }
+  
+  return flattenedElements;
+};
+
 function ReportPreviewPanel({ definition, onContentChange, isGenerating, generatingElements = {}, scrollToElementId, setScrollToElementId, highlightElementId, setHighlightElementId }) {
   const classes = useStyles();
   const theme = useTheme();
@@ -425,9 +446,12 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
   const [elementsMetadata, setElementsMetadata] = useState([]);
 
   useEffect(() => {
-    if (definition && definition.elements) {
+    if (definition && definition.items) {
+      // Flatten sections to just their child elements for preview
+      const flattenedElements = flattenItemsToElements(definition.items);
+      
       // We'll collect all formatted elements but handle Markdown differently for display vs. editing
-      const formattedElements = definition.elements.map(element => {
+      const formattedElements = flattenedElements.map(element => {
         // Initialize ref for new elements
         if (!elementRefs.current[element.id]) {
           elementRefs.current[element.id] = React.createRef();
@@ -526,14 +550,17 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
       // Make a deep copy of the original definition to modify
       const updatedDefinition = JSON.parse(JSON.stringify(definition));
       
+      // Get flattened elements for processing
+      const flattenedElements = flattenItemsToElements(updatedDefinition.items);
+      
       // Split the text by sections using the section markers
       const sections = editText.split('<!-- SECTION START -->').filter(Boolean);
       
       // Process each section
       sections.forEach((section, index) => {
-        if (index >= updatedDefinition.elements.length) return;
+        if (index >= flattenedElements.length) return;
         
-        const element = updatedDefinition.elements[index];
+        const element = flattenedElements[index];
         const cleanSection = section.split('<!-- SECTION END -->')[0].trim();
         
         if (element.type === 'explicit') {
@@ -555,25 +582,24 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
             }).join('\n');
           }
           
-          element.content = contentToSave;
+          // Find the actual element in the items structure and update it
+          updateElementInItems(updatedDefinition.items, element.id, 'content', contentToSave);
         } else if (element.type === 'generative') {
           // For generative elements, parse instructions and AI content
           const instructionsMatch = cleanSection.split('<!-- INSTRUCTIONS START -->')[1]?.split('<!-- INSTRUCTIONS END -->')[0]?.trim();
           const aiContentMatch = cleanSection.split('<!-- AI CONTENT START -->')[1]?.split('<!-- AI CONTENT END -->')[0]?.trim();
           
           if (instructionsMatch) {
-            element.instructions = instructionsMatch;
+            updateElementInItems(updatedDefinition.items, element.id, 'instructions', instructionsMatch);
           }
           
           if (aiContentMatch) {
             // Only update if not the placeholder and if content actually changed
             if (aiContentMatch !== '[AI content not yet generated]') {
-              element.ai_generated_content = aiContentMatch;
+              updateElementInItems(updatedDefinition.items, element.id, 'ai_generated_content', aiContentMatch);
               
-              // Explicitly removing this flag ensures the backend treats this as a real content update
-              if (element.hasOwnProperty('pendingGeneration')) {
-                delete element.pendingGeneration;
-              }
+              // Remove pendingGeneration flag if it exists
+              updateElementInItems(updatedDefinition.items, element.id, 'pendingGeneration', undefined, true);
             }
           }
         }
@@ -588,13 +614,42 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
     }
   };
 
+  // Helper function to update an element within the items structure
+  const updateElementInItems = (items, elementId, field, value, remove = false) => {
+    for (const item of items) {
+      if (item.item_type === 'element' && item.id === elementId) {
+        if (remove) {
+          delete item[field];
+        } else {
+          item[field] = value;
+        }
+        return true;
+      } else if (item.item_type === 'section' && item.elements) {
+        for (const element of item.elements) {
+          if (element.id === elementId) {
+            if (remove) {
+              delete element[field];
+            } else {
+              element[field] = value;
+            }
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
   const handleCancelClick = () => {
     // Restore the original definition
     setIsEditing(false);
     
     if (originalDefinition) {
+      // Get flattened elements from the original definition
+      const flattenedElements = flattenItemsToElements(originalDefinition.items);
+      
       // Regenerate the edit text from the original definition
-      const formattedElements = originalDefinition.elements.map(element => {
+      const formattedElements = flattenedElements.map(element => {
         if (element.type === 'explicit') {
           let contentToFormat = element.content || '';
           if (!element.content && element.title && element.format && element.format.match(/^h[1-6]$/)) {
@@ -647,11 +702,18 @@ function ReportPreviewPanel({ definition, onContentChange, isGenerating, generat
 
   // Render each element according to its type
   const renderElements = () => {
-    if (!definition || !definition.elements || definition.elements.length === 0) {
+    if (!definition || !definition.items || definition.items.length === 0) {
       return <Typography variant="body2" color="textSecondary">No elements defined yet.</Typography>;
     }
 
-    return definition.elements.map((element, index) => {
+    // Get flattened elements for rendering (sections are not shown, only their child elements)
+    const flattenedElements = flattenItemsToElements(definition.items);
+
+    if (flattenedElements.length === 0) {
+      return <Typography variant="body2" color="textSecondary">No content elements to display.</Typography>;
+    }
+
+    return flattenedElements.map((element, index) => {
       // Ensure ref is created if it wasn't during the initial useEffect
       if (!elementRefs.current[element.id]) {
         elementRefs.current[element.id] = React.createRef();
