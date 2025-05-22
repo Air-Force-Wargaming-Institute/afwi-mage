@@ -319,6 +319,7 @@ async def generate_export_markdown(report: Report) -> str:
     """
     Generate clean markdown content for export purposes.
     This version only includes AI-generated content for generative sections, not instructions.
+    For sections, only child elements are included (sections themselves are not rendered).
     
     Args:
         report: The report definition to use
@@ -335,22 +336,72 @@ async def generate_export_markdown(report: Report) -> str:
     if report.description:
         markdown_parts.append(f"{report.description}\n\n")  # Add extra newline for spacing after description
 
-    # Process each element in the report
-    logger.info(f"Processing {len(report.content.elements)} elements for export")
+    # Extract all elements from items (flattening sections to just their child elements)
+    all_elements = []
+    
+    # Handle both new items structure and legacy elements structure for backward compatibility
+    if hasattr(report.content, 'items') and report.content.items:
+        # New structure with sections and elements
+        for item in report.content.items:
+            if hasattr(item, 'item_type') or (isinstance(item, dict) and item.get('item_type')):
+                item_type = item.item_type if hasattr(item, 'item_type') else item.get('item_type')
+                
+                if item_type == 'element':
+                    # Add element directly
+                    all_elements.append(item)
+                elif item_type == 'section':
+                    # Skip section itself, but add its child elements
+                    if hasattr(item, 'elements') and item.elements:
+                        all_elements.extend(item.elements)
+                    elif isinstance(item, dict) and item.get('elements'):
+                        all_elements.extend(item.get('elements', []))
+            else:
+                # Item without item_type - treat as element for backward compatibility
+                all_elements.append(item)
+    elif hasattr(report.content, 'elements') and report.content.elements:
+        # Legacy structure - all items are elements
+        all_elements = report.content.elements
+    else:
+        # No content found
+        logger.warning(f"Report {report.id} has no content items or elements")
+        all_elements = []
+
+    # Process each element for export
+    logger.info(f"Processing {len(all_elements)} elements for export (flattened from sections)")
     has_missing_content = False
-    for element_index, element in enumerate(report.content.elements):
+    
+    for element_index, element in enumerate(all_elements):
         element_content_parts = [] # For collecting parts of the current element's content
 
+        # Handle both Pydantic models and dict representations
+        if hasattr(element, 'format'):
+            # Pydantic model
+            element_format = element.format
+            element_type = element.type
+            element_content = element.content
+            element_title = element.title
+            element_ai_content = element.ai_generated_content
+            element_id = element.id
+        else:
+            # Dict representation
+            element_format = element.get('format')
+            element_type = element.get('type')
+            element_content = element.get('content')
+            element_title = element.get('title')
+            element_ai_content = element.get('ai_generated_content')
+            element_id = element.get('id', f'element-{element_index}')
+
         # Skip elements with no content unless they are headings (which might just use their title)
-        is_heading = element.format and element.format.startswith('h')
+        is_heading = element_format and element_format.startswith('h')
+        
         # Determine actual content to use
         actual_content = None
-        if element.type == 'explicit':
-            actual_content = element.content if element.content is not None else (element.title if is_heading and element.title is not None else '')
-        elif element.type == 'generative':
-            actual_content = element.ai_generated_content if element.ai_generated_content is not None else ''
+        if element_type == 'explicit':
+            actual_content = element_content if element_content is not None else (element_title if is_heading and element_title is not None else '')
+        elif element_type == 'generative':
+            actual_content = element_ai_content if element_ai_content is not None else ''
             if not actual_content: # Check if AI content is missing for a generative section
-                logger.warning(f"Element {element.id} (generative) has no ai_generated_content for export.")
+                logger.warning(f"Element {element_id} (generative) has no ai_generated_content for export.")
                 has_missing_content = True
         
         if actual_content is None: # Should not happen if logic above is correct
@@ -364,23 +415,25 @@ async def generate_export_markdown(report: Report) -> str:
             continue
 
         # Apply formatting based on element.format
-        if element.format and element.format.startswith('h'):
+        if element_format and element_format.startswith('h'):
             try:
-                level = int(element.format[1:])
+                level = int(element_format[1:])
                 if 1 <= level <= 6:
                     element_content_parts.append(f"{'#' * level} {actual_content}\n")
                 else: # Default to paragraph if level is invalid
                     element_content_parts.append(f"{actual_content}\n")
             except ValueError: # Default to paragraph if format is like 'hX' but X is not a number
                 element_content_parts.append(f"{actual_content}\n")
-        elif element.format == 'bulletList':
+        elif element_format == 'bulletList':
             lines = actual_content.split('\n')
             for line in lines:
-                element_content_parts.append(f"- {line}\n")
-        elif element.format == 'numberedList':
+                if line.strip():  # Only add non-empty lines
+                    element_content_parts.append(f"- {line.strip()}\n")
+        elif element_format == 'numberedList':
             lines = actual_content.split('\n')
             for i, line in enumerate(lines):
-                element_content_parts.append(f"{i + 1}. {line}\n")
+                if line.strip():  # Only add non-empty lines
+                    element_content_parts.append(f"{i + 1}. {line.strip()}\n")
         else: # Default to paragraph
             element_content_parts.append(f"{actual_content}\n")
         

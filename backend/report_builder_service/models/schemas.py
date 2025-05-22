@@ -5,6 +5,7 @@ from datetime import datetime
 
 # Report Element Models
 class ReportElement(BaseModel):
+    item_type: Literal['element'] = 'element'
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: Optional[str] = None
     type: Literal['explicit', 'generative']
@@ -15,9 +16,20 @@ class ReportElement(BaseModel):
     generation_status: Optional[Literal['pending', 'generating', 'completed', 'error']] = None
     generation_error: Optional[str] = None
     updatedAt: Optional[datetime] = None # Added for regenerate_section logic
+    parent_uuid: Optional[str] = None # Links element to parent section, null for standalone elements
+
+# Section Model for organizing elements
+class Section(BaseModel):
+    item_type: Literal['section'] = 'section'
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    elements: List[ReportElement] = Field(default_factory=list)
+
+# Union type for items that can be either sections or elements
+ReportItem = Union[Section, ReportElement]
 
 class ReportContent(BaseModel):
-    elements: List[ReportElement] = Field(default_factory=list)
+    items: List[ReportItem] = Field(default_factory=list)
     # Potentially add layout, styling info here
 
 # Report Models
