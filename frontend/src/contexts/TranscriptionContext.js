@@ -50,6 +50,7 @@ const defaultMarkerTypes = [
   { id: 'marker-question', label: 'Question', type: 'question', color: 'primary' },
   { id: 'marker-action', label: 'Action Item', type: 'action_item', color: 'primary' },
   { id: 'marker-risk', label: 'Key Risk', type: 'key_risk', color: 'secondary' },
+  { id: 'marker-strike', label: 'Strike from Record', type: 'strike_from_record', color: 'secondary' },
 ];
 
 // Function to generate a unique ID (simple version)
