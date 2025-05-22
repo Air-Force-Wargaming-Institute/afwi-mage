@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status, Request, Body, Depends, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Request, Body, Depends, Query, Form
 from fastapi.responses import FileResponse # Import FileResponse
 import whisperx
 import os
@@ -28,6 +28,7 @@ from schemas import (
      AddMarkerRequest, AddMarkerResponse, # Import marker schemas
      GetTranscriptionResponse, # Import new response model
      UpdateSessionRequest, # Ensure this is the one from schemas.py
+     UploadAudioResponse,
      UpdateSessionResponse as SchemaUpdateSessionResponse # Alias the one from schemas.py if needed
 )
 # Import the centralized model loader and getter using relative path
@@ -921,11 +922,364 @@ async def transcribe_audio_diarized_util(
 
     logger.info(f"Received file for utility transcription: {file.filename}, content type: {file.content_type}")
 
-    if not file.content_type.startswith("audio/"):
-        logger.warning(f"Received non-audio file: {file.filename} ({file.content_type})")
+    # Define allowed extensions
+    allowed_extensions = [".m4a", ".mp3", ".webm", ".mp4", ".mpga", ".wav", ".mpeg"]
+    file_extension = pathlib.Path(file.filename).suffix.lower() if file.filename else ""
+
+    # Validate file type based on content_type or extension
+    is_audio_content_type = file.content_type.startswith("audio/")
+    is_allowed_extension = file_extension in allowed_extensions
+
+    if not (is_audio_content_type or is_allowed_extension):
+        logger.warning(f"Received file with unsupported type: {file.filename} (Content-Type: {file.content_type}, Extension: {file_extension})")
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file type. Please upload an audio file."
+            detail=f"Unsupported file type. Please upload an audio file. Allowed extensions: {', '.join(allowed_extensions)}"
+        )
+
+    temp_audio_path = None
+    try:
+        start_time = time.time()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_audio_file:
+            content = await file.read()
+            temp_audio_file.write(content)
+            temp_audio_path = temp_audio_file.name
+        logger.info(f"Temporary audio file created at: {temp_audio_path}")
+
+        # 1. Load Audio
+        logger.info("Loading audio...")
+        audio = whisperx.load_audio(temp_audio_path)
+        logger.info("Audio loaded.")
+
+        # Get models for the detected or default language (defaulting to 'en')
+        # Note: Transcription itself detects language, but alignment needs it upfront.
+        # For simplicity, we'll transcribe first, then get the specific align model.
+        
+        # 2. Transcribe
+        logger.info(f"Starting transcription (batch: {BATCH_SIZE})...")
+        whisper_model, _, _ = get_models() # Diarize model is None
+        if not whisper_model:
+             raise RuntimeError("Whisper model is not loaded.")
+             
+        result = whisper_model.transcribe(audio, batch_size=BATCH_SIZE)
+        transcribe_time = time.time()
+        detected_language = result.get("language", "en")
+        logger.info(f"Transcription finished in {transcribe_time - start_time:.2f}s. Detected language: {detected_language}")
+
+        # 3. Align Whisper output
+        logger.info(f"Loading/getting alignment model for '{detected_language}' and aligning...")
+        _ , _, align_model_tuple = get_models(language_code=detected_language) # Diarize model is None
+        if align_model_tuple is None:
+             logger.error(f"Alignment model for language '{detected_language}' could not be loaded.")
+             raise HTTPException(
+                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail=f"Failed to load alignment model for detected language: {detected_language}"
+             )
+        model_a, metadata = align_model_tuple
+        
+        # Align results
+        result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
+        align_time = time.time()
+        logger.info(f"Alignment finished in {align_time - transcribe_time:.2f}s.")
+
+        # Diarization SKIPPED
+        logger.info("Diarization and speaker assignment (SKIPPED)...")
+        # diarize_model will be None from get_models()
+        # if not diarize_model:
+             # logger.warning("Diarization model not available. Skipping diarization.")
+        # else:
+            # diarize_segments = diarize_model(audio)
+            # result = whisperx.assign_word_speakers(diarize_segments, result)
+            # diarize_assign_time = time.time()
+            # logger.info(f"Diarization and speaker assignment finished in {diarize_assign_time - align_time:.2f}s.")
+        logger.warning("Diarization and speaker assignment have been SKIPPED.")
+
+        output_segments = []
+        segments_to_process = result.get("segments", []) if isinstance(result, dict) else result if isinstance(result, list) else []
+        for segment in segments_to_process:
+            output_segments.append({
+                "start": segment.get("start"),
+                "end": segment.get("end"),
+                "text": segment.get("text", "").strip(),
+                "speaker": "UNKNOWN" # Speaker is UNKNOWN as diarization is skipped
+            })
+
+        total_time = time.time() - start_time
+        logger.info(f"Processing completed for {file.filename} in {total_time:.2f}s (Diarization SKIPPED).")
+
+    except Exception as e:
+        logger.error(f"Error during processing for {file.filename}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Processing failed: {str(e)}"
+        )
+    finally:
+        # Clean up the temporary file
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+            logger.info(f"Temporary file {temp_audio_path} deleted.")
+        await file.close()
+
+    return {
+        "filename": file.filename,
+        "language": result.get("language"),
+        "segments": output_segments
+        } 
+
+@router.get("/api/transcription/sessions/{session_id}/audio",
+            summary="Get the audio file for a session",
+            response_class=FileResponse # Use FileResponse directly
+           )
+async def get_session_audio(
+    session_id: UUID,
+    request: Request, # Can be used for auth checks if needed
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Retrieves the concatenated audio file for a completed session."""
+    logger.info(f"Request received for audio for session: {session_id}")
+    session = await session_manager.get_session(db, str(session_id))
+
+    if not session:
+        logger.warning(f"Audio request failed: Session {session_id} not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+    if not session.audio_storage_path:
+        logger.warning(f"Audio request failed: No audio file path stored for session {session_id}.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found for this session.")
+
+    audio_path = pathlib.Path(session.audio_storage_path)
+    
+    if not audio_path.is_file():
+        logger.error(f"Audio request failed: Audio file not found at stored path: {audio_path}")
+        # Maybe update DB state here if file is missing?
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing or inaccessible.")
+        
+    # TODO: Add permission check - does the requesting user own this session?
+    # user_id_from_auth = request.state.user_id # Assuming auth middleware sets this
+    # if session.user_id != user_id_from_auth:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+
+    # Determine filename for download
+    # Use session name if available, fallback to session_id
+    filename_base = session.session_name or str(session_id)
+    download_filename = f"{filename_base}{audio_path.suffix}"
+    
+    # Determine media type based on suffix (simple check)
+    media_type = "audio/webm" if audio_path.suffix.lower() == ".webm" else "application/octet-stream"
+    
+    logger.info(f"Serving audio file: {audio_path} as {download_filename} (type: {media_type})")
+    return FileResponse(path=audio_path, media_type=media_type, filename=download_filename) 
+
+@router.post("/api/transcription/upload-audio",
+            response_model=UploadAudioResponse,
+            summary="Upload audio, provide metadata, create session, transcribe, and store.")
+async def upload_audio_with_metadata(
+    request: Request,
+    file: UploadFile = File(...),
+    session_name: str = Form(...),
+    security_classification: str = Form(...),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    if not are_models_loaded():
+        logger.error("Models were not loaded successfully during application startup.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Transcription models are not available. Check service logs."
+        )
+
+    # Define allowed extensions
+    allowed_extensions = [".m4a", ".mp3", ".webm", ".mp4", ".mpga", ".wav", ".mpeg"]
+    file_extension = pathlib.Path(file.filename).suffix.lower() if file.filename else ""
+
+    # Validate file type based on content_type or extension
+    is_audio_content_type = file.content_type.startswith("audio/")
+    is_allowed_extension = file_extension in allowed_extensions
+
+    if not (is_audio_content_type or is_allowed_extension):
+        logger.warning(f"Received file with unsupported type: {file.filename} (Content-Type: {file.content_type}, Extension: {file_extension})")
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type. Please upload an audio file. Allowed extensions: {', '.join(allowed_extensions)}"
+        )
+    
+    # Assuming SECURITY_CLASSIFICATIONS is a list/constant available for validation
+    # For example: from frontend_constants import SECURITY_CLASSIFICATIONS 
+    # Or define it in backend config if it's shared knowledge
+    # For this snippet, direct string comparison or a helper function would be used.
+    # Placeholder for actual validation logic of security_classification:
+    # if not security_classification or security_classification == "SELECT A SECURITY CLASSIFICATION" : 
+    if not security_classification or security_classification.startswith("SELECT A"): # More robust placeholder check
+        logger.warning(f"Invalid security classification provided: {security_classification}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid security classification is required.")
+
+    # Prepare data for session creation
+    event_meta = EventMetadataSchema(classification=security_classification) # Assuming classification is the main field to set here
+    session_start_data = StartSessionRequest(
+        session_name=session_name, # User provided session name
+        event_metadata=event_meta,
+        participants=[] # No participants by default for uploaded files
+    )
+
+    session_id_str = await session_manager.create_session(db, session_start_data, current_user_id)
+    if not session_id_str:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create session for uploaded file.")
+    
+    logger.info(f"Created session {session_id_str} for uploaded file (original: {file.filename}, session name: {session_name})")
+    session_id_uuid = UUID(session_id_str)
+
+    session_artifact_path = pathlib.Path(ARTIFACT_STORAGE_BASE_PATH) / session_id_str
+    session_artifact_path.mkdir(parents=True, exist_ok=True)
+    
+    file_suffix = pathlib.Path(file.filename).suffix if file.filename else ".audio"
+    saved_audio_filename = f"uploaded_audio_original{file_suffix}" # More specific name
+    saved_audio_full_path = session_artifact_path / saved_audio_filename
+    temp_audio_path_for_processing = None
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as temp_audio_file_for_upload:
+            content = await file.read()
+            temp_audio_file_for_upload.write(content)
+            temp_audio_path_for_processing = temp_audio_file_for_upload.name
+        
+        shutil.copy2(temp_audio_path_for_processing, saved_audio_full_path)
+        logger.info(f"Uploaded audio file saved to: {saved_audio_full_path}")
+
+        # Update session with audio storage path immediately
+        current_session = await session_manager.get_session(db, session_id_str)
+        if not current_session: # Should not happen if create_session succeeded
+            logger.error(f"Session {session_id_str} not found after creation for audio path update.")
+            # Consider how to handle this error, maybe cleanup session? For now, raise.
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Session consistency error after creation.")
+
+        current_session.audio_storage_path = str(saved_audio_full_path.resolve())
+        current_session.last_update = datetime.utcnow()
+        await db.commit()
+        logger.info(f"Session {session_id_str} DB updated with audio path: {saved_audio_full_path}")
+        
+        # Perform transcription and diarization on the saved audio file
+        logger.info(f"Starting transcription for uploaded audio: {saved_audio_full_path}. num_participants will be dynamic (None).")
+        
+        language_for_processing = current_session.detected_language or "en" # Get language from session or default
+
+        final_segments = await process_entire_audio_for_final_transcript(
+            str(saved_audio_full_path.resolve()),
+            language_code=language_for_processing,
+            num_participants=None # CRITICAL: Ensures PyAnnote determines speaker count
+        )
+
+        if not final_segments:
+            logger.warning(f"Transcription of {saved_audio_full_path} resulted in no segments.")
+            
+        full_transcript_text = generate_transcript_with_speaker_paragraphs(final_segments, []) # No live markers
+        
+        # Save the .txt transcript using the session_name for the file
+        transcript_txt_filename = f"{session_name}_transcript.txt" # Use the user-provided session name
+        transcript_txt_full_path = session_artifact_path / transcript_txt_filename
+        with open(transcript_txt_full_path, 'w', encoding='utf-8') as f:
+            f.write(full_transcript_text)
+        logger.info(f"Text transcript saved to: {transcript_txt_full_path}")
+
+        # Update the session as completed with all details
+        update_success = await session_manager.update_session_completion(
+            db,
+            session_id_str,
+            audio_path=str(saved_audio_full_path.resolve()),
+            transcript_path=str(transcript_txt_full_path.resolve()),
+            transcript_text=full_transcript_text,
+            final_segments=final_segments
+            # detected_language will be set by process_entire_audio if it changes
+        )
+        
+        # Also ensure status is 'completed' explicitly and set completion time
+        if update_success:
+            # Re-fetch session to make sure we're updating the latest version
+            session_after_processing = await session_manager.get_session(db, session_id_str)
+            if session_after_processing: # Check if session still exists
+                session_after_processing.status = "completed"
+                session_after_processing.completion_time = datetime.utcnow()
+                session_after_processing.last_update = datetime.utcnow() # Ensure last_update is current
+                await db.commit()
+                logger.info(f"Session {session_id_str} finalized status as 'completed' and set completion time.")
+            else:
+                # This case should ideally not be reached if update_success was true and session existed.
+                logger.error(f"Session {session_id_str} not found after update_session_completion returned success.")
+                update_success = False # Mark as failed for response
+        else: # update_session_completion failed
+            logger.error(f"Failed to update session {session_id_str} completion details in DB after processing uploaded file.")
+            
+        details_url_str = str(request.url_for("get_session_details", session_id=session_id_uuid))
+
+        return UploadAudioResponse(
+            session_id=session_id_uuid,
+            session_name=session_name, # Return the user-provided session name
+            status="completed" if update_success else "processing_error", # More specific status
+            message="Audio file processed successfully." if update_success else "Error during final database update for session.",
+            details_url=details_url_str if update_success else None
+        )
+
+    except HTTPException: # Re-raise HTTP exceptions from our own code or FastAPI
+        if 'session_id_str' in locals() and session_id_str: # Check if session_id was created
+             await session_manager.update_session_status(db, session_id_str, "error_processing")
+        raise
+    except Exception as e:
+        logger.error(f"General error processing uploaded audio file {file.filename} (session: {session_id_str if 'session_id_str' in locals() else 'N/A'}): {e}", exc_info=True)
+        if 'session_id_str' in locals() and session_id_str: # Check if session_id was created
+             await session_manager.update_session_status(db, session_id_str, "error_processing")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process uploaded audio file: {str(e)}"
+        )
+    finally:
+        if temp_audio_path_for_processing and os.path.exists(temp_audio_path_for_processing):
+            os.remove(temp_audio_path_for_processing)
+            logger.debug(f"Temporary processing file {temp_audio_path_for_processing} deleted.")
+        if file: # Ensure file is closed
+            await file.close()
+
+# (Other existing routes)
+# ...
+# --- END EDIT ---
+
+# --- Existing File Upload Endpoint (Renamed for Clarity) ---
+
+@router.post("/api/transcription/transcribe-file", 
+             summary="(Util) Transcribe a single audio file (NO DIARIZATION)",
+             tags=["Utility"]) 
+async def transcribe_audio_diarized_util(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db_session) # Inject DB session even if not directly used
+):
+    """
+    Utility endpoint: Receives a single audio file, performs transcription 
+    and speaker diarization, and returns segments with speaker labels.
+    This is NOT used for the live transcription feature.
+    """
+    # Check if models are loaded using the centralized function
+    if not are_models_loaded():
+        # Models should have been loaded at startup by the lifespan manager.
+        # If not, something went wrong during startup.
+        logger.error("Models were not loaded successfully during application startup.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Transcription/Alignment models are not available. Check service logs."
+        )
+
+    logger.info(f"Received file for utility transcription: {file.filename}, content type: {file.content_type}")
+
+    # Define allowed extensions
+    allowed_extensions = [".m4a", ".mp3", ".webm", ".mp4", ".mpga", ".wav", ".mpeg"]
+    file_extension = pathlib.Path(file.filename).suffix.lower() if file.filename else ""
+
+    # Validate file type based on content_type or extension
+    is_audio_content_type = file.content_type.startswith("audio/")
+    is_allowed_extension = file_extension in allowed_extensions
+
+    if not (is_audio_content_type or is_allowed_extension):
+        logger.warning(f"Received file with unsupported type: {file.filename} (Content-Type: {file.content_type}, Extension: {file_extension})")
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type. Please upload an audio file. Allowed extensions: {', '.join(allowed_extensions)}"
         )
 
     temp_audio_path = None

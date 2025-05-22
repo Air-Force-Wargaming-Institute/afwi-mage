@@ -102,3 +102,11 @@ class UpdateSessionResponse(BaseModel):
      session_id: UUID # Changed from str to UUID to match other responses
      status: str = "updated"
      updated_at: datetime # Changed from completion_timestamp to updated_at for clarity 
+
+# --- Upload Audio Feature ---
+class UploadAudioResponse(BaseModel):
+    session_id: UUID
+    session_name: str
+    status: str # e.g., "processing", "completed", "error"
+    message: str
+    details_url: Optional[str] = None 

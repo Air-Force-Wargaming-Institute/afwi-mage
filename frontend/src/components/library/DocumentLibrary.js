@@ -31,7 +31,13 @@ import {
   CircularProgress,
   Box,
   Snackbar,
-  useTheme
+  useTheme,
+  FormControl,
+  InputLabel,
+  FormHelperText,
+  RadioGroup,
+  FormControlLabel,
+  Radio
 } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import {
@@ -52,6 +58,7 @@ import { AuthContext } from '../../contexts/AuthContext';
 import { useDocumentLibrary, ACTIONS } from '../../contexts/DocumentLibraryContext';
 import { StyledContainer, GradientBorderPaper, useContainerStyles, GradientText } from '../../styles/StyledComponents';
 import { DeleteButton, DownloadButton, EditButton, ViewButton } from '../../styles/ActionButtons';
+import { useTranscription, ACTIONS as TRANSCRIPTION_ACTIONS } from '../../contexts/TranscriptionContext';
 
 const SECURITY_CLASSIFICATIONS = [
   "SELECT A CLASSIFICATION",
@@ -93,6 +100,8 @@ const SECURITY_CLASSIFICATIONS = [
   "NATO Secret//REL TO USA, UK",
   "NATO Secret//REL TO USA, FVEY"  
 ];
+
+const BASE_CLASSIFICATIONS = ["SELECT BASE CLASSIFICATION", "Unclassified", "Secret", "Top Secret"];
 
 const getFileNameWithoutExtension = (fileName) => {
   if (!fileName) return '';
@@ -308,34 +317,35 @@ class ErrorBoundary extends React.Component {
 }
 
 function DocumentLibrary() {
-  const { state, dispatch } = useDocumentLibrary();
+  const { state: docLibState, dispatch: docLibDispatch } = useDocumentLibrary();
   const { user, token } = useContext(AuthContext);
+  const { dispatch: dispatchTranscription } = useTranscription();
   const classes = useStyles();
   const theme = useTheme();
   const containerClasses = useContainerStyles();
   const [audioDragOver, setAudioDragOver] = useState(false);
 
-  const draggedItem = state?.draggedItem;
-  const dropTarget = state?.dropTarget;
+  const draggedItem = docLibState?.draggedItem;
+  const dropTarget = docLibState?.dropTarget;
 
   const tableContainerRef = useRef(null);
   
-  const documents = state?.documents || [];
-  const selectedDocs = state?.selectedDocs || [];
-  const previewFile = state?.previewFile;
-  const dragOver = state?.dragOver;
-  const isLoading = state?.isLoading;
-  const isRefreshing = state?.isRefreshing;
-  const operationProgress = state?.operationProgress;
-  const error = state?.error;
-  const openConfirmDialog = state?.openConfirmDialog;
-  const currentPath = state?.currentPath;
-  const newFolderDialogOpen = state?.newFolderDialogOpen;
-  const newFolderName = state?.newFolderName;
-  const breadcrumbs = state?.breadcrumbs;
-  const renameDialogOpen = state?.renameDialogOpen;
-  const itemToRename = state?.itemToRename;
-  const newName = state?.newName;
+  const documents = docLibState?.documents || [];
+  const selectedDocs = docLibState?.selectedDocs || [];
+  const previewFile = docLibState?.previewFile;
+  const dragOver = docLibState?.dragOver;
+  const isLoading = docLibState?.isLoading;
+  const isRefreshing = docLibState?.isRefreshing;
+  const operationProgress = docLibState?.operationProgress;
+  const error = docLibState?.error;
+  const openConfirmDialog = docLibState?.openConfirmDialog;
+  const currentPath = docLibState?.currentPath;
+  const newFolderDialogOpen = docLibState?.newFolderDialogOpen;
+  const newFolderName = docLibState?.newFolderName;
+  const breadcrumbs = docLibState?.breadcrumbs;
+  const renameDialogOpen = docLibState?.renameDialogOpen;
+  const itemToRename = docLibState?.itemToRename;
+  const newName = docLibState?.newName;
 
   const lastDragProcessTimeRef = useRef(0);
   const currentDragHandlerRef = useRef(null);
@@ -343,13 +353,21 @@ function DocumentLibrary() {
 
   const cleanupDragOperationRef = useRef(null);
 
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [fileForUpload, setFileForUpload] = useState(null);
+  const [uploadSessionName, setUploadSessionName] = useState('');
+  const [uploadBaseClassification, setUploadBaseClassification] = useState(BASE_CLASSIFICATIONS[0]);
+  const [uploadCaveatType, setUploadCaveatType] = useState('none');
+  const [uploadCustomCaveat, setUploadCustomCaveat] = useState('');
+  const [uploadModalError, setUploadModalError] = useState('');
+
   const fetchDocuments = useCallback(async (path) => {
-    if (state?.isRefreshing) {
+    if (docLibState?.isRefreshing) {
       return;
     }
 
     try {
-      dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: true });
+      docLibDispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: true });
       const response = await fetch(
         getGatewayUrl(`/api/upload/files/?folder=${encodeURIComponent(path || '')}`),
         {
@@ -384,46 +402,45 @@ function DocumentLibrary() {
         return a.name.localeCompare(b.name);
       });
       
-      dispatch({ 
+      docLibDispatch({ 
         type: ACTIONS.SET_DOCUMENTS, 
         payload: sortedDocuments
       });
     } catch (error) {
       console.error('Error fetching documents:', error);
-      dispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to fetch documents: ' + error.message });
-      dispatch({ type: ACTIONS.SET_DOCUMENTS, payload: [] });
+      docLibDispatch({ type: ACTIONS.SET_ERROR, payload: 'Failed to fetch documents: ' + error.message });
+      docLibDispatch({ type: ACTIONS.SET_DOCUMENTS, payload: [] });
     } finally {
-      dispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: false });
+      docLibDispatch({ type: ACTIONS.SET_IS_REFRESHING, payload: false });
     }
-  }, [state?.isRefreshing, dispatch]);
+  }, [docLibState?.isRefreshing, docLibDispatch]);
 
   useEffect(() => {
-    if (state?.currentPath !== undefined) {
-      fetchDocuments(state.currentPath);
+    if (docLibState?.currentPath !== undefined) {
+      fetchDocuments(docLibState.currentPath);
     }
-  }, [state?.currentPath]);
+  }, [docLibState?.currentPath]);
 
-  const setSelectedDocs = (docs) => dispatch({ type: ACTIONS.SET_SELECTED_DOCS, payload: docs });
-  const setPreviewFile = (file) => dispatch({ type: ACTIONS.SET_PREVIEW_FILE, payload: file });
-  const setDragOver = (isDragOver) => dispatch({ type: ACTIONS.SET_DRAG_OVER, payload: isDragOver });
-  const setIsLoading = (loading) => dispatch({ type: ACTIONS.SET_LOADING, payload: loading });
-  const setError = (err) => dispatch({ type: ACTIONS.SET_ERROR, payload: err });
-  const setOpenConfirmDialog = (open) => dispatch({ type: ACTIONS.SET_OPEN_CONFIRM_DIALOG, payload: open });
-  const setCurrentPath = (path) => dispatch({ type: ACTIONS.SET_CURRENT_PATH, payload: path });
-  const setNewFolderDialogOpen = (open) => dispatch({ type: ACTIONS.SET_CREATE_FOLDER_DIALOG_OPEN, payload: open });
-  const setNewFolderName = (name) => dispatch({ type: ACTIONS.SET_NEW_FOLDER_NAME, payload: name });
-  const setBreadcrumbs = (crumbs) => dispatch({ type: ACTIONS.SET_BREADCRUMBS, payload: crumbs });
-  const setRenameDialogOpen = (open) => dispatch({ type: ACTIONS.SET_RENAME_DIALOG_OPEN, payload: open });
-  const setItemToRename = (item) => dispatch({ type: ACTIONS.SET_ITEM_TO_RENAME, payload: item });
-  const setNewName = (name) => dispatch({ type: ACTIONS.SET_NEW_NAME, payload: name });
-  const setDraggedItem = (item) => dispatch({ type: ACTIONS.SET_DRAGGED_ITEM, payload: item });
-  const setDropTarget = (target) => dispatch({ type: ACTIONS.SET_DROP_TARGET, payload: target });
+  const setSelectedDocs = (docs) => docLibDispatch({ type: ACTIONS.SET_SELECTED_DOCS, payload: docs });
+  const setPreviewFile = (file) => docLibDispatch({ type: ACTIONS.SET_PREVIEW_FILE, payload: file });
+  const setDragOver = (isDragOver) => docLibDispatch({ type: ACTIONS.SET_DRAG_OVER, payload: isDragOver });
+  const setIsLoading = (loading) => docLibDispatch({ type: ACTIONS.SET_LOADING, payload: loading });
+  const setError = (err) => docLibDispatch({ type: ACTIONS.SET_ERROR, payload: err });
+  const setOpenConfirmDialog = (open) => docLibDispatch({ type: ACTIONS.SET_OPEN_CONFIRM_DIALOG, payload: open });
+  const setCurrentPath = (path) => docLibDispatch({ type: ACTIONS.SET_CURRENT_PATH, payload: path });
+  const setNewFolderDialogOpen = (open) => docLibDispatch({ type: ACTIONS.SET_CREATE_FOLDER_DIALOG_OPEN, payload: open });
+  const setNewFolderName = (name) => docLibDispatch({ type: ACTIONS.SET_NEW_FOLDER_NAME, payload: name });
+  const setBreadcrumbs = (crumbs) => docLibDispatch({ type: ACTIONS.SET_BREADCRUMBS, payload: crumbs });
+  const setRenameDialogOpen = (open) => docLibDispatch({ type: ACTIONS.SET_RENAME_DIALOG_OPEN, payload: open });
+  const setItemToRename = (item) => docLibDispatch({ type: ACTIONS.SET_ITEM_TO_RENAME, payload: item });
+  const setNewName = (name) => docLibDispatch({ type: ACTIONS.SET_NEW_NAME, payload: name });
+  const setDraggedItem = (item) => docLibDispatch({ type: ACTIONS.SET_DRAGGED_ITEM, payload: item });
+  const setDropTarget = (target) => docLibDispatch({ type: ACTIONS.SET_DROP_TARGET, payload: target });
   const setOperationProgress = (progress) => {
     const formattedProgress = typeof progress === 'string' 
       ? { status: progress, processed_items: undefined, total_items: undefined }
       : progress;
-      
-    dispatch({ type: ACTIONS.SET_OPERATION_PROGRESS, payload: formattedProgress });
+    docLibDispatch({ type: ACTIONS.SET_OPERATION_PROGRESS, payload: formattedProgress });
   };
 
   const handleFileUploadDragOver = (e) => {
@@ -862,7 +879,7 @@ function DocumentLibrary() {
     document.body.addEventListener('drop', cleanupDragHandler, { once: true });
 
     setTimeout(() => {
-      if (state?.draggedItem || draggedItemRef.current) {
+      if (docLibState?.draggedItem || draggedItemRef.current) {
         if (cleanupDragOperationRef.current) {
             cleanupDragOperationRef.current();
         }
@@ -1083,6 +1100,121 @@ function DocumentLibrary() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const openUploadModalWithFile = (selectedFile) => {
+    if (selectedFile) {
+        setFileForUpload(selectedFile);
+        setUploadSessionName(getFileNameWithoutExtension(selectedFile.name));
+        setUploadBaseClassification(BASE_CLASSIFICATIONS[0]);
+        setUploadCaveatType('none');
+        setUploadCustomCaveat('');
+        setUploadModalError('');
+        setIsUploadModalOpen(true);
+    }
+  };
+
+  const handleAudioFileSelectForModal = (event) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+        openUploadModalWithFile(files[0]);
+    }
+    if (event.target) {
+        event.target.value = null;
+    }
+  };
+
+  const handleAudioFileDropForModal = (event) => {
+    event.preventDefault();
+    setAudioDragOver(false);
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+        openUploadModalWithFile(files[0]);
+    }
+  };
+
+  const handleCloseUploadModal = () => {
+    setIsUploadModalOpen(false);
+    setFileForUpload(null);
+    setUploadModalError('');
+    setUploadSessionName('');
+    setUploadBaseClassification(BASE_CLASSIFICATIONS[0]);
+    setUploadCaveatType('none');
+    setUploadCustomCaveat('');
+  };
+
+  const handleConfirmAudioUpload = async () => {
+    setUploadModalError('');
+
+    if (!fileForUpload) {
+        setUploadModalError('No file has been selected for upload.');
+        return;
+    }
+    if (!uploadSessionName.trim()) {
+        setUploadModalError('Session name is required.');
+        return;
+    }
+    if (!uploadBaseClassification || uploadBaseClassification === BASE_CLASSIFICATIONS[0]) {
+        setUploadModalError('A base security classification must be selected.');
+        return;
+    }
+    if (uploadCaveatType === 'custom' && !uploadCustomCaveat.trim()) {
+        setUploadModalError('Caveat text is required when "Caveats" are selected.');
+        return;
+    }
+
+    let finalUploadClassification = uploadBaseClassification;
+    if (uploadCaveatType === 'custom' && uploadCustomCaveat.trim()) {
+        finalUploadClassification += `//${uploadCustomCaveat.trim().toUpperCase()}`;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileForUpload);
+    formData.append('session_name', uploadSessionName);
+    formData.append('security_classification', finalUploadClassification);
+
+    setOperationProgress({ status: `Uploading ${fileForUpload.name}...` });
+    setIsLoading(true);
+    setIsUploadModalOpen(false); 
+
+    try {
+        const response = await fetch(getGatewayUrl('/api/transcription/upload-audio'), {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData,
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || `Upload failed with status: ${response.status}`);
+        }
+
+        setOperationProgress({ status: result.message || `Successfully processed ${result.session_name}.` });
+        dispatchTranscription({ type: TRANSCRIPTION_ACTIONS.REFRESH_SESSION_LIST });
+
+    } catch (error) {
+        console.error('Error during audio upload and transcription:', error);
+        setError('Upload failed: ' + error.message);
+        setOperationProgress({ status: `Failed to process ${fileForUpload?.name || 'file'}.`, error: true });
+    } finally {
+        setIsLoading(false);
+        setFileForUpload(null); 
+        setUploadSessionName('');
+        setUploadBaseClassification(BASE_CLASSIFICATIONS[0]);
+        setUploadCaveatType('none');
+        setUploadCustomCaveat('');
+    }
+  };
+
+  const isUploadDisabled = () => {
+    if (!fileForUpload || !uploadSessionName.trim() || !uploadBaseClassification || uploadBaseClassification === BASE_CLASSIFICATIONS[0]) {
+        return true;
+    }
+    if (uploadCaveatType === 'custom' && !uploadCustomCaveat.trim()) {
+        return true;
+    }
+    return false;
+  };
+
   return (
     <ErrorBoundary>
       <StyledContainer maxWidth={false} className={classes.root}>
@@ -1183,31 +1315,31 @@ function DocumentLibrary() {
               <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 2 }}></Box>
               
               <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                Upload audio files for transcription. Supported formats: m4a, mp3, webm, mp4, mpga, wav, mpeg.
+                Upload a single audio file for transcription. Supported formats: m4a, mp3, webm, mp4, mpga, wav, mpeg.
               </Typography>
               <Typography variant="body2" color="textSecondary" sx={{ mt: 1.5 }}>
-                When processing is complete, a PDF transcription of your audio file will appear in the document library.
+                A modal will prompt for session details. Processed audio will appear as a new transcription session.
               </Typography>
-              <Box className={`${containerClasses.dropzone} ${audioDragOver ? 'active' : ''}`}
-                   onDragOver={handleAudioDragOver}
-                   onDragLeave={handleAudioDragLeave}
-                   onDrop={handleAudioDrop}
+              <Box 
+                   className={`${containerClasses.dropzone} ${audioDragOver ? 'active' : ''}`}
+                   onDragOver={(e) => { e.preventDefault(); setAudioDragOver(true); }}
+                   onDragLeave={(e) => { e.preventDefault(); setAudioDragOver(false); }}
+                   onDrop={handleAudioFileDropForModal}
                    sx={{ my: 2.5, p: 2.5 }}>
                 <input
                   type="file"
-                  id="audio-upload"
-                  multiple
+                  id="audio-upload-input-for-modal"
                   accept=".m4a,.mp3,.webm,.mp4,.mpga,.wav,.mpeg"
                   style={{ display: 'none' }}
-                  onChange={handleAudioSelect}
+                  onChange={handleAudioFileSelectForModal}
                 />
-                <label htmlFor="audio-upload">
+                <label htmlFor="audio-upload-input-for-modal">
                   <Button component="span" variant="contained" color="primary" startIcon={<UploadIcon />}>
-                    Upload Audio
+                    Select Audio File
                   </Button>
                 </label>
                 <Typography variant="body2" sx={{ mt: 1.5 }}>
-                  or drag and drop m4a, mp3, webm, mp4, mpga, wav, mpeg audio files here
+                  or drag and drop an audio file here
                 </Typography>
               </Box>
             </GradientBorderPaper>
@@ -1604,6 +1736,114 @@ function DocumentLibrary() {
            <Button onClick={handleRename} color="primary" variant="contained">Rename</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={isUploadModalOpen} onClose={handleCloseUploadModal} aria-labelledby="upload-audio-dialog-title" maxWidth="sm" fullWidth>
+        <DialogTitle id="upload-audio-dialog-title">Audio Upload & Session Details</DialogTitle>
+        <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+                {fileForUpload ? `File to upload: ${fileForUpload.name}` : "No file selected."}
+            </DialogContentText>
+            <TextField
+                autoFocus
+                margin="dense"
+                id="upload-session-name-input"
+                label="Session Name"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={uploadSessionName}
+                onChange={(e) => setUploadSessionName(e.target.value)}
+                sx={{ mb: 2 }}
+                required
+            />
+            
+            <FormControl fullWidth variant="outlined" required margin="dense" error={!!uploadModalError && (!uploadBaseClassification || uploadBaseClassification === BASE_CLASSIFICATIONS[0])}>
+                <InputLabel id="upload-base-classification-label">Base Security Classification</InputLabel>
+                <Select
+                    labelId="upload-base-classification-label"
+                    id="upload-base-classification-select"
+                    value={uploadBaseClassification}
+                    onChange={(e) => {
+                        setUploadBaseClassification(e.target.value);
+                        if (e.target.value === BASE_CLASSIFICATIONS[0]) {
+                            setUploadCaveatType('none');
+                            setUploadCustomCaveat('');
+                        }
+                    }}
+                    label="Base Security Classification"
+                >
+                    {BASE_CLASSIFICATIONS.map((classificationName, index) => (
+                        <MenuItem 
+                            key={classificationName} 
+                            value={classificationName} 
+                            disabled={index === 0} 
+                        >
+                            {index === 0 ? <em>{classificationName}</em> : classificationName}
+                        </MenuItem>
+                    ))}
+                </Select>
+                {!!uploadModalError && (!uploadBaseClassification || uploadBaseClassification === BASE_CLASSIFICATIONS[0]) && (
+                    <FormHelperText>{uploadModalError.includes("base security classification") ? uploadModalError : ""}</FormHelperText>
+                )}
+            </FormControl>
+
+            {uploadBaseClassification && uploadBaseClassification !== BASE_CLASSIFICATIONS[0] && (
+                <FormControl component="fieldset" margin="dense" fullWidth>
+                    <RadioGroup 
+                        row 
+                        aria-label="caveats" 
+                        name="caveat-selection" 
+                        value={uploadCaveatType} 
+                        onChange={(e) => {
+                            setUploadCaveatType(e.target.value);
+                            if (e.target.value === 'none') {
+                                setUploadCustomCaveat('');
+                            }
+                        }}
+                    >
+                        <FormControlLabel value="none" control={<Radio size="small" />} label="No Caveats" />
+                        <FormControlLabel value="custom" control={<Radio size="small" />} label="Caveats" />
+                    </RadioGroup>
+                </FormControl>
+            )}
+
+            {uploadBaseClassification && uploadBaseClassification !== BASE_CLASSIFICATIONS[0] && uploadCaveatType === 'custom' && (
+                <TextField
+                    margin="dense"
+                    id="upload-custom-caveat-input"
+                    label="Caveat Text (e.g., REL TO USA, FVEY)"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={uploadCustomCaveat}
+                    onChange={(e) => setUploadCustomCaveat(e.target.value)}
+                    required
+                    error={!!uploadModalError && uploadCaveatType === 'custom' && !uploadCustomCaveat.trim()}
+                    helperText={!!uploadModalError && uploadCaveatType === 'custom' && !uploadCustomCaveat.trim() && uploadModalError.includes("Caveat text") ? uploadModalError : "Separate multiple caveats with commas if necessary."}
+                />
+            )}
+            
+            {uploadModalError && 
+             !uploadModalError.includes("base security classification") && 
+             !(uploadCaveatType === 'custom' && !uploadCustomCaveat.trim() && uploadModalError.includes("Caveat text")) && (
+                 <Typography color="error" variant="caption" display="block" sx={{mt: 1}}>{uploadModalError}</Typography>
+            )}
+
+        </DialogContent>
+        <DialogActions sx={{p: '16px 24px'}}>
+            <Button onClick={handleCloseUploadModal} color="primary">
+                Cancel
+            </Button>
+            <Button 
+                onClick={handleConfirmAudioUpload} 
+                color="primary" 
+                variant="contained"
+                disabled={isUploadDisabled()}
+            >
+                Upload & Transcribe
+            </Button>
+        </DialogActions>
+    </Dialog>
 
       <Snackbar
         open={!!operationProgress}
